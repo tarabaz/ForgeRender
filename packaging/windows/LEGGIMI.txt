@@ -24,6 +24,9 @@ In caso di problemi allega forgerender.log alla segnalazione.
 
 Formati supportati: STEP/STP (assiemi con nomi, colori e trasformazioni, tramite
 forgerender-step.exe che deve restare nella stessa cartella), OBJ (con .mtl), STL.
+glTF/GLB (anche esportati da Blender) con camera, luci, materiali e texture.
+Blender .blend: richiede Blender installato (viene avviato in background per esportare glTF;
+le texture incorporate vengono salvate accanto al file .blend).
 SolidWorks SLDPRT/SLDASM: sperimentale, richiede SolidWorks installato su questo PC
 (il file viene esportato in STEP da SolidWorks tramite le sue API COM, in sola lettura).
 

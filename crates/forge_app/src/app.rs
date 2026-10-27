@@ -50,6 +50,7 @@ struct PendingGeometry {
 pub enum TaskMsg {
     Progress(String),
     Model(Result<forge_import::frmesh::FrMesh, String>),
+    Blend(Result<forge_import::blender::BlendExport, String>),
     Project(Result<Box<forge_project::LoadedProject>, String>),
 }
 
@@ -435,12 +436,14 @@ impl ForgeApp {
 
     pub fn import_dialog(&mut self) {
         let mut exts: Vec<&str> = forge_import::SUPPORTED_EXTENSIONS.to_vec();
+        exts.extend(forge_import::BLENDER_EXTENSIONS);
         if cfg!(windows) {
             exts.extend(forge_import::SOLIDWORKS_EXTENSIONS);
         }
         let files = rfd::FileDialog::new()
             .add_filter("Modelli 3D e CAD", &exts)
             .add_filter("STEP", &["step", "stp"])
+            .add_filter("Blender / glTF", &["blend", "glb", "gltf"])
             .add_filter("Mesh (OBJ, STL)", &["obj", "stl"])
             .pick_files()
             .unwrap_or_default();
@@ -475,7 +478,38 @@ impl ForgeApp {
         matches!(ext.as_str(), "step" | "stp" | "sldprt" | "sldasm")
     }
 
+    fn is_blend(path: &Path) -> bool {
+        path.extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| e.eq_ignore_ascii_case("blend"))
+    }
+
     pub fn import_path(&mut self, path: &Path) {
+        if Self::is_blend(path) {
+            // Esportazione glTF da Blender in background.
+            let (tx, rx) = std::sync::mpsc::channel();
+            let p = path.to_path_buf();
+            let _ = tx.send(TaskMsg::Progress("esportazione glTF da Blender…".into()));
+            std::thread::Builder::new()
+                .name("forge-blender".into())
+                .spawn(move || {
+                    let r = forge_import::blender::blend_to_glb(&p).map_err(|e| e.to_string());
+                    let _ = tx.send(TaskMsg::Blend(r));
+                })
+                .expect("thread Blender");
+            self.pending = Some(Pending {
+                label: format!(
+                    "Importazione di {}",
+                    path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default()
+                ),
+                message: "avvio di Blender…".into(),
+                path: path.to_path_buf(),
+                opts: self.import_opts.clone(),
+                rx,
+                started: std::time::Instant::now(),
+            });
+            return;
+        }
         if Self::is_cad_format(path) {
             // Conversione lenta (Open CASCADE / SolidWorks): in background.
             let (tx, rx) = std::sync::mpsc::channel();
@@ -541,7 +575,10 @@ impl ForgeApp {
     ) {
         match result {
             Ok(r) => {
-                if opts.drop_to_floor {
+                // Una scena con camera o luci proprie (glTF, Blender) resta com'è: spostarla
+                // la disallineerebbe rispetto a camera e luci.
+                let staged = r.camera.is_some() || !r.lights.is_empty();
+                if opts.drop_to_floor && !staged {
                     self.scene.drop_to_floor(r.root, 0.0);
                 }
                 let project_dir = self.meta.path.as_deref().and_then(Path::parent);
@@ -553,11 +590,23 @@ impl ForgeApp {
                 self.geometry_changed();
                 self.selection = BTreeSet::from([r.root]);
                 let b = self.scene.bounds_of(r.root);
-                if was_empty || self.scene.lights.is_empty() {
+                if !r.lights.is_empty() {
+                    if was_empty {
+                        self.scene.lights = r.lights.clone();
+                    } else {
+                        self.scene.lights.extend(r.lights.iter().cloned());
+                    }
+                } else if was_empty || self.scene.lights.is_empty() {
                     self.scene.lights = forge_scene::light::preset("studio", b.center(), b.radius()).unwrap_or_default();
                 }
-                self.orbit.frame(&b);
-                self.camera_changed();
+                if let Some(cam) = &r.camera {
+                    self.scene.camera = cam.clone();
+                    self.sync_orbit_from_camera();
+                    self.shading_changed();
+                } else {
+                    self.orbit.frame(&b);
+                    self.camera_changed();
+                }
                 self.tab = InspectorTab::Object;
                 let mut msg = format!(
                     "{}: {} componenti, {} triangoli ({} ms)",
@@ -599,7 +648,24 @@ impl ForgeApp {
                 });
                 self.finish_import(&p.path, p.opts.clone(), was_empty, r);
             }
-            TaskMsg::Model(Err(e)) => self.error = Some(format!("importazione di {} fallita:\n{e}", p.path.display())),
+            TaskMsg::Model(Err(e)) | TaskMsg::Blend(Err(e)) => {
+                self.error = Some(format!("importazione di {} fallita:\n{e}", p.path.display()))
+            }
+            TaskMsg::Blend(Ok(export)) => {
+                self.leave_demo_scene();
+                self.remove_previous_import(&p.path);
+                let was_empty = self.scene.nodes.is_empty();
+                let file_name = p.path.file_name().and_then(|n| n.to_str()).unwrap_or("scena.blend").to_string();
+                let dir = p.path.parent().unwrap_or(Path::new(".")).to_path_buf();
+                let r =
+                    forge_import::gltf_import::import_named(&mut self.scene, &export.glb, &file_name, &dir, &p.opts, export.area_lights)
+                        .map(|r| forge_import::ImportReport {
+                            duration: p.started.elapsed(),
+                            ..r
+                        });
+                let _ = std::fs::remove_file(&export.glb);
+                self.finish_import(&p.path, p.opts.clone(), was_empty, r);
+            }
             TaskMsg::Project(Ok(l)) => self.apply_loaded_project(*l),
             TaskMsg::Project(Err(e)) => self.error = Some(format!("apertura del progetto fallita: {e}")),
             TaskMsg::Progress(_) => {}

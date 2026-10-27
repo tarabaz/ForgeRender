@@ -54,6 +54,15 @@ NVML per utilizzo GPU/VRAM. CUDA/OptiX esclusi per ora.
 - ⏳ test con i file STEP/SLDASM reali dell'utente, instancing nel renderer (oggi le istanze
   condividono la mesh in memoria ma la BVH è appiattita).
 
+## Import da Blender e glTF ✅
+- `.glb`/`.gltf`: gerarchia, mesh, materiali Principled (colore, metallic, roughness, IOR,
+  trasmissione, emissione), texture incorporate o esterne, camera, luci `KHR_lights_punctual`
+  (unità fotometriche convertite)
+- `.blend`: Blender installato viene avviato in background per esportare glTF; le luci ad area
+  (non supportate da glTF) vengono esportate a parte. Verificato con Blender 4.0 su una scena
+  di prova generata da script. I nodi shader complessi di Cycles non hanno equivalente: vanno
+  "cotti" in texture (bake) in Blender.
+
 ## Fase 6 — Denoising e qualità ⏳
 Open Image Denoise con buffer albedo/normali, arresto a soglia di rumore, benchmark completi.
 

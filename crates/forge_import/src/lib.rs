@@ -6,7 +6,9 @@
 //! costruiti come `"<nome file>/<nome oggetto>"`, stabili tra reimportazioni
 //! dello stesso file.
 
+pub mod blender;
 pub mod frmesh;
+pub mod gltf_import;
 mod obj;
 pub mod step;
 mod stl;
@@ -123,6 +125,10 @@ pub struct ImportReport {
     pub materials_created: Vec<String>,
     pub warnings: Vec<String>,
     pub duration: std::time::Duration,
+    /// Camera definita nel file (glTF/Blender), già in spazio scena.
+    pub camera: Option<forge_scene::Camera>,
+    /// Luci definite nel file (glTF/Blender), già in spazio scena.
+    pub lights: Vec<forge_scene::Light>,
 }
 
 /// Oggetto letto da un file, prima dell'inserimento nella scena.
@@ -132,7 +138,9 @@ pub(crate) struct ImportedObject {
     pub material: Option<Material>,
 }
 
-pub const SUPPORTED_EXTENSIONS: [&str; 4] = ["obj", "stl", "step", "stp"];
+pub const SUPPORTED_EXTENSIONS: [&str; 6] = ["obj", "stl", "step", "stp", "gltf", "glb"];
+/// File di Blender: richiedono Blender installato (esportazione glTF in background).
+pub const BLENDER_EXTENSIONS: [&str; 1] = ["blend"];
 /// Formati SolidWorks: richiedono SolidWorks installato (esportazione STEP via COM).
 pub const SOLIDWORKS_EXTENSIONS: [&str; 2] = ["sldprt", "sldasm"];
 
@@ -150,6 +158,23 @@ pub fn import_file(scene: &mut Scene, path: &Path, opts: &ImportOptions) -> Resu
             return Ok(ImportReport {
                 duration: t0.elapsed(),
                 ..report
+            });
+        }
+        "gltf" | "glb" => {
+            let r = gltf_import::import(scene, path, opts)?;
+            return Ok(ImportReport {
+                duration: t0.elapsed(),
+                ..r
+            });
+        }
+        "blend" => {
+            let glb = blender::blend_to_glb(path)?;
+            let dir = path.parent().unwrap_or(Path::new(".")).to_path_buf();
+            let r = gltf_import::import_named(scene, &glb.glb, &file_name, &dir, opts, glb.area_lights);
+            let _ = std::fs::remove_file(&glb.glb);
+            return Ok(ImportReport {
+                duration: t0.elapsed(),
+                ..r?
             });
         }
         "ply" => return Err(ImportError::NeedsConverter(ext)),
@@ -247,6 +272,8 @@ pub(crate) fn insert_objects(
         materials_created,
         warnings,
         duration: Default::default(),
+        camera: None,
+        lights: Vec::new(),
     })
 }
 

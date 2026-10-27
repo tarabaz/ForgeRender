@@ -280,6 +280,8 @@ pub fn insert(scene: &mut Scene, file_name: &str, model: FrMesh, opts: &ImportOp
         materials_created,
         warnings,
         duration: t0.elapsed(),
+        camera: None,
+        lights: Vec::new(),
     })
 }
 

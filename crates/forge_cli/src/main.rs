@@ -69,7 +69,7 @@ fn print_help() {
          Comandi:\n  \
          info                       informazioni hardware rilevate\n  \
          render [opzioni]           rendering headless verso PNG\n    \
-             --project F.frproject | --mesh F.obj/.stl | --test-scene (default)\n    \
+             --project F.frproject | --mesh F.obj/.stl/.step/.glb/.blend | --test-scene (default)\n    \
              --out F.png  --spp N  --width W  --height H  --threads T  --bounces B\n    \
              --unit mm|cm|m|in  (per --mesh, default mm)  --quiet\n    \
              --hdri F.hdr|F.exr  --hdri-strength S  --hdri-rotation GRADI\n  \
@@ -101,12 +101,21 @@ fn load_scene(args: &Args) -> anyhow::Result<(Scene, RenderSettings)> {
         }
         let r = forge_import::import_file(&mut scene, &PathBuf::from(p), &opts)?;
         let b = scene.bounds_of(r.root);
-        let mut orbit = OrbitController::from_camera(&scene.camera);
-        orbit.yaw = 0.6;
-        orbit.pitch = 0.35;
-        orbit.frame(&b);
-        scene.camera = orbit.camera();
-        scene.lights = forge_scene::light::preset("studio", b.center(), b.radius()).unwrap_or_default();
+        match r.camera {
+            Some(cam) => scene.camera = cam,
+            None => {
+                let mut orbit = OrbitController::from_camera(&scene.camera);
+                orbit.yaw = 0.6;
+                orbit.pitch = 0.35;
+                orbit.frame(&b);
+                scene.camera = orbit.camera();
+            }
+        }
+        scene.lights = if r.lights.is_empty() {
+            forge_scene::light::preset("studio", b.center(), b.radius()).unwrap_or_default()
+        } else {
+            r.lights
+        };
         return Ok((scene, RenderSettings::default()));
     }
     Ok((Scene::test_scene(), RenderSettings::default()))
