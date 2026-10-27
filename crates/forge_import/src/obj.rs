@@ -22,18 +22,18 @@ pub(crate) fn read(path: &Path, warnings: &mut Vec<String>) -> Result<Vec<Import
     let mut out = Vec::with_capacity(models.len());
     for (i, model) in models.into_iter().enumerate() {
         let m = model.mesh;
-        let positions: Vec<Vec3> = m.positions.chunks_exact(3).map(|c| Vec3::new(c[0], c[1], c[2])).collect();
+        let positions: Vec<Vec3> = m.positions.as_chunks::<3>().0.iter().map(|c| Vec3::from_array(*c)).collect();
         let normals: Vec<Vec3> = if m.normals.len() == m.positions.len() {
-            m.normals.chunks_exact(3).map(|c| Vec3::new(c[0], c[1], c[2])).collect()
+            m.normals.as_chunks::<3>().0.iter().map(|c| Vec3::from_array(*c)).collect()
         } else {
             Vec::new()
         };
         let uvs: Vec<Vec2> = if m.texcoords.len() / 2 == positions.len() {
-            m.texcoords.chunks_exact(2).map(|c| Vec2::new(c[0], c[1])).collect()
+            m.texcoords.as_chunks::<2>().0.iter().map(|c| Vec2::from_array(*c)).collect()
         } else {
             Vec::new()
         };
-        let indices = m.indices.chunks_exact(3).map(|c| [c[0], c[1], c[2]]).collect();
+        let indices = m.indices.as_chunks::<3>().0.to_vec();
         let name = if model.name.trim().is_empty() {
             format!("oggetto-{}", i + 1)
         } else {

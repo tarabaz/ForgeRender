@@ -185,16 +185,59 @@ impl<S: tracing::Subscriber> Layer<S> for BufferLayer {
     }
 }
 
+const DEFAULT_FILTER: &str = "info,wgpu_core=warn,wgpu_hal=warn,naga=warn,eframe=warn,egui_wgpu=warn";
+
+fn env_filter() -> EnvFilter {
+    EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(DEFAULT_FILTER))
+}
+
 /// Inizializza il logging: console (filtrabile con `RUST_LOG`) e buffer per la UI.
 pub fn init_logging() -> LogBuffer {
+    init_logging_to(None)
+}
+
+/// Come [`init_logging`], scrivendo anche su `<dir>/forgerender.log`
+/// (il file precedente viene conservato come `forgerender.prev.log`).
+pub fn init_logging_to(dir: Option<&std::path::Path>) -> LogBuffer {
     let buf = LogBuffer::default();
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info,wgpu_core=warn,wgpu_hal=warn,naga=warn,eframe=warn,egui_wgpu=warn"));
+    let file = dir.and_then(|d| {
+        std::fs::create_dir_all(d).ok()?;
+        let path = d.join("forgerender.log");
+        if path.exists() {
+            let _ = std::fs::rename(&path, d.join("forgerender.prev.log"));
+        }
+        std::fs::File::create(path).ok()
+    });
+    let file_layer = file.map(|f| {
+        tracing_subscriber::fmt::layer()
+            .with_ansi(false)
+            .with_target(false)
+            .with_writer(Mutex::new(f))
+            .with_filter(env_filter())
+    });
     let _ = tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer().with_target(false).with_filter(filter))
+        .with(tracing_subscriber::fmt::layer().with_target(false).with_filter(env_filter()))
+        .with(file_layer)
         .with(BufferLayer(buf.clone()))
         .try_init();
     buf
+}
+
+/// Cartella dei log: `logs` accanto all'eseguibile in modalità portable (file
+/// `portable.txt` presente), altrimenti `%LOCALAPPDATA%\ForgeRender\logs` su
+/// Windows o `$XDG_STATE_HOME`/`~/.local/state/forgerender/logs` altrove.
+pub fn default_log_dir() -> Option<std::path::PathBuf> {
+    let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+    if exe_dir.join("portable.txt").exists() {
+        return Some(exe_dir.join("logs"));
+    }
+    if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+        return Some(std::path::PathBuf::from(local).join("ForgeRender").join("logs"));
+    }
+    if let Some(state) = std::env::var_os("XDG_STATE_HOME") {
+        return Some(std::path::PathBuf::from(state).join("forgerender").join("logs"));
+    }
+    std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".local/state/forgerender/logs"))
 }
 
 #[cfg(test)]

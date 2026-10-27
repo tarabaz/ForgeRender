@@ -18,7 +18,9 @@ Comandi della viewport
   Home = inquadra tutto, F5 = avvia render, Ctrl+S salva, Ctrl+O apri, Ctrl+I importa
 
 Versione portable: nessuna installazione, non scrive nulla nel registro né fuori
-dalla cartella (i progetti vengono salvati dove scegli tu).
+dalla cartella (i progetti vengono salvati dove scegli tu). I log sono in .\logs.
+Versione installata: i log sono in %LOCALAPPDATA%\ForgeRender\logs.
+In caso di problemi allega forgerender.log alla segnalazione.
 
 Formati supportati in questa versione: OBJ (con .mtl), STL.
 STEP e SolidWorks (SLDPRT/SLDASM) arriveranno nella Fase 5.

@@ -32,6 +32,8 @@ New-Item -ItemType Directory -Path $staging | Out-Null
 Copy-Item (Join-Path $bin "forgerender.exe") $staging
 Copy-Item (Join-Path $bin "forgerender-cli.exe") $staging
 Copy-Item (Join-Path $PSScriptRoot "LEGGIMI.txt") $staging
+# Marcatore della modalità portable: i log restano nella cartella del programma.
+Set-Content -Path (Join-Path $staging "portable.txt") -Value "Versione portable di ForgeRender: i log vengono scritti nella sottocartella logs."
 $zip = Join-Path $dist "$portableName.zip"
 if (Test-Path $zip) { Remove-Item -Force $zip }
 Compress-Archive -Path "$staging\*" -DestinationPath $zip

@@ -42,10 +42,14 @@ fn parse_args() -> StartupOptions {
 }
 
 fn main() -> std::process::ExitCode {
-    let logs = forge_telemetry::init_logging();
+    let log_dir = forge_telemetry::default_log_dir();
+    let logs = forge_telemetry::init_logging_to(log_dir.as_deref());
     let startup = parse_args();
     let system = forge_telemetry::SystemInfo::detect();
     tracing::info!("ForgeRender {} — {}", env!("CARGO_PKG_VERSION"), system.summary());
+    if let Some(d) = &log_dir {
+        tracing::info!("file di log: {}", d.join("forgerender.log").display());
+    }
 
     let native = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
