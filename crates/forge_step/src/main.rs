@@ -32,6 +32,8 @@ extern "C" {
         error_len: c_int,
     ) -> c_int;
     fn fr_step_write_test_assembly(path_utf8: *const c_char, error: *mut c_char, error_len: c_int) -> c_int;
+    /// Uscita immediata della libreria C (glibc e UCRT), senza distruttori statici.
+    fn _exit(code: c_int) -> !;
 }
 
 extern "C" fn on_mesh(user: *mut c_void, pos: *const f32, nrm: *const f32, nv: c_int, idx: *const u32, nt: c_int) -> c_int {
@@ -83,26 +85,37 @@ extern "C" fn on_progress(_user: *mut c_void, msg: *const c_char) {
     println!("progresso: {msg}");
 }
 
-fn main() -> std::process::ExitCode {
+fn main() {
+    let code = run();
+    use std::io::Write;
+    let _ = std::io::stdout().flush();
+    let _ = std::io::stderr().flush();
+    // I distruttori statici di OCCT compilato statico possono andare in crash all'uscita
+    // su Windows: tutto è già scritto su disco, quindi si esce senza eseguirli.
+    // SAFETY: nessuna risorsa Rust da rilasciare oltre ai buffer appena svuotati.
+    unsafe { _exit(code) }
+}
+
+fn run() -> c_int {
     let args: Vec<String> = std::env::args().skip(1).collect();
     // Genera un assieme STEP di prova (usato dai test automatici).
     if args.first().map(String::as_str) == Some("--write-test-assembly") {
         let Some(out) = args.get(1).and_then(|p| CString::new(p.as_bytes()).ok()) else {
             eprintln!("uso: forgerender-step --write-test-assembly <out.step>");
-            return std::process::ExitCode::from(2);
+            return 2;
         };
         let mut err = vec![0 as c_char; 512];
         // SAFETY: puntatori validi per la durata della chiamata.
         let rc = unsafe { fr_step_write_test_assembly(out.as_ptr(), err.as_mut_ptr(), err.len() as c_int) };
         if rc != 0 {
             eprintln!("{}", unsafe { CStr::from_ptr(err.as_ptr()) }.to_string_lossy());
-            return std::process::ExitCode::FAILURE;
+            return 1;
         }
-        return std::process::ExitCode::SUCCESS;
+        return 0;
     }
     if args.len() < 2 {
         eprintln!("uso: forgerender-step <input.step> <output.frmesh> [--quality bassa|media|alta]");
-        return std::process::ExitCode::from(2);
+        return 2;
     }
     let input = PathBuf::from(&args[0]);
     let output = PathBuf::from(&args[1]);
@@ -120,7 +133,7 @@ fn main() -> std::process::ExitCode {
     };
     let Ok(path_c) = CString::new(input.to_string_lossy().as_bytes()) else {
         eprintln!("percorso non valido");
-        return std::process::ExitCode::from(2);
+        return 2;
     };
     let t0 = std::time::Instant::now();
     let mut out = FrMesh {
@@ -144,12 +157,12 @@ fn main() -> std::process::ExitCode {
     if rc != 0 {
         let msg = unsafe { CStr::from_ptr(err.as_ptr()) }.to_string_lossy();
         eprintln!("{msg}");
-        return std::process::ExitCode::FAILURE;
+        return 1;
     }
     out.header.unit_m = unit;
     if let Err(e) = out.write(&output) {
         eprintln!("scrittura di {} fallita: {e}", output.display());
-        return std::process::ExitCode::FAILURE;
+        return 1;
     }
     let tris: usize = out.meshes.iter().map(|m| m.indices.len()).sum();
     println!(
@@ -160,5 +173,5 @@ fn main() -> std::process::ExitCode {
         unit,
         t0.elapsed().as_secs_f64()
     );
-    std::process::ExitCode::SUCCESS
+    0
 }

@@ -5,6 +5,7 @@
 // callback C. Nessuna eccezione C++ attraversa il confine: tutte vengono
 // catturate e trasformate in un messaggio d'errore.
 
+#include <cstdio>
 #include <BRepLib_ToolTriangulatedShape.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <BRep_Tool.hxx>
@@ -257,6 +258,7 @@ extern "C" int fr_step_convert(const char* path_utf8, double linear_deflection, 
             const int node = emit_node(c, -1, name, XCAFDoc_ShapeTool::GetLocation(root), has_col ? &col : nullptr, -1);
             visit_proto(c, root, node, name);
         }
+        app->Close(doc);
         return 0;
     } catch (const Standard_Failure& e) {
         return fail(std::string("errore Open CASCADE: ") + (e.GetMessageString() ? e.GetMessageString() : "sconosciuto"));
@@ -309,17 +311,25 @@ extern "C" int fr_step_write_test_assembly(const char* path_utf8, char* error, i
         TDataStd_Name::Set(c3, "Vite M8-2");
         st->UpdateAssemblies();
 
-        STEPCAFControl_Writer writer;
-        writer.SetColorMode(Standard_True);
-        writer.SetNameMode(Standard_True);
-        if (!writer.Transfer(doc, STEPControl_AsIs)) {
-            std::strncpy(error, "trasferimento al writer STEP fallito", (size_t)error_len - 1);
-            return 1;
+        {
+            STEPCAFControl_Writer writer;
+            writer.SetColorMode(Standard_True);
+            writer.SetNameMode(Standard_True);
+            if (!writer.Transfer(doc, STEPControl_AsIs)) {
+                std::strncpy(error, "trasferimento al writer STEP fallito", (size_t)error_len - 1);
+                return 1;
+            }
+            if (writer.Write(path_utf8) != IFSelect_RetDone) {
+                std::strncpy(error, "scrittura STEP fallita", (size_t)error_len - 1);
+                return 1;
+            }
         }
-        if (writer.Write(path_utf8) != IFSelect_RetDone) {
-            std::strncpy(error, "scrittura STEP fallita", (size_t)error_len - 1);
-            return 1;
-        }
+        // Marcatori su stderr: se il processo va in crash, il test mostra fin dove è arrivato.
+        std::fputs("[shim] writer chiuso\n", stderr);
+        std::fflush(stderr);
+        app->Close(doc);
+        std::fputs("[shim] documento chiuso\n", stderr);
+        std::fflush(stderr);
         return 0;
     } catch (const Standard_Failure& e) {
         std::strncpy(error, e.GetMessageString() ? e.GetMessageString() : "errore OCCT", (size_t)error_len - 1);
