@@ -5,6 +5,12 @@
 use std::path::PathBuf;
 
 fn main() {
+    // CMake 4 rifiuta i progetti che dichiarano compatibilità con versioni < 3.5, come il
+    // CMakeLists di OCCT 7.8: si usa l'opzione di compatibilità indicata da CMake stesso.
+    if std::env::var_os("CMAKE_POLICY_VERSION_MINIMUM").is_none() {
+        // SAFETY: lo script di build è single-thread a questo punto.
+        unsafe { std::env::set_var("CMAKE_POLICY_VERSION_MINIMUM", "3.5") };
+    }
     occt_sys::build_occt();
     let occt = occt_sys::occt_path();
     let include = occt.join("include");
