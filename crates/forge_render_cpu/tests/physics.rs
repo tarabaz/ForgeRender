@@ -95,6 +95,18 @@ fn white_furnace_glass_is_lossless() {
     assert!((c.x - 1.0).abs() < 0.02, "vetro: {c}");
 }
 
+/// Vetro satinato: sfera in ambiente uniforme. Il modello microfacet a singolo
+/// scattering perde un po' di energia, ma non deve mai crearne.
+#[test]
+fn white_furnace_rough_glass() {
+    for rough in [0.2, 0.5] {
+        let s = sphere_scene(test_material(1.0, 0.0, rough, 0.5, 1.0), 1.0);
+        let img = render(&s, &settings(24, 24), 128, 4);
+        let c = mean_region(&img, 24, 8, 8, 16, 16);
+        assert!(c.x <= 1.02 && c.x > 0.85, "vetro satinato roughness {rough}: {c}");
+    }
+}
+
 #[test]
 fn white_furnace_metal_and_plastic_never_gain_energy() {
     for (metallic, rough, spec) in [(1.0, 0.05, 0.5), (1.0, 0.6, 0.5), (0.0, 0.3, 0.5), (0.0, 0.8, 1.0)] {
@@ -103,6 +115,10 @@ fn white_furnace_metal_and_plastic_never_gain_energy() {
         let c = mean_region(&img, 24, 8, 8, 16, 16);
         assert!(c.x <= 1.01, "guadagno di energia: {c} (metallic {metallic}, roughness {rough})");
         assert!(c.x >= 0.8, "perdita eccessiva: {c} (metallic {metallic}, roughness {rough})");
+        if metallic == 1.0 {
+            // Con la compensazione multi-scattering un metallo bianco conserva l'energia.
+            assert!(c.x >= 0.95, "metallo ruvido troppo scuro: {c} (roughness {rough})");
+        }
     }
 }
 
@@ -337,4 +353,47 @@ fn flat_normal_map_is_neutral() {
         .sum::<f32>()
         / reference.iter().map(|a| a.iter().sum::<f32>()).sum::<f32>();
     assert!(diff < 0.02, "differenza relativa {diff}");
+}
+
+/// Rettangolo emissivo (mesh, campionato con la NEE sugli emissivi + MIS) sopra un piano:
+/// stesso risultato analitico della luce ad area equivalente (fattore di forma).
+#[test]
+fn emissive_mesh_matches_form_factor() {
+    let (a, b, h, le, rho) = (0.5f32, 0.75f32, 1.0f32, 3.0f32, 0.9f32);
+    let mut s = plane_scene(rho);
+    s.materials.upsert(Material {
+        id: MaterialId::new("luce"),
+        base_color: [0.0; 3],
+        emission: [1.0; 3],
+        emission_strength: le,
+        specular: 0.0,
+        ..Default::default()
+    });
+    // Piano 1×1.5 m rivolto verso il basso, a quota h.
+    let quad = s.add_mesh(primitives::plane(2.0 * a, 2.0 * b));
+    let id = ComponentId("pannello".into());
+    s.add_node(
+        None,
+        id.clone(),
+        "Pannello",
+        Mat4::from_translation(Vec3::new(0.0, h, 0.0)) * Mat4::from_rotation_x(std::f32::consts::PI),
+        Some(quad),
+    );
+    s.assignments.insert(id, MaterialId::new("luce"));
+    // Camera tra il piano e il pannello, che guarda il piano.
+    s.camera = Camera {
+        position: Vec3::new(0.0, 0.5, 0.01),
+        target: Vec3::ZERO,
+        up: Vec3::Y,
+        vfov_deg: 0.5,
+    };
+    let img = render(&s, &settings(8, 8), 1024, 4);
+    let c = mean_region(&img, 8, 0, 0, 8, 8);
+    let corner = |x: f32, y: f32| {
+        let (ax, by) = (x / h, y / h);
+        let (sa, sb) = ((1.0 + ax * ax).sqrt(), (1.0 + by * by).sqrt());
+        (ax / sa * (by / sa).atan() + by / sb * (ax / sb).atan()) / (2.0 * std::f32::consts::PI)
+    };
+    let expected = rho * le * 4.0 * corner(a, b);
+    assert!((c.x - expected).abs() / expected < 0.02, "{} vs {expected}", c.x);
 }

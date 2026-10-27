@@ -27,7 +27,10 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
     let mut prev_pdf = 0.0f32;
     // La HDRI, se presente, è una "luce" in più nella scelta uniforme della NEE.
     let n_lights = scene.lights.len();
-    let n_select = n_lights + scene.env_map.is_some() as usize;
+    // Scelta uniforme tra: luci della scena, HDRI (se presente), superfici emissive (se presenti).
+    let env_slot = scene.env_map.is_some().then_some(n_lights);
+    let emissive_slot = scene.emissive.is_some().then_some(n_lights + scene.env_map.is_some() as usize);
+    let n_select = n_lights + scene.env_map.is_some() as usize + scene.emissive.is_some() as usize;
     let light_select_pdf = if n_select > 0 { 1.0 / n_select as f32 } else { 0.0 };
     let clamp = settings.clamp_indirect;
 
@@ -111,7 +114,16 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
         }
 
         if mat.emission != Vec3::ZERO {
-            add(&mut l, beta * mat.emission, depth);
+            // Superficie emissiva raggiunta dalla BSDF: peso MIS rispetto al campionamento diretto.
+            let w = match &scene.emissive {
+                Some(em) if !specular_bounce => {
+                    let cos_l = ng.dot(wo).abs().max(1e-8);
+                    let pdf_light = em.area_pdf(prim) * hit.t * hit.t / cos_l * light_select_pdf;
+                    power_heuristic(prev_pdf, pdf_light)
+                }
+                _ => 1.0,
+            };
+            add(&mut l, beta * mat.emission * w, depth);
         }
 
         let bsdf = Bsdf {
@@ -128,7 +140,11 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
             let (sample, cast_shadows) = if li_idx < n_lights {
                 let light = &scene.lights[li_idx];
                 (sample_light(light, p, u1, u2), light.cast_shadows)
+            } else if Some(li_idx) == emissive_slot {
+                let em = scene.emissive.as_ref().expect("emissivi");
+                (sample_emissive(scene, em, p, rng.next_f32(), u1, u2), true)
             } else {
+                debug_assert_eq!(Some(li_idx), env_slot);
                 let (map, strength, rot) = scene.env_map.as_ref().expect("env map");
                 let s = map.sample(u1, u2, *rot).map(|(wi, li, pdf)| LightSample {
                     wi,
@@ -144,7 +160,7 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
                 if f != Vec3::ZERO {
                     let cos = ls.wi.dot(ns).abs();
                     let visible = !cast_shadows || {
-                        let so = offset_ray_origin(p, ng);
+                        let so = offset_ray_origin(p, if ls.wi.dot(ng) >= 0.0 { ng } else { -ng });
                         let t_max = if ls.dist.is_finite() {
                             ls.dist * (1.0 - 1e-4)
                         } else {
@@ -187,4 +203,34 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
         }
     }
     l
+}
+
+/// Campiona un punto su una superficie emissiva (triangolo scelto in proporzione alla potenza).
+fn sample_emissive(scene: &RenderScene, em: &forge_render_core::EmissiveSet, p: Vec3, u0: f32, u1: f32, u2: f32) -> Option<LightSample> {
+    let (_, _, i) = em.distribution.sample(u0);
+    let prim = em.prims[i] as usize;
+    let [a, b, c] = scene.geometry.vertices(prim);
+    // Punto uniforme sul triangolo.
+    let su = u1.sqrt();
+    let q = a * (1.0 - su) + b * (su * (1.0 - u2)) + c * (su * u2);
+    let d = q - p;
+    let d2 = d.length_squared();
+    if d2 <= 0.0 {
+        return None;
+    }
+    let dist = d2.sqrt();
+    let wi = d / dist;
+    let n = scene.geometry.geometric_normals[prim];
+    let cos_l = n.dot(wi).abs(); // emissione su entrambe le facce
+    if cos_l <= 1e-8 {
+        return None;
+    }
+    let li = scene.material_of(prim).emission;
+    Some(LightSample {
+        wi,
+        dist,
+        li,
+        pdf: em.area_pdf(prim) * d2 / cos_l,
+        delta: false,
+    })
 }

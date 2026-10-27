@@ -1,3 +1,4 @@
+use crate::env_map::Distribution1D;
 use crate::texture::Texture;
 use crate::EnvironmentMap;
 use forge_accel::TriangleAccel;
@@ -130,7 +131,42 @@ pub struct RenderGeometry {
     pub tri_uvs: Vec<[Vec2; 3]>,
     /// Tangente ∂p/∂u in spazio mondo (zero se la mesh non ha UV).
     pub tri_tangents: Vec<Vec3>,
+    /// Posizione di ogni primitiva (ordine originale) dentro `accel.tris` (ordine BVH).
+    pub prim_to_slot: Vec<u32>,
     pub bounds: Aabb,
+}
+
+impl RenderGeometry {
+    /// Vertici del triangolo `prim` in spazio mondo.
+    #[inline]
+    pub fn vertices(&self, prim: usize) -> [Vec3; 3] {
+        let t = &self.accel.tris[self.prim_to_slot[prim] as usize];
+        [t.v0, t.v0 + t.e1, t.v0 + t.e2]
+    }
+}
+
+/// Triangoli emissivi, campionati in proporzione alla potenza emessa (NEE).
+#[derive(Debug)]
+pub struct EmissiveSet {
+    pub prims: Vec<u32>,
+    pub areas: Vec<f32>,
+    pub distribution: Distribution1D,
+    /// Per ogni primitiva: indice in `prims`, o `u32::MAX` se non emissiva.
+    pub index_of_prim: Vec<u32>,
+}
+
+impl EmissiveSet {
+    /// PDF d'area (per unità di superficie) di campionare un punto del triangolo `prim`.
+    #[inline]
+    pub fn area_pdf(&self, prim: usize) -> f32 {
+        match self.index_of_prim.get(prim) {
+            Some(&i) if i != u32::MAX => {
+                let i = i as usize;
+                self.distribution.pdf(i) / self.distribution.count() as f32 / self.areas[i]
+            }
+            _ => 0.0,
+        }
+    }
 }
 
 impl RenderGeometry {
@@ -195,6 +231,10 @@ impl RenderGeometry {
         }
         let accel = TriangleAccel::build(&tris);
         let bounds = accel.bvh.bounds();
+        let mut prim_to_slot = vec![0u32; accel.bvh.prim_indices.len()];
+        for (slot, &prim) in accel.bvh.prim_indices.iter().enumerate() {
+            prim_to_slot[prim as usize] = slot as u32;
+        }
         tracing::info!(
             "geometria compilata: {} triangoli, BVH {} nodi, in {:.0} ms",
             tris.len(),
@@ -208,6 +248,7 @@ impl RenderGeometry {
             tri_node: tnode,
             tri_uvs: tuv,
             tri_tangents: ttan,
+            prim_to_slot,
             bounds,
         }
     }
@@ -225,6 +266,8 @@ pub struct RenderScene {
     pub environment: Environment,
     /// Mappa HDRI caricata (se l'ambiente è una HDRI), con intensità e rotazione in radianti.
     pub env_map: Option<(Arc<EnvironmentMap>, f32, f32)>,
+    /// Superfici emissive campionabili come luci.
+    pub emissive: Option<EmissiveSet>,
     pub camera: Camera,
 }
 
@@ -243,7 +286,7 @@ impl RenderScene {
         let fallback = materials.len() as u32;
         materials.push(RenderMaterial::from_material(&Material::default()));
         material_textures.push(None);
-        let node_material = (0..scene.nodes.len())
+        let node_material: Vec<u32> = (0..scene.nodes.len())
             .map(|i| {
                 scene
                     .materials
@@ -317,7 +360,10 @@ impl RenderScene {
             _ => None,
         };
 
+        let emissive = build_emissive(&geometry, &node_material, &materials);
+
         RenderScene {
+            emissive,
             geometry,
             node_material,
             materials,
@@ -372,6 +418,43 @@ pub fn pick(geometry: &RenderGeometry, origin: Vec3, dir: Vec3) -> Option<(usize
         .accel
         .intersect(origin, dir, 0.0, f32::INFINITY)
         .map(|h| (geometry.tri_node[h.prim as usize] as usize, h.t))
+}
+
+fn build_emissive(geo: &RenderGeometry, node_material: &[u32], materials: &[RenderMaterial]) -> Option<EmissiveSet> {
+    if !materials.iter().any(|m| m.emission != Vec3::ZERO) {
+        return None;
+    }
+    let mut prims = Vec::new();
+    let mut areas = Vec::new();
+    let mut power = Vec::new();
+    for prim in 0..geo.tri_node.len() {
+        let m = &materials[node_material[geo.tri_node[prim] as usize] as usize];
+        if m.emission == Vec3::ZERO {
+            continue;
+        }
+        let [a, b, c] = geo.vertices(prim);
+        let area = 0.5 * (b - a).cross(c - a).length();
+        if area <= 0.0 {
+            continue;
+        }
+        prims.push(prim as u32);
+        areas.push(area);
+        power.push(forge_math::luminance(m.emission) * area);
+    }
+    if prims.is_empty() {
+        return None;
+    }
+    let mut index_of_prim = vec![u32::MAX; geo.tri_node.len()];
+    for (i, &p) in prims.iter().enumerate() {
+        index_of_prim[p as usize] = i as u32;
+    }
+    tracing::info!("{} triangoli emissivi campionati come luci", prims.len());
+    Some(EmissiveSet {
+        prims,
+        areas,
+        distribution: Distribution1D::new(power),
+        index_of_prim,
+    })
 }
 
 #[cfg(test)]

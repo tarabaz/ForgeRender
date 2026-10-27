@@ -19,7 +19,7 @@ mod tonemap;
 pub use accum::Accumulator;
 pub use backend::RenderBackend;
 pub use env_map::EnvironmentMap;
-pub use render_scene::{pick, MaterialTextures, RenderGeometry, RenderLight, RenderLightKind, RenderMaterial, RenderScene};
+pub use render_scene::{pick, EmissiveSet, MaterialTextures, RenderGeometry, RenderLight, RenderLightKind, RenderMaterial, RenderScene};
 pub use session::{Frame, Progress, RenderSession, SessionState};
 pub use settings::{RenderSettings, SamplesPreset, ToneMapping};
 pub use tonemap::{tonemap_pixel, tonemap_to_rgba8};

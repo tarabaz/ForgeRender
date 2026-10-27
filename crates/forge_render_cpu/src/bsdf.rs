@@ -99,11 +99,72 @@ fn sample_vndf(wo: Vec3, alpha: f32, u1: f32, u2: f32) -> Vec3 {
     Vec3::new(alpha * nh.x, alpha * nh.y, nh.z.max(1e-6)).normalize()
 }
 
+/// Albedo direzionale del GGX a singolo scattering con F = 1, E(μ, α), tabulata
+/// una volta per processo (32×32, integrazione con campionamento VNDF stratificato).
+/// Serve alla compensazione dell'energia persa dai riflessi multipli tra microfacce
+/// (Turquin 2019, "Practical multiple scattering compensation for microfacet models").
+fn ggx_albedo(cos_o: f32, alpha: f32) -> f32 {
+    const N: usize = 32;
+    static LUT: std::sync::OnceLock<Vec<f32>> = std::sync::OnceLock::new();
+    let lut = LUT.get_or_init(|| {
+        let mut t = vec![0.0f32; N * N];
+        const S: usize = 24;
+        for ia in 0..N {
+            let a = (ia as f32 / (N - 1) as f32).max(1e-3);
+            let a2 = a * a;
+            for ic in 0..N {
+                let mu = (ic as f32 / (N - 1) as f32).max(1e-3);
+                let wo = Vec3::new((1.0 - mu * mu).max(0.0).sqrt(), 0.0, mu);
+                let mut e = 0.0f64;
+                for i in 0..S {
+                    for j in 0..S {
+                        let h = sample_vndf(wo, a, (i as f32 + 0.5) / S as f32, (j as f32 + 0.5) / S as f32);
+                        let wi = 2.0 * wo.dot(h) * h - wo;
+                        if wi.z > 0.0 {
+                            let lo = smith_lambda(wo, a2);
+                            let li = smith_lambda(wi, a2);
+                            e += ((1.0 + lo) / (1.0 + lo + li)) as f64;
+                        }
+                    }
+                }
+                t[ia * N + ic] = (e / (S * S) as f64) as f32;
+            }
+        }
+        t
+    });
+    let fa = (alpha.clamp(0.0, 1.0) * (N - 1) as f32).min((N - 1) as f32 - 1e-4);
+    let fc = (cos_o.clamp(0.0, 1.0) * (N - 1) as f32).min((N - 1) as f32 - 1e-4);
+    let (ia, ic) = (fa as usize, fc as usize);
+    let (ta, tc) = (fa - ia as f32, fc - ic as f32);
+    let v = |a: usize, c: usize| lut[a * N + c];
+    let top = v(ia, ic) * (1.0 - tc) + v(ia, ic + 1) * tc;
+    let bot = v(ia + 1, ic) * (1.0 - tc) + v(ia + 1, ic + 1) * tc;
+    (top * (1.0 - ta) + bot * ta).max(1e-3)
+}
+
+/// Rugosità oltre la quale il vetro diventa satinato (trasmissione microfacet).
+const ROUGH_GLASS: f32 = 0.03;
+
 impl<'a> Bsdf<'a> {
     /// Componente non-delta presente (serve il campionamento delle luci).
     #[inline]
     pub fn has_non_delta(&self) -> bool {
-        self.mat.transmission < 1.0
+        self.mat.transmission < 1.0 || self.rough_glass()
+    }
+
+    #[inline]
+    fn rough_glass(&self) -> bool {
+        self.mat.transmission > 0.0 && self.mat.roughness >= ROUGH_GLASS
+    }
+
+    /// Indici di rifrazione (lato di `wo`, lato opposto).
+    #[inline]
+    fn ior_pair(&self) -> (f32, f32) {
+        if self.entering {
+            (1.0, self.mat.ior)
+        } else {
+            (self.mat.ior, 1.0)
+        }
     }
 
     #[inline]
@@ -111,12 +172,17 @@ impl<'a> Bsdf<'a> {
         (self.mat.specular_scale * schlick(self.mat.f0_dielectric, cos)).min(1.0)
     }
 
+    #[inline]
+    fn f0(&self) -> Vec3 {
+        let m = self.mat;
+        Vec3::splat((m.specular_scale * m.f0_dielectric).min(1.0)).lerp(m.base_color, m.metallic)
+    }
+
     /// Probabilità di scegliere il lobo speculare (per il lobo opaco).
     #[inline]
     fn spec_probability(&self, wo: Vec3) -> f32 {
         let m = self.mat;
-        let f0 = Vec3::splat(self.mat.specular_scale * m.f0_dielectric).lerp(m.base_color, m.metallic);
-        let spec = luminance(schlick3(f0, wo.z)).max(if m.metallic > 0.0 || m.specular_scale > 0.0 { 1e-3 } else { 0.0 });
+        let spec = luminance(schlick3(self.f0(), wo.z)).max(if m.metallic > 0.0 || m.specular_scale > 0.0 { 1e-3 } else { 0.0 });
         let diff = (1.0 - m.metallic) * luminance(m.base_color) * (1.0 - self.f_dielectric(wo.z));
         if diff <= 0.0 {
             1.0
@@ -127,31 +193,17 @@ impl<'a> Bsdf<'a> {
         }
     }
 
-    /// Valuta la parte non-delta della BSDF (senza il coseno) e la sua PDF.
-    /// `wo`, `wi` in spazio mondo.
-    pub fn eval(&self, wo_w: Vec3, wi_w: Vec3) -> (Vec3, f32) {
+    /// Lobo opaco (diffuso + GGX con compensazione multi-scattering), solo riflessione.
+    fn eval_opaque(&self, wo: Vec3, wi: Vec3) -> (Vec3, f32) {
         let m = self.mat;
-        if m.transmission >= 1.0 {
-            return (Vec3::ZERO, 0.0);
-        }
-        // Le direzioni devono stare dallo stesso lato anche rispetto alla normale geometrica
-        // (altrimenti la normale di shading farebbe "trapelare" luce attraverso la superficie).
-        if wi_w.dot(self.ng) <= 0.0 || wo_w.dot(self.ng) <= 0.0 {
-            return (Vec3::ZERO, 0.0);
-        }
-        let wo = self.frame.to_local(wo_w);
-        let wi = self.frame.to_local(wi_w);
         if wo.z <= 0.0 || wi.z <= 0.0 {
             return (Vec3::ZERO, 0.0);
         }
-        let opaque = 1.0 - m.transmission;
         let p_spec = self.spec_probability(wo);
         let a2 = m.alpha * m.alpha;
         let h = (wo + wi).normalize();
-
         let mut f = Vec3::ZERO;
         let mut pdf = 0.0;
-
         if p_spec > 0.0 {
             let d = ggx_d(h, a2);
             let lo = smith_lambda(wo, a2);
@@ -160,7 +212,10 @@ impl<'a> Bsdf<'a> {
             let g1o = 1.0 / (1.0 + lo);
             let voh = wo.dot(h).max(0.0);
             let fr = Vec3::splat(self.f_dielectric(voh)).lerp(schlick3(m.base_color, voh), m.metallic);
-            f += fr * (d * g2 / (4.0 * wo.z * wi.z));
+            // Compensazione dell'energia dei riflessi multipli: 1 + F0·(1/E − 1).
+            let e = ggx_albedo(wo.z, m.alpha);
+            let ms = Vec3::ONE + self.f0() * (1.0 / e - 1.0);
+            f += fr * ms * (d * g2 / (4.0 * wo.z * wi.z));
             pdf += p_spec * g1o * d / (4.0 * wo.z);
         }
         if p_spec < 1.0 {
@@ -168,43 +223,132 @@ impl<'a> Bsdf<'a> {
             f += m.base_color * (kd * FRAC_1_PI);
             pdf += (1.0 - p_spec) * sampling::cosine_hemisphere_pdf(wi.z);
         }
-        (f * opaque, pdf * opaque)
+        (f, pdf)
+    }
+
+    /// Dielettrico ruvido (Walter et al. 2007, formulazione di PBRT v4): riflessione e
+    /// rifrazione attraverso le microfacce GGX. Radianza scalata per (n_o/n_i)².
+    fn eval_rough_glass(&self, wo: Vec3, wi: Vec3) -> (Vec3, f32) {
+        let m = self.mat;
+        if wo.z <= 0.0 || wi.z == 0.0 {
+            return (Vec3::ZERO, 0.0);
+        }
+        let (n_o, n_t) = self.ior_pair();
+        let eta = n_t / n_o;
+        let reflect = wi.z > 0.0;
+        let mut wm = if reflect { wi + wo } else { wi * eta + wo };
+        if wm.length_squared() == 0.0 {
+            return (Vec3::ZERO, 0.0);
+        }
+        wm = wm.normalize();
+        if wm.z < 0.0 {
+            wm = -wm;
+        }
+        let (wom, wim) = (wo.dot(wm), wi.dot(wm));
+        if wom * wo.z <= 0.0 || wim * wi.z <= 0.0 {
+            return (Vec3::ZERO, 0.0);
+        }
+        let a2 = m.alpha * m.alpha;
+        let (fr, _) = fresnel_dielectric(wom, eta);
+        let d = ggx_d(wm, a2);
+        let lo = smith_lambda(wo, a2);
+        let li = smith_lambda(Vec3::new(wi.x, wi.y, wi.z.abs()), a2);
+        let g2 = 1.0 / (1.0 + lo + li);
+        let g1o = 1.0 / (1.0 + lo);
+        let dv = g1o * wom * d / wo.z;
+        if reflect {
+            let f = d * g2 * fr / (4.0 * wo.z * wi.z);
+            (Vec3::splat(f), dv / (4.0 * wom) * fr)
+        } else {
+            let denom = (wim + wom / eta).powi(2);
+            if denom <= 0.0 {
+                return (Vec3::ZERO, 0.0);
+            }
+            let ft = (1.0 - fr) * d * g2 * (wim * wom / (wi.z * wo.z * denom)).abs() / (eta * eta);
+            let pdf = dv * (wim.abs() / denom) * (1.0 - fr);
+            (m.base_color * ft, pdf)
+        }
+    }
+
+    /// Valuta la parte non-delta della BSDF (senza il coseno) e la sua PDF complessiva.
+    /// `wo`, `wi` in spazio mondo.
+    pub fn eval(&self, wo_w: Vec3, wi_w: Vec3) -> (Vec3, f32) {
+        let m = self.mat;
+        if wo_w.dot(self.ng) <= 0.0 {
+            return (Vec3::ZERO, 0.0);
+        }
+        let wo = self.frame.to_local(wo_w);
+        let wi = self.frame.to_local(wi_w);
+        // Coerenza tra normale geometrica e di shading: evita che la luce "trapeli".
+        let geo_reflect = wi_w.dot(self.ng) > 0.0;
+        if geo_reflect != (wi.z > 0.0) {
+            return (Vec3::ZERO, 0.0);
+        }
+        let t = m.transmission;
+        let mut f = Vec3::ZERO;
+        let mut pdf = 0.0;
+        if t < 1.0 && geo_reflect {
+            let (fo, po) = self.eval_opaque(wo, wi);
+            f += fo * (1.0 - t);
+            pdf += po * (1.0 - t);
+        }
+        if self.rough_glass() {
+            let (fg, pg) = self.eval_rough_glass(wo, wi);
+            f += fg * t;
+            pdf += pg * t;
+        }
+        (f, pdf)
     }
 
     pub fn sample(&self, wo_w: Vec3, u_lobe: f32, u1: f32, u2: f32) -> Option<BsdfSample> {
         let m = self.mat;
-        if u_lobe < m.transmission {
-            return self.sample_glass(wo_w, u1, u2);
-        }
-        // Rimappa u_lobe in [0,1) per la scelta tra speculare e diffuso.
-        let u = if m.transmission > 0.0 {
-            (u_lobe - m.transmission) / (1.0 - m.transmission)
-        } else {
-            u_lobe
-        };
         let wo = self.frame.to_local(wo_w);
         if wo.z <= 0.0 {
             return None;
         }
-        let p_spec = self.spec_probability(wo);
-        let wi = if u < p_spec {
-            let h = sample_vndf(wo, m.alpha, u1, u2);
-            let wi = 2.0 * wo.dot(h) * h - wo;
-            if wi.z <= 0.0 {
-                return None;
+        let wi = if u_lobe < m.transmission {
+            if !self.rough_glass() {
+                return self.sample_glass(wo_w, u1, u2);
             }
-            wi
+            // Vetro satinato: microfaccia visibile, poi riflessione o rifrazione con probabilità F.
+            let (n_o, n_t) = self.ior_pair();
+            let eta = n_t / n_o;
+            let wm = sample_vndf(wo, m.alpha, u1, u2);
+            let wom = wo.dot(wm);
+            let (fr, cos_t) = fresnel_dielectric(wom, eta);
+            // Terzo numero casuale ricavato da u_lobe (già usato solo per la soglia).
+            let u3 = u_lobe / m.transmission;
+            if u3 < fr {
+                2.0 * wom * wm - wo
+            } else {
+                -wo / eta + wm * (wom / eta - cos_t)
+            }
         } else {
-            sampling::cosine_hemisphere(u1, u2)
+            let u = if m.transmission > 0.0 {
+                (u_lobe - m.transmission) / (1.0 - m.transmission)
+            } else {
+                u_lobe
+            };
+            let p_spec = self.spec_probability(wo);
+            if u < p_spec {
+                let h = sample_vndf(wo, m.alpha, u1, u2);
+                2.0 * wo.dot(h) * h - wo
+            } else {
+                sampling::cosine_hemisphere(u1, u2)
+            }
         };
-        let wi_w = self.frame.to_world(wi);
+        if !wi.is_finite() || wi.z == 0.0 {
+            return None;
+        }
+        let wi_w = self.frame.to_world(wi.normalize());
+        // Stimatore a un campione sulla miscela dei lobi: f e pdf complessivi.
         let (f, pdf) = self.eval(wo_w, wi_w);
         if pdf <= 0.0 || f == Vec3::ZERO {
             return None;
         }
         Some(BsdfSample {
             wi: wi_w,
-            weight: f * (wi.z / pdf),
+            weight: f * (wi_w.dot(self.frame.n).abs() / pdf),
             pdf,
             delta: false,
         })
@@ -295,9 +439,8 @@ mod tests {
         (acc / n as f64) as f32
     }
 
-    /// Nessun materiale crea energia. Il GGX a singolo scattering perde energia
-    /// alle rugosità alte (la compensazione multi-scattering è prevista più avanti),
-    /// quindi il limite inferiore dipende dalla rugosità.
+    /// Nessun materiale crea energia e, grazie alla compensazione multi-scattering,
+    /// un metallo bianco conserva l'energia anche se molto ruvido.
     #[test]
     fn energy_conservation() {
         let wo = Vec3::new(0.5, 0.0, 0.866).normalize();
@@ -363,6 +506,58 @@ mod tests {
         }
     }
 
+    fn glass(roughness: f32, entering: bool) -> (RenderMaterial, bool) {
+        (
+            RenderMaterial::from_material(&Material {
+                base_color: [1.0; 3],
+                transmission: 1.0,
+                roughness,
+                ior: 1.5,
+                ..Default::default()
+            }),
+            entering,
+        )
+    }
+
+    /// Vetro satinato: la somma di riflessione e trasmissione non supera 1, e il
+    /// campionamento è coerente con eval/pdf su tutta la sfera delle direzioni.
+    #[test]
+    fn rough_glass_energy_and_consistency() {
+        for &(rough, entering) in &[(0.3, true), (0.6, true), (0.3, false)] {
+            let (m, ent) = glass(rough, entering);
+            let b = Bsdf {
+                frame: Onb::from_normal(Vec3::Z),
+                ng: Vec3::Z,
+                mat: &m,
+                entering: ent,
+            };
+            let wo = Vec3::new(0.3, 0.1, 0.95).normalize();
+            let mut rng = Pcg32::new(21, 5);
+            let n = 400_000;
+            let mut by_sample = 0.0f64;
+            for _ in 0..n {
+                if let Some(s) = b.sample(wo, rng.next_f32() * 0.999, rng.next_f32(), rng.next_f32()) {
+                    by_sample += s.weight.x as f64;
+                }
+            }
+            let by_sample = by_sample / n as f64;
+            let mut by_eval = 0.0f64;
+            for _ in 0..n {
+                let d = sampling::uniform_sphere(rng.next_f32(), rng.next_f32());
+                let (f, _) = b.eval(wo, d);
+                by_eval += (f.x * d.z.abs() / sampling::UNIFORM_SPHERE_PDF) as f64;
+            }
+            let by_eval = by_eval / n as f64;
+            // La trasmissione include la scala fisica della radianza (n_o/n_i)²: entrando nel vetro
+            // l'albedo "apparente" è ≈ R + T/η² ≈ 0.47. L'energia si verifica sulla sfera completa
+            // (white furnace in tests/physics.rs); qui si controlla la coerenza sample/eval/pdf.
+            assert!(
+                (by_sample - by_eval).abs() / by_eval.max(1e-3) < 0.03,
+                "sample {by_sample} vs eval {by_eval} (rough {rough}, entering {entering})"
+            );
+        }
+    }
+
     #[test]
     fn eval_is_reciprocal() {
         let m = mat(0.7, 0.3, 0.4, 0.5);
@@ -371,7 +566,8 @@ mod tests {
         let c = Vec3::new(-0.6, 0.4, 0.5).normalize();
         let (f1, _) = b.eval(a, c);
         let (f2, _) = b.eval(c, a);
-        assert!((f1 - f2).length() < 1e-5, "{f1} vs {f2}");
+        // La compensazione multi-scattering di Turquin dipende solo da wo: reciprocità all'1%.
+        assert!((f1 - f2).length() / f1.length() < 0.01, "{f1} vs {f2}");
     }
 
     #[test]

@@ -63,9 +63,9 @@ esatto e scala della radianza (n₁/n₂)².
 
 ### Limiti noti della Milestone 1
 
-- GGX a singolo scattering: i metalli molto ruvidi perdono energia (≈40% a roughness 0.9).
-  Compensazione multi-scattering prevista nella Fase 3.
-- Vetro solo liscio; nessuna texture, normal map, HDRI; niente profondità di campo.
+- La compensazione multi-scattering di Turquin dipende solo dalla direzione d'uscita:
+  reciprocità approssimata (scarto < 1%).
+- Niente profondità di campo, opacità/ritagli, displacement.
 - Le caustiche (luce focalizzata da vetro/metallo) convergono lentamente, come in ogni
   path tracer unidirezionale.
 - Geometria appiattita in spazio mondo (niente instancing): assiemi con molte copie dello
