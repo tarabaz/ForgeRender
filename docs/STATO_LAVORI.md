@@ -23,10 +23,17 @@
 - Fase 3: HDRI .hdr/.exr con importance sampling + MIS; texture colore/roughness/normal map
   con mapping UV o box (CAD senza UV). Verificate con test analitici e render visivi.
 
+## Fatto nella quarta parte
+- Trasformazioni non distruttive (scheda Oggetto, mm, Alt+trascina), libreria di 124 materiali.
+- Import STEP con Open CASCADE (convertitore separato forgerender-step, test end-to-end),
+  bridge SolidWorks via COM (da collaudare sul PC con SolidWorks).
+- Import glTF/GLB e .blend (via Blender in background), verificato con Blender 4.0.
+- Fase 3 completata: compensazione multi-scattering, emissivi come luci, vetro satinato.
+- Fase 4: backend GPU WGSL via wgpu con test fisici e confronto statistico con la CPU.
+
 ## Prossimi passi
-1. Prova sul PC reale: scaricare ForgeRender-portable-x64 dagli artifact della CI.
-2. Benchmark sul 9900X (`forgerender-cli bench --json bench-9900x.json`).
-3. Fase 3 restante: compensazione multi-scattering GGX, NEE sulle superfici emissive,
-   trasmissione ruvida, mip-mapping.
-4. Fase 4: backend GPU wgpu compute (riusa il layout BVH di forge_accel).
-5. Fase 5: convertitore STEP (Open CASCADE) e bridge SolidWorks (C#/COM).
+1. Confermare in CI la build Windows di Open CASCADE (correzione CMake 4 applicata).
+2. Prova sul PC reale: avvio, viewport e render GPU sulla RTX 5070, benchmark CPU vs GPU,
+   import dei file STEP/SLDASM reali, bridge SolidWorks.
+3. Fase 6: denoiser (Intel Open Image Denoise), arresto a soglia di rumore.
+4. GPU: NVML per utilizzo/VRAM, eventuale ray tracing hardware; anteprima RTX (DLSS RR) opzionale.
