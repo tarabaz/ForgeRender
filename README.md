@@ -13,6 +13,7 @@ pensato per Windows 11 (Ryzen 9 9900X + RTX 5070) ma funzionante anche senza GPU
   (16…1024, personalizzato o illimitato), modificabile durante il render.
 - Next Event Estimation + Multiple Importance Sampling, Russian roulette, BVH SAH.
 - Materiali: diffuso, metalli e plastiche GGX (campionamento VNDF), vetro con Fresnel esatto, emissivi.
+  Texture colore/roughness/normal map con mapping UV o proiezione box (per CAD senza UV).
   Libreria iniziale di 15 preset.
 - Luci ad area, puntiformi, spot, direzionali; ambiente uniforme, a gradiente o HDRI (.hdr/.exr)
   con importance sampling; 5 preset da studio.

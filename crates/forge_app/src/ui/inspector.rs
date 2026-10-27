@@ -244,13 +244,108 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
         changed |= ui.text_edit_singleline(&mut m.category).changed();
         ui.end_row();
     });
-    unavailable(ui, "Texture, UV e tiling", "Fase 3");
-    unavailable(ui, "Normal / bump map", "Fase 3");
-    unavailable(ui, "Opacità e trasmissione ruvida", "Fase 3");
+    ui.add_space(4.0);
+    ui.strong("Texture");
+    egui::Grid::new("tex-grid").num_columns(2).spacing([10.0, 6.0]).show(ui, |ui| {
+        ui.label("Colore base");
+        if texture_slot(ui, &mut m.base_color_texture, "base") {
+            if m.base_color_texture.is_some() {
+                m.base_color = [1.0; 3]; // la texture viene moltiplicata per il colore base
+            }
+            changed = true;
+        }
+        ui.end_row();
+        ui.label("Roughness");
+        if texture_slot(ui, &mut m.roughness_texture, "rough") {
+            if m.roughness_texture.is_some() {
+                m.roughness = 1.0; // la texture (canale R) viene moltiplicata per la roughness
+            }
+            changed = true;
+        }
+        ui.end_row();
+        ui.label("Normal map");
+        changed |= texture_slot(ui, &mut m.normal_texture, "normal");
+        ui.end_row();
+        if m.has_textures() {
+            ui.label("Proiezione");
+            ui.horizontal(|ui| {
+                changed |= ui
+                    .radio_value(&mut m.mapping.projection, forge_scene::Projection::Box, "Box (CAD)")
+                    .on_hover_text("Proiezione cubica in spazio mondo: non richiede UV")
+                    .changed();
+                changed |= ui
+                    .radio_value(&mut m.mapping.projection, forge_scene::Projection::Uv, "UV della mesh")
+                    .changed();
+            });
+            ui.end_row();
+            match m.mapping.projection {
+                forge_scene::Projection::Box => {
+                    ui.label("Dimensione ripetizione (m)");
+                    changed |= ui
+                        .add(egui::DragValue::new(&mut m.mapping.scale).speed(0.001).range(0.0001..=100.0))
+                        .changed();
+                }
+                forge_scene::Projection::Uv => {
+                    ui.label("Ripetizioni");
+                    changed |= ui
+                        .add(egui::DragValue::new(&mut m.mapping.scale).speed(0.05).range(0.001..=1000.0))
+                        .changed();
+                }
+            }
+            ui.end_row();
+            ui.label("Rotazione (°)");
+            changed |= ui.add(egui::Slider::new(&mut m.mapping.rotation_deg, -180.0..=180.0)).changed();
+            ui.end_row();
+            ui.label("Spostamento");
+            ui.horizontal(|ui| {
+                changed |= ui.add(egui::DragValue::new(&mut m.mapping.offset[0]).speed(0.01)).changed();
+                changed |= ui.add(egui::DragValue::new(&mut m.mapping.offset[1]).speed(0.01)).changed();
+            });
+            ui.end_row();
+        }
+        if m.normal_texture.is_some() {
+            ui.label("Intensità normal map");
+            changed |= ui.add(egui::Slider::new(&mut m.normal_strength, 0.0..=4.0)).changed();
+            ui.end_row();
+        }
+    });
+    unavailable(ui, "Displacement, opacità e trasmissione ruvida", "fasi successive");
     if changed {
         app.appearance_changed();
     }
     crate::ui::central::material_preview(app, ui);
+}
+
+/// Slot di una texture: nome del file, "Scegli…" e rimozione. Restituisce `true` se cambiato.
+fn texture_slot(ui: &mut egui::Ui, slot: &mut Option<std::path::PathBuf>, id: &str) -> bool {
+    let mut changed = false;
+    ui.push_id(id, |ui| {
+        ui.horizontal(|ui| {
+            match slot {
+                Some(p) => {
+                    let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                    ui.label(name).on_hover_text(p.display().to_string());
+                    if ui.small_button("×").on_hover_text("Rimuovi texture").clicked() {
+                        *slot = None;
+                        changed = true;
+                    }
+                }
+                None => {
+                    ui.label(egui::RichText::new("nessuna").weak());
+                }
+            }
+            if ui.small_button("Scegli…").clicked() {
+                if let Some(p) = rfd::FileDialog::new()
+                    .add_filter("Immagini", &["png", "jpg", "jpeg", "exr", "hdr"])
+                    .pick_file()
+                {
+                    *slot = Some(p);
+                    changed = true;
+                }
+            }
+        });
+    });
+    changed
 }
 
 // ----------------------------------------------------------------------

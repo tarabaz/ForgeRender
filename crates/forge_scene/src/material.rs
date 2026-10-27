@@ -1,6 +1,7 @@
 //! Materiali PBR del renderer, indipendenti dal file CAD di origine.
 
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 /// Identificatore stabile di un materiale (stringa, salvata nel progetto).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -25,7 +26,8 @@ impl std::fmt::Display for MaterialId {
 /// - `transmission` interpola verso un dielettrico trasparente liscio (vetro), con Fresnel esatto e `ior`;
 /// - `emission` è radianza emessa (W·sr⁻¹·m⁻²) moltiplicata per `emission_strength`.
 ///
-/// Texture, normal map, opacità e trasmissione ruvida sono previste nella Fase 3.
+/// Texture opzionali: colore base (sRGB), roughness (canale R, lineare) e
+/// normal map (tangent space, convenzione OpenGL / +Y), con mappatura UV o box.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Material {
@@ -41,8 +43,59 @@ pub struct Material {
     pub transmission: f32,
     pub emission: [f32; 3],
     pub emission_strength: f32,
+    pub base_color_texture: Option<PathBuf>,
+    pub roughness_texture: Option<PathBuf>,
+    pub normal_texture: Option<PathBuf>,
+    pub normal_strength: f32,
+    pub mapping: TextureMapping,
     /// Categoria per la libreria (solo UI).
     pub category: String,
+}
+
+/// Come si proiettano le texture sulla superficie.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum Projection {
+    /// Coordinate UV della mesh (OBJ con `vt`). Senza UV si ricade sulla proiezione box.
+    Uv,
+    /// Proiezione cubica in spazio mondo lungo l'asse dominante della normale:
+    /// adatta ai modelli CAD, che di solito non hanno UV.
+    #[default]
+    Box,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct TextureMapping {
+    pub projection: Projection,
+    /// Box: lato di una ripetizione della texture in metri. UV: numero di ripetizioni.
+    pub scale: f32,
+    pub rotation_deg: f32,
+    pub offset: [f32; 2],
+}
+
+impl Default for TextureMapping {
+    fn default() -> Self {
+        Self {
+            projection: Projection::Box,
+            scale: 0.1,
+            rotation_deg: 0.0,
+            offset: [0.0; 2],
+        }
+    }
+}
+
+impl TextureMapping {
+    /// Trasforma le coordinate di base (UV della mesh o proiezione box già in metri).
+    pub fn apply(&self, uv: forge_math::Vec2, is_box: bool) -> forge_math::Vec2 {
+        let s = if is_box { 1.0 / self.scale.max(1e-6) } else { self.scale };
+        let (sn, cs) = self.rotation_deg.to_radians().sin_cos();
+        let p = uv * s;
+        forge_math::Vec2::new(p.x * cs - p.y * sn, p.x * sn + p.y * cs) + forge_math::Vec2::from_array(self.offset)
+    }
+
+    pub fn is_default(&self) -> bool {
+        *self == Self::default()
+    }
 }
 
 impl Default for Material {
@@ -58,6 +111,11 @@ impl Default for Material {
             transmission: 0.0,
             emission: [0.0; 3],
             emission_strength: 0.0,
+            base_color_texture: None,
+            roughness_texture: None,
+            normal_texture: None,
+            normal_strength: 1.0,
+            mapping: TextureMapping::default(),
             category: "Generico".into(),
         }
     }
@@ -80,7 +138,19 @@ impl Material {
         } else {
             0.0
         };
+        m.normal_strength = if m.normal_strength.is_finite() {
+            m.normal_strength.clamp(0.0, 4.0)
+        } else {
+            1.0
+        };
+        if !m.mapping.scale.is_finite() || m.mapping.scale <= 0.0 {
+            m.mapping.scale = TextureMapping::default().scale;
+        }
         m
+    }
+
+    pub fn has_textures(&self) -> bool {
+        self.base_color_texture.is_some() || self.roughness_texture.is_some() || self.normal_texture.is_some()
     }
 
     pub fn is_emissive(&self) -> bool {

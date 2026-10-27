@@ -269,3 +269,72 @@ fn hdri_with_sun_matches_reference_irradiance() {
     let expected = (rho as f64 / std::f64::consts::PI * e) as f32;
     assert!((c.x - expected).abs() / expected < 0.03, "{} vs {expected}", c.x);
 }
+
+fn write_png(name: &str, w: u32, h: u32, px: &[[u8; 3]]) -> std::path::PathBuf {
+    let mut img = image::RgbImage::new(w, h);
+    for (i, p) in img.pixels_mut().enumerate() {
+        *p = image::Rgb(px[i]);
+    }
+    let dir = std::env::temp_dir().join(format!("forge_tex_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join(name);
+    img.save(&path).unwrap();
+    path
+}
+
+/// Piano in white furnace con texture rosso|blu in proiezione box da 1 m:
+/// la radianza deve essere il colore del texel nel punto inquadrato.
+#[test]
+fn box_mapped_texture_in_furnace() {
+    let tex = write_png("rosso_blu.png", 2, 1, &[[255, 0, 0], [0, 0, 255]]);
+    for (x, expect_red) in [(0.25f32, true), (0.75, false)] {
+        let mut s = plane_scene(1.0);
+        s.environment = Environment::Uniform {
+            color: [1.0; 3],
+            strength: 1.0,
+        };
+        let m = s.materials.get_mut(&MaterialId::new("test")).unwrap();
+        m.base_color_texture = Some(tex.clone());
+        m.mapping = forge_scene::TextureMapping {
+            projection: forge_scene::Projection::Box,
+            scale: 1.0,
+            rotation_deg: 0.0,
+            offset: [0.0; 2],
+        };
+        s.camera = Camera {
+            position: Vec3::new(x, 5.0, 0.3),
+            target: Vec3::new(x, 0.0, 0.3),
+            up: Vec3::Z,
+            vfov_deg: 0.3,
+        };
+        let img = render(&s, &settings(8, 8), 16, 2);
+        let c = mean_region(&img, 8, 0, 0, 8, 8);
+        let (main, other) = if expect_red { (c.x, c.z) } else { (c.z, c.x) };
+        assert!(main > 0.95 && other < 0.05, "x={x}: {c}");
+        assert!(c.y < 1e-4, "verde inatteso: {c}");
+    }
+}
+
+/// Una normal map "piatta" non deve alterare l'immagine.
+#[test]
+fn flat_normal_map_is_neutral() {
+    let flat = write_png("normale_piatta.png", 1, 1, &[[128, 128, 255]]);
+    let mut s = Scene::test_scene();
+    let st = RenderSettings {
+        width: 24,
+        height: 16,
+        ..Default::default()
+    };
+    let reference = render(&s, &st, 16, 2);
+    for m in &mut s.materials.materials {
+        m.normal_texture = Some(flat.clone());
+    }
+    let with_map = render(&s, &st, 16, 2);
+    let diff: f32 = reference
+        .iter()
+        .zip(&with_map)
+        .map(|(a, b)| (0..3).map(|k| (a[k] - b[k]).abs()).sum::<f32>())
+        .sum::<f32>()
+        / reference.iter().map(|a| a.iter().sum::<f32>()).sum::<f32>();
+    assert!(diff < 0.02, "differenza relativa {diff}");
+}

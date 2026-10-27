@@ -9,6 +9,7 @@
 pub mod bsdf;
 mod integrator;
 pub mod lights;
+mod textures;
 
 pub use integrator::radiance;
 

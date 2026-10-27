@@ -1,11 +1,13 @@
+use crate::texture::Texture;
 use crate::EnvironmentMap;
 use forge_accel::TriangleAccel;
-use forge_math::{Aabb, Mat3, Vec3};
-use forge_scene::{Camera, Environment, LightKind, Material, Scene};
+use forge_math::{Aabb, Mat3, Vec2, Vec3};
+use forge_scene::{Camera, Environment, LightKind, Material, Scene, TextureMapping};
 use std::sync::Arc;
 
 /// Materiale con i parametri derivati già calcolati per l'integratore.
-#[derive(Clone, Debug)]
+/// È `Copy`: con le texture l'integratore ne crea una copia locale per ogni punto colpito.
+#[derive(Clone, Copy, Debug)]
 pub struct RenderMaterial {
     pub base_color: Vec3,
     pub metallic: f32,
@@ -18,6 +20,45 @@ pub struct RenderMaterial {
     pub specular_scale: f32,
     pub transmission: f32,
     pub emission: Vec3,
+    /// Roughness originale (serve per modularla con la texture).
+    pub roughness: f32,
+}
+
+/// Texture di un materiale, già caricate.
+#[derive(Debug, Default)]
+pub struct MaterialTextures {
+    pub base_color: Option<Arc<Texture>>,
+    pub roughness: Option<Arc<Texture>>,
+    pub normal: Option<Arc<Texture>>,
+    pub normal_strength: f32,
+    pub mapping: TextureMapping,
+}
+
+impl MaterialTextures {
+    /// Carica le texture del materiale (dalla cache). Le texture mancanti vengono
+    /// segnalate nel log e ignorate: il render prosegue senza.
+    pub fn load(m: &Material) -> Option<Arc<MaterialTextures>> {
+        if !m.has_textures() {
+            return None;
+        }
+        let load = |p: &Option<std::path::PathBuf>, srgb: bool| {
+            p.as_ref().and_then(|p| match crate::texture::load_cached(p, srgb) {
+                Ok(t) => Some(t),
+                Err(e) => {
+                    tracing::error!("materiale «{}»: {e:#}", m.name);
+                    None
+                }
+            })
+        };
+        let t = MaterialTextures {
+            base_color: load(&m.base_color_texture, true),
+            roughness: load(&m.roughness_texture, false),
+            normal: load(&m.normal_texture, false),
+            normal_strength: m.normal_strength,
+            mapping: m.mapping,
+        };
+        (t.base_color.is_some() || t.roughness.is_some() || t.normal.is_some()).then(|| Arc::new(t))
+    }
 }
 
 impl RenderMaterial {
@@ -33,6 +74,7 @@ impl RenderMaterial {
             specular_scale: m.specular * 2.0,
             transmission: m.transmission,
             emission: Vec3::from_array(m.emission) * m.emission_strength,
+            roughness: m.roughness,
         }
     }
 }
@@ -84,6 +126,10 @@ pub struct RenderGeometry {
     pub shading_normals: Vec<[Vec3; 3]>,
     /// Indice del nodo di scena di provenienza.
     pub tri_node: Vec<u32>,
+    /// Coordinate UV ai vertici (zero se la mesh non ne ha).
+    pub tri_uvs: Vec<[Vec2; 3]>,
+    /// Tangente ∂p/∂u in spazio mondo (zero se la mesh non ha UV).
+    pub tri_tangents: Vec<Vec3>,
     pub bounds: Aabb,
 }
 
@@ -96,6 +142,8 @@ impl RenderGeometry {
         let mut gn = Vec::new();
         let mut sn = Vec::new();
         let mut tnode = Vec::new();
+        let mut tuv = Vec::new();
+        let mut ttan = Vec::new();
         for (i, node) in scene.nodes.iter().enumerate() {
             let Some(mi) = node.mesh else { continue };
             if !scene.is_visible(i) {
@@ -107,6 +155,7 @@ impl RenderGeometry {
             // Una trasformazione con determinante negativo (specchiatura) inverte il winding.
             let mirrored = Mat3::from_mat4(xf).determinant() < 0.0;
             let has_n = mesh.has_normals();
+            let has_uv = mesh.uvs.len() == mesh.positions.len();
             for idx in &mesh.indices {
                 let p = idx.map(|k| xf.transform_point3(mesh.positions[k as usize]));
                 let mut ng = (p[1] - p[0]).cross(p[2] - p[0]);
@@ -122,10 +171,26 @@ impl RenderGeometry {
                 } else {
                     [ng; 3]
                 };
+                let (uv, tangent) = if has_uv {
+                    let uv = idx.map(|k| mesh.uvs[k as usize]);
+                    // ∂p/∂u dai differenziali del triangolo.
+                    let (d1, d2) = (uv[1] - uv[0], uv[2] - uv[0]);
+                    let det = d1.x * d2.y - d1.y * d2.x;
+                    let t = if det.abs() > 1e-12 {
+                        ((p[1] - p[0]) * d2.y - (p[2] - p[0]) * d1.y) / det
+                    } else {
+                        Vec3::ZERO
+                    };
+                    (uv, if t.is_finite() { t } else { Vec3::ZERO })
+                } else {
+                    ([Vec2::ZERO; 3], Vec3::ZERO)
+                };
                 tris.push(p);
                 gn.push(ng);
                 sn.push(ns);
                 tnode.push(i as u32);
+                tuv.push(uv);
+                ttan.push(tangent);
             }
         }
         let accel = TriangleAccel::build(&tris);
@@ -141,6 +206,8 @@ impl RenderGeometry {
             geometric_normals: gn,
             shading_normals: sn,
             tri_node: tnode,
+            tri_uvs: tuv,
+            tri_tangents: ttan,
             bounds,
         }
     }
@@ -152,6 +219,8 @@ pub struct RenderScene {
     /// Materiale effettivo di ogni nodo della scena (indice in `materials`).
     pub node_material: Vec<u32>,
     pub materials: Vec<RenderMaterial>,
+    /// Texture per materiale (stesso indice di `materials`).
+    pub material_textures: Vec<Option<Arc<MaterialTextures>>>,
     pub lights: Vec<RenderLight>,
     pub environment: Environment,
     /// Mappa HDRI caricata (se l'ambiente è una HDRI), con intensità e rotazione in radianti.
@@ -169,8 +238,11 @@ impl RenderScene {
     /// già costruita (operazione economica: nessuna ricostruzione della BVH).
     pub fn compile_with_geometry(scene: &Scene, geometry: Arc<RenderGeometry>) -> RenderScene {
         let mut materials: Vec<RenderMaterial> = scene.materials.materials.iter().map(RenderMaterial::from_material).collect();
+        let mut material_textures: Vec<Option<Arc<MaterialTextures>>> =
+            scene.materials.materials.iter().map(MaterialTextures::load).collect();
         let fallback = materials.len() as u32;
         materials.push(RenderMaterial::from_material(&Material::default()));
+        material_textures.push(None);
         let node_material = (0..scene.nodes.len())
             .map(|i| {
                 scene
@@ -249,6 +321,7 @@ impl RenderScene {
             geometry,
             node_material,
             materials,
+            material_textures,
             lights,
             environment,
             env_map,
@@ -275,10 +348,16 @@ impl RenderScene {
         self.geometry.bounds
     }
 
+    /// Indice del materiale del triangolo `prim`.
+    #[inline]
+    pub fn material_index(&self, prim: usize) -> usize {
+        self.node_material[self.geometry.tri_node[prim] as usize] as usize
+    }
+
     /// Materiale del triangolo `prim`.
     #[inline]
     pub fn material_of(&self, prim: usize) -> &RenderMaterial {
-        &self.materials[self.node_material[self.geometry.tri_node[prim] as usize] as usize]
+        &self.materials[self.material_index(prim)]
     }
 
     /// Picking: nodo di scena colpito da un raggio.

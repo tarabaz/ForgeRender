@@ -29,8 +29,11 @@ accumulo corretto, export PNG.
 - ✅ BRDF GGX, metalli, dielettrici, riflessi, rifrazioni, Fresnel, persistenza materiali, editor base
 - ✅ HDRI equirettangolari (.hdr/.exr) con importance sampling e MIS, rotazione e intensità,
   verificate contro integrazione di riferimento
-- ⏳ texture e UV (con proiezione box/triplanare per CAD senza UV), normal/bump map,
-  trasmissione ruvida, compensazione multi-scattering, NEE sulle superfici emissive
+- ✅ texture colore base / roughness / normal map (PNG, JPEG, EXR, HDR), mapping UV o
+  proiezione box in metri per CAD senza UV, ripetizione, rotazione, spostamento; percorsi
+  ritrovati se il progetto viene spostato
+- ⏳ bump/displacement, opacità, trasmissione ruvida, compensazione multi-scattering,
+  NEE sulle superfici emissive, mip-mapping
 
 ## Fase 4 — GPU ⏳
 Path tracer WGSL in compute shader via wgpu, confronto CPU/GPU sulla stessa scena,

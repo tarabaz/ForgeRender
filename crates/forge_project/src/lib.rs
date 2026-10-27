@@ -175,6 +175,23 @@ pub fn parse(json: &str) -> anyhow::Result<ProjectFile> {
     serde_json::from_value(v).context("struttura del progetto non valida")
 }
 
+/// Se un file esterno (HDRI, texture) non esiste più nel percorso salvato, lo
+/// cerca accanto al progetto o nelle sottocartelle indicate.
+fn relocate_asset(path: &mut PathBuf, project_dir: Option<&Path>, subdirs: &[&str], report: &mut LoadReport) {
+    if path.is_file() {
+        return;
+    }
+    let Some(name) = path.file_name().map(PathBuf::from) else { return };
+    let found = std::iter::once(name.clone())
+        .chain(subdirs.iter().map(|d| Path::new(d).join(&name)))
+        .filter_map(|r| project_dir.map(|d| d.join(r)))
+        .find(|p| p.is_file());
+    match found {
+        Some(p) => *path = p,
+        None => report.warnings.push(format!("file non trovato: {}", path.display())),
+    }
+}
+
 pub fn load(path: &Path) -> anyhow::Result<LoadedProject> {
     let text = std::fs::read_to_string(path).with_context(|| format!("lettura di {}", path.display()))?;
     let pf = parse(&text)?;
@@ -229,21 +246,16 @@ pub fn load(path: &Path) -> anyhow::Result<LoadedProject> {
     }
     scene.lights = pf.lights;
     scene.environment = pf.environment;
-    // HDRI spostata insieme al progetto: si cerca il file nella cartella del progetto.
+    // HDRI e texture spostate insieme al progetto: si cercano nella cartella del progetto.
     if let forge_scene::Environment::Hdri { path: hdri, .. } = &mut scene.environment {
-        if !hdri.is_file() {
-            let found = [
-                hdri.file_name().map(PathBuf::from),
-                Some(PathBuf::from("hdri")).zip(hdri.file_name()).map(|(a, b)| a.join(b)),
-            ]
+        relocate_asset(hdri, project_dir, &["hdri"], &mut report);
+    }
+    for m in &mut scene.materials.materials {
+        for slot in [&mut m.base_color_texture, &mut m.roughness_texture, &mut m.normal_texture]
             .into_iter()
             .flatten()
-            .filter_map(|r| project_dir.map(|d| d.join(r)))
-            .find(|p| p.is_file());
-            match found {
-                Some(p) => *hdri = p,
-                None => report.warnings.push(format!("HDRI non trovata: {}", hdri.display())),
-            }
+        {
+            relocate_asset(slot, project_dir, &["textures", "texture"], &mut report);
         }
     }
     scene.camera = pf.camera;

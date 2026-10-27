@@ -90,10 +90,15 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
         // Geometria del punto colpito.
         let prim = hit.prim as usize;
         let p = o + d * hit.t;
-        let mat = scene.material_of(prim);
+        let mat_idx = scene.material_index(prim);
+        let mut mat_local = scene.materials[mat_idx];
         let mut ng = geo.geometric_normals[prim];
         let [n0, n1, n2] = geo.shading_normals[prim];
         let mut ns = (n0 * (1.0 - hit.u - hit.v) + n1 * hit.u + n2 * hit.v).normalize_or(ng);
+        if let Some(tex) = &scene.material_textures[mat_idx] {
+            crate::textures::apply(tex, geo, &hit, p, &mut mat_local, &mut ns);
+        }
+        let mat = &mat_local;
         let wo = -d;
         let entering = ng.dot(wo) > 0.0;
         if !entering {
