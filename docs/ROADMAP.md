@@ -27,7 +27,9 @@ accumulo corretto, export PNG.
 
 ## Fase 3 — Materiali e illuminazione 🟡
 - ✅ BRDF GGX, metalli, dielettrici, riflessi, rifrazioni, Fresnel, persistenza materiali, editor base
-- ⏳ texture e UV, normal/bump map, HDRI equirettangolari con importance sampling,
+- ✅ HDRI equirettangolari (.hdr/.exr) con importance sampling e MIS, rotazione e intensità,
+  verificate contro integrazione di riferimento
+- ⏳ texture e UV (con proiezione box/triplanare per CAD senza UV), normal/bump map,
   trasmissione ruvida, compensazione multi-scattering, NEE sulle superfici emissive
 
 ## Fase 4 — GPU ⏳

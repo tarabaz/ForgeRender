@@ -195,3 +195,77 @@ fn deterministic_across_thread_counts() {
     };
     assert_eq!(render(&s, &st, 3, 1), render(&s, &st, 3, 3));
 }
+
+/// Scrive una HDRI di test in EXR: cielo uniforme + "sole" piccolo e intenso.
+fn write_test_hdri(name: &str, sky: f32, sun: f32) -> std::path::PathBuf {
+    let (w, h) = (128u32, 64u32);
+    let mut img = image::Rgb32FImage::new(w, h);
+    for (x, y, p) in img.enumerate_pixels_mut() {
+        let v = if (20..23).contains(&y) && (80..83).contains(&x) { sun } else { sky };
+        *p = image::Rgb([v, v, v]);
+    }
+    let dir = std::env::temp_dir().join(format!("forge_hdri_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join(name);
+    img.save(&path).unwrap();
+    path
+}
+
+/// White furnace con HDRI uniforme: verifica la NEE sull'ambiente e il MIS con la BSDF.
+#[test]
+fn white_furnace_hdri() {
+    let path = write_test_hdri("uniforme.exr", 1.0, 1.0);
+    let mut s = sphere_scene(test_material(0.5, 0.0, 0.5, 0.0, 0.0), 1.0);
+    s.environment = Environment::Hdri {
+        path,
+        strength: 1.0,
+        rotation_deg: 0.0,
+    };
+    let img = render(&s, &settings(32, 32), 64, 4);
+    let c = mean_region(&img, 32, 12, 12, 20, 20);
+    assert!((c.x - 0.5).abs() < 0.01, "radianza {c}");
+}
+
+/// Piano diffuso illuminato da una HDRI con sole: L = ρ/π · E, con E calcolata
+/// in modo indipendente integrando la mappa sull'emisfero superiore.
+#[test]
+fn hdri_with_sun_matches_reference_irradiance() {
+    let path = write_test_hdri("sole.exr", 0.3, 2000.0);
+    let rho = 0.7;
+    let mut s = plane_scene(rho);
+    s.environment = Environment::Hdri {
+        path: path.clone(),
+        strength: 1.0,
+        rotation_deg: 30.0,
+    };
+    let img = render(&s, &settings(8, 8), 256, 4);
+    let c = mean_region(&img, 8, 0, 0, 8, 8);
+
+    // Riferimento: integrazione deterministica pixel per pixel della mappa (angolo solido esatto per pixel).
+    let map = forge_render_core::EnvironmentMap::load(&path).unwrap();
+    let (w, h) = (map.width, map.height);
+    let mut e = 0.0f64;
+    for y in 0..h {
+        let (t0, t1) = (
+            y as f64 / h as f64 * std::f64::consts::PI,
+            (y + 1) as f64 / h as f64 * std::f64::consts::PI,
+        );
+        for x in 0..w {
+            // Si integra cos θ sul pixel: ∫∫ cosθ sinθ dθ dφ, metà superiore (y > 0 ⇔ θ < π/2).
+            let t1c = t1.min(std::f64::consts::FRAC_PI_2);
+            if t0 >= t1c {
+                continue;
+            }
+            let dphi = 2.0 * std::f64::consts::PI / w as f64;
+            let cos_int = 0.5 * (t1c.sin().powi(2) - t0.sin().powi(2));
+            let u = (x as f32 + 0.5) / w as f32;
+            let v = (y as f32 + 0.5) / h as f32;
+            let phi = (u - 0.5) * std::f32::consts::TAU + 30f32.to_radians();
+            let th = v * std::f32::consts::PI;
+            let d = Vec3::new(th.sin() * phi.sin(), th.cos(), -th.sin() * phi.cos());
+            e += map.radiance(d, 30f32.to_radians()).x as f64 * cos_int * dphi;
+        }
+    }
+    let expected = (rho as f64 / std::f64::consts::PI * e) as f32;
+    assert!((c.x - expected).abs() / expected < 0.03, "{} vs {expected}", c.x);
+}

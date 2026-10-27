@@ -1,8 +1,8 @@
 use forge_math::Vec3;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 /// Illuminazione ambientale (luce proveniente dall'infinito).
-/// Le mappe HDRI (equirettangolari) sono previste nella Fase 3.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Environment {
     /// Radianza uniforme in tutte le direzioni.
@@ -13,6 +13,13 @@ pub enum Environment {
         horizon: [f32; 3],
         ground: [f32; 3],
         strength: f32,
+    },
+    /// Mappa HDRI equirettangolare (.hdr Radiance o .exr), caricata dal renderer.
+    Hdri {
+        path: PathBuf,
+        strength: f32,
+        /// Rotazione attorno all'asse verticale (gradi).
+        rotation_deg: f32,
     },
 }
 
@@ -48,6 +55,8 @@ impl Environment {
                 };
                 c * *strength
             }
+            // La mappa è campionata dal renderer (vedi `forge_render_core::EnvironmentMap`).
+            Environment::Hdri { .. } => Vec3::ZERO,
         }
     }
 }

@@ -439,21 +439,34 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
 
 fn environment(app: &mut ForgeApp, ui: &mut egui::Ui) {
     let mut changed = false;
-    let mut kind = matches!(app.scene.environment, Environment::Gradient { .. });
+    let current = match app.scene.environment {
+        Environment::Uniform { .. } => 0,
+        Environment::Gradient { .. } => 1,
+        Environment::Hdri { .. } => 2,
+    };
+    let mut kind = current;
     ui.horizontal(|ui| {
-        changed |= ui.radio_value(&mut kind, false, "Uniforme").changed();
-        changed |= ui.radio_value(&mut kind, true, "Cielo a gradiente").changed();
+        ui.radio_value(&mut kind, 0, "Uniforme");
+        ui.radio_value(&mut kind, 1, "Cielo a gradiente");
+        ui.radio_value(&mut kind, 2, "Mappa HDRI");
     });
-    if changed {
-        app.scene.environment = if kind {
-            Environment::default()
-        } else {
-            Environment::Uniform {
-                color: [0.8; 3],
-                strength: 0.5,
+    if kind != current {
+        match kind {
+            0 => {
+                app.scene.environment = Environment::Uniform {
+                    color: [0.8; 3],
+                    strength: 0.5,
+                };
+                changed = true;
             }
-        };
+            1 => {
+                app.scene.environment = Environment::default();
+                changed = true;
+            }
+            _ => changed |= pick_hdri(app),
+        }
     }
+    let mut repick = false;
     egui::Grid::new("env-grid")
         .num_columns(2)
         .spacing([10.0, 6.0])
@@ -485,7 +498,29 @@ fn environment(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 changed |= ui.add(egui::Slider::new(strength, 0.0..=10.0).logarithmic(true)).changed();
                 ui.end_row();
             }
+            Environment::Hdri {
+                path,
+                strength,
+                rotation_deg,
+            } => {
+                ui.label("File");
+                ui.horizontal(|ui| {
+                    let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                    ui.label(name).on_hover_text(path.display().to_string());
+                    repick = ui.small_button("Cambia…").clicked();
+                });
+                ui.end_row();
+                ui.label("Intensità");
+                changed |= ui.add(egui::Slider::new(strength, 0.0..=20.0).logarithmic(true)).changed();
+                ui.end_row();
+                ui.label("Rotazione (°)");
+                changed |= ui.add(egui::Slider::new(rotation_deg, -180.0..=180.0)).changed();
+                ui.end_row();
+            }
         });
+    if repick {
+        changed |= pick_hdri(app);
+    }
     if changed {
         app.shading_changed();
     }
@@ -496,7 +531,41 @@ fn environment(app: &mut ForgeApp, ui: &mut egui::Ui) {
     {
         app.unsaved = true;
     }
-    unavailable(ui, "Mappe HDRI (.hdr/.exr)", "Fase 3");
+    if matches!(app.scene.environment, Environment::Hdri { .. }) {
+        ui.label(
+            egui::RichText::new(
+                "La HDRI illumina la scena con importance sampling (sole e finestre campionati direttamente). \
+                 Mappe gratuite CC0: polyhaven.com.",
+            )
+            .weak()
+            .small(),
+        );
+    }
+}
+
+/// Sceglie una HDRI e la carica in background (così il primo render non blocca l'interfaccia).
+fn pick_hdri(app: &mut ForgeApp) -> bool {
+    let Some(path) = rfd::FileDialog::new().add_filter("HDRI (.hdr, .exr)", &["hdr", "exr"]).pick_file() else {
+        return false;
+    };
+    let p2 = path.clone();
+    std::thread::spawn(move || {
+        if let Err(e) = forge_render_core::env_map::load_cached(&p2) {
+            tracing::error!("HDRI non caricata: {e:#}");
+        }
+    });
+    let (strength, rotation_deg) = match app.scene.environment {
+        Environment::Hdri {
+            strength, rotation_deg, ..
+        } => (strength, rotation_deg),
+        _ => (1.0, 0.0),
+    };
+    app.scene.environment = Environment::Hdri {
+        path,
+        strength,
+        rotation_deg,
+    };
+    true
 }
 
 // ----------------------------------------------------------------------

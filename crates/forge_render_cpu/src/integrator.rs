@@ -15,7 +15,7 @@
 //! l'eventuale `clamp_indirect` (disattivato per default).
 
 use crate::bsdf::Bsdf;
-use crate::lights::{intersect_area, sample_light};
+use crate::lights::{intersect_area, sample_light, LightSample};
 use forge_math::{luminance, offset_ray_origin, sampling::power_heuristic, Onb, Pcg32, Vec3};
 use forge_render_core::{RenderScene, RenderSettings};
 
@@ -25,8 +25,10 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
     let mut beta = Vec3::ONE;
     let mut specular_bounce = true; // il raggio camera si comporta come un rimbalzo delta
     let mut prev_pdf = 0.0f32;
+    // La HDRI, se presente, è una "luce" in più nella scelta uniforme della NEE.
     let n_lights = scene.lights.len();
-    let light_select_pdf = if n_lights > 0 { 1.0 / n_lights as f32 } else { 0.0 };
+    let n_select = n_lights + scene.env_map.is_some() as usize;
+    let light_select_pdf = if n_select > 0 { 1.0 / n_select as f32 } else { 0.0 };
     let clamp = settings.clamp_indirect;
 
     let add = |l: &mut Vec3, c: Vec3, depth: u32| {
@@ -68,8 +70,19 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
         }
 
         let Some(hit) = hit else {
-            if depth > 0 || settings.environment_visible {
-                add(&mut l, beta * scene.environment.radiance(d), depth);
+            if depth == 0 {
+                if settings.environment_visible {
+                    add(&mut l, beta * scene.env_radiance(d, true), depth);
+                }
+            } else if let Some((map, strength, rot)) = &scene.env_map {
+                let w = if specular_bounce {
+                    1.0
+                } else {
+                    power_heuristic(prev_pdf, map.pdf(d, *rot) * light_select_pdf)
+                };
+                add(&mut l, beta * map.radiance(d, *rot) * (*strength * w), depth);
+            } else {
+                add(&mut l, beta * scene.env_radiance(d, false), depth);
             }
             break;
         };
@@ -104,17 +117,35 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
         };
 
         // Next Event Estimation.
-        if n_lights > 0 && bsdf.has_non_delta() {
-            let li_idx = ((rng.next_f32() * n_lights as f32) as usize).min(n_lights - 1);
-            let light = &scene.lights[li_idx];
+        if n_select > 0 && bsdf.has_non_delta() {
+            let li_idx = ((rng.next_f32() * n_select as f32) as usize).min(n_select - 1);
             let (u1, u2) = rng.next_2d();
-            if let Some(ls) = sample_light(light, p, u1, u2) {
+            let (sample, cast_shadows) = if li_idx < n_lights {
+                let light = &scene.lights[li_idx];
+                (sample_light(light, p, u1, u2), light.cast_shadows)
+            } else {
+                let (map, strength, rot) = scene.env_map.as_ref().expect("env map");
+                let s = map.sample(u1, u2, *rot).map(|(wi, li, pdf)| LightSample {
+                    wi,
+                    dist: f32::INFINITY,
+                    li: li * *strength,
+                    pdf,
+                    delta: false,
+                });
+                (s, true)
+            };
+            if let Some(ls) = sample {
                 let (f, bsdf_pdf) = bsdf.eval(wo, ls.wi);
                 if f != Vec3::ZERO {
                     let cos = ls.wi.dot(ns).abs();
-                    let visible = !light.cast_shadows || {
+                    let visible = !cast_shadows || {
                         let so = offset_ray_origin(p, ng);
-                        !geo.accel.occluded(so, ls.wi, 0.0, ls.dist * (1.0 - 1e-4))
+                        let t_max = if ls.dist.is_finite() {
+                            ls.dist * (1.0 - 1e-4)
+                        } else {
+                            f32::INFINITY
+                        };
+                        !geo.accel.occluded(so, ls.wi, 0.0, t_max)
                     };
                     if visible {
                         let contrib = if ls.delta {

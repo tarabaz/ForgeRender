@@ -71,7 +71,8 @@ fn print_help() {
          render [opzioni]           rendering headless verso PNG\n    \
              --project F.frproject | --mesh F.obj/.stl | --test-scene (default)\n    \
              --out F.png  --spp N  --width W  --height H  --threads T  --bounces B\n    \
-             --unit mm|cm|m|in  (per --mesh, default mm)  --quiet\n  \
+             --unit mm|cm|m|in  (per --mesh, default mm)  --quiet\n    \
+             --hdri F.hdr|F.exr  --hdri-strength S  --hdri-rotation GRADI\n  \
          bench [opzioni]            benchmark della scena di test con diversi numeri di thread\n    \
              --spp N (default 16)  --width W  --height H  --threads 1,2,4  --json F",
         env!("CARGO_PKG_VERSION")
@@ -112,7 +113,14 @@ fn load_scene(args: &Args) -> anyhow::Result<(Scene, RenderSettings)> {
 }
 
 fn render(args: &Args) -> anyhow::Result<()> {
-    let (scene, mut settings) = load_scene(args)?;
+    let (mut scene, mut settings) = load_scene(args)?;
+    if let Some(p) = args.value("--hdri") {
+        scene.environment = forge_scene::Environment::Hdri {
+            path: PathBuf::from(p),
+            strength: args.parse("--hdri-strength")?.unwrap_or(1.0),
+            rotation_deg: args.parse("--hdri-rotation")?.unwrap_or(0.0),
+        };
+    }
     if let Some(v) = args.parse("--spp")? {
         settings.target_samples = v;
     }

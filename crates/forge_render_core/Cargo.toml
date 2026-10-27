@@ -13,3 +13,4 @@ serde.workspace = true
 tracing.workspace = true
 rayon.workspace = true
 anyhow.workspace = true
+image.workspace = true

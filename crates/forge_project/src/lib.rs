@@ -229,6 +229,23 @@ pub fn load(path: &Path) -> anyhow::Result<LoadedProject> {
     }
     scene.lights = pf.lights;
     scene.environment = pf.environment;
+    // HDRI spostata insieme al progetto: si cerca il file nella cartella del progetto.
+    if let forge_scene::Environment::Hdri { path: hdri, .. } = &mut scene.environment {
+        if !hdri.is_file() {
+            let found = [
+                hdri.file_name().map(PathBuf::from),
+                Some(PathBuf::from("hdri")).zip(hdri.file_name()).map(|(a, b)| a.join(b)),
+            ]
+            .into_iter()
+            .flatten()
+            .filter_map(|r| project_dir.map(|d| d.join(r)))
+            .find(|p| p.is_file());
+            match found {
+                Some(p) => *hdri = p,
+                None => report.warnings.push(format!("HDRI non trovata: {}", hdri.display())),
+            }
+        }
+    }
     scene.camera = pf.camera;
 
     if !report.missing_components.is_empty() {

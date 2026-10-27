@@ -1,3 +1,4 @@
+use crate::EnvironmentMap;
 use forge_accel::TriangleAccel;
 use forge_math::{Aabb, Mat3, Vec3};
 use forge_scene::{Camera, Environment, LightKind, Material, Scene};
@@ -153,6 +154,8 @@ pub struct RenderScene {
     pub materials: Vec<RenderMaterial>,
     pub lights: Vec<RenderLight>,
     pub environment: Environment,
+    /// Mappa HDRI caricata (se l'ambiente è una HDRI), con intensità e rotazione in radianti.
+    pub env_map: Option<(Arc<EnvironmentMap>, f32, f32)>,
     pub camera: Camera,
 }
 
@@ -225,18 +228,47 @@ impl RenderScene {
             })
             .collect();
 
+        let mut environment = scene.environment.clone();
+        let env_map = match &scene.environment {
+            Environment::Hdri {
+                path,
+                strength,
+                rotation_deg,
+            } => match crate::env_map::load_cached(path) {
+                Ok(m) => Some((m, strength.max(0.0), rotation_deg.to_radians())),
+                Err(e) => {
+                    tracing::error!("HDRI non caricata ({e:#}): uso il cielo a gradiente predefinito");
+                    environment = Environment::default();
+                    None
+                }
+            },
+            _ => None,
+        };
+
         RenderScene {
             geometry,
             node_material,
             materials,
             lights,
-            environment: scene.environment.clone(),
+            environment,
+            env_map,
             camera: scene.camera.clone(),
         }
     }
 
     pub fn triangle_count(&self) -> usize {
         self.geometry.tri_node.len()
+    }
+
+    /// Radianza dell'ambiente in una direzione. `smooth` usa l'interpolazione
+    /// bilineare della HDRI (solo per lo sfondo visto direttamente).
+    #[inline]
+    pub fn env_radiance(&self, dir: Vec3, smooth: bool) -> Vec3 {
+        match &self.env_map {
+            Some((m, s, r)) if smooth => m.radiance_smooth(dir, *r) * *s,
+            Some((m, s, r)) => m.radiance(dir, *r) * *s,
+            None => self.environment.radiance(dir),
+        }
     }
 
     pub fn bounds(&self) -> Aabb {

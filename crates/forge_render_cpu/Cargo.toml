@@ -13,3 +13,6 @@ forge_render_core.workspace = true
 rayon.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
+
+[dev-dependencies]
+image.workspace = true

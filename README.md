@@ -14,7 +14,8 @@ pensato per Windows 11 (Ryzen 9 9900X + RTX 5070) ma funzionante anche senza GPU
 - Next Event Estimation + Multiple Importance Sampling, Russian roulette, BVH SAH.
 - Materiali: diffuso, metalli e plastiche GGX (campionamento VNDF), vetro con Fresnel esatto, emissivi.
   Libreria iniziale di 15 preset.
-- Luci ad area, puntiformi, spot, direzionali; ambiente uniforme o a gradiente; 5 preset da studio.
+- Luci ad area, puntiformi, spot, direzionali; ambiente uniforme, a gradiente o HDRI (.hdr/.exr)
+  con importance sampling; 5 preset da studio.
 - Import OBJ (con .mtl) e STL, con unità di misura e normali con angolo di piega.
 - Viewport 3D wgpu (orbita/pan/zoom, selezione col clic), albero dei componenti,
   assegnazione materiali persistente per id stabile (singola, multipla, per nome, ereditata).
