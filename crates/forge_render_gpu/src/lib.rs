@@ -56,6 +56,10 @@ pub struct GpuBackend {
     samples_per_pass: u32,
 }
 
+fn is_warp(info: &wgpu::AdapterInfo) -> bool {
+    info.backend == wgpu::Backend::Dx12 && info.device_type == wgpu::DeviceType::Cpu
+}
+
 impl GpuBackend {
     /// Crea il backend sulla GPU ad alte prestazioni (la scheda dedicata invece
     /// della grafica integrata). Restituisce errore se non c'è una GPU adatta.
@@ -79,6 +83,11 @@ impl GpuBackend {
                 compatible_surface: None,
                 ..Default::default()
             })) {
+                // WARP (DirectX 12 in software) va in crash con questo shader: si scarta,
+                // a meno che `FORGE_GPU_ALLOW_WARP=1`. Lavapipe (Vulkan in software) resta valido.
+                Ok(a) if is_warp(&a.get_info()) && std::env::var_os("FORGE_GPU_ALLOW_WARP").is_none() => {
+                    last_err = "solo DirectX 12 in software (WARP), nessuna GPU reale".into()
+                }
                 Ok(a) if a.get_info().backend != wgpu::Backend::Gl => {
                     found = Some(a);
                     break;
