@@ -1,0 +1,4 @@
+# CRT di Visual C++ collegato staticamente: l'eseguibile Windows non richiede
+# l'installazione dei "Visual C++ Redistributable" (requisito per la versione portable).
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

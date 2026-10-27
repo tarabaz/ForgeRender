@@ -10,10 +10,14 @@
 - GUI provata sotto Xvfb + lavapipe (screenshot viewport e render progressivo OK).
 - Cross-compilazione Windows (x86_64-pc-windows-gnu) OK: exe senza DLL esterne.
 
-## Da fare alla ripresa
-1. Sistemare 2 warning clippy in forge_app (app.rs new_empty_scene, inspector.rs if annidato).
-2. Packaging: `.cargo/config.toml` con crt-static per MSVC, script `packaging/build-windows.ps1`
-   (portable zip + installer Inno Setup), workflow GitHub Actions Windows.
-3. Documentazione: README, docs/ARCHITECTURE.md, docs/ROADMAP.md, istruzioni build Windows.
-4. Benchmark nel container (`forgerender-cli bench`) e poi sul PC reale.
-5. Poi Fase 3 (texture, HDRI, editor materiali avanzato) e Fase 4 (backend GPU wgpu compute).
+## Fatto nella seconda sessione
+- Warning clippy risolti; CI GitHub Actions (Linux: fmt, clippy -D warnings, test; Windows: test, build MSVC,
+  benchmark indicativo, pacchetti portable zip + installer Inno Setup come artifact).
+- `.cargo/config.toml`: CRT statico per MSVC (nessun redistributable richiesto).
+- Documentazione: README, ARCHITECTURE, ROADMAP, BENCHMARK.
+
+## Prossimi passi
+1. Verificare il primo run della CI su Windows e scaricare i pacchetti.
+2. Prova sul PC reale (avvio, viewport sulla RTX, benchmark 9900X).
+3. Fase 3: texture/UV, HDRI con importance sampling, multi-scattering GGX, NEE sugli emissivi.
+4. Fase 4: backend GPU wgpu compute.

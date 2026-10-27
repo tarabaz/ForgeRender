@@ -3,7 +3,7 @@ name = "forge_telemetry"
 description = "Rilevamento hardware, logging (tracing) e monitoraggio risorse."
 version.workspace = true
 edition.workspace = true
-license.workspace = true
+publish.workspace = true
 
 [dependencies]
 sysinfo.workspace = true

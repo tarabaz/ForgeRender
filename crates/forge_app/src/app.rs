@@ -402,8 +402,10 @@ impl ForgeApp {
     }
 
     pub fn new_empty_scene(&mut self) {
-        let mut s = Scene::default();
-        s.lights = forge_scene::light::preset("studio", forge_math::Vec3::ZERO, 1.0).unwrap_or_default();
+        let s = Scene {
+            lights: forge_scene::light::preset("studio", forge_math::Vec3::ZERO, 1.0).unwrap_or_default(),
+            ..Default::default()
+        };
         self.replace_scene(s, ProjectMeta::default(), None);
     }
 

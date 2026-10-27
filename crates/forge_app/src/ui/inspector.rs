@@ -626,18 +626,18 @@ fn render(app: &mut ForgeApp, ui: &mut egui::Ui) {
             changed = true;
         }
     });
-    if s.target_samples != 0 && !forge_render_core::SamplesPreset::FIXED.contains(&s.target_samples) {
-        if ui
+    if s.target_samples != 0
+        && !forge_render_core::SamplesPreset::FIXED.contains(&s.target_samples)
+        && ui
             .add(
                 egui::DragValue::new(&mut s.target_samples)
                     .range(1..=1_000_000)
                     .prefix("campioni: "),
             )
             .changed()
-        {
-            app.custom_samples = s.target_samples;
-            changed = true;
-        }
+    {
+        app.custom_samples = s.target_samples;
+        changed = true;
     }
     ui.label(
         egui::RichText::new("Si può cambiare durante il rendering: l'accumulo prosegue senza ripartire.")

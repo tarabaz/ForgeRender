@@ -3,7 +3,7 @@ name = "forge_render_cpu"
 description = "Path tracer progressivo CPU multithread (Rayon)."
 version.workspace = true
 edition.workspace = true
-license.workspace = true
+publish.workspace = true
 
 [dependencies]
 forge_math.workspace = true

@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  linux:
+    name: Test (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --release -- -D warnings
+      - run: cargo test --workspace --release
+
+  windows:
+    name: Build e pacchetti (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Test
+        run: cargo test --workspace --release
+      - name: Compilazione
+        run: cargo build --release -p forge_app -p forge_cli
+      - name: Benchmark (runner GitHub, solo indicativo)
+        run: target\release\forgerender-cli.exe bench --spp 8 --json bench-windows-runner.json
+      - name: Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+      - name: Pacchetti portable e installer
+        shell: pwsh
+        run: packaging\windows\package.ps1 -SkipBuild
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ForgeRender-portable-x64
+          path: dist/*-portable-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ForgeRender-setup-x64
+          path: dist/*-setup-x64.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-runner
+          path: bench-windows-runner.json

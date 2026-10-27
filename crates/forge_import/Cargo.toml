@@ -3,7 +3,7 @@ name = "forge_import"
 description = "Importazione mesh (OBJ, STL). STEP e SolidWorks arriveranno tramite convertitori esterni (Fase 5)."
 version.workspace = true
 edition.workspace = true
-license.workspace = true
+publish.workspace = true
 
 [dependencies]
 forge_math.workspace = true

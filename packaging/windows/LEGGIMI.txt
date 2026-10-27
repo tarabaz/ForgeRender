@@ -1,0 +1,24 @@
+ForgeRender — renderer fotorealistico per modelli CAD
+======================================================
+
+Avvio
+  forgerender.exe                  interfaccia grafica
+  forgerender.exe --safe-mode      senza accelerazione GPU (se la viewport non parte)
+  forgerender.exe progetto.frproject | modello.obj | modello.stl
+
+Riga di comando (render e benchmark senza interfaccia)
+  forgerender-cli.exe info
+  forgerender-cli.exe render --test-scene --spp 256 --width 1920 --height 1080 --out render.png
+  forgerender-cli.exe render --mesh pezzo.stl --unit mm --spp 128 --out pezzo.png
+  forgerender-cli.exe bench --json benchmark.json
+
+Comandi della viewport
+  trascina = orbita, Shift+trascina / tasto destro / centrale = pan, rotella = zoom
+  clic = seleziona, Ctrl+clic = selezione multipla, doppio clic / F = inquadra selezione
+  Home = inquadra tutto, F5 = avvia render, Ctrl+S salva, Ctrl+O apri, Ctrl+I importa
+
+Versione portable: nessuna installazione, non scrive nulla nel registro né fuori
+dalla cartella (i progetti vengono salvati dove scegli tu).
+
+Formati supportati in questa versione: OBJ (con .mtl), STL.
+STEP e SolidWorks (SLDPRT/SLDASM) arriveranno nella Fase 5.

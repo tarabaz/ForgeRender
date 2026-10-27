@@ -1,0 +1,59 @@
+; Installer di ForgeRender (Inno Setup 6).
+; Compilazione:  ISCC.exe /DAppVersion=0.1.0 /DBinDir=..\..\target\release packaging\windows\forgerender.iss
+
+#ifndef AppVersion
+  #define AppVersion "0.1.0"
+#endif
+#ifndef BinDir
+  #define BinDir "..\..\target\release"
+#endif
+
+[Setup]
+AppId={{8F3C2A51-6B7D-4E0A-9C1F-2D5E7A9B3C41}
+AppName=ForgeRender
+AppVersion={#AppVersion}
+AppPublisher=FrancyStore3D
+DefaultDirName={autopf}\ForgeRender
+DefaultGroupName=ForgeRender
+DisableProgramGroupPage=yes
+OutputDir=..\..\dist
+OutputBaseFilename=ForgeRender-{#AppVersion}-setup-x64
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
+MinVersion=10.0
+Compression=lzma2/max
+SolidCompression=yes
+WizardStyle=modern
+; Installazione per tutti gli utenti (richiede amministratore) o solo per l'utente corrente.
+PrivilegesRequired=lowest
+PrivilegesRequiredOverridesAllowed=dialog
+ChangesAssociations=yes
+UninstallDisplayIcon={app}\forgerender.exe
+
+[Languages]
+Name: "italian"; MessagesFile: "compiler:Languages\Italian.isl"
+Name: "english"; MessagesFile: "compiler:Default.isl"
+
+[Tasks]
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "assoc"; Description: "Apri i file .frproject con ForgeRender"; GroupDescription: "Associazioni file:"
+
+[Files]
+Source: "{#BinDir}\forgerender.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BinDir}\forgerender-cli.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "LEGGIMI.txt"; DestDir: "{app}"; Flags: ignoreversion isreadme
+
+[Icons]
+Name: "{group}\ForgeRender"; Filename: "{app}\forgerender.exe"
+Name: "{group}\ForgeRender (modalità sicura)"; Filename: "{app}\forgerender.exe"; Parameters: "--safe-mode"
+Name: "{group}\{cm:UninstallProgram,ForgeRender}"; Filename: "{uninstallexe}"
+Name: "{autodesktop}\ForgeRender"; Filename: "{app}\forgerender.exe"; Tasks: desktopicon
+
+[Registry]
+Root: HKA; Subkey: "Software\Classes\.frproject"; ValueType: string; ValueName: ""; ValueData: "ForgeRender.Project"; Flags: uninsdeletevalue; Tasks: assoc
+Root: HKA; Subkey: "Software\Classes\ForgeRender.Project"; ValueType: string; ValueName: ""; ValueData: "Progetto ForgeRender"; Flags: uninsdeletekey; Tasks: assoc
+Root: HKA; Subkey: "Software\Classes\ForgeRender.Project\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\forgerender.exe,0"; Tasks: assoc
+Root: HKA; Subkey: "Software\Classes\ForgeRender.Project\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\forgerender.exe"" ""%1"""; Tasks: assoc
+
+[Run]
+Filename: "{app}\forgerender.exe"; Description: "{cm:LaunchProgram,ForgeRender}"; Flags: nowait postinstall skipifsilent
