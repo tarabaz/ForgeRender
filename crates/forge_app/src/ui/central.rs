@@ -386,8 +386,8 @@ fn render_preview(mat: &Material) -> Vec<u8> {
     let cancel = std::sync::atomic::AtomicBool::new(false);
     if let Ok(mut be) = forge_render_cpu::CpuBackend::new(2) {
         for i in 0..32 {
-            if be.render_pass(&rs, &settings, i, &mut pass, &cancel).unwrap_or(false) {
-                acc.add_pass(&pass);
+            if let Ok(n @ 1..) = be.render_pass(&rs, &settings, i, 1, &mut pass, &cancel) {
+                acc.add_samples(&pass, n);
             }
         }
     }

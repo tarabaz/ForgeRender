@@ -9,7 +9,7 @@ pensato per Windows 11 (Ryzen 9 9900X + RTX 5070) ma funzionante anche senza GPU
 
 ## Cosa fa oggi
 
-- Path tracer CPU multithread con accumulo progressivo reale dei campioni
+- Path tracer su CPU (tutti i core) e su GPU (compute shader wgpu, Vulkan/DX12) con accumulo progressivo reale dei campioni
   (16…1024, personalizzato o illimitato), modificabile durante il render.
 - Next Event Estimation + Multiple Importance Sampling, Russian roulette, BVH SAH.
 - Materiali: diffuso, metalli e plastiche GGX (campionamento VNDF), vetro con Fresnel esatto, emissivi.

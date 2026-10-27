@@ -1,0 +1,290 @@
+//! Test del backend GPU: stessi controlli fisici del backend CPU, più un
+//! confronto statistico CPU/GPU. Se non c'è una GPU Vulkan/DX12 (nemmeno
+//! software, es. lavapipe) i test vengono saltati con un messaggio.
+
+use forge_math::{Mat4, Vec3};
+use forge_render_core::{Accumulator, RenderBackend, RenderScene, RenderSettings};
+use forge_render_cpu::CpuBackend;
+use forge_render_gpu::GpuBackend;
+use forge_scene::{primitives, Camera, ComponentId, Environment, Light, Material, MaterialId, Scene};
+use std::sync::atomic::AtomicBool;
+
+fn gpu() -> Option<GpuBackend> {
+    match GpuBackend::new() {
+        Ok(g) => Some(g),
+        Err(e) => {
+            eprintln!("GPU non disponibile, test saltato: {e}");
+            None
+        }
+    }
+}
+
+fn render_with(be: &mut dyn RenderBackend, scene: &Scene, st: &RenderSettings, spp: u32) -> Vec<[f32; 3]> {
+    let rs = RenderScene::compile(scene);
+    let mut acc = Accumulator::new(st.width, st.height);
+    let mut pass = vec![[0.0; 3]; acc.pixel_count()];
+    let cancel = AtomicBool::new(false);
+    while acc.samples < spp {
+        let n = be.render_pass(&rs, st, acc.samples, spp - acc.samples, &mut pass, &cancel).unwrap();
+        assert!(n >= 1 && acc.samples + n <= spp, "campioni restituiti non validi: {n}");
+        acc.add_samples(&pass, n);
+    }
+    acc.resolve()
+}
+
+fn settings(w: u32, h: u32) -> RenderSettings {
+    RenderSettings {
+        width: w,
+        height: h,
+        max_bounces: 64,
+        ..Default::default()
+    }
+}
+
+fn mean_region(img: &[[f32; 3]], w: u32, x0: u32, y0: u32, x1: u32, y1: u32) -> Vec3 {
+    let mut s = Vec3::ZERO;
+    for y in y0..y1 {
+        for x in x0..x1 {
+            s += Vec3::from_array(img[(y * w + x) as usize]);
+        }
+    }
+    s / ((x1 - x0) * (y1 - y0)) as f32
+}
+
+fn sphere_scene(mat: Material) -> Scene {
+    let mut s = Scene::default();
+    let id = mat.id.clone();
+    s.materials.upsert(mat);
+    let m = s.add_mesh(primitives::uv_sphere(1.0, 64, 32));
+    let cid = ComponentId("sfera".into());
+    s.add_node(None, cid.clone(), "Sfera", Mat4::IDENTITY, Some(m));
+    s.assignments.insert(cid, id);
+    s.environment = Environment::Uniform {
+        color: [1.0; 3],
+        strength: 1.0,
+    };
+    s.camera = Camera {
+        position: Vec3::new(0.0, 0.0, 4.0),
+        target: Vec3::ZERO,
+        up: Vec3::Y,
+        vfov_deg: 40.0,
+    };
+    s
+}
+
+fn mat(base: f32, metallic: f32, roughness: f32, specular: f32, transmission: f32) -> Material {
+    Material {
+        id: MaterialId::new("test"),
+        base_color: [base; 3],
+        metallic,
+        roughness,
+        specular,
+        transmission,
+        ..Default::default()
+    }
+}
+
+#[test]
+fn gpu_white_furnace() {
+    let Some(mut g) = gpu() else { return };
+    for (m, expected, tol) in [
+        (mat(0.5, 0.0, 0.5, 0.0, 0.0), 0.5, 0.01),
+        (mat(1.0, 0.0, 0.0, 0.5, 1.0), 1.0, 0.02),
+        (mat(1.0, 1.0, 0.8, 0.5, 0.0), 1.0, 0.05),
+    ] {
+        let s = sphere_scene(m.clone());
+        let img = render_with(&mut g, &s, &settings(24, 24), 64);
+        let c = mean_region(&img, 24, 8, 8, 16, 16);
+        assert!((c.x - expected).abs() < tol, "{m:?}: {c}");
+    }
+}
+
+/// Luce rettangolare sopra un piano: risultato analitico (fattore di forma).
+#[test]
+fn gpu_area_light_form_factor() {
+    let Some(mut g) = gpu() else { return };
+    let (a, b, h, le, rho) = (0.5f32, 0.75f32, 1.0f32, 3.0f32, 0.9f32);
+    let mut s = Scene::default();
+    s.materials.upsert(mat(rho, 0.0, 0.5, 0.0, 0.0));
+    let m = s.add_mesh(primitives::plane(100.0, 100.0));
+    let cid = ComponentId("piano".into());
+    s.add_node(None, cid.clone(), "Piano", Mat4::IDENTITY, Some(m));
+    s.assignments.insert(cid, MaterialId::new("test"));
+    s.environment = Environment::Uniform {
+        color: [0.0; 3],
+        strength: 0.0,
+    };
+    s.camera = Camera {
+        position: Vec3::new(0.0, 0.5, 0.01),
+        target: Vec3::ZERO,
+        up: Vec3::Y,
+        vfov_deg: 0.5,
+    };
+    s.lights
+        .push(Light::area("a", Vec3::new(0.0, h, 0.0), Vec3::ZERO, 2.0 * a, 2.0 * b, le));
+    let img = render_with(&mut g, &s, &settings(8, 8), 1024);
+    let c = mean_region(&img, 8, 0, 0, 8, 8);
+    let corner = |x: f32, y: f32| {
+        let (ax, by) = (x / h, y / h);
+        let (sa, sb) = ((1.0 + ax * ax).sqrt(), (1.0 + by * by).sqrt());
+        (ax / sa * (by / sa).atan() + by / sb * (ax / sb).atan()) / (2.0 * std::f32::consts::PI)
+    };
+    let expected = rho * le * 4.0 * corner(a, b);
+    assert!((c.x - expected).abs() / expected < 0.02, "{} vs {expected}", c.x);
+}
+
+/// La GPU converge alla stessa immagine della CPU: lo scarto GPU−CPU è dello
+/// stesso ordine del rumore tra due render CPU con seed diversi.
+#[test]
+fn gpu_matches_cpu_statistically() {
+    let Some(mut g) = gpu() else { return };
+    let s = Scene::test_scene();
+    let st = RenderSettings {
+        width: 32,
+        height: 18,
+        ..Default::default()
+    };
+    let spp = 256;
+    let mut cpu = CpuBackend::new(4).unwrap();
+    let a = render_with(&mut cpu, &s, &st, spp);
+    let b = render_with(&mut cpu, &s, &RenderSettings { seed: 12345, ..st.clone() }, spp);
+    let gpu = render_with(&mut g, &s, &st, spp);
+    let rmse = |x: &[[f32; 3]], y: &[[f32; 3]]| {
+        let e: f64 = x
+            .iter()
+            .zip(y)
+            .map(|(p, q)| (0..3).map(|k| ((p[k] - q[k]) as f64).powi(2)).sum::<f64>())
+            .sum();
+        (e / (x.len() * 3) as f64).sqrt()
+    };
+    let mean = |x: &[[f32; 3]]| x.iter().map(|p| (p[0] + p[1] + p[2]) as f64).sum::<f64>() / (x.len() * 3) as f64;
+    let noise = rmse(&a, &b);
+    let diff = rmse(&a, &gpu);
+    let (ma, mg) = (mean(&a), mean(&gpu));
+    assert!((ma - mg).abs() / ma < 0.02, "media CPU {ma} vs GPU {mg}");
+    assert!(diff < noise * 1.5, "RMSE GPU−CPU {diff} vs rumore CPU−CPU {noise}");
+}
+
+fn plane_scene(rho: f32) -> Scene {
+    let mut s = Scene::default();
+    s.materials.upsert(mat(rho, 0.0, 0.5, 0.0, 0.0));
+    let m = s.add_mesh(primitives::plane(100.0, 100.0));
+    let cid = ComponentId("piano".into());
+    s.add_node(None, cid.clone(), "Piano", Mat4::IDENTITY, Some(m));
+    s.assignments.insert(cid, MaterialId::new("test"));
+    s.environment = Environment::Uniform {
+        color: [0.0; 3],
+        strength: 0.0,
+    };
+    s.camera = Camera {
+        position: Vec3::new(0.0, 0.5, 0.01),
+        target: Vec3::ZERO,
+        up: Vec3::Y,
+        vfov_deg: 0.5,
+    };
+    s
+}
+
+fn tmp(name: &str) -> std::path::PathBuf {
+    let d = std::env::temp_dir().join(format!("forge_gpu_{}", std::process::id()));
+    std::fs::create_dir_all(&d).unwrap();
+    d.join(name)
+}
+
+/// HDRI con sole: la GPU deve dare lo stesso valore della CPU (stessa scena, molti campioni).
+#[test]
+fn gpu_hdri_with_sun_matches_cpu() {
+    let Some(mut g) = gpu() else { return };
+    let (w, h) = (128u32, 64u32);
+    let mut img = image::Rgb32FImage::new(w, h);
+    for (x, y, p) in img.enumerate_pixels_mut() {
+        let v = if (20..23).contains(&y) && (80..83).contains(&x) {
+            2000.0
+        } else {
+            0.3
+        };
+        *p = image::Rgb([v, v, v]);
+    }
+    let path = tmp("sole.exr");
+    img.save(&path).unwrap();
+    let mut s = plane_scene(0.7);
+    s.environment = Environment::Hdri {
+        path,
+        strength: 1.0,
+        rotation_deg: 30.0,
+    };
+    let st = settings(8, 8);
+    let gv = mean_region(&render_with(&mut g, &s, &st, 512), 8, 0, 0, 8, 8);
+    let cv = mean_region(&render_with(&mut CpuBackend::new(4).unwrap(), &s, &st, 512), 8, 0, 0, 8, 8);
+    assert!((gv.x - cv.x).abs() / cv.x < 0.03, "GPU {gv} vs CPU {cv}");
+}
+
+/// Pannello emissivo (mesh) campionato con la NEE sugli emissivi: fattore di forma analitico.
+#[test]
+fn gpu_emissive_mesh_form_factor() {
+    let Some(mut g) = gpu() else { return };
+    let (a, b, h, le, rho) = (0.5f32, 0.75f32, 1.0f32, 3.0f32, 0.9f32);
+    let mut s = plane_scene(rho);
+    s.materials.upsert(Material {
+        id: MaterialId::new("luce"),
+        base_color: [0.0; 3],
+        emission: [1.0; 3],
+        emission_strength: le,
+        specular: 0.0,
+        ..Default::default()
+    });
+    let quad = s.add_mesh(primitives::plane(2.0 * a, 2.0 * b));
+    let id = ComponentId("pannello".into());
+    s.add_node(
+        None,
+        id.clone(),
+        "Pannello",
+        Mat4::from_translation(Vec3::new(0.0, h, 0.0)) * Mat4::from_rotation_x(std::f32::consts::PI),
+        Some(quad),
+    );
+    s.assignments.insert(id, MaterialId::new("luce"));
+    let img = render_with(&mut g, &s, &settings(8, 8), 1024);
+    let c = mean_region(&img, 8, 0, 0, 8, 8);
+    let corner = |x: f32, y: f32| {
+        let (ax, by) = (x / h, y / h);
+        let (sa, sb) = ((1.0 + ax * ax).sqrt(), (1.0 + by * by).sqrt());
+        (ax / sa * (by / sa).atan() + by / sb * (ax / sb).atan()) / (2.0 * std::f32::consts::PI)
+    };
+    let expected = rho * le * 4.0 * corner(a, b);
+    assert!((c.x - expected).abs() / expected < 0.02, "{} vs {expected}", c.x);
+}
+
+/// Texture rosso|blu in proiezione box su un piano in white furnace (come il test CPU).
+#[test]
+fn gpu_box_mapped_texture() {
+    let Some(mut g) = gpu() else { return };
+    let mut t = image::RgbImage::new(2, 1);
+    t.put_pixel(0, 0, image::Rgb([255, 0, 0]));
+    t.put_pixel(1, 0, image::Rgb([0, 0, 255]));
+    let path = tmp("rosso_blu.png");
+    t.save(&path).unwrap();
+    for (x, red) in [(0.25f32, true), (0.75, false)] {
+        let mut s = plane_scene(1.0);
+        s.environment = Environment::Uniform {
+            color: [1.0; 3],
+            strength: 1.0,
+        };
+        let m = s.materials.get_mut(&MaterialId::new("test")).unwrap();
+        m.base_color_texture = Some(path.clone());
+        m.mapping = forge_scene::TextureMapping {
+            projection: forge_scene::Projection::Box,
+            scale: 1.0,
+            rotation_deg: 0.0,
+            offset: [0.0; 2],
+        };
+        s.camera = Camera {
+            position: Vec3::new(x, 5.0, 0.3),
+            target: Vec3::new(x, 0.0, 0.3),
+            up: Vec3::Z,
+            vfov_deg: 0.3,
+        };
+        let c = mean_region(&render_with(&mut g, &s, &settings(8, 8), 16), 8, 0, 0, 8, 8);
+        let (main, other) = if red { (c.x, c.z) } else { (c.z, c.x) };
+        assert!(main > 0.95 && other < 0.05 && c.y < 1e-4, "x={x}: {c}");
+    }
+}

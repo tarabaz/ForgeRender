@@ -256,6 +256,9 @@ impl RenderGeometry {
 
 /// Scena compilata per il rendering, indipendente dal backend.
 pub struct RenderScene {
+    /// Identificativo univoco (per processo): i backend GPU lo usano per sapere
+    /// quando ricaricare i dati della scena in memoria video.
+    pub id: u64,
     pub geometry: Arc<RenderGeometry>,
     /// Materiale effettivo di ogni nodo della scena (indice in `materials`).
     pub node_material: Vec<u32>,
@@ -362,7 +365,9 @@ impl RenderScene {
 
         let emissive = build_emissive(&geometry, &node_material, &materials);
 
+        static NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         RenderScene {
+            id: NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             emissive,
             geometry,
             node_material,

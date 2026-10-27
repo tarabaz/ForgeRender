@@ -847,6 +847,7 @@ dependencies = [
  "forge_project",
  "forge_render_core",
  "forge_render_cpu",
+ "forge_render_gpu",
  "forge_scene",
  "forge_telemetry",
  "rfd",
@@ -864,6 +865,7 @@ dependencies = [
  "forge_project",
  "forge_render_core",
  "forge_render_cpu",
+ "forge_render_gpu",
  "forge_scene",
  "forge_telemetry",
  "serde_json",
@@ -945,6 +947,22 @@ dependencies = [
  "image",
  "rayon",
  "tracing",
+]
+
+[[package]]
+name = "forge_render_gpu"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytemuck",
+ "forge_math",
+ "forge_render_core",
+ "forge_render_cpu",
+ "forge_scene",
+ "image",
+ "pollster 1.0.1",
+ "tracing",
+ "wgpu",
 ]
 
 [[package]]

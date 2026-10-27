@@ -47,6 +47,18 @@ impl Distribution1D {
         self.func.len()
     }
 
+    pub fn func(&self) -> &[f32] {
+        &self.func
+    }
+
+    pub fn cdf(&self) -> &[f32] {
+        &self.cdf
+    }
+
+    pub fn integral(&self) -> f32 {
+        self.integral
+    }
+
     /// Restituisce (x continuo in [0,1), pdf, indice).
     pub fn sample(&self, u: f32) -> (f32, f32, usize) {
         let n = self.func.len();
@@ -104,6 +116,18 @@ impl EnvironmentMap {
             marginal,
             conditional,
         }
+    }
+
+    pub fn pixels(&self) -> &[Vec3] {
+        &self.pixels
+    }
+
+    pub fn marginal(&self) -> &Distribution1D {
+        &self.marginal
+    }
+
+    pub fn conditional(&self) -> &[Distribution1D] {
+        &self.conditional
     }
 
     pub fn load(path: &Path) -> anyhow::Result<Self> {

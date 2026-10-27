@@ -103,10 +103,13 @@ fn sample_vndf(wo: Vec3, alpha: f32, u1: f32, u2: f32) -> Vec3 {
 /// una volta per processo (32×32, integrazione con campionamento VNDF stratificato).
 /// Serve alla compensazione dell'energia persa dai riflessi multipli tra microfacce
 /// (Turquin 2019, "Practical multiple scattering compensation for microfacet models").
-fn ggx_albedo(cos_o: f32, alpha: f32) -> f32 {
-    const N: usize = 32;
+pub const GGX_LUT_SIZE: usize = 32;
+
+/// Tabella E(μ, α) (righe: α, colonne: μ), condivisa con il backend GPU.
+pub fn ggx_albedo_table() -> &'static [f32] {
+    const N: usize = GGX_LUT_SIZE;
     static LUT: std::sync::OnceLock<Vec<f32>> = std::sync::OnceLock::new();
-    let lut = LUT.get_or_init(|| {
+    LUT.get_or_init(|| {
         let mut t = vec![0.0f32; N * N];
         const S: usize = 24;
         for ia in 0..N {
@@ -131,7 +134,12 @@ fn ggx_albedo(cos_o: f32, alpha: f32) -> f32 {
             }
         }
         t
-    });
+    })
+}
+
+fn ggx_albedo(cos_o: f32, alpha: f32) -> f32 {
+    const N: usize = GGX_LUT_SIZE;
+    let lut = ggx_albedo_table();
     let fa = (alpha.clamp(0.0, 1.0) * (N - 1) as f32).min((N - 1) as f32 - 1e-4);
     let fc = (cos_o.clamp(0.0, 1.0) * (N - 1) as f32).min((N - 1) as f32 - 1e-4);
     let (ia, ic) = (fa as usize, fc as usize);

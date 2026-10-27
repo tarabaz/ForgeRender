@@ -13,7 +13,7 @@ fn render(scene: &Scene, settings: &RenderSettings, spp: u32, threads: usize) ->
     let mut pass = vec![[0.0; 3]; acc.pixel_count()];
     let cancel = AtomicBool::new(false);
     for s in 0..spp {
-        assert!(be.render_pass(&rs, settings, s, &mut pass, &cancel).unwrap());
+        assert_eq!(be.render_pass(&rs, settings, s, 1, &mut pass, &cancel).unwrap(), 1);
         acc.add_pass(&pass);
     }
     acc.resolve()

@@ -41,7 +41,15 @@ impl Accumulator {
 
     /// Aggiunge una passata completa (1 campione per pixel).
     pub fn add_pass(&mut self, pass: &[[f32; 3]]) {
+        self.add_samples(pass, 1);
+    }
+
+    /// Aggiunge la somma di `n` campioni per pixel.
+    pub fn add_samples(&mut self, pass: &[[f32; 3]], n: u32) {
         assert_eq!(pass.len(), self.sum.len());
+        if n == 0 {
+            return;
+        }
         self.sum.par_iter_mut().zip(pass.par_iter()).for_each(|(s, p)| {
             // Un campione non finito (NaN/Inf) corromperebbe il pixel per sempre.
             if p.iter().all(|v| v.is_finite()) {
@@ -50,7 +58,7 @@ impl Accumulator {
                 s[2] += p[2];
             }
         });
-        self.samples += 1;
+        self.samples += n;
     }
 
     /// Media corrente (radianza lineare).

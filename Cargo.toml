@@ -8,6 +8,7 @@ default-members = [
     "crates/forge_accel",
     "crates/forge_render_core",
     "crates/forge_render_cpu",
+    "crates/forge_render_gpu",
     "crates/forge_import",
     "crates/forge_project",
     "crates/forge_image_io",
@@ -29,6 +30,7 @@ forge_scene = { path = "crates/forge_scene" }
 forge_accel = { path = "crates/forge_accel" }
 forge_render_core = { path = "crates/forge_render_core" }
 forge_render_cpu = { path = "crates/forge_render_cpu" }
+forge_render_gpu = { path = "crates/forge_render_gpu" }
 forge_import = { path = "crates/forge_import" }
 forge_project = { path = "crates/forge_project" }
 forge_image_io = { path = "crates/forge_image_io" }
@@ -46,6 +48,8 @@ gltf = { version = "1.4", default-features = false, features = ["import", "utils
 stl_io = "0.11"
 sysinfo = "0.39"
 rfd = "0.17"
+wgpu = "30"
+pollster = "1"
 bytemuck = { version = "1", features = ["derive"] }
 anyhow = "1"
 thiserror = "2"

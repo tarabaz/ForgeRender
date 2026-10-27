@@ -32,6 +32,7 @@ pub enum InspectorTab {
 
 /// Cosa è stato usato per avviare il rendering corrente (per capire quando ripartire).
 struct JobInfo {
+    backend: forge_render_core::BackendKind,
     geometry_rev: u64,
     shading_rev: u64,
     key: (u32, u32, u32, u32, u32, u64, bool),
@@ -94,6 +95,8 @@ pub struct ForgeApp {
     pub custom_samples: u32,
     pub preview: crate::ui::central::MaterialPreview,
     pub pending: Option<Pending>,
+    pub gpu: Option<Result<forge_render_gpu::SharedGpu, String>>,
+    gpu_warmup: Option<Receiver<Result<forge_render_gpu::SharedGpu, String>>>,
     pub import_queue: Vec<PathBuf>,
     pub show_import_options: bool,
 
@@ -156,6 +159,8 @@ impl ForgeApp {
             custom_samples: 2048,
             preview: Default::default(),
             pending: None,
+            gpu: None,
+            gpu_warmup: None,
             import_queue: Vec::new(),
             show_import_options: false,
             geometry_rev: 1,
@@ -178,6 +183,18 @@ impl ForgeApp {
             screenshot_done: Default::default(),
             frames: 0,
         };
+        // Prepara il backend GPU in background (creazione dispositivo e compilazione
+        // dello shader da parte del driver), così è pronto quando serve.
+        if !app.safe_mode {
+            let (tx, rx) = std::sync::mpsc::channel();
+            std::thread::Builder::new()
+                .name("forge-gpu-init".into())
+                .spawn(move || {
+                    let _ = tx.send(forge_render_gpu::SharedGpu::new().map_err(|e| format!("{e:#}")));
+                })
+                .ok();
+            app.gpu_warmup = Some(rx);
+        }
         if let Some(p) = &startup.open {
             app.open_any(p);
         }
@@ -293,23 +310,49 @@ impl ForgeApp {
             self.view = View::Render;
             return;
         };
-        let backend = match CpuBackend::from_settings(&self.settings) {
-            Ok(b) => b,
-            Err(e) => {
-                self.error = Some(format!("impossibile creare il backend CPU: {e}"));
-                return;
-            }
+        let backend: Box<dyn forge_render_core::RenderBackend> = match self.settings.backend {
+            forge_render_core::BackendKind::Gpu => match self.gpu_backend() {
+                Ok(g) => Box::new(g),
+                Err(e) => {
+                    self.info = Some(format!("GPU non disponibile, il rendering prosegue sulla CPU.\n\n{e}"));
+                    self.settings.backend = forge_render_core::BackendKind::Cpu;
+                    return self.start_render();
+                }
+            },
+            forge_render_core::BackendKind::Cpu => match CpuBackend::from_settings(&self.settings) {
+                Ok(b) => Box::new(b),
+                Err(e) => {
+                    self.error = Some(format!("impossibile creare il backend CPU: {e}"));
+                    return;
+                }
+            },
         };
         let rs = Arc::new(RenderScene::compile_with_geometry(&self.scene, geometry));
-        self.session.start(rs, self.settings.clone(), Box::new(backend));
+        self.session.start(rs, self.settings.clone(), backend);
         self.job = Some(JobInfo {
             geometry_rev: self.geometry_rev,
             shading_rev: self.shading_rev,
             key: self.settings.accumulation_key(),
             threads: self.settings.effective_threads(),
             target: self.settings.target_samples,
+            backend: self.settings.backend,
         });
         self.view = View::Render;
+    }
+
+    /// Dispositivo GPU condiviso, creato al primo utilizzo.
+    pub fn gpu_backend(&mut self) -> Result<forge_render_gpu::SharedGpu, String> {
+        if self.gpu.is_none() {
+            if let Some(rx) = self.gpu_warmup.take() {
+                // Attende la preparazione in corso invece di crearne un secondo.
+                if let Ok(r) = rx.recv() {
+                    self.gpu = Some(r);
+                    return self.gpu.clone().expect("gpu");
+                }
+            }
+            self.gpu = Some(forge_render_gpu::SharedGpu::new().map_err(|e| format!("{e:#}")));
+        }
+        self.gpu.clone().expect("gpu")
     }
 
     pub fn render_state(&self) -> SessionState {
@@ -325,6 +368,7 @@ impl ForgeApp {
                     || j.shading_rev != self.shading_rev
                     || j.key != self.settings.accumulation_key()
                     || j.threads != self.settings.effective_threads()
+                    || j.backend != self.settings.backend
             }
         }
     }
@@ -817,6 +861,15 @@ impl ForgeApp {
         self.frames += 1;
         self.poll_geometry();
         self.poll_pending();
+        if let Some(rx) = &self.gpu_warmup {
+            if let Ok(r) = rx.try_recv() {
+                if let Err(e) = &r {
+                    tracing::warn!("GPU non disponibile per il rendering: {e}");
+                }
+                self.gpu = Some(r);
+                self.gpu_warmup = None;
+            }
+        }
         self.update_render_job();
         self.monitor.tick();
         let state = self.render_state();

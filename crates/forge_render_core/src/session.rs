@@ -387,20 +387,30 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
             continue;
         }
 
-        // Una passata da 1 campione per pixel.
+        // Una passata: uno o più campioni per pixel, senza superare l'obiettivo.
         let Some(a) = active.as_mut() else {
             state = SessionState::Idle;
             continue;
         };
         let t0 = Instant::now();
         let sample_index = a.accum.samples;
-        let result = a
-            .job
-            .backend
-            .render_pass(&a.job.scene, &a.job.settings, sample_index, &mut a.pass, &shared.interrupt);
+        let target = a.job.settings.target_samples;
+        let max_samples = if target == 0 {
+            u32::MAX
+        } else {
+            target.saturating_sub(sample_index).max(1)
+        };
+        let result = a.job.backend.render_pass(
+            &a.job.scene,
+            &a.job.settings,
+            sample_index,
+            max_samples,
+            &mut a.pass,
+            &shared.interrupt,
+        );
         match result {
-            Ok(true) => {
-                a.accum.add_pass(&a.pass);
+            Ok(n) if n > 0 => {
+                a.accum.add_samples(&a.pass, n);
                 let dt = t0.elapsed();
                 let done = a.done();
                 if done {
@@ -426,7 +436,7 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
                 }
                 update_progress(a, &state, dt, &shared);
             }
-            Ok(false) => {} // interrotta: si torna a leggere i comandi
+            Ok(_) => {} // interrotta: si torna a leggere i comandi
             Err(e) => {
                 tracing::error!("errore del backend: {e:#}");
                 if let Some(t) = a.running_since.take() {
@@ -466,18 +476,19 @@ mod tests {
             _: &RenderScene,
             _: &RenderSettings,
             _: u32,
+            _: u32,
             out: &mut [[f32; 3]],
             cancel: &AtomicBool,
-        ) -> anyhow::Result<bool> {
+        ) -> anyhow::Result<u32> {
             let t0 = Instant::now();
             while t0.elapsed() < self.0 {
                 if cancel.load(Ordering::Relaxed) {
-                    return Ok(false);
+                    return Ok(0);
                 }
                 std::thread::sleep(Duration::from_millis(1));
             }
             out.fill([1.0; 3]);
-            Ok(true)
+            Ok(1)
         }
     }
 

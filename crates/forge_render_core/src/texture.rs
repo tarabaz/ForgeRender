@@ -30,6 +30,14 @@ impl Texture {
         Self { width, height, data, srgb }
     }
 
+    pub fn data(&self) -> &[[u8; 3]] {
+        &self.data
+    }
+
+    pub fn is_srgb(&self) -> bool {
+        self.srgb
+    }
+
     pub fn load(path: &Path, srgb: bool) -> anyhow::Result<Self> {
         let img = image::open(path)
             .with_context(|| format!("lettura texture {}", path.display()))?

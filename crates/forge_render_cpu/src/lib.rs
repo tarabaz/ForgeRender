@@ -68,9 +68,10 @@ impl RenderBackend for CpuBackend {
         scene: &RenderScene,
         settings: &RenderSettings,
         sample_index: u32,
+        _max_samples: u32,
         out: &mut [[f32; 3]],
         cancel: &AtomicBool,
-    ) -> anyhow::Result<bool> {
+    ) -> anyhow::Result<u32> {
         let w = settings.width as usize;
         anyhow::ensure!(out.len() == w * settings.height as usize, "buffer di uscita di dimensione errata");
         self.pool.install(|| {
@@ -83,6 +84,7 @@ impl RenderBackend for CpuBackend {
                 }
             });
         });
-        Ok(!cancel.load(Ordering::Relaxed))
+        // Il backend CPU calcola un campione per passata: passate brevi, interruzioni immediate.
+        Ok(if cancel.load(Ordering::Relaxed) { 0 } else { 1 })
     }
 }

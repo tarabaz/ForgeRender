@@ -38,9 +38,18 @@ accumulo corretto, export PNG.
 - ✅ vetro satinato (trasmissione microfacet GGX, Walter 2007) con white furnace
 - ⏳ bump/displacement, opacità, mip-mapping
 
-## Fase 4 — GPU ⏳
-Path tracer WGSL in compute shader via wgpu, confronto CPU/GPU sulla stessa scena,
-NVML per utilizzo GPU/VRAM. CUDA/OptiX esclusi per ora.
+## Fase 4 — GPU 🟡
+- ✅ Path tracer in compute shader WGSL via wgpu (Vulkan/DX12), stesso algoritmo del CPU:
+  BSDF con multi-scattering, vetro liscio e satinato, NEE+MIS su luci, HDRI ed emissivi,
+  texture, Russian roulette. Scena in un unico buffer "bindless".
+- ✅ Passate adattive con più campioni per pixel (≈60 ms per passata, niente timeout TDR),
+  dispositivo e shader preparati in background all'avvio e riutilizzati.
+- ✅ Test su GPU (lavapipe in CI): white furnace, luce ad area ed emissivi contro formule
+  analitiche, HDRI con sole contro CPU, texture, convergenza statistica alla stessa immagine CPU.
+- ✅ Selettore CPU/GPU nell'interfaccia e nella CLI (`--backend gpu`), riga GPU nel benchmark,
+  ritorno automatico alla CPU se la GPU non è disponibile.
+- ⏳ misure sulla RTX 5070, utilizzo GPU/VRAM via NVML, ray tracing hardware (RT core),
+  rendering ibrido CPU+GPU. CUDA/OptiX esclusi per ora.
 
 ## Fase 5 — CAD 🟡
 - ✅ Import STEP/STP tramite `forgerender-step` (Open CASCADE 7.8.1, processo separato):

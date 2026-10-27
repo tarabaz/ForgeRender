@@ -61,8 +61,8 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             forge_telemetry::gib(app.monitor.used_ram_bytes),
             forge_telemetry::gib(app.system.total_ram_bytes)
         ));
-        ui.label("GPU: utilizzo non rilevato (Fase 4)")
-            .on_hover_text("La lettura di utilizzo GPU e VRAM via NVML arriverà con il backend GPU");
+        ui.label("GPU: utilizzo non rilevato")
+            .on_hover_text("La lettura di utilizzo GPU e VRAM (NVML) non è ancora integrata");
         ui.label("Denoising: non disponibile (Fase 6)");
         ui.label(egui::RichText::new(format!("{} ({} thread)", app.system.cpu_brand, app.system.logical_threads)).weak());
         ui.end_row();

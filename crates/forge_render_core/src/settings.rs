@@ -18,6 +18,23 @@ impl ToneMapping {
     }
 }
 
+/// Dispositivo su cui calcolare il rendering.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum BackendKind {
+    #[default]
+    Cpu,
+    Gpu,
+}
+
+impl BackendKind {
+    pub fn label(self) -> &'static str {
+        match self {
+            BackendKind::Cpu => "CPU (tutti i core)",
+            BackendKind::Gpu => "GPU (compute shader)",
+        }
+    }
+}
+
 /// Preset del numero di campioni per pixel.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SamplesPreset {
@@ -52,6 +69,7 @@ pub struct RenderSettings {
     pub exposure_ev: f32,
     /// Se falso lo sfondo è nero ma l'ambiente continua a illuminare.
     pub environment_visible: bool,
+    pub backend: BackendKind,
 }
 
 impl Default for RenderSettings {
@@ -68,6 +86,7 @@ impl Default for RenderSettings {
             tone_mapping: ToneMapping::AcesFilmic,
             exposure_ev: 0.0,
             environment_visible: true,
+            backend: BackendKind::Cpu,
         }
     }
 }

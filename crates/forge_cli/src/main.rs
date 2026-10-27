@@ -70,7 +70,7 @@ fn print_help() {
          info                       informazioni hardware rilevate\n  \
          render [opzioni]           rendering headless verso PNG\n    \
              --project F.frproject | --mesh F.obj/.stl/.step/.glb/.blend | --test-scene (default)\n    \
-             --out F.png  --spp N  --width W  --height H  --threads T  --bounces B\n    \
+             --out F.png  --spp N  --width W  --height H  --threads T  --bounces B  --backend cpu|gpu\n    \
              --unit mm|cm|m|in  (per --mesh, default mm)  --quiet\n    \
              --hdri F.hdr|F.exr  --hdri-strength S  --hdri-rotation GRADI\n  \
          bench [opzioni]            benchmark della scena di test con diversi numeri di thread\n    \
@@ -152,9 +152,19 @@ fn render(args: &Args) -> anyhow::Result<()> {
     let t_compile = Instant::now();
     let rs = Arc::new(RenderScene::compile(&scene));
     let compile = t_compile.elapsed();
-    let backend = CpuBackend::from_settings(&settings)?;
+    if let Some(b) = args.value("--backend") {
+        settings.backend = match b {
+            "gpu" => forge_render_core::BackendKind::Gpu,
+            "cpu" => forge_render_core::BackendKind::Cpu,
+            _ => bail!("backend non valido: {b} (cpu|gpu)"),
+        };
+    }
+    let backend: Box<dyn RenderBackend> = match settings.backend {
+        forge_render_core::BackendKind::Gpu => Box::new(forge_render_gpu::GpuBackend::new()?),
+        forge_render_core::BackendKind::Cpu => Box::new(CpuBackend::from_settings(&settings)?),
+    };
     let session = RenderSession::new();
-    let job = session.start(rs.clone(), settings.clone(), Box::new(backend));
+    let job = session.start(rs.clone(), settings.clone(), backend);
     let mut last_print = Instant::now();
     let p = loop {
         let p = session.progress();
@@ -238,10 +248,10 @@ fn bench(args: &Args) -> anyhow::Result<()> {
         let mut be = CpuBackend::new(t)?;
         let mut pass = vec![[0.0f32; 3]; (width * height) as usize];
         // Passata di riscaldamento (cache, pagine di memoria, avvio thread).
-        be.render_pass(&rs, &settings, 0, &mut pass, &cancel)?;
+        be.render_pass(&rs, &settings, 0, 1, &mut pass, &cancel)?;
         let t0 = Instant::now();
         for s in 0..spp {
-            be.render_pass(&rs, &settings, s, &mut pass, &cancel)?;
+            be.render_pass(&rs, &settings, s, 1, &mut pass, &cancel)?;
         }
         let secs = t0.elapsed().as_secs_f64();
         let ms = secs * 1e3 / spp as f64;
@@ -252,6 +262,29 @@ fn bench(args: &Args) -> anyhow::Result<()> {
         }
         println!("{t:>8} {secs:>12.3} {ms:>14.2} {msps:>14.3} {speedup:>9.2}x");
         results.push(serde_json::json!({"threads": t, "seconds": secs, "ms_per_pass": ms, "msamples_per_sec": msps, "speedup": speedup}));
+    }
+    // GPU: passate adattive con più campioni per pixel.
+    match forge_render_gpu::GpuBackend::new() {
+        Ok(mut g) => {
+            let name = g.info().name.clone();
+            let mut pass = vec![[0.0f32; 3]; (width * height) as usize];
+            g.render_pass(&rs, &settings, 0, 1, &mut pass, &cancel)?; // riscaldamento (caricamento scena)
+            let t0 = Instant::now();
+            let mut done = 0;
+            while done < spp {
+                done += g.render_pass(&rs, &settings, done, spp - done, &mut pass, &cancel)?;
+            }
+            let secs = t0.elapsed().as_secs_f64();
+            let msps = (width as f64 * height as f64 * spp as f64) / secs / 1e6;
+            let speedup = base.map(|b: f64| b / secs).unwrap_or(1.0);
+            println!(
+                "{:>8} {secs:>12.3} {:>14.2} {msps:>14.3} {speedup:>9.2}x   ({name})",
+                "GPU",
+                secs * 1e3 / spp as f64
+            );
+            results.push(serde_json::json!({"device": "gpu", "name": name, "seconds": secs, "msamples_per_sec": msps, "speedup": speedup}));
+        }
+        Err(e) => println!("GPU: non disponibile ({e})"),
     }
     if let Some(p) = args.value("--json") {
         let doc = serde_json::json!({

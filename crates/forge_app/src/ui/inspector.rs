@@ -755,14 +755,34 @@ fn camera(app: &mut ForgeApp, ui: &mut egui::Ui) {
 // ----------------------------------------------------------------------
 
 fn render(app: &mut ForgeApp, ui: &mut egui::Ui) {
-    let s = &mut app.settings;
     let mut changed = false;
-    egui::ComboBox::from_label("Backend")
-        .selected_text("CPU path tracer")
+    let prev_backend = app.settings.backend;
+    egui::ComboBox::from_label("Dispositivo")
+        .selected_text(app.settings.backend.label())
         .show_ui(ui, |ui| {
-            let _ = ui.selectable_label(true, "CPU path tracer");
-            ui.add_enabled(false, egui::Button::selectable(false, "GPU (wgpu compute) — Fase 4"));
+            for b in [forge_render_core::BackendKind::Cpu, forge_render_core::BackendKind::Gpu] {
+                ui.selectable_value(&mut app.settings.backend, b, b.label());
+            }
         });
+    if app.settings.backend != prev_backend {
+        changed = true;
+    }
+    if app.settings.backend == forge_render_core::BackendKind::Gpu {
+        match app.gpu_backend() {
+            Ok(g) => {
+                let i = g.info();
+                ui.label(
+                    egui::RichText::new(format!("{} · {} · {}", i.name, i.backend, i.device_type))
+                        .weak()
+                        .small(),
+                );
+            }
+            Err(e) => {
+                ui.colored_label(style::WARN, format!("GPU non disponibile: {e}"));
+            }
+        }
+    }
+    let s = &mut app.settings;
     let max_t = app.system.logical_threads;
     ui.horizontal(|ui| {
         ui.label("Thread CPU");
