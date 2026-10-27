@@ -16,8 +16,17 @@
 - `.cargo/config.toml`: CRT statico per MSVC (nessun redistributable richiesto).
 - Documentazione: README, ARCHITECTURE, ROADMAP, BENCHMARK.
 
+## Fatto nella terza parte
+- CI verde end-to-end (run #2): test su Windows MSVC, build, pacchetti portable (7,8 MB) e
+  installer (6,7 MB) caricati come artifact.
+- Log su file (portable: .\logs, installato: %LOCALAPPDATA%\ForgeRender\logs).
+- Fase 3: HDRI .hdr/.exr con importance sampling + MIS; texture colore/roughness/normal map
+  con mapping UV o box (CAD senza UV). Verificate con test analitici e render visivi.
+
 ## Prossimi passi
-1. Verificare il primo run della CI su Windows e scaricare i pacchetti.
-2. Prova sul PC reale (avvio, viewport sulla RTX, benchmark 9900X).
-3. Fase 3: texture/UV, HDRI con importance sampling, multi-scattering GGX, NEE sugli emissivi.
-4. Fase 4: backend GPU wgpu compute.
+1. Prova sul PC reale: scaricare ForgeRender-portable-x64 dagli artifact della CI.
+2. Benchmark sul 9900X (`forgerender-cli bench --json bench-9900x.json`).
+3. Fase 3 restante: compensazione multi-scattering GGX, NEE sulle superfici emissive,
+   trasmissione ruvida, mip-mapping.
+4. Fase 4: backend GPU wgpu compute (riusa il layout BVH di forge_accel).
+5. Fase 5: convertitore STEP (Open CASCADE) e bridge SolidWorks (C#/COM).
