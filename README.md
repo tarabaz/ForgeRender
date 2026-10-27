@@ -14,10 +14,12 @@ pensato per Windows 11 (Ryzen 9 9900X + RTX 5070) ma funzionante anche senza GPU
 - Next Event Estimation + Multiple Importance Sampling, Russian roulette, BVH SAH.
 - Materiali: diffuso, metalli e plastiche GGX (campionamento VNDF), vetro con Fresnel esatto, emissivi.
   Texture colore/roughness/normal map con mapping UV o proiezione box (per CAD senza UV).
-  Libreria iniziale di 15 preset.
+  Libreria di ~120 materiali pronti in 11 categorie, con ricerca.
 - Luci ad area, puntiformi, spot, direzionali; ambiente uniforme, a gradiente o HDRI (.hdr/.exr)
   con importance sampling; 5 preset da studio.
-- Import OBJ (con .mtl) e STL, con unità di misura e normali con angolo di piega.
+- Import STEP/STP (assiemi con nomi, colori, trasformazioni; Open CASCADE in un processo separato),
+  OBJ (con .mtl) e STL; SolidWorks SLDPRT/SLDASM sperimentale tramite SolidWorks installato.
+- Trasformazioni non distruttive: sposta, ruota, ridimensiona (anche in mm), appoggia sul pavimento.
 - Viewport 3D wgpu (orbita/pan/zoom, selezione col clic), albero dei componenti,
   assegnazione materiali persistente per id stabile (singola, multipla, per nome, ereditata).
 - Avvio / pausa / ripresa / stop / riavvio automatico quando la scena cambia, export PNG.

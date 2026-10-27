@@ -6,7 +6,9 @@
 //! costruiti come `"<nome file>/<nome oggetto>"`, stabili tra reimportazioni
 //! dello stesso file.
 
+pub mod frmesh;
 mod obj;
+pub mod step;
 mod stl;
 
 use forge_math::Mat4;
@@ -17,12 +19,16 @@ use std::path::Path;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ImportOptions {
-    /// Unità di misura del file (STL e OBJ non la dichiarano).
+    /// Unità di misura del file (STL e OBJ non la dichiarano; lo STEP sì e la ignora).
     pub unit: LengthUnit,
     /// Angolo di piega per il calcolo delle normali quando mancano (gradi).
     pub crease_angle_deg: f32,
-    /// Ruota da Z-up (tipico CAD) a Y-up (convenzione della scena).
-    pub z_up: bool,
+    /// Asse verticale del file. La scena usa Y verso l'alto.
+    pub up: UpAxis,
+    /// Qualità della triangolazione dei formati CAD (STEP).
+    pub step_quality: StepQuality,
+    /// Dopo l'importazione appoggia il modello a quota 0 (trasformazione utente, non distruttiva).
+    pub drop_to_floor: bool,
 }
 
 impl Default for ImportOptions {
@@ -30,8 +36,63 @@ impl Default for ImportOptions {
         Self {
             unit: LengthUnit::Millimeter,
             crease_angle_deg: 40.0,
-            z_up: true,
+            up: UpAxis::Auto,
+            step_quality: StepQuality::Media,
+            drop_to_floor: true,
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum UpAxis {
+    /// In base al formato: STL Z-up (slicer e CAD), OBJ e STEP Y-up (SolidWorks, Blender).
+    #[default]
+    Auto,
+    Y,
+    Z,
+}
+
+impl UpAxis {
+    pub fn is_z_up(self, ext: &str) -> bool {
+        match self {
+            UpAxis::Auto => ext == "stl",
+            UpAxis::Y => false,
+            UpAxis::Z => true,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            UpAxis::Auto => "Automatico",
+            UpAxis::Y => "Y verso l'alto",
+            UpAxis::Z => "Z verso l'alto",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum StepQuality {
+    Bassa,
+    #[default]
+    Media,
+    Alta,
+}
+
+impl StepQuality {
+    pub fn arg(self) -> &'static str {
+        match self {
+            StepQuality::Bassa => "bassa",
+            StepQuality::Media => "media",
+            StepQuality::Alta => "alta",
+        }
+    }
+}
+
+fn up_matrix(z_up: bool) -> Mat4 {
+    if z_up {
+        Mat4::from_rotation_x(-std::f32::consts::FRAC_PI_2)
+    } else {
+        Mat4::IDENTITY
     }
 }
 
@@ -39,8 +100,10 @@ impl Default for ImportOptions {
 pub enum ImportError {
     #[error("formato non supportato: .{0}")]
     UnsupportedFormat(String),
-    #[error("il formato .{0} richiede un convertitore esterno non ancora disponibile (Fase 5)")]
+    #[error("il formato .{0} richiede un convertitore esterno non ancora disponibile")]
     NeedsConverter(String),
+    #[error("{0}")]
+    Converter(String),
     #[error("il file non contiene geometria triangolabile")]
     Empty,
     #[error("errore di lettura: {0}")]
@@ -69,7 +132,9 @@ pub(crate) struct ImportedObject {
     pub material: Option<Material>,
 }
 
-pub const SUPPORTED_EXTENSIONS: [&str; 2] = ["obj", "stl"];
+pub const SUPPORTED_EXTENSIONS: [&str; 4] = ["obj", "stl", "step", "stp"];
+/// Formati SolidWorks: richiedono SolidWorks installato (esportazione STEP via COM).
+pub const SOLIDWORKS_EXTENSIONS: [&str; 2] = ["sldprt", "sldasm"];
 
 pub fn import_file(scene: &mut Scene, path: &Path, opts: &ImportOptions) -> Result<ImportReport, ImportError> {
     let t0 = std::time::Instant::now();
@@ -79,10 +144,20 @@ pub fn import_file(scene: &mut Scene, path: &Path, opts: &ImportOptions) -> Resu
     let objects = match ext.as_str() {
         "obj" => obj::read(path, &mut warnings)?,
         "stl" => stl::read(path)?,
-        "step" | "stp" | "sldprt" | "sldasm" | "ply" => return Err(ImportError::NeedsConverter(ext)),
+        "step" | "stp" | "sldprt" | "sldasm" => {
+            let model = step::convert(path, opts, |m| tracing::info!("{m}"))?;
+            let report = step::insert(scene, &file_name, model, opts)?;
+            return Ok(ImportReport {
+                duration: t0.elapsed(),
+                ..report
+            });
+        }
+        "ply" => return Err(ImportError::NeedsConverter(ext)),
         _ => return Err(ImportError::UnsupportedFormat(ext)),
     };
-    let report = insert_objects(scene, &file_name, objects, opts, warnings)?;
+    let mut opts = opts.clone();
+    opts.up = if opts.up.is_z_up(&ext) { UpAxis::Z } else { UpAxis::Y };
+    let report = insert_objects(scene, &file_name, objects, &opts, warnings)?;
     let report = ImportReport {
         duration: t0.elapsed(),
         ..report
@@ -108,11 +183,7 @@ pub(crate) fn insert_objects(
     mut warnings: Vec<String>,
 ) -> Result<ImportReport, ImportError> {
     let scale = opts.unit.to_meters();
-    let root_xf = if opts.z_up {
-        Mat4::from_rotation_x(-std::f32::consts::FRAC_PI_2)
-    } else {
-        Mat4::IDENTITY
-    };
+    let root_xf = up_matrix(opts.up == UpAxis::Z);
     let root = scene.add_node(None, ComponentId(file_name.to_string()), file_name, root_xf, None);
     let mut components = 0;
     let mut triangles = 0;
@@ -166,6 +237,7 @@ pub(crate) fn insert_objects(
     if removed > 0 {
         warnings.push(format!("rimossi {removed} triangoli degeneri o non validi"));
     }
+    scene.refresh_pivots();
     Ok(ImportReport {
         root,
         components,
@@ -243,7 +315,7 @@ mod tests {
         ));
         assert!(matches!(
             import_file(&mut s, Path::new("x.SLDASM"), &ImportOptions::default()),
-            Err(ImportError::NeedsConverter(_))
+            Err(ImportError::Converter(_))
         ));
     }
 }

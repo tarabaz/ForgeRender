@@ -8,6 +8,7 @@ use forge_scene::{light, Environment, Light, LightKind, Material, MaterialId};
 pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
     ui.horizontal_wrapped(|ui| {
         for (tab, label) in [
+            (InspectorTab::Object, "Oggetto"),
             (InspectorTab::Materials, "Materiali"),
             (InspectorTab::Lights, "Luci"),
             (InspectorTab::Environment, "Ambiente"),
@@ -22,6 +23,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
         .id_salt("inspector-scroll")
         .auto_shrink([false, false])
         .show(ui, |ui| match app.tab {
+            InspectorTab::Object => crate::ui::transform::show(app, ui),
             InspectorTab::Materials => materials(app, ui),
             InspectorTab::Lights => lights(app, ui),
             InspectorTab::Environment => environment(app, ui),
@@ -71,30 +73,62 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
 
     // Libreria raggruppata per categoria.
     ui.add_space(4.0);
-    ui.strong("Libreria materiali");
+    ui.horizontal(|ui| {
+        ui.strong(format!("Libreria materiali ({})", app.scene.materials.materials.len()));
+        let id = egui::Id::NULL.with("matlib-search");
+        let mut q = ui.ctx().data(|d| d.get_temp::<String>(id).unwrap_or_default());
+        if ui
+            .add(egui::TextEdit::singleline(&mut q).hint_text("cerca…").desired_width(120.0))
+            .changed()
+        {
+            ui.ctx().data_mut(|d| d.insert_temp(id, q.clone()));
+        }
+    });
+    let query = ui
+        .ctx()
+        .data(|d| d.get_temp::<String>(egui::Id::NULL.with("matlib-search")).unwrap_or_default())
+        .to_lowercase();
     let mut categories: Vec<String> = app.scene.materials.materials.iter().map(|m| m.category.clone()).collect();
     categories.sort();
     categories.dedup();
-    egui::ScrollArea::vertical().id_salt("matlib").max_height(190.0).show(ui, |ui| {
+    egui::ScrollArea::vertical().id_salt("matlib").max_height(280.0).show(ui, |ui| {
         for cat in &categories {
-            egui::CollapsingHeader::new(cat).default_open(true).show(ui, |ui| {
-                for m in app.scene.materials.materials.iter().filter(|m| &m.category == cat) {
-                    let usage = app.scene.assignments.values().filter(|v| **v == m.id).count();
-                    let label = if usage > 0 {
-                        format!("{}  ({usage})", m.name)
-                    } else {
-                        m.name.clone()
-                    };
-                    ui.horizontal(|ui| {
-                        let (r, _) = ui.allocate_exact_size(egui::vec2(12.0, 12.0), egui::Sense::hover());
-                        ui.painter()
-                            .rect_filled(r, 2.0, crate::viewport::to_egui_color(Vec3::from_array(m.base_color)));
-                        if ui.selectable_label(app.selected_material == m.id, label).clicked() {
-                            app.selected_material = m.id.clone();
-                        }
-                    });
-                }
-            });
+            let items: Vec<&forge_scene::Material> = app
+                .scene
+                .materials
+                .materials
+                .iter()
+                .filter(|m| &m.category == cat)
+                .filter(|m| query.is_empty() || m.name.to_lowercase().contains(&query) || m.category.to_lowercase().contains(&query))
+                .collect();
+            if items.is_empty() {
+                continue;
+            }
+            egui::CollapsingHeader::new(format!("{cat} ({})", items.len()))
+                .id_salt(cat)
+                .default_open(!query.is_empty())
+                .show(ui, |ui| {
+                    for m in items {
+                        let usage = app.scene.assignments.values().filter(|v| **v == m.id).count();
+                        let label = if usage > 0 {
+                            format!("{}  ({usage})", m.name)
+                        } else {
+                            m.name.clone()
+                        };
+                        ui.horizontal(|ui| {
+                            let (r, _) = ui.allocate_exact_size(egui::vec2(12.0, 12.0), egui::Sense::hover());
+                            let col = if m.is_emissive() {
+                                Vec3::from_array(m.emission)
+                            } else {
+                                Vec3::from_array(m.base_color)
+                            };
+                            ui.painter().rect_filled(r, 2.0, crate::viewport::to_egui_color(col));
+                            if ui.selectable_label(app.selected_material == m.id, label).clicked() {
+                                app.selected_material = m.id.clone();
+                            }
+                        });
+                    }
+                });
         }
     });
 

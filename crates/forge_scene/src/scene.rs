@@ -26,6 +26,58 @@ impl std::fmt::Display for ComponentId {
 
 pub type NodeIndex = usize;
 
+/// Trasformazione impostata dall'utente su un componente, non distruttiva:
+/// si applica sopra la posizione del file sorgente e viene salvata nel progetto.
+///
+/// È espressa in spazio mondo: rotazione (angoli XYZ in gradi) e scala avvengono
+/// attorno al centro del componente nella posizione originale (`Node::pivot`),
+/// poi si applica lo spostamento. La trasformazione di un assieme si applica
+/// anche a tutti i suoi figli.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct UserTransform {
+    /// Spostamento in metri.
+    pub translation: Vec3,
+    pub rotation_deg: Vec3,
+    pub scale: Vec3,
+}
+
+impl Default for UserTransform {
+    fn default() -> Self {
+        Self {
+            translation: Vec3::ZERO,
+            rotation_deg: Vec3::ZERO,
+            scale: Vec3::ONE,
+        }
+    }
+}
+
+impl UserTransform {
+    pub fn is_identity(&self) -> bool {
+        *self == Self::default()
+    }
+
+    /// Matrice in spazio mondo dato il punto di rotazione/scala.
+    pub fn matrix(&self, pivot: Vec3) -> Mat4 {
+        if self.is_identity() {
+            return Mat4::IDENTITY;
+        }
+        let r = self.rotation_deg;
+        let rot = forge_math::Quat::from_euler(
+            forge_math::glam::EulerRot::XYZ,
+            r.x.to_radians(),
+            r.y.to_radians(),
+            r.z.to_radians(),
+        );
+        let scale = Vec3::new(
+            if self.scale.x.abs() > 1e-9 { self.scale.x } else { 1e-9 },
+            if self.scale.y.abs() > 1e-9 { self.scale.y } else { 1e-9 },
+            if self.scale.z.abs() > 1e-9 { self.scale.z } else { 1e-9 },
+        );
+        Mat4::from_translation(self.translation + pivot) * Mat4::from_quat(rot) * Mat4::from_scale(scale) * Mat4::from_translation(-pivot)
+    }
+}
+
 /// Nodo dell'albero di scena (parte, assieme o gruppo).
 #[derive(Clone, Debug)]
 pub struct Node {
@@ -36,6 +88,9 @@ pub struct Node {
     pub local_transform: Mat4,
     pub mesh: Option<usize>,
     pub visible: bool,
+    pub user: UserTransform,
+    /// Centro del componente nella posizione del file sorgente (punto di rotazione/scala).
+    pub pivot: Vec3,
 }
 
 #[derive(Clone, Debug)]
@@ -105,6 +160,8 @@ impl Scene {
             local_transform,
             mesh,
             visible: true,
+            user: UserTransform::default(),
+            pivot: Vec3::ZERO,
         });
         match parent {
             Some(p) => self.nodes[p].children.push(idx),
@@ -117,13 +174,69 @@ impl Scene {
         self.nodes.iter().position(|n| &n.id == id)
     }
 
-    pub fn world_transform(&self, mut idx: NodeIndex) -> Mat4 {
+    /// Trasformazione mondo come nel file sorgente (senza modifiche dell'utente).
+    pub fn source_world_transform(&self, mut idx: NodeIndex) -> Mat4 {
         let mut m = self.nodes[idx].local_transform;
         while let Some(p) = self.nodes[idx].parent {
             m = self.nodes[p].local_transform * m;
             idx = p;
         }
         m
+    }
+
+    /// Trasformazione mondo effettiva: le trasformazioni utente degli antenati
+    /// (applicate per ultime) e del nodo stesso, sopra la posizione sorgente.
+    pub fn world_transform(&self, idx: NodeIndex) -> Mat4 {
+        let mut user = Mat4::IDENTITY;
+        let mut k = Some(idx);
+        while let Some(i) = k {
+            let n = &self.nodes[i];
+            if !n.user.is_identity() {
+                user = n.user.matrix(n.pivot) * user;
+            }
+            k = n.parent;
+        }
+        user * self.source_world_transform(idx)
+    }
+
+    /// Ricalcola i punti di rotazione/scala (centro dei componenti nella posizione
+    /// sorgente). Va chiamata dopo aver aggiunto geometria.
+    pub fn refresh_pivots(&mut self) {
+        let mesh_bounds: Vec<Aabb> = self.meshes.iter().map(|m| m.bounds()).collect();
+        let mut bounds = vec![Aabb::EMPTY; self.nodes.len()];
+        // Visita in ordine inverso di profondità: i figli prima dei genitori.
+        let order = self.walk();
+        for &(i, _) in order.iter().rev() {
+            let mut b = Aabb::EMPTY;
+            if let Some(m) = self.nodes[i].mesh {
+                b.grow(&mesh_bounds[m].transformed(&self.source_world_transform(i)));
+            }
+            for &c in &self.nodes[i].children {
+                b.grow(&bounds[c]);
+            }
+            bounds[i] = b;
+        }
+        for (i, n) in self.nodes.iter_mut().enumerate() {
+            n.pivot = if bounds[i].is_empty() { Vec3::ZERO } else { bounds[i].center() };
+        }
+    }
+
+    /// Sposta il componente in modo che il suo punto più basso stia a quota `y`.
+    pub fn drop_to_floor(&mut self, idx: NodeIndex, y: f32) {
+        let b = self.bounds_of(idx);
+        if !b.is_empty() {
+            self.nodes[idx].user.translation.y += y - b.min.y;
+        }
+    }
+
+    /// Porta il centro del componente sull'asse verticale dell'origine (X = Z = 0).
+    pub fn center_on_origin(&mut self, idx: NodeIndex) {
+        let b = self.bounds_of(idx);
+        if !b.is_empty() {
+            let c = b.center();
+            self.nodes[idx].user.translation.x -= c.x;
+            self.nodes[idx].user.translation.z -= c.z;
+        }
     }
 
     /// Visibile se il nodo e tutti i suoi antenati sono visibili.
@@ -285,6 +398,7 @@ impl Scene {
             s.assignments.insert(cid, MaterialId::new(mat));
         }
         s.lights = crate::light::preset("studio", Vec3::new(0.0, 0.5, 0.0), 1.2).unwrap_or_default();
+        s.refresh_pivots();
         s.camera = Camera {
             position: Vec3::new(0.3, 1.6, 4.2),
             target: Vec3::new(0.0, 0.35, 0.0),
@@ -317,6 +431,40 @@ mod tests {
         s.nodes[b].visible = false;
         assert!(!s.is_visible(c));
         assert!(s.is_visible(a));
+    }
+
+    #[test]
+    fn user_transforms_compose_and_pivot() {
+        let mut s = Scene::default();
+        let m = s.add_mesh(primitives::cuboid(Vec3::ONE));
+        let a = s.add_node(
+            None,
+            ComponentId("a".into()),
+            "A",
+            Mat4::from_translation(Vec3::new(5.0, 0.0, 0.0)),
+            None,
+        );
+        let b = s.add_node(Some(a), ComponentId("a/b".into()), "B", Mat4::IDENTITY, Some(m));
+        s.refresh_pivots();
+        assert!((s.nodes[b].pivot - Vec3::new(5.0, 0.0, 0.0)).length() < 1e-5);
+        // Rotazione attorno al proprio centro: il centro non si muove.
+        s.nodes[b].user.rotation_deg = Vec3::new(0.0, 45.0, 0.0);
+        assert!((s.bounds_of(b).center() - Vec3::new(5.0, 0.0, 0.0)).length() < 1e-5);
+        // Scala 2: il cubo raddoppia attorno al centro.
+        s.nodes[b].user = UserTransform {
+            scale: Vec3::splat(2.0),
+            ..Default::default()
+        };
+        assert!((s.bounds_of(b).extent() - Vec3::splat(2.0)).length() < 1e-5);
+        // Spostamento dell'assieme: si sposta anche il figlio.
+        s.nodes[a].user.translation = Vec3::new(0.0, 1.0, 0.0);
+        assert!((s.bounds_of(b).center() - Vec3::new(5.0, 1.0, 0.0)).length() < 1e-5);
+        // Appoggia sul pavimento e centra.
+        s.drop_to_floor(a, 0.0);
+        assert!(s.bounds_of(b).min.y.abs() < 1e-5);
+        s.center_on_origin(a);
+        let c = s.bounds_of(b).center();
+        assert!(c.x.abs() < 1e-5 && c.z.abs() < 1e-5, "{c}");
     }
 
     #[test]

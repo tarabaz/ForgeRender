@@ -232,104 +232,369 @@ fn srgb(r: u8, g: u8, b: u8) -> [f32; 3] {
     [r, g, b].map(|v| srgb_to_linear(v as f32 / 255.0))
 }
 
-/// Libreria iniziale. I valori sono punti di partenza ragionevoli, non misure
-/// di laboratorio: un singolo valore di roughness non descrive ogni finitura reale.
-/// Colori dei metalli: F0 approssimati da dati spettrali noti (es. "Real-Time Rendering", 4ª ed.).
+/// Libreria di materiali pronti all'uso, divisa per categorie.
+///
+/// I valori sono punti di partenza fisicamente plausibili, non misure di
+/// laboratorio: un singolo valore di roughness non descrive ogni finitura reale.
+/// Colori dei metalli: riflettanza a incidenza normale (F0) da dati spettrali noti
+/// (es. "Real-Time Rendering", 4ª ed., tab. 9.2), già in spazio lineare.
+/// IOR dei dielettrici da valori tabulati (vetro sodico-calcico 1.52, PMMA 1.49,
+/// policarbonato 1.585, acqua 1.333, diamante 2.42…).
 pub fn presets() -> Vec<Material> {
-    let m = |id: &str, name: &str, cat: &str| Material {
-        id: MaterialId::new(id),
-        name: name.into(),
-        category: cat.into(),
-        ..Default::default()
+    let mut v = Vec::new();
+    let mut add = |id: &str, name: &str, cat: &str, f: &dyn Fn(&mut Material)| {
+        let mut m = Material {
+            id: MaterialId::new(id),
+            name: name.into(),
+            category: cat.into(),
+            ..Default::default()
+        };
+        f(&mut m);
+        v.push(m);
     };
-    vec![
-        Material {
-            base_color: [0.56, 0.57, 0.58],
-            metallic: 1.0,
-            roughness: 0.35,
-            ..m("acciaio-satinato", "Acciaio satinato", "Metalli")
-        },
-        Material {
-            base_color: [0.56, 0.57, 0.58],
-            metallic: 1.0,
-            roughness: 0.06,
-            ..m("acciaio-lucidato", "Acciaio lucidato", "Metalli")
-        },
-        Material {
-            base_color: [0.91, 0.92, 0.92],
-            metallic: 1.0,
-            roughness: 0.25,
-            ..m("alluminio", "Alluminio", "Metalli")
-        },
-        Material {
-            base_color: srgb(40, 70, 140),
-            metallic: 1.0,
-            roughness: 0.3,
-            ..m("alluminio-anodizzato-blu", "Alluminio anodizzato (blu)", "Metalli")
-        },
-        Material {
-            base_color: [0.62, 0.64, 0.65],
-            metallic: 1.0,
-            roughness: 0.55,
-            ..m("acciaio-zincato", "Acciaio zincato", "Metalli")
-        },
-        Material {
-            base_color: [0.95, 0.64, 0.54],
-            metallic: 1.0,
-            roughness: 0.2,
-            ..m("rame", "Rame", "Metalli")
-        },
-        Material {
-            base_color: [0.91, 0.78, 0.42],
-            metallic: 1.0,
-            roughness: 0.2,
-            ..m("ottone", "Ottone", "Metalli")
-        },
-        Material {
-            base_color: srgb(30, 30, 32),
-            roughness: 0.6,
-            ..m("plastica-opaca-nera", "Plastica opaca (nera)", "Plastiche")
-        },
-        Material {
-            base_color: srgb(180, 20, 20),
-            roughness: 0.12,
-            ..m("plastica-lucida-rossa", "Plastica lucida (rossa)", "Plastiche")
-        },
-        Material {
-            base_color: srgb(15, 15, 15),
-            roughness: 0.85,
-            specular: 0.3,
-            ..m("gomma", "Gomma", "Plastiche")
-        },
-        Material {
-            base_color: [1.0, 1.0, 1.0],
-            roughness: 0.0,
-            transmission: 1.0,
-            ior: 1.5,
-            ..m("vetro", "Vetro", "Trasparenti")
-        },
-        Material {
-            base_color: srgb(240, 240, 235),
-            roughness: 0.08,
-            specular: 0.5,
-            ..m("ceramica", "Ceramica smaltata", "Ceramiche")
-        },
-        Material {
-            base_color: srgb(140, 90, 50),
-            roughness: 0.55,
-            ..m("legno", "Legno (tinta unita, texture in Fase 3)", "Naturali")
-        },
-        Material {
-            base_color: srgb(20, 60, 120),
-            roughness: 0.25,
-            ..m("vernice", "Vernice", "Vernici")
-        },
-        Material {
-            base_color: [1.0, 1.0, 1.0],
-            emission: [1.0, 1.0, 1.0],
-            emission_strength: 10.0,
-            roughness: 1.0,
-            ..m("emissivo", "Superficie emissiva", "Emissivi")
-        },
-    ]
+    let metal = |c: [f32; 3], r: f32| {
+        move |m: &mut Material| {
+            m.base_color = c;
+            m.metallic = 1.0;
+            m.roughness = r;
+        }
+    };
+    let diel = |c: [f32; 3], r: f32| {
+        move |m: &mut Material| {
+            m.base_color = c;
+            m.roughness = r;
+        }
+    };
+    let glass = |c: [f32; 3], ior: f32, r: f32| {
+        move |m: &mut Material| {
+            m.base_color = c;
+            m.transmission = 1.0;
+            m.ior = ior;
+            m.roughness = r;
+        }
+    };
+
+    // --- Metalli (F0 lineari) ---
+    const STEEL: [f32; 3] = [0.56, 0.57, 0.58];
+    const STAINLESS: [f32; 3] = [0.62, 0.62, 0.60];
+    const ALU: [f32; 3] = [0.91, 0.92, 0.92];
+    const CHROME: [f32; 3] = [0.55, 0.556, 0.554];
+    const GOLD: [f32; 3] = [1.0, 0.71, 0.29];
+    const SILVER: [f32; 3] = [0.97, 0.96, 0.91];
+    const COPPER: [f32; 3] = [0.95, 0.64, 0.54];
+    const BRASS: [f32; 3] = [0.91, 0.78, 0.42];
+    const BRONZE: [f32; 3] = [0.80, 0.55, 0.35];
+    const TITANIUM: [f32; 3] = [0.54, 0.50, 0.46];
+    const NICKEL: [f32; 3] = [0.66, 0.61, 0.53];
+    const ZINC: [f32; 3] = [0.66, 0.68, 0.69];
+    let c = "Metalli";
+    add("acciaio-lucidato", "Acciaio lucidato a specchio", c, &metal(STEEL, 0.06));
+    add("acciaio-satinato", "Acciaio satinato", c, &metal(STEEL, 0.35));
+    add("acciaio-sabbiato", "Acciaio sabbiato", c, &metal(STEEL, 0.6));
+    add("acciaio-inox", "Acciaio inox", c, &metal(STAINLESS, 0.22));
+    add("acciaio-inox-spazzolato", "Acciaio inox spazzolato", c, &metal(STAINLESS, 0.4));
+    add("acciaio-zincato", "Acciaio zincato", c, &metal([0.62, 0.64, 0.65], 0.55));
+    add("ghisa", "Ghisa grezza", c, &metal([0.35, 0.35, 0.36], 0.75));
+    add("ferro-brunito", "Ferro brunito", c, &metal([0.12, 0.12, 0.13], 0.35));
+    add("alluminio", "Alluminio", c, &metal(ALU, 0.25));
+    add("alluminio-lucido", "Alluminio lucidato", c, &metal(ALU, 0.06));
+    add("alluminio-spazzolato", "Alluminio spazzolato", c, &metal(ALU, 0.42));
+    add("alluminio-sabbiato", "Alluminio sabbiato", c, &metal(ALU, 0.62));
+    add("cromo", "Cromo", c, &metal(CHROME, 0.03));
+    add("cromo-satinato", "Cromo satinato", c, &metal(CHROME, 0.3));
+    add("nichel", "Nichel", c, &metal(NICKEL, 0.2));
+    add("titanio", "Titanio", c, &metal(TITANIUM, 0.3));
+    add("zinco", "Zinco", c, &metal(ZINC, 0.4));
+    add("oro", "Oro lucido", c, &metal(GOLD, 0.08));
+    add("oro-satinato", "Oro satinato", c, &metal(GOLD, 0.35));
+    add("argento", "Argento", c, &metal(SILVER, 0.08));
+    add("specchio", "Specchio", c, &metal(SILVER, 0.0));
+    add("rame", "Rame", c, &metal(COPPER, 0.2));
+    add("rame-ossidato", "Rame brunito", c, &metal([0.45, 0.25, 0.18], 0.5));
+    add("ottone", "Ottone", c, &metal(BRASS, 0.2));
+    add("ottone-satinato", "Ottone satinato", c, &metal(BRASS, 0.45));
+    add("bronzo", "Bronzo", c, &metal(BRONZE, 0.3));
+
+    // --- Alluminio anodizzato (approssimazione: metallo colorato) ---
+    let c = "Anodizzati";
+    for (id, name, col) in [
+        ("blu", "blu", srgb(40, 70, 140)),
+        ("nero", "nero", srgb(28, 28, 32)),
+        ("rosso", "rosso", srgb(150, 25, 30)),
+        ("oro", "oro", srgb(200, 150, 60)),
+        ("verde", "verde", srgb(40, 110, 60)),
+        ("viola", "viola", srgb(90, 40, 120)),
+        ("titanio", "grigio titanio", srgb(90, 92, 98)),
+        ("argento", "naturale", srgb(200, 202, 205)),
+    ] {
+        add(
+            &format!("alluminio-anodizzato-{id}"),
+            &format!("Alluminio anodizzato {name}"),
+            c,
+            &metal(col, 0.3),
+        );
+    }
+
+    // --- Vernici ---
+    let c = "Vernici";
+    add("vernice", "Vernice lucida blu", c, &diel(srgb(20, 60, 120), 0.08));
+    add(
+        "vernice-lucida-bianca",
+        "Vernice lucida bianca",
+        c,
+        &diel(srgb(235, 235, 232), 0.08),
+    );
+    add("vernice-lucida-nera", "Vernice lucida nera", c, &diel(srgb(12, 12, 13), 0.06));
+    add(
+        "vernice-lucida-rossa",
+        "Vernice lucida rossa (Ferrari)",
+        c,
+        &diel(srgb(180, 10, 12), 0.07),
+    );
+    add("vernice-opaca-nera", "Vernice opaca nera", c, &diel(srgb(18, 18, 19), 0.65));
+    add("vernice-opaca-bianca", "Vernice opaca bianca", c, &diel(srgb(225, 225, 222), 0.7));
+    add(
+        "verniciatura-polvere",
+        "Verniciatura a polvere (RAL 7016)",
+        c,
+        &diel(srgb(56, 62, 66), 0.45),
+    );
+    add(
+        "verniciatura-polvere-nera",
+        "Verniciatura a polvere nera goffrata",
+        c,
+        &diel(srgb(22, 22, 23), 0.6),
+    );
+    add("vernice-metallizzata-argento", "Metallizzato argento", c, &|m| {
+        metal(srgb(190, 192, 196), 0.28)(m);
+        m.metallic = 0.75;
+    });
+    add("vernice-metallizzata-blu", "Metallizzato blu", c, &|m| {
+        metal(srgb(25, 55, 130), 0.25)(m);
+        m.metallic = 0.6;
+    });
+    add("vernice-metallizzata-grafite", "Metallizzato grafite", c, &|m| {
+        metal(srgb(60, 62, 66), 0.3)(m);
+        m.metallic = 0.65;
+    });
+    add("vernice-perlata", "Perlato bianco", c, &|m| {
+        diel(srgb(238, 236, 228), 0.18)(m);
+        m.metallic = 0.25;
+        m.specular = 0.7;
+    });
+
+    // --- Plastiche ---
+    let c = "Plastiche";
+    add("plastica-opaca-nera", "Plastica opaca nera", c, &diel(srgb(30, 30, 32), 0.6));
+    add("plastica-lucida-rossa", "Plastica lucida rossa", c, &diel(srgb(180, 20, 20), 0.12));
+    add("abs-nero", "ABS nero (stampato)", c, &diel(srgb(22, 22, 24), 0.45));
+    add("abs-bianco", "ABS bianco", c, &diel(srgb(230, 230, 225), 0.4));
+    add("abs-grigio", "ABS grigio", c, &diel(srgb(120, 122, 125), 0.45));
+    add("plastica-soft-touch", "Plastica soft-touch", c, &|m| {
+        diel(srgb(35, 35, 37), 0.85)(m);
+        m.specular = 0.3;
+    });
+    add("nylon-pa12", "Nylon PA12 (SLS)", c, &|m| {
+        diel(srgb(205, 203, 196), 0.9)(m);
+        m.specular = 0.35;
+    });
+    add("nylon-nero", "Nylon nero tinto (MJF)", c, &|m| {
+        diel(srgb(40, 40, 42), 0.85)(m);
+        m.specular = 0.35;
+    });
+    add("polipropilene", "Polipropilene naturale", c, &diel(srgb(220, 218, 205), 0.35));
+    add("pom-delrin", "POM / Delrin bianco", c, &diel(srgb(240, 238, 230), 0.3));
+    add("ptfe", "PTFE / Teflon", c, &diel(srgb(245, 245, 242), 0.55));
+    add("policarbonato", "Policarbonato trasparente", c, &glass([1.0; 3], 1.585, 0.0));
+    add("plexiglass", "Plexiglass / PMMA", c, &glass([1.0; 3], 1.49, 0.0));
+    add("plexiglass-satinato", "Plexiglass satinato", c, &glass([1.0; 3], 1.49, 0.35));
+    add("plexiglass-fume", "Plexiglass fumé", c, &glass(srgb(120, 120, 125), 1.49, 0.0));
+
+    // --- Stampa 3D (FDM e resina) ---
+    let c = "Stampa 3D";
+    for (id, name, col) in [
+        ("bianco", "bianco", srgb(235, 235, 230)),
+        ("nero", "nero", srgb(25, 25, 27)),
+        ("grigio", "grigio", srgb(128, 130, 132)),
+        ("rosso", "rosso", srgb(190, 25, 25)),
+        ("arancione", "arancione", srgb(235, 110, 20)),
+        ("giallo", "giallo", srgb(240, 200, 20)),
+        ("verde", "verde", srgb(40, 160, 70)),
+        ("blu", "blu", srgb(30, 80, 190)),
+    ] {
+        add(&format!("pla-{id}"), &format!("PLA {name}"), c, &diel(col, 0.45));
+    }
+    add("pla-seta-oro", "PLA silk oro", c, &|m| {
+        metal(srgb(215, 165, 70), 0.3)(m);
+        m.metallic = 0.55;
+    });
+    add("pla-seta-argento", "PLA silk argento", c, &|m| {
+        metal(srgb(195, 197, 200), 0.3)(m);
+        m.metallic = 0.55;
+    });
+    add("petg-trasparente", "PETG trasparente", c, &glass(srgb(235, 245, 240), 1.57, 0.08));
+    add("petg-nero", "PETG nero", c, &diel(srgb(20, 20, 22), 0.25));
+    add("tpu-nero", "TPU nero (flessibile)", c, &|m| {
+        diel(srgb(25, 25, 25), 0.7)(m);
+        m.specular = 0.35;
+    });
+    add("resina-grigia", "Resina standard grigia", c, &diel(srgb(140, 142, 145), 0.35));
+    add("resina-bianca", "Resina standard bianca", c, &diel(srgb(232, 232, 228), 0.35));
+    add(
+        "resina-trasparente",
+        "Resina trasparente",
+        c,
+        &glass(srgb(250, 248, 235), 1.51, 0.02),
+    );
+    add("resina-acqua", "Resina «water washable» beige", c, &diel(srgb(214, 196, 160), 0.4));
+    add("primer-grigio", "Primer grigio (pre-pittura)", c, &diel(srgb(150, 150, 150), 0.75));
+
+    // --- Gomme ---
+    let c = "Gomme";
+    add("gomma", "Gomma nera", c, &|m| {
+        diel(srgb(15, 15, 15), 0.85)(m);
+        m.specular = 0.3;
+    });
+    add("gomma-lucida", "Gomma nera lucida", c, &|m| {
+        diel(srgb(15, 15, 15), 0.45)(m);
+        m.specular = 0.4;
+    });
+    add("silicone-grigio", "Silicone grigio", c, &|m| {
+        diel(srgb(130, 132, 135), 0.6)(m);
+        m.specular = 0.35;
+    });
+    add(
+        "silicone-trasparente",
+        "Silicone trasparente",
+        c,
+        &glass(srgb(240, 240, 235), 1.41, 0.25),
+    );
+    add("guarnizione-rossa", "Guarnizione rossa", c, &|m| {
+        diel(srgb(160, 30, 25), 0.7)(m);
+        m.specular = 0.3;
+    });
+
+    // --- Vetri e trasparenti ---
+    let c = "Vetri";
+    add("vetro", "Vetro", c, &glass([1.0; 3], 1.52, 0.0));
+    add("vetro-satinato", "Vetro satinato", c, &glass([1.0; 3], 1.52, 0.4));
+    add("vetro-verde", "Vetro verde", c, &glass(srgb(170, 215, 180), 1.52, 0.0));
+    add("vetro-bronzo", "Vetro bronzato", c, &glass(srgb(200, 165, 120), 1.52, 0.0));
+    add("vetro-blu", "Vetro blu", c, &glass(srgb(150, 180, 230), 1.52, 0.0));
+    add("vetro-ambra", "Vetro ambra", c, &glass(srgb(230, 150, 50), 1.52, 0.0));
+    add("cristallo", "Cristallo al piombo", c, &glass([1.0; 3], 1.7, 0.0));
+    add("diamante", "Diamante", c, &glass([1.0; 3], 2.42, 0.0));
+    add("acqua", "Acqua", c, &glass([1.0; 3], 1.333, 0.0));
+    add("lente-ottica", "Lente ottica", c, &glass([1.0; 3], 1.517, 0.0));
+
+    // --- Ceramiche e pietre ---
+    let c = "Ceramiche e pietre";
+    add("ceramica", "Ceramica smaltata", c, &diel(srgb(240, 240, 235), 0.08));
+    add("porcellana", "Porcellana", c, &diel(srgb(246, 244, 238), 0.15));
+    add("terracotta", "Terracotta", c, &diel(srgb(170, 90, 55), 0.85));
+    add("marmo-bianco", "Marmo bianco lucido", c, &diel(srgb(235, 233, 228), 0.12));
+    add("marmo-nero", "Marmo nero lucido", c, &diel(srgb(25, 25, 27), 0.1));
+    add("granito-grigio", "Granito grigio", c, &diel(srgb(110, 108, 106), 0.35));
+    add("cemento", "Cemento", c, &diel(srgb(150, 148, 142), 0.9));
+    add(
+        "allumina-ceramica",
+        "Ceramica tecnica (allumina)",
+        c,
+        &diel(srgb(238, 232, 220), 0.4),
+    );
+
+    // --- Legni (tinta unita: per le venature applicare una texture di colore) ---
+    let c = "Legni";
+    add("legno", "Legno (tinta unita)", c, &diel(srgb(140, 90, 50), 0.55));
+    add("legno-rovere", "Rovere", c, &diel(srgb(170, 125, 80), 0.5));
+    add("legno-noce", "Noce", c, &diel(srgb(95, 60, 38), 0.45));
+    add("legno-ciliegio", "Ciliegio", c, &diel(srgb(150, 75, 45), 0.4));
+    add("legno-abete", "Abete", c, &diel(srgb(215, 180, 130), 0.6));
+    add("legno-laccato-nero", "Legno laccato nero", c, &diel(srgb(12, 12, 12), 0.08));
+    add("compensato-betulla", "Compensato di betulla", c, &diel(srgb(220, 195, 155), 0.6));
+    add("mdf", "MDF grezzo", c, &diel(srgb(170, 135, 95), 0.8));
+
+    // --- Tessuti e pelle ---
+    let c = "Tessuti e pelle";
+    add("tessuto-grigio", "Tessuto grigio", c, &|m| {
+        diel(srgb(110, 110, 112), 1.0)(m);
+        m.specular = 0.2;
+    });
+    add("feltro-nero", "Feltro nero", c, &|m| {
+        diel(srgb(25, 25, 26), 1.0)(m);
+        m.specular = 0.15;
+    });
+    add("pelle-nera", "Pelle nera", c, &diel(srgb(20, 18, 17), 0.45));
+    add("pelle-cuoio", "Cuoio naturale", c, &diel(srgb(140, 85, 45), 0.5));
+    add("alcantara", "Alcantara grigio", c, &|m| {
+        diel(srgb(70, 70, 72), 0.95)(m);
+        m.specular = 0.2;
+    });
+    add(
+        "carbonio-lucido",
+        "Fibra di carbonio lucida (tinta, senza trama)",
+        c,
+        &diel(srgb(18, 18, 20), 0.12),
+    );
+
+    // --- Emissivi e generici ---
+    let c = "Emissivi";
+    let emit = |col: [f32; 3], strength: f32| {
+        move |m: &mut Material| {
+            m.base_color = [1.0; 3];
+            m.emission = col;
+            m.emission_strength = strength;
+            m.roughness = 1.0;
+        }
+    };
+    add("emissivo", "Superficie emissiva", c, &emit([1.0; 3], 10.0));
+    add(
+        "led-bianco-freddo",
+        "LED bianco freddo (6500 K)",
+        c,
+        &emit(crate::light::kelvin_to_rgb(6500.0), 30.0),
+    );
+    add(
+        "led-bianco-caldo",
+        "LED bianco caldo (3000 K)",
+        c,
+        &emit(crate::light::kelvin_to_rgb(3000.0), 30.0),
+    );
+    add("led-rosso", "LED rosso", c, &emit([1.0, 0.02, 0.02], 25.0));
+    add("led-blu", "LED blu", c, &emit([0.02, 0.1, 1.0], 25.0));
+    add("led-verde", "LED verde", c, &emit([0.05, 1.0, 0.1], 25.0));
+    add("display", "Display acceso (bianco)", c, &emit([1.0; 3], 3.0));
+    v
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn library_is_consistent() {
+        let p = presets();
+        assert!(p.len() >= 100, "libreria troppo piccola: {}", p.len());
+        let mut ids: Vec<_> = p.iter().map(|m| m.id.clone()).collect();
+        ids.sort();
+        let n = ids.len();
+        ids.dedup();
+        assert_eq!(ids.len(), n, "id duplicati nella libreria");
+        for m in &p {
+            assert_eq!(&m.sanitized(), m, "{} ha valori fuori intervallo", m.id);
+            assert!(!m.category.is_empty() && !m.name.is_empty());
+        }
+        // Gli id usati dalla scena di test e dai progetti esistenti restano validi.
+        for id in [
+            "acciaio-lucidato",
+            "vetro",
+            "plastica-lucida-rossa",
+            "rame",
+            "ottone",
+            "alluminio-anodizzato-blu",
+            "gomma",
+        ] {
+            assert!(p.iter().any(|m| m.id.0 == id), "manca {id}");
+        }
+    }
 }

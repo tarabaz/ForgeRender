@@ -22,6 +22,7 @@ pub enum View {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InspectorTab {
+    Object,
     Materials,
     Lights,
     Environment,
@@ -43,6 +44,23 @@ struct PendingGeometry {
     rev: u64,
     rx: Receiver<Arc<RenderGeometry>>,
     then_render: bool,
+}
+
+/// Messaggi dalle operazioni in background.
+pub enum TaskMsg {
+    Progress(String),
+    Model(Result<forge_import::frmesh::FrMesh, String>),
+    Project(Result<Box<forge_project::LoadedProject>, String>),
+}
+
+/// Operazione lenta in corso su un altro thread (import CAD, apertura progetto).
+pub struct Pending {
+    pub label: String,
+    pub message: String,
+    path: PathBuf,
+    opts: ImportOptions,
+    rx: Receiver<TaskMsg>,
+    pub started: std::time::Instant,
 }
 
 /// Opzioni da riga di comando utili a test automatici della GUI.
@@ -74,6 +92,9 @@ pub struct ForgeApp {
     pub collapsed: BTreeSet<usize>,
     pub custom_samples: u32,
     pub preview: crate::ui::central::MaterialPreview,
+    pub pending: Option<Pending>,
+    pub import_queue: Vec<PathBuf>,
+    pub show_import_options: bool,
 
     /// Revisione della geometria (import, visibilità): invalida la BVH.
     pub geometry_rev: u64,
@@ -133,6 +154,9 @@ impl ForgeApp {
             collapsed: BTreeSet::new(),
             custom_samples: 2048,
             preview: Default::default(),
+            pending: None,
+            import_queue: Vec::new(),
+            show_import_options: false,
             geometry_rev: 1,
             shading_rev: 1,
             appearance_rev: 1,
@@ -410,29 +434,119 @@ impl ForgeApp {
     }
 
     pub fn import_dialog(&mut self) {
+        let mut exts: Vec<&str> = forge_import::SUPPORTED_EXTENSIONS.to_vec();
+        if cfg!(windows) {
+            exts.extend(forge_import::SOLIDWORKS_EXTENSIONS);
+        }
         let files = rfd::FileDialog::new()
-            .add_filter("Mesh (OBJ, STL)", &forge_import::SUPPORTED_EXTENSIONS)
-            .pick_files();
-        for f in files.unwrap_or_default() {
-            self.import_path(&f);
+            .add_filter("Modelli 3D e CAD", &exts)
+            .add_filter("STEP", &["step", "stp"])
+            .add_filter("Mesh (OBJ, STL)", &["obj", "stl"])
+            .pick_files()
+            .unwrap_or_default();
+        self.ask_import(files);
+    }
+
+    /// Mostra la finestra delle opzioni di importazione per i file indicati.
+    pub fn ask_import(&mut self, files: Vec<PathBuf>) {
+        if !files.is_empty() {
+            self.import_queue.extend(files);
+            self.show_import_options = true;
         }
     }
 
+    /// Avvia l'importazione dei file in coda con le opzioni correnti.
+    pub fn run_import_queue(&mut self) {
+        self.show_import_options = false;
+        self.process_import_queue();
+    }
+
+    fn process_import_queue(&mut self) {
+        while self.pending.is_none() {
+            let Some(path) = (!self.import_queue.is_empty()).then(|| self.import_queue.remove(0)) else {
+                break;
+            };
+            self.import_path(&path);
+        }
+    }
+
+    fn is_cad_format(path: &Path) -> bool {
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+        matches!(ext.as_str(), "step" | "stp" | "sldprt" | "sldasm")
+    }
+
     pub fn import_path(&mut self, path: &Path) {
-        // Se lo stesso file era già stato importato, lo si sostituisce (stessi id stabili).
+        if Self::is_cad_format(path) {
+            // Conversione lenta (Open CASCADE / SolidWorks): in background.
+            let (tx, rx) = std::sync::mpsc::channel();
+            let p = path.to_path_buf();
+            let opts = self.import_opts.clone();
+            std::thread::Builder::new()
+                .name("forge-import".into())
+                .spawn(move || {
+                    let tx2 = tx.clone();
+                    let r = forge_import::step::convert(&p, &opts, |m| {
+                        let _ = tx2.send(TaskMsg::Progress(m));
+                    });
+                    let _ = tx.send(TaskMsg::Model(r.map_err(|e| e.to_string())));
+                })
+                .expect("thread di importazione");
+            self.pending = Some(Pending {
+                label: format!(
+                    "Importazione di {}",
+                    path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default()
+                ),
+                message: "avvio del convertitore…".into(),
+                path: path.to_path_buf(),
+                opts: self.import_opts.clone(),
+                rx,
+                started: std::time::Instant::now(),
+            });
+            return;
+        }
+        self.leave_demo_scene();
+        self.remove_previous_import(path);
+        let was_empty = self.scene.nodes.is_empty();
+        let r = forge_import::import_file(&mut self.scene, path, &self.import_opts);
+        self.finish_import(path, self.import_opts.clone(), was_empty, r);
+    }
+
+    /// Il primo import sostituisce la scena dimostrativa con una scena pulita.
+    fn leave_demo_scene(&mut self) {
+        if self.meta.test_scene && self.meta.path.is_none() {
+            let s = Scene {
+                lights: Vec::new(),
+                ..Default::default()
+            };
+            self.replace_scene(s, ProjectMeta::default(), None);
+        }
+    }
+
+    /// Se lo stesso file era già stato importato, lo si sostituisce (stessi id stabili:
+    /// materiali, visibilità e trasformazioni assegnati restano validi).
+    fn remove_previous_import(&mut self, path: &Path) {
         let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or_default().to_string();
         if let Some(old) = self.scene.find(&forge_scene::ComponentId(file_name)) {
             self.scene.remove_subtree(old);
             self.selection.clear();
         }
-        let was_empty = self.scene.nodes.is_empty();
-        match forge_import::import_file(&mut self.scene, path, &self.import_opts) {
+    }
+
+    fn finish_import(
+        &mut self,
+        path: &Path,
+        opts: ImportOptions,
+        was_empty: bool,
+        result: Result<forge_import::ImportReport, forge_import::ImportError>,
+    ) {
+        match result {
             Ok(r) => {
+                if opts.drop_to_floor {
+                    self.scene.drop_to_floor(r.root, 0.0);
+                }
                 let project_dir = self.meta.path.as_deref().and_then(Path::parent);
                 self.meta.sources.retain(|s| s.absolute_path.file_name() != path.file_name());
-                self.meta
-                    .sources
-                    .push(forge_project::source_ref(project_dir, path, self.import_opts.clone()));
+                self.meta.sources.push(forge_project::source_ref(project_dir, path, opts));
                 if was_empty && self.meta.test_scene {
                     self.meta.test_scene = false;
                 }
@@ -444,6 +558,7 @@ impl ForgeApp {
                 }
                 self.orbit.frame(&b);
                 self.camera_changed();
+                self.tab = InspectorTab::Object;
                 let mut msg = format!(
                     "{}: {} componenti, {} triangoli ({} ms)",
                     path.display(),
@@ -458,6 +573,38 @@ impl ForgeApp {
             }
             Err(e) => self.error = Some(format!("importazione di {} fallita: {e}", path.display())),
         }
+    }
+
+    /// Avanzamento delle operazioni in background (import CAD, apertura progetto).
+    fn poll_pending(&mut self) {
+        let Some(p) = &mut self.pending else { return };
+        let mut done = None;
+        while let Ok(msg) = p.rx.try_recv() {
+            match msg {
+                TaskMsg::Progress(m) => p.message = m,
+                other => done = Some(other),
+            }
+        }
+        let Some(done) = done else { return };
+        let p = self.pending.take().expect("pending");
+        match done {
+            TaskMsg::Model(Ok(model)) => {
+                self.leave_demo_scene();
+                self.remove_previous_import(&p.path);
+                let was_empty = self.scene.nodes.is_empty();
+                let file_name = p.path.file_name().and_then(|n| n.to_str()).unwrap_or("modello").to_string();
+                let r = forge_import::step::insert(&mut self.scene, &file_name, model, &p.opts).map(|r| forge_import::ImportReport {
+                    duration: p.started.elapsed(),
+                    ..r
+                });
+                self.finish_import(&p.path, p.opts.clone(), was_empty, r);
+            }
+            TaskMsg::Model(Err(e)) => self.error = Some(format!("importazione di {} fallita:\n{e}", p.path.display())),
+            TaskMsg::Project(Ok(l)) => self.apply_loaded_project(*l),
+            TaskMsg::Project(Err(e)) => self.error = Some(format!("apertura del progetto fallita: {e}")),
+            TaskMsg::Progress(_) => {}
+        }
+        self.process_import_queue();
     }
 
     pub fn open_project_dialog(&mut self) {
@@ -480,35 +627,57 @@ impl ForgeApp {
     }
 
     pub fn open_project(&mut self, path: &Path) {
-        match forge_project::load(path) {
-            Ok(l) => {
-                let report = l.report;
-                self.replace_scene(l.scene, l.meta, Some(l.settings));
-                let mut notes = Vec::new();
-                if !report.missing_sources.is_empty() {
-                    notes.push(format!(
-                        "File sorgente non trovati:\n- {}",
-                        report
-                            .missing_sources
-                            .iter()
-                            .map(|p| p.display().to_string())
-                            .collect::<Vec<_>>()
-                            .join("\n- ")
-                    ));
-                }
-                if !report.missing_components.is_empty() {
-                    notes.push(format!(
+        if self.pending.is_some() {
+            self.error = Some("attendi la fine dell'operazione in corso".into());
+            return;
+        }
+        // Il progetto può reimportare file STEP: caricamento in background.
+        let (tx, rx) = std::sync::mpsc::channel();
+        let p = path.to_path_buf();
+        std::thread::Builder::new()
+            .name("forge-open".into())
+            .spawn(move || {
+                let r = forge_project::load(&p).map(Box::new).map_err(|e| format!("{e:#}"));
+                let _ = tx.send(TaskMsg::Project(r));
+            })
+            .expect("thread di apertura");
+        self.pending = Some(Pending {
+            label: format!("Apertura di {}", path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default()),
+            message: "lettura del progetto e dei file sorgente…".into(),
+            path: path.to_path_buf(),
+            opts: self.import_opts.clone(),
+            rx,
+            started: std::time::Instant::now(),
+        });
+    }
+
+    fn apply_loaded_project(&mut self, l: forge_project::LoadedProject) {
+        {
+            let report = l.report;
+            self.replace_scene(l.scene, l.meta, Some(l.settings));
+            let mut notes = Vec::new();
+            if !report.missing_sources.is_empty() {
+                notes.push(format!(
+                    "File sorgente non trovati:\n- {}",
+                    report
+                        .missing_sources
+                        .iter()
+                        .map(|p| p.display().to_string())
+                        .collect::<Vec<_>>()
+                        .join("\n- ")
+                ));
+            }
+            if !report.missing_components.is_empty() {
+                notes.push(format!(
                         "{} componenti con materiale assegnato non sono più presenti (rinominati o rimossi). Le assegnazioni sono conservate:\n- {}",
                         report.missing_components.len(),
                         report.missing_components.iter().take(20).map(|c| c.0.clone()).collect::<Vec<_>>().join("\n- ")
                     ));
-                }
-                notes.extend(report.warnings);
-                if !notes.is_empty() {
-                    self.info = Some(notes.join("\n\n"));
-                }
             }
-            Err(e) => self.error = Some(format!("apertura del progetto fallita: {e:#}")),
+            notes.extend(report.warnings);
+            if !notes.is_empty() {
+                self.info = Some(notes.join("\n\n"));
+            }
         }
     }
 
@@ -569,14 +738,23 @@ impl ForgeApp {
 }
 
 impl ForgeApp {
+    /// Dopo una selezione: mostra la scheda Materiali, salvo che l'utente stia
+    /// già lavorando su Oggetto o Materiali.
+    pub fn show_selection_tab(&mut self) {
+        if !matches!(self.tab, InspectorTab::Object | InspectorTab::Materials) {
+            self.tab = InspectorTab::Materials;
+        }
+    }
+
     /// Chiamata a ogni frame prima del disegno dell'interfaccia.
     pub fn tick(&mut self, ctx: &egui::Context) {
         self.frames += 1;
         self.poll_geometry();
+        self.poll_pending();
         self.update_render_job();
         self.monitor.tick();
         let state = self.render_state();
-        if state == SessionState::Rendering || self.is_preparing() {
+        if state == SessionState::Rendering || self.is_preparing() || self.pending.is_some() {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
         self.handle_screenshot(ctx);

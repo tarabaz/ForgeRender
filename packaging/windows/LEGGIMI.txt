@@ -22,5 +22,9 @@ dalla cartella (i progetti vengono salvati dove scegli tu). I log sono in .\logs
 Versione installata: i log sono in %LOCALAPPDATA%\ForgeRender\logs.
 In caso di problemi allega forgerender.log alla segnalazione.
 
-Formati supportati in questa versione: OBJ (con .mtl), STL.
-STEP e SolidWorks (SLDPRT/SLDASM) arriveranno nella Fase 5.
+Formati supportati: STEP/STP (assiemi con nomi, colori e trasformazioni, tramite
+forgerender-step.exe che deve restare nella stessa cartella), OBJ (con .mtl), STL.
+SolidWorks SLDPRT/SLDASM: sperimentale, richiede SolidWorks installato su questo PC
+(il file viene esportato in STEP da SolidWorks tramite le sue API COM, in sola lettura).
+
+Componenti di terze parti e licenze: cartella licenze\ (Open CASCADE Technology, LGPL 2.1).

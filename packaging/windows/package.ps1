@@ -18,6 +18,9 @@ Write-Host "ForgeRender $version"
 if (-not $SkipBuild) {
     cargo build --release -p forge_app -p forge_cli
     if ($LASTEXITCODE -ne 0) { throw "compilazione fallita" }
+    # Convertitore STEP (Open CASCADE): la prima compilazione richiede decine di minuti.
+    cargo build --release -p forge_step
+    if ($LASTEXITCODE -ne 0) { throw "compilazione del convertitore STEP fallita" }
 }
 
 $bin = Join-Path $root "target\release"
@@ -31,7 +34,11 @@ if (Test-Path $staging) { Remove-Item -Recurse -Force $staging }
 New-Item -ItemType Directory -Path $staging | Out-Null
 Copy-Item (Join-Path $bin "forgerender.exe") $staging
 Copy-Item (Join-Path $bin "forgerender-cli.exe") $staging
+$stepExe = Join-Path $bin "forgerender-step.exe"
+if (Test-Path $stepExe) { Copy-Item $stepExe $staging } else { Write-Warning "forgerender-step.exe non trovato: pacchetto senza import STEP" }
 Copy-Item (Join-Path $PSScriptRoot "LEGGIMI.txt") $staging
+New-Item -ItemType Directory -Force -Path (Join-Path $staging "licenze") | Out-Null
+Copy-Item (Join-Path $root "packaging\licenses\*") (Join-Path $staging "licenze")
 # Marcatore della modalità portable: i log restano nella cartella del programma.
 Set-Content -Path (Join-Path $staging "portable.txt") -Value "Versione portable di ForgeRender: i log vengono scritti nella sottocartella logs."
 $zip = Join-Path $dist "$portableName.zip"

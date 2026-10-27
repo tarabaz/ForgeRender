@@ -39,14 +39,25 @@ accumulo corretto, export PNG.
 Path tracer WGSL in compute shader via wgpu, confronto CPU/GPU sulla stessa scena,
 NVML per utilizzo GPU/VRAM. CUDA/OptiX esclusi per ora.
 
-## Fase 5 — CAD ⏳
-STEP via Open CASCADE (processo separato), bridge SolidWorks (C#/COM), instancing,
-test con i file STEP/SLDASM reali.
+## Fase 5 — CAD 🟡
+- ✅ Import STEP/STP tramite `forgerender-step` (Open CASCADE 7.8.1, processo separato):
+  gerarchia dell'assieme, nomi delle istanze, trasformazioni, unità del file, colori per
+  pezzo e per faccia, triangolazione a qualità regolabile, mesh condivise tra istanze uguali,
+  id stabili. Test end-to-end con un assieme STEP generato da OCCT.
+- ✅ Importazione in background con avanzamento; opzioni (unità, asse verticale, qualità,
+  appoggio sul pavimento).
+- 🟡 SolidWorks SLDPRT/SLDASM: esportazione STEP tramite le API COM di SolidWorks (script
+  PowerShell, sola lettura). **Implementato ma non verificabile qui**: da provare sul PC con SolidWorks.
+- ⏳ test con i file STEP/SLDASM reali dell'utente, instancing nel renderer (oggi le istanze
+  condividono la mesh in memoria ma la BVH è appiattita).
 
 ## Fase 6 — Denoising e qualità ⏳
 Open Image Denoise con buffer albedo/normali, arresto a soglia di rumore, benchmark completi.
 
 ## Fase 7 — Editor professionale 🟡
-- ✅ libreria materiali, editor luci con preset, viste camera, salvataggio progetti
+- ✅ libreria di ~120 materiali in 11 categorie con ricerca, editor luci con preset, viste camera,
+  salvataggio progetti
+- ✅ trasformazioni non distruttive (spostamento, rotazione, scala, dimensioni in mm,
+  appoggia sul pavimento, centra, rotazioni di 90°, Alt+trascina nella viewport)
 - ⏳ regole di assegnazione avanzate, rimappatura componenti rinominati, profondità di campo,
   ripresa del render dopo la chiusura, file di log su disco, lingue aggiuntive, annulla/ripeti

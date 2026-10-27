@@ -18,7 +18,15 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
 fn camera_controls(app: &mut ForgeApp, ui: &mut egui::Ui, rect: egui::Rect) -> egui::Response {
     let resp = ui.allocate_rect(rect, egui::Sense::click_and_drag());
     let shift = ui.input(|i| i.modifiers.shift);
+    let alt = ui.input(|i| i.modifiers.alt);
     let delta = resp.drag_delta();
+    // Alt + trascina: sposta la selezione invece della camera.
+    if alt && !app.selection.is_empty() && resp.dragged_by(egui::PointerButton::Primary) && delta != egui::Vec2::ZERO {
+        if let Some(pos) = resp.interact_pointer_pos() {
+            move_selection(app, rect, pos - delta, pos, shift);
+        }
+        return resp;
+    }
     let mut moved = false;
     if delta != egui::Vec2::ZERO {
         let pan = resp.dragged_by(egui::PointerButton::Secondary)
@@ -42,6 +50,67 @@ fn camera_controls(app: &mut ForgeApp, ui: &mut egui::Ui, rect: egui::Rect) -> e
         app.camera_changed();
     }
     resp
+}
+
+/// Sposta i componenti selezionati seguendo il mouse: sul piano orizzontale
+/// passante per il loro centro, oppure in verticale (`vertical`).
+fn move_selection(app: &mut ForgeApp, rect: egui::Rect, from: egui::Pos2, to: egui::Pos2, vertical: bool) {
+    let mut bounds = forge_math::Aabb::EMPTY;
+    for &s in &app.selection {
+        bounds.grow(&app.scene.bounds_of(s));
+    }
+    if bounds.is_empty() {
+        return;
+    }
+    let center = bounds.center();
+    let cam = app.scene.camera.clone();
+    let aspect = rect.width() / rect.height().max(1.0);
+    let ray = |p: egui::Pos2| {
+        let nx = (p.x - rect.left()) / rect.width() * 2.0 - 1.0;
+        let ny = 1.0 - (p.y - rect.top()) / rect.height() * 2.0;
+        cam.ray_dir(nx, ny, aspect)
+    };
+    // Piano: orizzontale, oppure verticale rivolto verso la camera.
+    let normal = if vertical {
+        let f = cam.forward();
+        Vec3::new(f.x, 0.0, f.z).normalize_or(Vec3::Z)
+    } else {
+        Vec3::Y
+    };
+    let hit = |d: Vec3| {
+        let denom = d.dot(normal);
+        if denom.abs() < 1e-6 {
+            return None;
+        }
+        let t = (center - cam.position).dot(normal) / denom;
+        (t > 0.0).then(|| cam.position + d * t)
+    };
+    let (Some(a), Some(b)) = (hit(ray(from)), hit(ray(to))) else {
+        return;
+    };
+    let mut d = b - a;
+    if vertical {
+        d = Vec3::new(0.0, d.y, 0.0);
+    } else {
+        d.y = 0.0;
+    }
+    // Se sono selezionati sia un assieme sia un suo figlio, si sposta solo l'assieme.
+    let sel: Vec<usize> = app.selection.iter().copied().collect();
+    for &i in &sel {
+        let mut p = app.scene.nodes[i].parent;
+        let mut covered = false;
+        while let Some(k) = p {
+            if app.selection.contains(&k) {
+                covered = true;
+                break;
+            }
+            p = app.scene.nodes[k].parent;
+        }
+        if !covered {
+            app.scene.nodes[i].user.translation += d;
+        }
+    }
+    app.geometry_changed();
 }
 
 fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
@@ -88,7 +157,7 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
                 Some((node, _)) => {
                     crate::ui::tree::select(&mut app.selection, node, multi);
                     app.selected_material = app.scene.resolve_material(node).clone();
-                    app.tab = crate::app::InspectorTab::Materials;
+                    app.show_selection_tab();
                 }
                 None if !multi => app.selection.clear(),
                 None => {}

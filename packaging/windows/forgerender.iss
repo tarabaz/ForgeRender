@@ -41,6 +41,8 @@ Name: "assoc"; Description: "Apri i file .frproject con ForgeRender"; GroupDescr
 [Files]
 Source: "{#BinDir}\forgerender.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#BinDir}\forgerender-cli.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BinDir}\forgerender-step.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\licenses\*"; DestDir: "{app}\licenze"; Flags: ignoreversion
 Source: "LEGGIMI.txt"; DestDir: "{app}"; Flags: ignoreversion isreadme
 
 [Icons]

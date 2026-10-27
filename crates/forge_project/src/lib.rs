@@ -32,6 +32,9 @@ pub struct SourceRef {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct ComponentState {
     pub visible: bool,
+    /// Trasformazione impostata dall'utente (assente se identità).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transform: Option<forge_scene::UserTransform>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -132,7 +135,15 @@ pub fn to_project_file(scene: &Scene, meta: &ProjectMeta, settings: &RenderSetti
         components: scene
             .nodes
             .iter()
-            .map(|n| (n.id.clone(), ComponentState { visible: n.visible }))
+            .map(|n| {
+                (
+                    n.id.clone(),
+                    ComponentState {
+                        visible: n.visible,
+                        transform: (!n.user.is_identity()).then_some(n.user),
+                    },
+                )
+            })
             .collect(),
         lights: scene.lights.clone(),
         environment: scene.environment.clone(),
@@ -242,6 +253,9 @@ pub fn load(path: &Path) -> anyhow::Result<LoadedProject> {
     for (id, st) in pf.components {
         if let Some(i) = scene.find(&id) {
             scene.nodes[i].visible = st.visible;
+            if let Some(t) = st.transform {
+                scene.nodes[i].user = t;
+            }
         }
     }
     scene.lights = pf.lights;
@@ -327,6 +341,12 @@ mod tests {
         scene.nodes[vi].visible = false;
         scene.lights.push(Light::point("P", Vec3::new(1.0, 2.0, 3.0), 5.0));
         scene.camera.vfov_deg = 27.0;
+        let si = scene.find(&staffa).unwrap();
+        scene.nodes[si].user = forge_scene::UserTransform {
+            translation: Vec3::new(0.1, 0.2, 0.3),
+            rotation_deg: Vec3::new(0.0, 90.0, 0.0),
+            scale: Vec3::splat(1.5),
+        };
         let settings = RenderSettings {
             width: 640,
             height: 480,
@@ -348,6 +368,8 @@ mod tests {
         assert_eq!(s2.resolve_material(s2.find(&staffa).unwrap()), &MaterialId::new("ottone"));
         assert_eq!(s2.materials.get(&MaterialId::new("mio")), Some(&custom));
         assert!(!s2.nodes[s2.find(&vite).unwrap()].visible);
+        assert_eq!(s2.nodes[s2.find(&staffa).unwrap()].user, scene.nodes[si].user);
+        assert!((s2.bounds_of(s2.find(&staffa).unwrap()).center() - scene.bounds_of(si).center()).length() < 1e-6);
         assert_eq!(s2.lights, scene.lights);
         assert_eq!(s2.camera, scene.camera);
         assert_eq!(loaded.settings, settings);

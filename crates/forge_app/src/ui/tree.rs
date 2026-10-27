@@ -118,7 +118,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
     }
     if let Some((i, multi)) = click {
         select(&mut app.selection, i, multi);
-        app.tab = InspectorTab::Materials;
+        app.show_selection_tab();
         if let Some(&s) = app.selection.iter().next() {
             app.selected_material = app.scene.resolve_material(s).clone();
         }

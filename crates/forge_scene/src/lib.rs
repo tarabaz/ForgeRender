@@ -18,5 +18,5 @@ pub use environment::Environment;
 pub use light::{Light, LightKind};
 pub use material::{Material, MaterialId, MaterialLibrary, Projection, TextureMapping};
 pub use mesh::Mesh;
-pub use scene::{ComponentId, Node, NodeIndex, Scene};
+pub use scene::{ComponentId, Node, NodeIndex, Scene, UserTransform};
 pub use units::LengthUnit;

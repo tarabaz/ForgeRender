@@ -1,0 +1,14 @@
+ForgeRender — componenti di terze parti
+=======================================
+
+forgerender-step.exe (convertitore STEP) utilizza Open CASCADE Technology 7.8.1
+(https://dev.opencascade.org), distribuita con licenza GNU LGPL 2.1 con la
+"Open CASCADE exception" (vedi OpenCASCADE_LICENSE_LGPL_21.txt e
+OpenCASCADE_LGPL_EXCEPTION.txt). Il convertitore è un eseguibile separato
+dall'applicazione principale; il codice sorgente completo di ForgeRender e dello
+shim di integrazione è disponibile nel repository del progetto, e i sorgenti di
+Open CASCADE sono quelli del pacchetto occt-sys 7.8.1 (crates.io).
+
+L'applicazione utilizza inoltre librerie Rust con licenze permissive (MIT,
+Apache-2.0, BSD, Zlib), tra cui egui/eframe, wgpu, glam, rayon, serde, image,
+tobj, stl_io, sysinfo, rfd.

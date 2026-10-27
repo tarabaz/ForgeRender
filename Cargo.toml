@@ -1,6 +1,20 @@
 [workspace]
 resolver = "2"
 members = ["crates/forge_*"]
+# Il convertitore STEP compila Open CASCADE (lento): si costruisce solo se richiesto esplicitamente.
+default-members = [
+    "crates/forge_math",
+    "crates/forge_scene",
+    "crates/forge_accel",
+    "crates/forge_render_core",
+    "crates/forge_render_cpu",
+    "crates/forge_import",
+    "crates/forge_project",
+    "crates/forge_image_io",
+    "crates/forge_telemetry",
+    "crates/forge_cli",
+    "crates/forge_app",
+]
 
 [workspace.package]
 version = "0.1.0"
