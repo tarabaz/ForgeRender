@@ -48,7 +48,9 @@ gltf = { version = "1.4", default-features = false, features = ["import", "utils
 stl_io = "0.11"
 sysinfo = "0.39"
 rfd = "0.17"
-wgpu = "30"
+# static-dxc: compilatore di shader DXC incluso nell'eseguibile (solo Windows MSVC): il vecchio
+# FXC non riesce a compilare il path tracer GPU per DirectX 12.
+wgpu = { version = "30", features = ["static-dxc"] }
 pollster = "1"
 bytemuck = { version = "1", features = ["derive"] }
 anyhow = "1"

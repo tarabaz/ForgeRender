@@ -192,17 +192,16 @@ fn trace(o: vec3<f32>, d: vec3<f32>, tmin: f32, tmax_in: f32, any_hit: bool) -> 
 }
 
 // Wächter & Binder, "A Fast and Robust Method for Avoiding Self-Intersection".
+// Componente per componente: niente indici dinamici (il compilatore FXC di DX12 li gestisce male).
+fn offset_1(p: f32, n: f32) -> f32 {
+    if (abs(p) < 1.0 / 32.0) { return p + (1.0 / 65536.0) * n; }
+    var delta = i32(256.0 * n);
+    if (p < 0.0) { delta = -delta; }
+    return bitcast<f32>(bitcast<i32>(p) + delta);
+}
+
 fn offset_ray(p: vec3<f32>, n: vec3<f32>) -> vec3<f32> {
-    let of_i = vec3<i32>(i32(256.0 * n.x), i32(256.0 * n.y), i32(256.0 * n.z));
-    var r: vec3<f32>;
-    for (var k = 0; k < 3; k = k + 1) {
-        let pk = p[k];
-        var delta = of_i[k];
-        if (pk < 0.0) { delta = -delta; }
-        let pi = bitcast<f32>(bitcast<i32>(pk) + delta);
-        if (abs(pk) < 1.0 / 32.0) { r[k] = pk + (1.0 / 65536.0) * n[k]; } else { r[k] = pi; }
-    }
-    return r;
+    return vec3<f32>(offset_1(p.x, n.x), offset_1(p.y, n.y), offset_1(p.z, n.z));
 }
 
 struct Onb { t: vec3<f32>, b: vec3<f32>, n: vec3<f32> };

@@ -60,14 +60,34 @@ impl GpuBackend {
     /// Crea il backend sulla GPU ad alte prestazioni (la scheda dedicata invece
     /// della grafica integrata). Restituisce errore se non c'è una GPU adatta.
     pub fn new() -> anyhow::Result<Self> {
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
-        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::HighPerformance,
-            force_fallback_adapter: false,
-            compatible_surface: None,
-            ..Default::default()
-        }))
-        .map_err(|e| anyhow!("nessuna GPU compatibile: {e}"))?;
+        // Ordine dei backend: Vulkan (ottimo sui driver NVIDIA), poi DirectX 12, poi gli altri.
+        // `FORGE_GPU_BACKEND=vulkan|dx12` forza una scelta.
+        let order: Vec<wgpu::Backends> = match std::env::var("FORGE_GPU_BACKEND").ok().as_deref() {
+            Some("vulkan") => vec![wgpu::Backends::VULKAN],
+            Some("dx12") => vec![wgpu::Backends::DX12],
+            _ => vec![wgpu::Backends::VULKAN, wgpu::Backends::DX12, wgpu::Backends::PRIMARY],
+        };
+        let mut found = None;
+        let mut last_err = String::from("nessun backend disponibile");
+        for backends in order {
+            let mut desc = wgpu::InstanceDescriptor::new_without_display_handle_from_env();
+            desc.backends = backends;
+            let instance = wgpu::Instance::new(desc);
+            match pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                force_fallback_adapter: false,
+                compatible_surface: None,
+                ..Default::default()
+            })) {
+                Ok(a) if a.get_info().backend != wgpu::Backend::Gl => {
+                    found = Some(a);
+                    break;
+                }
+                Ok(_) => last_err = "solo OpenGL disponibile".into(),
+                Err(e) => last_err = e.to_string(),
+            }
+        }
+        let adapter = found.ok_or_else(|| anyhow!("nessuna GPU compatibile: {last_err}"))?;
         let ai = adapter.get_info();
         let info = GpuInfo {
             name: ai.name.clone(),
