@@ -1,0 +1,11 @@
+[package]
+name = "forge_image_io"
+description = "Esportazione immagini (PNG) con scrittura atomica."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+forge_render_core.workspace = true
+image.workspace = true
+anyhow.workspace = true

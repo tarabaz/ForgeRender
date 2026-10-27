@@ -1,0 +1,15 @@
+[package]
+name = "forge_render_cpu"
+description = "Path tracer progressivo CPU multithread (Rayon)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+forge_math.workspace = true
+forge_scene.workspace = true
+forge_accel.workspace = true
+forge_render_core.workspace = true
+rayon.workspace = true
+anyhow.workspace = true
+tracing.workspace = true

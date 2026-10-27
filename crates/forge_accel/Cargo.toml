@@ -1,0 +1,11 @@
+[package]
+name = "forge_accel"
+description = "Strutture di accelerazione (BVH SAH) per il ray tracing."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+forge_math.workspace = true
+bytemuck.workspace = true
+tracing.workspace = true

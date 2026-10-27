@@ -1,0 +1,25 @@
+[package]
+name = "forge_app"
+description = "ForgeRender: applicazione desktop (egui/eframe + viewport wgpu)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "forgerender"
+path = "src/main.rs"
+
+[dependencies]
+forge_math.workspace = true
+forge_scene.workspace = true
+forge_import.workspace = true
+forge_project.workspace = true
+forge_render_core.workspace = true
+forge_render_cpu.workspace = true
+forge_image_io.workspace = true
+forge_telemetry.workspace = true
+eframe.workspace = true
+rfd.workspace = true
+bytemuck.workspace = true
+anyhow.workspace = true
+tracing.workspace = true

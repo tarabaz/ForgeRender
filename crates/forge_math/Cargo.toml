@@ -1,0 +1,11 @@
+[package]
+name = "forge_math"
+description = "Primitive matematiche condivise: AABB, raggi, basi ortonormali, campionamento, RNG deterministico."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+glam.workspace = true
+serde.workspace = true
+bytemuck.workspace = true

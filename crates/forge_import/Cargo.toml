@@ -1,0 +1,16 @@
+[package]
+name = "forge_import"
+description = "Importazione mesh (OBJ, STL). STEP e SolidWorks arriveranno tramite convertitori esterni (Fase 5)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+forge_math.workspace = true
+forge_scene.workspace = true
+tobj.workspace = true
+stl_io.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+serde.workspace = true

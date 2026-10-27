@@ -1,0 +1,197 @@
+//! Test di correttezza fisica del path tracer CPU (con risultati analitici noti).
+
+use forge_math::{Mat4, Vec3};
+use forge_render_core::{Accumulator, RenderBackend, RenderScene, RenderSettings};
+use forge_render_cpu::CpuBackend;
+use forge_scene::{primitives, Camera, ComponentId, Environment, Light, Material, MaterialId, Scene};
+use std::sync::atomic::AtomicBool;
+
+fn render(scene: &Scene, settings: &RenderSettings, spp: u32, threads: usize) -> Vec<[f32; 3]> {
+    let rs = RenderScene::compile(scene);
+    let mut be = CpuBackend::new(threads).unwrap();
+    let mut acc = Accumulator::new(settings.width, settings.height);
+    let mut pass = vec![[0.0; 3]; acc.pixel_count()];
+    let cancel = AtomicBool::new(false);
+    for s in 0..spp {
+        assert!(be.render_pass(&rs, settings, s, &mut pass, &cancel).unwrap());
+        acc.add_pass(&pass);
+    }
+    acc.resolve()
+}
+
+fn settings(w: u32, h: u32) -> RenderSettings {
+    RenderSettings {
+        width: w,
+        height: h,
+        max_bounces: 64,
+        ..Default::default()
+    }
+}
+
+fn mean_region(img: &[[f32; 3]], w: u32, x0: u32, y0: u32, x1: u32, y1: u32) -> Vec3 {
+    let mut s = Vec3::ZERO;
+    let mut n = 0;
+    for y in y0..y1 {
+        for x in x0..x1 {
+            s += Vec3::from_array(img[(y * w + x) as usize]);
+            n += 1;
+        }
+    }
+    s / n as f32
+}
+
+fn sphere_scene(mat: Material, env: f32) -> Scene {
+    let mut s = Scene::default();
+    let id = mat.id.clone();
+    s.materials.upsert(mat);
+    let m = s.add_mesh(primitives::uv_sphere(1.0, 96, 48));
+    let cid = ComponentId("sfera".into());
+    s.add_node(None, cid.clone(), "Sfera", Mat4::IDENTITY, Some(m));
+    s.assignments.insert(cid, id);
+    s.environment = Environment::Uniform {
+        color: [1.0; 3],
+        strength: env,
+    };
+    s.camera = Camera {
+        position: Vec3::new(0.0, 0.0, 4.0),
+        target: Vec3::ZERO,
+        up: Vec3::Y,
+        vfov_deg: 40.0,
+    };
+    s
+}
+
+fn test_material(base: f32, metallic: f32, roughness: f32, specular: f32, transmission: f32) -> Material {
+    Material {
+        id: MaterialId::new("test"),
+        base_color: [base; 3],
+        metallic,
+        roughness,
+        specular,
+        transmission,
+        ..Default::default()
+    }
+}
+
+/// "White furnace": un oggetto convesso con albedo ρ in un ambiente uniforme di
+/// radianza 1 deve apparire con radianza esattamente ρ (nessuna energia creata o persa).
+#[test]
+fn white_furnace_lambert() {
+    for rho in [1.0f32, 0.5] {
+        let s = sphere_scene(test_material(rho, 0.0, 0.5, 0.0, 0.0), 1.0);
+        let img = render(&s, &settings(32, 32), 64, 4);
+        let c = mean_region(&img, 32, 12, 12, 20, 20);
+        assert!((c.x - rho).abs() < 0.01, "ρ={rho}: radianza {c}");
+        let bg = mean_region(&img, 32, 0, 0, 2, 2);
+        assert!((bg.x - 1.0).abs() < 1e-5);
+    }
+}
+
+#[test]
+fn white_furnace_glass_is_lossless() {
+    let s = sphere_scene(test_material(1.0, 0.0, 0.0, 0.5, 1.0), 1.0);
+    let img = render(&s, &settings(32, 32), 64, 4);
+    let c = mean_region(&img, 32, 12, 12, 20, 20);
+    assert!((c.x - 1.0).abs() < 0.02, "vetro: {c}");
+}
+
+#[test]
+fn white_furnace_metal_and_plastic_never_gain_energy() {
+    for (metallic, rough, spec) in [(1.0, 0.05, 0.5), (1.0, 0.6, 0.5), (0.0, 0.3, 0.5), (0.0, 0.8, 1.0)] {
+        let s = sphere_scene(test_material(1.0, metallic, rough, spec, 0.0), 1.0);
+        let img = render(&s, &settings(24, 24), 64, 4);
+        let c = mean_region(&img, 24, 8, 8, 16, 16);
+        assert!(c.x <= 1.01, "guadagno di energia: {c} (metallic {metallic}, roughness {rough})");
+        assert!(c.x >= 0.8, "perdita eccessiva: {c} (metallic {metallic}, roughness {rough})");
+    }
+}
+
+fn plane_scene(rho: f32) -> Scene {
+    let mut s = Scene::default();
+    s.materials.upsert(test_material(rho, 0.0, 0.5, 0.0, 0.0));
+    let m = s.add_mesh(primitives::plane(100.0, 100.0));
+    let cid = ComponentId("piano".into());
+    s.add_node(None, cid.clone(), "Piano", Mat4::IDENTITY, Some(m));
+    s.assignments.insert(cid, MaterialId::new("test"));
+    s.environment = Environment::Uniform {
+        color: [0.0; 3],
+        strength: 0.0,
+    };
+    // Camera molto stretta che guarda il punto (0,0,0) quasi dall'alto.
+    s.camera = Camera {
+        position: Vec3::new(0.0, 5.0, 0.01),
+        target: Vec3::ZERO,
+        up: Vec3::Y,
+        vfov_deg: 0.5,
+    };
+    s
+}
+
+/// Luce puntiforme: L = ρ/π · I / h².
+#[test]
+fn point_light_matches_analytic() {
+    let mut s = plane_scene(0.8);
+    s.lights.push(Light::point("p", Vec3::new(0.0, 2.0, 0.0), 10.0));
+    let img = render(&s, &settings(8, 8), 4, 2);
+    let c = mean_region(&img, 8, 0, 0, 8, 8);
+    let expected = 0.8 / std::f32::consts::PI * 10.0 / 4.0;
+    assert!((c.x - expected).abs() / expected < 0.01, "{} vs {expected}", c.x);
+}
+
+/// Luce rettangolare parallela al piano, centrata sopra il punto: radianza
+/// riflessa = ρ · Le · F, con F fattore di forma analitico punto-rettangolo.
+/// Verifica la combinazione MIS di campionamento luce e BSDF.
+#[test]
+fn area_light_matches_form_factor() {
+    let (a, b, h, le, rho) = (0.5f32, 0.75f32, 1.0f32, 3.0f32, 0.9f32);
+    let mut s = plane_scene(rho);
+    s.lights
+        .push(Light::area("a", Vec3::new(0.0, h, 0.0), Vec3::ZERO, 2.0 * a, 2.0 * b, le));
+    let img = render(&s, &settings(8, 8), 2048, 4);
+    let c = mean_region(&img, 8, 0, 0, 8, 8);
+    // Fattore di forma di un rettangolo a×b con un vertice sopra il punto (Howell, C-11).
+    let corner = |x: f32, y: f32| {
+        let (ax, by) = (x / h, y / h);
+        let (sa, sb) = ((1.0 + ax * ax).sqrt(), (1.0 + by * by).sqrt());
+        (ax / sa * (by / sa).atan() + by / sb * (ax / sb).atan()) / (2.0 * std::f32::consts::PI)
+    };
+    let f = 4.0 * corner(a, b);
+    let expected = rho * le * f;
+    assert!((c.x - expected).abs() / expected < 0.02, "{} vs {expected} (F={f})", c.x);
+}
+
+/// L'errore rispetto a un riferimento cala con l'aumentare dei campioni
+/// (Monte Carlo: RMSE ∝ 1/√N).
+#[test]
+fn progressive_convergence() {
+    let s = Scene::test_scene();
+    let st = RenderSettings {
+        width: 24,
+        height: 16,
+        ..Default::default()
+    };
+    let reference = render(&s, &RenderSettings { seed: 999, ..st.clone() }, 1024, 4);
+    let rmse = |img: &[[f32; 3]]| {
+        let e: f64 = img
+            .iter()
+            .zip(&reference)
+            .map(|(a, b)| (0..3).map(|k| ((a[k] - b[k]) as f64).powi(2)).sum::<f64>())
+            .sum();
+        (e / (img.len() * 3) as f64).sqrt()
+    };
+    let e8 = rmse(&render(&s, &st, 8, 4));
+    let e128 = rmse(&render(&s, &st, 128, 4));
+    assert!(e128 < e8 / 2.0, "RMSE 8spp {e8}, 128spp {e128}");
+}
+
+/// Il risultato non dipende dal numero di thread (RNG per pixel/campione).
+#[test]
+fn deterministic_across_thread_counts() {
+    let s = Scene::test_scene();
+    let st = RenderSettings {
+        width: 20,
+        height: 12,
+        ..Default::default()
+    };
+    assert_eq!(render(&s, &st, 3, 1), render(&s, &st, 3, 3));
+}

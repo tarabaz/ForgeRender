@@ -1,0 +1,16 @@
+[package]
+name = "forge_project"
+description = "Formato di progetto .frproject: salvataggio atomico, versionamento dello schema, ripristino."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+forge_math.workspace = true
+forge_scene.workspace = true
+forge_import.workspace = true
+forge_render_core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+tracing.workspace = true

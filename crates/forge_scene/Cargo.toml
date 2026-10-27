@@ -1,0 +1,11 @@
+[package]
+name = "forge_scene"
+description = "Modello dati della scena: mesh, componenti CAD, materiali, luci, camera, ambiente."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+forge_math.workspace = true
+serde.workspace = true
+tracing.workspace = true

@@ -1,0 +1,23 @@
+[package]
+name = "forge_cli"
+description = "Rendering da riga di comando e benchmark (senza interfaccia grafica)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "forgerender-cli"
+path = "src/main.rs"
+
+[dependencies]
+forge_math.workspace = true
+forge_scene.workspace = true
+forge_import.workspace = true
+forge_project.workspace = true
+forge_render_core.workspace = true
+forge_render_cpu.workspace = true
+forge_image_io.workspace = true
+forge_telemetry.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+serde_json.workspace = true
