@@ -23,6 +23,9 @@ fn main() {
             .cpp(true)
             .file(&shim)
             .include(&include)
+            // OCCT è compilato statico con questa macro: senza, su Windows gli header
+            // dichiarano i simboli come `dllimport` e i dati statici (RTTI) non coincidono.
+            .define("OCCT_STATIC_BUILD", None)
             .flag_if_supported("-std=c++17")
             .flag_if_supported("/std:c++17")
             .flag_if_supported("/EHsc")

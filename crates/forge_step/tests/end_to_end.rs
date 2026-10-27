@@ -15,9 +15,21 @@ fn step_assembly_roundtrip() {
     let out = dir.join("staffa.frmesh");
 
     let st = Command::new(EXE).arg("--write-test-assembly").arg(&step_path).output().unwrap();
-    assert!(st.status.success(), "{}", String::from_utf8_lossy(&st.stderr));
+    assert!(
+        st.status.success(),
+        "{}: {}{}",
+        st.status,
+        String::from_utf8_lossy(&st.stdout),
+        String::from_utf8_lossy(&st.stderr)
+    );
     let st = Command::new(EXE).arg(&step_path).arg(&out).output().unwrap();
-    assert!(st.status.success(), "{}", String::from_utf8_lossy(&st.stderr));
+    assert!(
+        st.status.success(),
+        "{}: {}{}",
+        st.status,
+        String::from_utf8_lossy(&st.stdout),
+        String::from_utf8_lossy(&st.stderr)
+    );
 
     let model = FrMesh::read(&out).unwrap();
     assert!((model.header.unit_m - 0.001).abs() < 1e-12, "unità {}", model.header.unit_m);

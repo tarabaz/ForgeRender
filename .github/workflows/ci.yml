@@ -50,6 +50,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          # Conserva la compilazione di Open CASCADE (~1 ora) anche se un passo fallisce.
+          cache-on-failure: true
       - name: Test
         run: cargo test --workspace --exclude forge_step --release
       - name: Compilazione
