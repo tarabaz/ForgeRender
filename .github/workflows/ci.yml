@@ -4,6 +4,12 @@ on:
   push:
   pull_request:
 
+# Un nuovo push sullo stesso branch annulla i run precedenti ancora in corso:
+# conta solo l'ultima versione del codice.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
 
