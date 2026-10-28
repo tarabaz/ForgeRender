@@ -97,7 +97,22 @@
   titolo letto nel log di avvio e nell'eseguibile nei tre casi (commit reale, `FORGE_GIT_SHA`
   impostata, Git assente → `dev`).
 
-### Fase 2 — Compilazione locale rapida (Build-ForgeRender.ps1): da fare dopo conferma
+### Fase 2 — Aggiornamento e compilazione locale con un comando: fatta, da collaudare sul PC
+- `.\Build-ForgeRender.ps1` dalla radice del repository (oppure `.\Build-ForgeRender.cmd` se
+  Windows blocca gli script; `-SkipInstaller` per il solo portable, `-NoOpen` per non aprire dist).
+- Controlli: git e cargo presenti; radice Git = cartella dello script; remoto
+  `tarabaz/RenderingEngine`; branch `claude/festive-heisenberg-d2ow6z` (non cambia branch da
+  solo); nessuna modifica ai file tracciati (se ce ne sono si ferma senza toccarle).
+- `git pull --ff-only origin claude/festive-heisenberg-d2ow6z`: se fallisce si ferma.
+- `cargo build --release -p forge_app -p forge_cli` (cache riutilizzata, forge_step escluso),
+  controllo degli eseguibili, poi `packaging\windows\package.ps1 -SkipBuild` in un processo
+  separato; il pacchetto deve essere stato scritto da questa esecuzione.
+- Niente GitHub Actions, artefatti, commit, push, reset o stash. Riepilogo finale con esito del
+  pull (commit prima/dopo e nuovi commit), eseguibili e percorso del pacchetto.
+- `package.ps1`: il convertitore STEP entra nel pacchetto solo con `-WithStep` (prima veniva
+  copiato anche un `forgerender-step.exe` rimasto da compilazioni vecchie).
+- Script salvato in UTF-8 con BOM e a capo CRLF (Windows PowerShell 5.1 legge i .ps1 senza BOM
+  come ANSI). Non eseguito nel container (PowerShell non disponibile): da collaudare sul PC.
 ### Fase 3 — Baseline visiva e profiling: da fare dopo la fase 2
 
 ## Prossimi passi

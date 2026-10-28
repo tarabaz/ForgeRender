@@ -55,7 +55,8 @@ New-Item -ItemType Directory -Path $staging | Out-Null
 Copy-Item (Join-Path $bin "forgerender.exe") $staging
 Copy-Item (Join-Path $bin "forgerender-cli.exe") $staging
 $stepExe = Join-Path $bin "forgerender-step.exe"
-if (Test-Path $stepExe) { Copy-Item $stepExe $staging } else { Write-Host "Pacchetto senza convertitore STEP (usa -WithStep per includerlo)" }
+# Solo se richiesto: un forgerender-step.exe rimasto da una compilazione precedente non entra nel pacchetto.
+if ($WithStep -and (Test-Path $stepExe)) { Copy-Item $stepExe $staging } else { Write-Host "Pacchetto senza convertitore STEP (usa -WithStep per includerlo)" }
 Copy-Item (Join-Path $PSScriptRoot "LEGGIMI.txt") $staging
 New-Item -ItemType Directory -Force -Path (Join-Path $staging "licenze") | Out-Null
 Copy-Item (Join-Path $root "packaging\licenses\*") (Join-Path $staging "licenze")
