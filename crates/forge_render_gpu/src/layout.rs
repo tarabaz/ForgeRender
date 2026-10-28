@@ -61,11 +61,13 @@ pub const P_ENV_H: usize = 63;
 pub const P_ENV_MINT: usize = 64;
 pub const P_EM_INTEGRAL: usize = 65;
 pub const P_N_SELECT: usize = 66;
+/// 1 se qualche materiale ha una mappa di opacità (ritaglio nelle intersezioni).
+pub const P_HAS_CUTOUT: usize = 67;
 
 pub const NODE_WORDS: usize = 8;
 pub const TRI_WORDS: usize = 12;
 pub const PRIM_WORDS: usize = 28;
-pub const MAT_WORDS: usize = 24;
+pub const MAT_WORDS: usize = 32;
 pub const LIGHT_WORDS: usize = 24;
 
 pub struct SceneBuffer {
@@ -184,6 +186,18 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
             ),
             None => (-1, -1, -1, 1.0, None),
         };
+        let (tm, th, ta, to, flags, bump, ao_s) = match &tx {
+            Some(t) => (
+                tex_of(&t.metallic),
+                tex_of(&t.height),
+                tex_of(&t.ao),
+                tex_of(&t.opacity),
+                t.normal_directx as u32 | (t.roughness_is_gloss as u32) << 1,
+                t.bump_m,
+                t.ao_strength,
+            ),
+            None => (-1, -1, -1, -1, 0, 0.0, 0.0),
+        };
         w.v3(m.base_color);
         w.f(m.metallic);
         w.f(m.alpha);
@@ -205,6 +219,14 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
         w.f(cs);
         w.f(mp.offset[0]);
         w.f(mp.offset[1]);
+        w.u(tm as u32);
+        w.u(th as u32);
+        w.u(ta as u32);
+        w.u(to as u32);
+        w.u(flags);
+        w.f(bump);
+        w.f(ao_s);
+        w.u(0);
         w.u(0);
         assert_eq!(
             (w.pos() - p[P_OFF_MATS]) as usize,
@@ -363,6 +385,7 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
     }
 
     p[P_N_SELECT] = scene.lights.len() as u32 + scene.env_map.is_some() as u32 + scene.emissive.is_some() as u32;
+    p[P_HAS_CUTOUT] = scene.has_cutout as u32;
     if w.w.is_empty() {
         w.u(0);
     }

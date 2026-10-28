@@ -397,3 +397,77 @@ fn emissive_mesh_matches_form_factor() {
     let expected = rho * le * 4.0 * corner(a, b);
     assert!((c.x - expected).abs() / expected < 0.02, "{} vs {expected}", c.x);
 }
+
+/// Scacchiera in scala di grigi (0/255) di `n`×`n` caselle.
+fn checker_png(name: &str, n: u32) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("forge_cut_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let p = dir.join(name);
+    let img = image::RgbImage::from_fn(n, n, |x, y| {
+        if (x + y) % 2 == 0 {
+            image::Rgb([255; 3])
+        } else {
+            image::Rgb([0; 3])
+        }
+    });
+    img.save(&p).unwrap();
+    p
+}
+
+/// Ritaglio con mappa di opacità: una lastra nera a scacchiera (metà trasparente)
+/// sopra un pavimento bianco, sotto un cielo uniforme. Il pavimento riceve circa
+/// metà della luce: il ritaglio vale anche per i raggi d'ombra e indiretti.
+#[test]
+fn opacity_cutout_lets_half_the_light_through() {
+    let mut s = Scene {
+        environment: Environment::Uniform {
+            color: [1.0; 3],
+            strength: 1.0,
+        },
+        ..Default::default()
+    };
+    let floor = Material {
+        id: MaterialId::new("pavimento"),
+        base_color: [1.0; 3],
+        specular: 0.0,
+        roughness: 1.0,
+        ..Default::default()
+    };
+    let screen = Material {
+        id: MaterialId::new("lastra"),
+        base_color: [0.0; 3],
+        specular: 0.0,
+        roughness: 1.0,
+        opacity_texture: Some(checker_png("scacchi.png", 64)),
+        mapping: forge_scene::TextureMapping {
+            scale: 0.64, // caselle da 1 cm
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    for (m, name, y) in [(floor, "pavimento", 0.0f32), (screen, "lastra", 0.5)] {
+        let id = m.id.clone();
+        s.materials.upsert(m);
+        let mesh = s.add_mesh(primitives::plane(200.0, 200.0));
+        let cid = ComponentId(name.into());
+        s.add_node(None, cid.clone(), name, Mat4::from_translation(Vec3::new(0.0, y, 0.0)), Some(mesh));
+        s.assignments.insert(cid, id);
+    }
+    // Camera tra lastra e pavimento, che guarda il pavimento.
+    s.camera = Camera {
+        position: Vec3::new(0.003, 0.25, 0.0021),
+        target: Vec3::new(0.003, 0.0, 0.002),
+        up: Vec3::Z,
+        vfov_deg: 1.0,
+    };
+    let st = settings(8, 8);
+    let c = mean_region(&render(&s, &st, 1024, 4), 8, 0, 0, 8, 8);
+    assert!((c.x - 0.5).abs() < 0.03, "radianza del pavimento {c} (attesa ≈ 0.5)");
+
+    // Vista dall'alto attraverso la lastra: metà pavimento illuminato, metà lastra nera.
+    s.camera.position = Vec3::new(0.0, 2.0, 0.001);
+    s.camera.target = Vec3::ZERO;
+    s.camera.vfov_deg = 20.0;
+    let c = mean_region(&render(&s, &settings(32, 32), 64, 4), 32, 0, 0, 32, 32);
+    assert!(c.x > 0.15 && c.x < 0.35, "vista attraverso la lastra {c} (≈ metà di ≈0.5)");
+}

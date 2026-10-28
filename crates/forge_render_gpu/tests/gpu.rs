@@ -288,3 +288,121 @@ fn gpu_box_mapped_texture() {
         assert!(main > 0.95 && other < 0.05 && c.y < 1e-4, "x={x}: {c}");
     }
 }
+
+/// Texture procedurale deterministica (pattern diverso per ogni `seed`).
+fn pattern_png(name: &str, seed: u32, rgb: bool) -> std::path::PathBuf {
+    let path = tmp(name);
+    let img = image::RgbImage::from_fn(64, 64, |x, y| {
+        let h = |k: u32| {
+            let v = (x * 7 + y * 13 + seed * 31 + k * 101).wrapping_mul(2_654_435_761) >> 24;
+            // Onde morbide + un po' di rumore: gradienti non nulli per il rilievo.
+            let w = ((x as f32 * 0.3 + seed as f32).sin() * (y as f32 * 0.2).cos() * 0.5 + 0.5) * 200.0;
+            (w as u32 + v / 5).min(255) as u8
+        };
+        if rgb {
+            image::Rgb([h(0), h(1), h(2)])
+        } else {
+            let g = h(0);
+            image::Rgb([g, g, g])
+        }
+    });
+    img.save(&path).unwrap();
+    path
+}
+
+/// Tutte le mappe PBR insieme (colore, AO, gloss, metallicità, normal DirectX,
+/// rilievo, opacità con ritaglio): la GPU converge alla stessa immagine della CPU.
+#[test]
+fn gpu_all_texture_maps_match_cpu() {
+    let Some(mut g) = gpu() else { return };
+    let mut s = Scene {
+        environment: Environment::Uniform {
+            color: [0.6, 0.7, 0.9],
+            strength: 1.0,
+        },
+        ..Default::default()
+    };
+    s.lights.push(Light::point("P", Vec3::new(0.5, 2.0, 1.0), 40.0));
+    let normal = {
+        // Normal map DirectX: azzurrina con variazioni (componenti attorno a 0.5, 0.5, 1).
+        let path = tmp("normal_dx.png");
+        image::RgbImage::from_fn(64, 64, |x, y| {
+            let a = (x as f32 * 0.4).sin() * 0.3;
+            let b = (y as f32 * 0.25).cos() * 0.3;
+            image::Rgb([((a * 0.5 + 0.5) * 255.0) as u8, ((b * 0.5 + 0.5) * 255.0) as u8, 230])
+        })
+        .save(&path)
+        .unwrap();
+        path
+    };
+    let floor = Material {
+        id: MaterialId::new("pavimento"),
+        base_color: [1.0; 3],
+        roughness: 1.0,
+        metallic: 1.0,
+        base_color_texture: Some(pattern_png("col.png", 1, true)),
+        ao_texture: Some(pattern_png("ao.png", 2, false)),
+        ao_strength: 0.8,
+        roughness_texture: Some(pattern_png("gloss.png", 3, false)),
+        roughness_is_gloss: true,
+        metallic_texture: Some(pattern_png("metal.png", 4, false)),
+        normal_texture: Some(normal),
+        normal_directx: true,
+        height_texture: Some(pattern_png("height.png", 5, false)),
+        bump_mm: 2.0,
+        mapping: forge_scene::TextureMapping {
+            scale: 0.5,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let screen = Material {
+        id: MaterialId::new("griglia"),
+        base_color: [0.9, 0.3, 0.1],
+        roughness: 0.4,
+        opacity_texture: Some(pattern_png("opacity.png", 6, false)),
+        mapping: forge_scene::TextureMapping {
+            scale: 0.4,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    for (m, name, size, y) in [(floor, "pavimento", 4.0f32, 0.0f32), (screen, "griglia", 1.0, 0.3)] {
+        let id = m.id.clone();
+        s.materials.upsert(m);
+        let mesh = s.add_mesh(primitives::plane(size, size));
+        let cid = ComponentId(name.into());
+        s.add_node(None, cid.clone(), name, Mat4::from_translation(Vec3::new(0.0, y, 0.0)), Some(mesh));
+        s.assignments.insert(cid, id);
+    }
+    s.camera = Camera {
+        position: Vec3::new(0.0, 1.6, 2.0),
+        target: Vec3::new(0.0, 0.0, 0.0),
+        up: Vec3::Y,
+        vfov_deg: 50.0,
+    };
+    let st = RenderSettings {
+        width: 32,
+        height: 24,
+        ..Default::default()
+    };
+    let spp = 256;
+    let mut cpu = CpuBackend::new(4).unwrap();
+    let a = render_with(&mut cpu, &s, &st, spp);
+    let b = render_with(&mut cpu, &s, &RenderSettings { seed: 999, ..st.clone() }, spp);
+    let gpu_img = render_with(&mut g, &s, &st, spp);
+    let rmse = |x: &[[f32; 3]], y: &[[f32; 3]]| {
+        let e: f64 = x
+            .iter()
+            .zip(y)
+            .map(|(p, q)| (0..3).map(|k| ((p[k] - q[k]) as f64).powi(2)).sum::<f64>())
+            .sum();
+        (e / (x.len() * 3) as f64).sqrt()
+    };
+    let mean = |x: &[[f32; 3]]| x.iter().map(|p| (p[0] + p[1] + p[2]) as f64).sum::<f64>() / (x.len() * 3) as f64;
+    let (noise, diff) = (rmse(&a, &b), rmse(&a, &gpu_img));
+    let (ma, mg) = (mean(&a), mean(&gpu_img));
+    eprintln!("media CPU {ma:.4} GPU {mg:.4} | RMSE CPU−CPU {noise:.4} GPU−CPU {diff:.4}");
+    assert!((ma - mg).abs() / ma < 0.02, "media CPU {ma} vs GPU {mg}");
+    assert!(diff < noise * 1.5, "RMSE GPU−CPU {diff} vs rumore CPU−CPU {noise}");
+}

@@ -46,7 +46,7 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
     };
 
     for depth in 0..settings.max_bounces {
-        let hit = geo.accel.intersect(o, d, 0.0, f32::INFINITY);
+        let hit = crate::textures::intersect(scene, o, d, 0.0, f32::INFINITY);
         let t_surf = hit.map(|h| h.t).unwrap_or(f32::INFINITY);
 
         // Luci ad area (non sono nella BVH: poche e analitiche).
@@ -166,7 +166,7 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
                         } else {
                             f32::INFINITY
                         };
-                        !geo.accel.occluded(so, ls.wi, 0.0, t_max)
+                        !crate::textures::occluded(scene, so, ls.wi, 0.0, t_max)
                     };
                     if visible {
                         let contrib = if ls.delta {

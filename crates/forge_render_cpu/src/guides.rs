@@ -69,7 +69,7 @@ fn guide_sample(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
     let geo = &*scene.geometry;
     let mut tint = Vec3::ONE;
     for depth in 0..=MAX_SPECULAR {
-        let hit = geo.accel.intersect(o, d, 0.0, f32::INFINITY);
+        let hit = crate::textures::intersect(scene, o, d, 0.0, f32::INFINITY);
         let t_surf = hit.map(|h| h.t).unwrap_or(f32::INFINITY);
         let mut light: Option<(f32, Vec3, f32)> = None;
         for l in &scene.lights {

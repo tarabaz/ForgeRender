@@ -26,8 +26,14 @@ impl std::fmt::Display for MaterialId {
 /// - `transmission` interpola verso un dielettrico trasparente liscio (vetro), con Fresnel esatto e `ior`;
 /// - `emission` è radianza emessa (W·sr⁻¹·m⁻²) moltiplicata per `emission_strength`.
 ///
-/// Texture opzionali: colore base (sRGB), roughness (canale R, lineare) e
-/// normal map (tangent space, convenzione OpenGL / +Y), con mappatura UV o box.
+/// Texture opzionali (mappe PBR), con mappatura UV o box:
+/// - colore base (sRGB), moltiplicato per `base_color`;
+/// - roughness (canale R, lineare; oppure glossiness invertita), moltiplicata per `roughness`;
+/// - metallicità (canale R), moltiplicata per `metallic`;
+/// - normal map in tangent space (OpenGL, +Y; oppure DirectX, −Y);
+/// - height (rilievo con profondità `bump_mm`, applicato come bump mapping);
+/// - occlusione ambientale (scurisce il colore base secondo `ao_strength`);
+/// - opacità (ritaglio: sotto il 50 % la superficie non esiste, anche per le ombre).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Material {
@@ -47,6 +53,18 @@ pub struct Material {
     pub roughness_texture: Option<PathBuf>,
     pub normal_texture: Option<PathBuf>,
     pub normal_strength: f32,
+    pub metallic_texture: Option<PathBuf>,
+    pub height_texture: Option<PathBuf>,
+    pub ao_texture: Option<PathBuf>,
+    pub opacity_texture: Option<PathBuf>,
+    /// Normal map in convenzione DirectX (verde invertito rispetto a OpenGL).
+    pub normal_directx: bool,
+    /// La mappa di rugosità è una mappa di lucidità (gloss): viene invertita.
+    pub roughness_is_gloss: bool,
+    /// Profondità del rilievo della mappa height, in millimetri.
+    pub bump_mm: f32,
+    /// Intensità dell'occlusione ambientale (0 = ignorata, 1 = piena).
+    pub ao_strength: f32,
     pub mapping: TextureMapping,
     /// Categoria per la libreria (solo UI).
     pub category: String,
@@ -115,6 +133,14 @@ impl Default for Material {
             roughness_texture: None,
             normal_texture: None,
             normal_strength: 1.0,
+            metallic_texture: None,
+            height_texture: None,
+            ao_texture: None,
+            opacity_texture: None,
+            normal_directx: false,
+            roughness_is_gloss: false,
+            bump_mm: 1.0,
+            ao_strength: 0.5,
             mapping: TextureMapping::default(),
             category: "Generico".into(),
         }
@@ -143,6 +169,8 @@ impl Material {
         } else {
             1.0
         };
+        m.bump_mm = if m.bump_mm.is_finite() { m.bump_mm.clamp(0.0, 100.0) } else { 1.0 };
+        m.ao_strength = c01(m.ao_strength);
         if !m.mapping.scale.is_finite() || m.mapping.scale <= 0.0 {
             m.mapping.scale = TextureMapping::default().scale;
         }
@@ -150,7 +178,32 @@ impl Material {
     }
 
     pub fn has_textures(&self) -> bool {
-        self.base_color_texture.is_some() || self.roughness_texture.is_some() || self.normal_texture.is_some()
+        self.texture_slots().iter().any(|t| t.is_some())
+    }
+
+    /// Tutti gli slot texture (per salvataggio, ricollegamento e copia).
+    pub fn texture_slots(&self) -> [&Option<PathBuf>; 7] {
+        [
+            &self.base_color_texture,
+            &self.roughness_texture,
+            &self.normal_texture,
+            &self.metallic_texture,
+            &self.height_texture,
+            &self.ao_texture,
+            &self.opacity_texture,
+        ]
+    }
+
+    pub fn texture_slots_mut(&mut self) -> [&mut Option<PathBuf>; 7] {
+        [
+            &mut self.base_color_texture,
+            &mut self.roughness_texture,
+            &mut self.normal_texture,
+            &mut self.metallic_texture,
+            &mut self.height_texture,
+            &mut self.ao_texture,
+            &mut self.opacity_texture,
+        ]
     }
 
     pub fn is_emissive(&self) -> bool {

@@ -24,6 +24,7 @@ const P_SEED_HI: u32 = 5u;
 const P_MAX_BOUNCES: u32 = 6u;
 const P_RR_START: u32 = 7u;
 const P_FLAGS: u32 = 8u;
+const P_HAS_CUTOUT: u32 = 67u;
 const P_N_LIGHTS: u32 = 9u;
 const P_ENV_KIND: u32 = 10u;
 const P_N_EMISSIVE: u32 = 11u;
@@ -66,7 +67,7 @@ const P_N_SELECT: u32 = 66u;
 
 const TRI_WORDS: u32 = 12u;
 const PRIM_WORDS: u32 = 28u;
-const MAT_WORDS: u32 = 24u;
+const MAT_WORDS: u32 = 32u;
 const LIGHT_WORDS: u32 = 24u;
 const ROUGH_GLASS: f32 = 0.03;
 
@@ -151,12 +152,15 @@ fn trace(o: vec3<f32>, d: vec3<f32>, tmin: f32, tmax_in: f32, any_hit: bool) -> 
             for (var i = lf; i < lf + count; i = i + 1u) {
                 let r = tri_intersect(i, o, d, tmin, h.t);
                 if (r.x > 0.0) {
-                    h.t = r.x;
-                    h.u = r.y;
-                    h.v = r.z;
-                    h.prim = S[pu(P_OFF_TRIS) + i * TRI_WORDS + 3u];
-                    h.found = true;
-                    if (any_hit) { return h; }
+                    let prim = S[pu(P_OFF_TRIS) + i * TRI_WORDS + 3u];
+                    if (pu(P_HAS_CUTOUT) == 0u || opaque_at(prim, r.x, r.y, r.z, o, d)) {
+                        h.t = r.x;
+                        h.u = r.y;
+                        h.v = r.z;
+                        h.prim = prim;
+                        h.found = true;
+                        if (any_hit) { return h; }
+                    }
                 }
             }
         } else {
@@ -268,7 +272,13 @@ struct Mat {
     transmission: f32, roughness: f32, emission: vec3<f32>,
     tex_base: i32, tex_rough: i32, tex_normal: i32, normal_strength: f32,
     proj_box: bool, map_scale: f32, map_sin: f32, map_cos: f32, map_off: vec2<f32>,
+    tex_metal: i32, tex_height: i32, tex_ao: i32, tex_opacity: i32,
+    normal_dx: bool, gloss: bool, bump_m: f32, ao_strength: f32,
 };
+
+fn has_textures(m: Mat) -> bool {
+    return m.tex_base >= 0 || m.tex_rough >= 0 || m.tex_normal >= 0 || m.tex_metal >= 0 || m.tex_height >= 0 || m.tex_ao >= 0;
+}
 
 fn load_mat(i: u32) -> Mat {
     let b = pu(P_OFF_MATS) + i * MAT_WORDS;
@@ -291,6 +301,14 @@ fn load_mat(i: u32) -> Mat {
     m.map_sin = sf(b + 19u);
     m.map_cos = sf(b + 20u);
     m.map_off = vec2<f32>(sf(b + 21u), sf(b + 22u));
+    m.tex_metal = bitcast<i32>(S[b + 23u]);
+    m.tex_height = bitcast<i32>(S[b + 24u]);
+    m.tex_ao = bitcast<i32>(S[b + 25u]);
+    m.tex_opacity = bitcast<i32>(S[b + 26u]);
+    m.normal_dx = (S[b + 27u] & 1u) != 0u;
+    m.gloss = (S[b + 27u] & 2u) != 0u;
+    m.bump_m = sf(b + 28u);
+    m.ao_strength = sf(b + 29u);
     return m;
 }
 
@@ -327,12 +345,14 @@ fn tex_sample(tex: u32, uv: vec2<f32>) -> vec3<f32> {
     return mix(top, bot, ty);
 }
 
-// Applica le texture (come forge_render_cpu::textures::apply).
-fn apply_textures(m: ptr<function, Mat>, prim: u32, bu: f32, bv: f32, p: vec3<f32>, ns: ptr<function, vec3<f32>>) {
+struct TexCoords { uv: vec2<f32>, du: vec3<f32>, dv: vec3<f32>, m_per_uv: f32 };
+
+// Coordinate di texture e direzioni tangenti (come forge_render_cpu::textures::coordinates).
+fn tex_coords(m: Mat, prim: u32, bu: f32, bv: f32, p: vec3<f32>) -> TexCoords {
     let pb = pu(P_OFF_PRIMS) + prim * PRIM_WORDS;
     let tangent = sv3(pb + 22u);
     let ngeo = sv3(pb + 12u);
-    let use_uv = !(*m).proj_box && dot(tangent, tangent) > 0.0;
+    let use_uv = !m.proj_box && dot(tangent, tangent) > 0.0;
     var base: vec2<f32>;
     var t: vec3<f32>;
     var b: vec3<f32>;
@@ -351,31 +371,91 @@ fn apply_textures(m: ptr<function, Mat>, prim: u32, bu: f32, bv: f32, p: vec3<f3
         else if (n.y >= n.z) { base = vec2<f32>(p.x, p.z); t = vec3<f32>(1.0, 0.0, 0.0); b = vec3<f32>(0.0, 0.0, 1.0); }
         else { base = vec2<f32>(p.x, p.y); t = vec3<f32>(1.0, 0.0, 0.0); b = vec3<f32>(0.0, 1.0, 0.0); }
     }
-    var s = (*m).map_scale;
-    if (is_box) { s = 1.0 / max((*m).map_scale, 1e-6); }
+    var s = m.map_scale;
+    var mpu = 1.0;
+    if (is_box) {
+        s = 1.0 / max(m.map_scale, 1e-6);
+        mpu = max(m.map_scale, 1e-6);
+    }
     let q = base * s;
-    let sn = (*m).map_sin;
-    let cs = (*m).map_cos;
-    let uv = vec2<f32>(q.x * cs - q.y * sn, q.x * sn + q.y * cs) + (*m).map_off;
-    let du = t * cs - b * sn;
-    let dv = t * sn + b * cs;
+    let sn = m.map_sin;
+    let cs = m.map_cos;
+    var r: TexCoords;
+    r.uv = vec2<f32>(q.x * cs - q.y * sn, q.x * sn + q.y * cs) + m.map_off;
+    r.du = t * cs - b * sn;
+    r.dv = t * sn + b * cs;
+    r.m_per_uv = mpu;
+    return r;
+}
+
+// Riferimento tangente ortonormale attorno a n, orientato come (du, dv); w = 0 se degenere.
+fn tangent_t(n: vec3<f32>, du: vec3<f32>) -> vec4<f32> {
+    let tt0 = du - n * dot(du, n);
+    if (dot(tt0, tt0) <= 0.0) { return vec4<f32>(0.0); }
+    return vec4<f32>(normalize(tt0), 1.0);
+}
+
+// Applica le texture (come forge_render_cpu::textures::apply).
+fn apply_textures(m: ptr<function, Mat>, prim: u32, bu: f32, bv: f32, p: vec3<f32>, ns: ptr<function, vec3<f32>>) {
+    let tc = tex_coords(*m, prim, bu, bv, p);
+    let uv = tc.uv;
     if ((*m).tex_base >= 0) { (*m).base = (*m).base * tex_sample(u32((*m).tex_base), uv); }
+    if ((*m).tex_ao >= 0) {
+        let ao = tex_sample(u32((*m).tex_ao), uv).x;
+        (*m).base = (*m).base * (1.0 + (ao - 1.0) * (*m).ao_strength);
+    }
     if ((*m).tex_rough >= 0) {
-        let r = clamp(tex_sample(u32((*m).tex_rough), uv).x * (*m).roughness, 0.0, 1.0);
+        var rr = tex_sample(u32((*m).tex_rough), uv).x;
+        if ((*m).gloss) { rr = 1.0 - rr; }
+        let r = clamp(rr * (*m).roughness, 0.0, 1.0);
         (*m).alpha = max(r * r, 1e-3);
     }
+    if ((*m).tex_metal >= 0) {
+        (*m).metallic = clamp((*m).metallic * tex_sample(u32((*m).tex_metal), uv).x, 0.0, 1.0);
+    }
     if ((*m).tex_normal >= 0) {
-        let c = tex_sample(u32((*m).tex_normal), uv) * 2.0 - vec3<f32>(1.0);
+        var c = tex_sample(u32((*m).tex_normal), uv) * 2.0 - vec3<f32>(1.0);
+        if ((*m).normal_dx) { c.y = -c.y; }
         let n = *ns;
-        let tt0 = du - n * dot(du, n);
-        if (dot(tt0, tt0) > 0.0) {
-            let tt = normalize(tt0);
+        let tf = tangent_t(n, tc.du);
+        if (tf.w > 0.0) {
+            let tt = tf.xyz;
             var bb = cross(n, tt);
-            if (dot(bb, dv) < 0.0) { bb = -bb; }
+            if (dot(bb, tc.dv) < 0.0) { bb = -bb; }
             let pert = tt * (c.x * (*m).normal_strength) + bb * (c.y * (*m).normal_strength) + n * max(c.z, 1e-3);
             if (dot(pert, pert) > 0.0) { *ns = normalize(pert); }
         }
     }
+    if ((*m).tex_height >= 0 && (*m).bump_m > 0.0) {
+        // Bump mapping: gradiente dell'altezza con differenze centrate di un texel.
+        let ht = u32((*m).tex_height);
+        let ib = pu(P_OFF_TEXINFO) + ht * 4u;
+        let eu = 1.0 / f32(max(S[ib + 1u], 1u));
+        let ev = 1.0 / f32(max(S[ib + 2u], 1u));
+        let gu = (tex_sample(ht, uv + vec2<f32>(eu, 0.0)).x - tex_sample(ht, uv - vec2<f32>(eu, 0.0)).x) / (2.0 * eu);
+        let gv = (tex_sample(ht, uv + vec2<f32>(0.0, ev)).x - tex_sample(ht, uv - vec2<f32>(0.0, ev)).x) / (2.0 * ev);
+        let n = *ns;
+        let tf = tangent_t(n, tc.du);
+        if (tf.w > 0.0) {
+            let tt = tf.xyz;
+            var bb = cross(n, tt);
+            if (dot(bb, tc.dv) < 0.0) { bb = -bb; }
+            let k = (*m).bump_m / tc.m_per_uv;
+            let pert = n - tt * (gu * k) - bb * (gv * k);
+            if (dot(pert, pert) > 0.0) { *ns = normalize(pert); }
+        }
+    }
+}
+
+// Ritaglio: vero se il punto del triangolo è opaco (come forge_render_cpu::textures::opaque_at).
+fn opaque_at(prim: u32, t: f32, bu: f32, bv: f32, o: vec3<f32>, d: vec3<f32>) -> bool {
+    let pb = pu(P_OFF_PRIMS) + prim * PRIM_WORDS;
+    let mb = pu(P_OFF_MATS) + S[pb + 3u] * MAT_WORDS;
+    let top = bitcast<i32>(S[mb + 26u]);
+    if (top < 0) { return true; }
+    let m = load_mat(S[pb + 3u]);
+    let tc = tex_coords(m, prim, bu, bv, o + d * t);
+    return tex_sample(u32(top), tc.uv).x >= 0.5;
 }
 
 // ---------------------------------------------------------------- BSDF
@@ -873,7 +953,7 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
         var ng = sv3(pb + 12u);
         var ns = sv3(pb) * (1.0 - hit.u - hit.v) + sv3(pb + 4u) * hit.u + sv3(pb + 8u) * hit.v;
         if (dot(ns, ns) > 0.0) { ns = normalize(ns); } else { ns = ng; }
-        if (m.tex_base >= 0 || m.tex_rough >= 0 || m.tex_normal >= 0) { apply_textures(&m, prim, hit.u, hit.v, p, &ns); }
+        if (has_textures(m)) { apply_textures(&m, prim, hit.u, hit.v, p, &ns); }
         let wo = -d;
         let entering = dot(ng, wo) > 0.0;
         if (!entering) { ng = -ng; ns = -ns; }

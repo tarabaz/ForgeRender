@@ -32,6 +32,15 @@ pub struct MaterialTextures {
     pub roughness: Option<Arc<Texture>>,
     pub normal: Option<Arc<Texture>>,
     pub normal_strength: f32,
+    pub metallic: Option<Arc<Texture>>,
+    pub height: Option<Arc<Texture>>,
+    pub ao: Option<Arc<Texture>>,
+    pub opacity: Option<Arc<Texture>>,
+    pub normal_directx: bool,
+    pub roughness_is_gloss: bool,
+    /// Profondità del rilievo in metri.
+    pub bump_m: f32,
+    pub ao_strength: f32,
     pub mapping: TextureMapping,
 }
 
@@ -51,14 +60,26 @@ impl MaterialTextures {
                 }
             })
         };
+        let m = m.sanitized();
         let t = MaterialTextures {
             base_color: load(&m.base_color_texture, true),
             roughness: load(&m.roughness_texture, false),
             normal: load(&m.normal_texture, false),
             normal_strength: m.normal_strength,
+            metallic: load(&m.metallic_texture, false),
+            height: load(&m.height_texture, false),
+            ao: load(&m.ao_texture, false),
+            opacity: load(&m.opacity_texture, false),
+            normal_directx: m.normal_directx,
+            roughness_is_gloss: m.roughness_is_gloss,
+            bump_m: m.bump_mm * 1e-3,
+            ao_strength: m.ao_strength,
             mapping: m.mapping,
         };
-        (t.base_color.is_some() || t.roughness.is_some() || t.normal.is_some()).then(|| Arc::new(t))
+        let any = [&t.base_color, &t.roughness, &t.normal, &t.metallic, &t.height, &t.ao, &t.opacity]
+            .iter()
+            .any(|x| x.is_some());
+        any.then(|| Arc::new(t))
     }
 }
 
@@ -272,6 +293,8 @@ pub struct RenderScene {
     /// Superfici emissive campionabili come luci.
     pub emissive: Option<EmissiveSet>,
     pub camera: Camera,
+    /// Qualche materiale ha una mappa di opacità (ritaglio): le intersezioni vanno filtrate.
+    pub has_cutout: bool,
 }
 
 impl RenderScene {
@@ -365,8 +388,10 @@ impl RenderScene {
 
         let emissive = build_emissive(&geometry, &node_material, &materials);
 
+        let has_cutout = material_textures.iter().flatten().any(|t| t.opacity.is_some());
         static NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         RenderScene {
+            has_cutout,
             id: NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             emissive,
             geometry,

@@ -114,6 +114,59 @@ impl TriangleAccel {
         })
     }
 
+    /// Intersezione più vicina accettata dal filtro `accept(prim, t, u, v)` (es. ritaglio
+    /// con mappa di opacità): le intersezioni rifiutate vengono attraversate.
+    pub fn intersect_filtered(
+        &self,
+        o: Vec3,
+        d: Vec3,
+        t_min: f32,
+        t_max: f32,
+        accept: impl Fn(u32, f32, f32, f32) -> bool,
+    ) -> Option<TriangleHit> {
+        if self.tris.is_empty() {
+            return None;
+        }
+        let mut best: Option<(f32, u32, f32, f32)> = None;
+        self.bvh.traverse(o, d, t_min, t_max, |first, count, tmax| {
+            for i in first..first + count {
+                if let Some((t, u, v)) = self.tris[i as usize].intersect(o, d, t_min, *tmax) {
+                    if accept(self.bvh.prim_indices[i as usize], t, u, v) {
+                        *tmax = t;
+                        best = Some((t, i, u, v));
+                    }
+                }
+            }
+            false
+        });
+        best.map(|(t, i, u, v)| TriangleHit {
+            t,
+            prim: self.bvh.prim_indices[i as usize],
+            u,
+            v,
+        })
+    }
+
+    /// Come [`occluded`](Self::occluded), ma ignora le intersezioni rifiutate dal filtro.
+    pub fn occluded_filtered(&self, o: Vec3, d: Vec3, t_min: f32, t_max: f32, accept: impl Fn(u32, f32, f32, f32) -> bool) -> bool {
+        if self.tris.is_empty() {
+            return false;
+        }
+        let mut hit = false;
+        self.bvh.traverse(o, d, t_min, t_max, |first, count, tmax| {
+            for i in first..first + count {
+                if let Some((t, u, v)) = self.tris[i as usize].intersect(o, d, t_min, *tmax) {
+                    if accept(self.bvh.prim_indices[i as usize], t, u, v) {
+                        hit = true;
+                        return true;
+                    }
+                }
+            }
+            false
+        });
+        hit
+    }
+
     /// `true` se qualcosa interseca il segmento `(t_min, t_max)` (raggi d'ombra).
     pub fn occluded(&self, o: Vec3, d: Vec3, t_min: f32, t_max: f32) -> bool {
         if self.tris.is_empty() {

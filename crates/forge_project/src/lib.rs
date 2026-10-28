@@ -271,10 +271,7 @@ pub fn load(path: &Path) -> anyhow::Result<LoadedProject> {
         relocate_asset(hdri, project_dir, &["hdri"], &mut report);
     }
     for m in &mut scene.materials.materials {
-        for slot in [&mut m.base_color_texture, &mut m.roughness_texture, &mut m.normal_texture]
-            .into_iter()
-            .flatten()
-        {
+        for slot in m.texture_slots_mut().into_iter().flatten() {
             relocate_asset(slot, project_dir, &["textures", "texture"], &mut report);
         }
     }
