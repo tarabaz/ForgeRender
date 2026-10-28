@@ -147,6 +147,22 @@ fn zone(f: &FogVolume, ground: Option<f32>) -> (Vec3, Vec3) {
     f.bounds_over(if f.collisions { ground } else { None })
 }
 
+/// Griglie usate dalla nebbia: (simulazione, dettaglio). Gli ostacoli che contano sono
+/// solo quelli voxelizzati su queste griglie: il renderer le usa per capire se una
+/// modifica della scena tocca davvero la nebbia.
+pub fn grid_specs(fog: &FogVolume, ground: Option<f32>) -> (GridSpec, GridSpec) {
+    let f = fog.sanitized();
+    let (min, max) = zone(&f, ground);
+    // Simulazione al 70% della risoluzione del dettaglio (il tappeto e le colate devono
+    // avere qualche cella di spessore per scorrere bene).
+    let sim = GridSpec::covering(
+        min,
+        max,
+        ((f.resolution as f32 * 0.7) as usize).clamp(32, (f.sim_cells as usize).min(SIM_MAX)),
+    );
+    (sim, GridSpec::covering(min, max, f.resolution as usize))
+}
+
 /// Filtro [1 2 1]/4 separabile sui tre assi (bordi replicati).
 fn smooth_field(data: &[f32], spec: &GridSpec) -> Vec<f32> {
     let mut a = data.to_vec();
@@ -174,15 +190,8 @@ fn smooth_field(data: &[f32], spec: &GridSpec) -> Vec<f32> {
 /// la zona si estende fino a lì (vedi [`FogVolume::bounds_over`]).
 pub fn simulate_fog(fog: &FogVolume, solid: Option<SolidFn>, ground: Option<f32>) -> SimState {
     let f = fog.sanitized();
-    let (min, max) = zone(&f, ground);
     let t0 = std::time::Instant::now();
-    // Simulazione al 70% della risoluzione del dettaglio (il tappeto e le colate devono
-    // avere qualche cella di spessore per scorrere bene).
-    let spec = GridSpec::covering(
-        min,
-        max,
-        ((f.resolution as f32 * 0.7) as usize).clamp(32, (f.sim_cells as usize).min(SIM_MAX)),
-    );
+    let spec = grid_specs(&f, ground).0;
     let sim_solid = match (f.collisions, solid) {
         (true, Some(s)) => s(&spec),
         _ => vec![false; spec.len()],
@@ -219,7 +228,6 @@ pub fn bake(fog: &FogVolume, solid: Option<SolidFn>, ground: Option<f32>) -> Bak
 /// Griglia fine con il dettaglio e l'aspetto, a partire da una simulazione già fatta.
 pub fn bake_detail(fog: &FogVolume, sim_state: &SimState, solid: Option<SolidFn>, ground: Option<f32>) -> BakedFog {
     let f = fog.sanitized();
-    let (min, max) = zone(&f, ground);
     let sim_spec = sim_state.spec;
     let sim_ms = sim_state.ms;
     // Campo della simulazione ammorbidito: l'interpolazione trilineare dei bordi netti
@@ -239,7 +247,7 @@ pub fn bake_detail(fog: &FogVolume, sim_state: &SimState, solid: Option<SolidFn>
     };
 
     let t1 = std::time::Instant::now();
-    let spec = GridSpec::covering(min, max, f.resolution as usize);
+    let spec = grid_specs(&f, ground).1;
     let fine_solid = solid_for(&spec);
     // Dettaglio sotto la risoluzione della simulazione:
     // - deformazione del campo (warp) di circa una cella: bordi a grumi e riccioli;

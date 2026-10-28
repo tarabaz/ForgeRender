@@ -42,12 +42,179 @@ pub struct BvhStats {
 
 const BINS: usize = 16;
 const MAX_LEAF: usize = 8;
+/// Sotto questo numero di primitive un sotto-albero si costruisce su un solo thread.
+const PAR_MIN: usize = 16 * 1024;
+
+/// Box del nodo e punto di taglio (le primitive di `idx` vengono riordinate: le prime
+/// `mid` vanno a sinistra). `None` = foglia.
+fn plan(bounds: &[Aabb], centroids: &[Vec3], idx: &mut [u32], depth: usize) -> (Aabb, Option<usize>) {
+    let count = idx.len();
+    let mut nb = Aabb::EMPTY;
+    let mut cb = Aabb::EMPTY;
+    for &p in idx.iter() {
+        nb.grow(&bounds[p as usize]);
+        cb.grow_point(centroids[p as usize]);
+    }
+    if count <= 2 || depth >= STACK_SIZE - 2 {
+        return (nb, None);
+    }
+    // Ricerca dello split SAH migliore sui tre assi.
+    let mut best: Option<(usize, usize, f32)> = None; // (asse, bin di split, costo)
+    let ext = cb.extent();
+    let node_area = nb.half_area().max(f32::MIN_POSITIVE);
+    for axis in 0..3 {
+        if ext[axis] <= 0.0 {
+            continue;
+        }
+        let scale = BINS as f32 / ext[axis];
+        let mut bin_box = [Aabb::EMPTY; BINS];
+        let mut bin_cnt = [0usize; BINS];
+        for &p in idx.iter() {
+            let b = (((centroids[p as usize][axis] - cb.min[axis]) * scale) as usize).min(BINS - 1);
+            bin_cnt[b] += 1;
+            bin_box[b].grow(&bounds[p as usize]);
+        }
+        let mut right_area = [0.0f32; BINS];
+        let mut right_cnt = [0usize; BINS];
+        let mut acc = Aabb::EMPTY;
+        let mut c = 0;
+        for b in (1..BINS).rev() {
+            acc.grow(&bin_box[b]);
+            c += bin_cnt[b];
+            right_area[b] = if c > 0 { acc.half_area() } else { 0.0 };
+            right_cnt[b] = c;
+        }
+        let mut acc = Aabb::EMPTY;
+        let mut c = 0;
+        for b in 0..BINS - 1 {
+            acc.grow(&bin_box[b]);
+            c += bin_cnt[b];
+            let rc = right_cnt[b + 1];
+            if c == 0 || rc == 0 {
+                continue;
+            }
+            let cost = TRAVERSAL_COST + INTERSECT_COST * (acc.half_area() * c as f32 + right_area[b + 1] * rc as f32) / node_area;
+            if best.is_none_or(|(_, _, bc)| cost < bc) {
+                best = Some((axis, b + 1, cost));
+            }
+        }
+    }
+
+    let leaf_cost = INTERSECT_COST * count as f32;
+    let mid = match best {
+        Some((_, _, cost)) if cost >= leaf_cost && count <= MAX_LEAF => return (nb, None),
+        Some((axis, split_bin, _)) => {
+            let scale = BINS as f32 / ext[axis];
+            let mut i = 0;
+            let mut j = idx.len();
+            while i < j {
+                let p = idx[i] as usize;
+                let b = (((centroids[p][axis] - cb.min[axis]) * scale) as usize).min(BINS - 1);
+                if b < split_bin {
+                    i += 1;
+                } else {
+                    j -= 1;
+                    idx.swap(i, j);
+                }
+            }
+            i
+        }
+        None => {
+            // Tutti i centroidi coincidono: nessuno split informativo.
+            if count <= MAX_LEAF {
+                return (nb, None);
+            }
+            count / 2
+        }
+    };
+    let mid = if mid == 0 || mid == count { count / 2 } else { mid };
+    (nb, Some(mid))
+}
+
+fn node_box(nb: &Aabb) -> BvhNode {
+    BvhNode {
+        min: nb.min.to_array(),
+        max: nb.max.to_array(),
+        ..Default::default()
+    }
+}
+
+/// Sotto-albero delle primitive `idx` (che nell'ordine finale partono da `base`), con la
+/// radice in posizione 0 e gli indici dei figli relativi al vettore restituito.
+fn build_subtree(bounds: &[Aabb], centroids: &[Vec3], idx: &mut [u32], base: usize, depth: usize) -> Vec<BvhNode> {
+    if idx.len() < PAR_MIN {
+        return build_serial(bounds, centroids, idx, base, depth);
+    }
+    let (nb, split) = plan(bounds, centroids, idx, depth);
+    let mut root = node_box(&nb);
+    let Some(mid) = split else {
+        root.left_or_first = base as u32;
+        root.count = idx.len() as u32;
+        return vec![root];
+    };
+    let (l, r) = idx.split_at_mut(mid);
+    let (left, right) = rayon::join(
+        || build_subtree(bounds, centroids, l, base, depth + 1),
+        || build_subtree(bounds, centroids, r, base + mid, depth + 1),
+    );
+    // Disposizione: radice, radice sinistra, radice destra (figli adiacenti), poi il resto
+    // del sotto-albero sinistro e del destro, con gli indici dei figli rimappati.
+    let (nl, nr) = (left.len(), right.len());
+    let map_l = |i: u32| if i == 0 { 1 } else { 3 + i - 1 };
+    let map_r = |i: u32| if i == 0 { 2 } else { 3 + (nl as u32 - 1) + i - 1 };
+    let mut nodes = Vec::with_capacity(1 + nl + nr);
+    root.left_or_first = 1;
+    root.count = 0;
+    nodes.push(root);
+    let fix = |mut n: BvhNode, map: &dyn Fn(u32) -> u32| {
+        if !n.is_leaf() {
+            n.left_or_first = map(n.left_or_first);
+        }
+        n
+    };
+    nodes.push(fix(left[0], &map_l));
+    nodes.push(fix(right[0], &map_r));
+    nodes.extend(left[1..].iter().map(|n| fix(*n, &map_l)));
+    nodes.extend(right[1..].iter().map(|n| fix(*n, &map_r)));
+    nodes
+}
+
+/// Costruzione seriale con una pila (stesso layout della versione storica).
+fn build_serial(bounds: &[Aabb], centroids: &[Vec3], idx: &mut [u32], base: usize, depth0: usize) -> Vec<BvhNode> {
+    let n = idx.len();
+    let mut nodes = Vec::with_capacity(n + 1);
+    nodes.push(BvhNode::default());
+    // (nodo, inizio, conteggio, profondità)
+    let mut stack: Vec<(usize, usize, usize, usize)> = vec![(0, 0, n, depth0)];
+    while let Some((ni, start, count, depth)) = stack.pop() {
+        let (nb, split) = plan(bounds, centroids, &mut idx[start..start + count], depth);
+        nodes[ni].min = nb.min.to_array();
+        nodes[ni].max = nb.max.to_array();
+        let Some(mid) = split else {
+            nodes[ni].left_or_first = (base + start) as u32;
+            nodes[ni].count = count as u32;
+            continue;
+        };
+        let left = nodes.len();
+        nodes.push(BvhNode::default());
+        nodes.push(BvhNode::default());
+        nodes[ni].left_or_first = left as u32;
+        nodes[ni].count = 0;
+        stack.push((left + 1, start + mid, count - mid, depth + 1));
+        stack.push((left, start, mid, depth + 1));
+    }
+    nodes
+}
 const TRAVERSAL_COST: f32 = 1.0;
 const INTERSECT_COST: f32 = 1.0;
 pub(crate) const STACK_SIZE: usize = 64;
 
 impl Bvh {
     /// Costruisce la BVH a partire dai box e dai centroidi delle primitive.
+    ///
+    /// I livelli alti si dividono tra i core (i due figli di un nodo sono indipendenti);
+    /// sotto [`PAR_MIN`] primitive un sotto-albero si costruisce in serie. Le scelte dei
+    /// tagli sono le stesse della versione seriale: cambia solo l'ordine dei nodi.
     pub fn build(bounds: &[Aabb], centroids: &[Vec3]) -> Bvh {
         assert_eq!(bounds.len(), centroids.len());
         let n = bounds.len();
@@ -63,114 +230,7 @@ impl Bvh {
                 prim_indices: idx,
             };
         }
-        let mut nodes = Vec::with_capacity(2 * n / 2 + 1);
-        nodes.push(BvhNode::default());
-        // (nodo, inizio, conteggio, profondità)
-        let mut stack: Vec<(usize, usize, usize, usize)> = vec![(0, 0, n, 0)];
-
-        while let Some((ni, start, count, depth)) = stack.pop() {
-            let mut nb = Aabb::EMPTY;
-            let mut cb = Aabb::EMPTY;
-            for &p in &idx[start..start + count] {
-                nb.grow(&bounds[p as usize]);
-                cb.grow_point(centroids[p as usize]);
-            }
-            nodes[ni].min = nb.min.to_array();
-            nodes[ni].max = nb.max.to_array();
-
-            let make_leaf = |nodes: &mut Vec<BvhNode>| {
-                nodes[ni].left_or_first = start as u32;
-                nodes[ni].count = count as u32;
-            };
-            if count <= 2 || depth >= STACK_SIZE - 2 {
-                make_leaf(&mut nodes);
-                continue;
-            }
-
-            // Ricerca dello split SAH migliore sui tre assi.
-            let mut best: Option<(usize, usize, f32)> = None; // (asse, bin di split, costo)
-            let ext = cb.extent();
-            let node_area = nb.half_area().max(f32::MIN_POSITIVE);
-            for axis in 0..3 {
-                if ext[axis] <= 0.0 {
-                    continue;
-                }
-                let scale = BINS as f32 / ext[axis];
-                let mut bin_box = [Aabb::EMPTY; BINS];
-                let mut bin_cnt = [0usize; BINS];
-                for &p in &idx[start..start + count] {
-                    let b = (((centroids[p as usize][axis] - cb.min[axis]) * scale) as usize).min(BINS - 1);
-                    bin_cnt[b] += 1;
-                    bin_box[b].grow(&bounds[p as usize]);
-                }
-                let mut right_area = [0.0f32; BINS];
-                let mut right_cnt = [0usize; BINS];
-                let mut acc = Aabb::EMPTY;
-                let mut c = 0;
-                for b in (1..BINS).rev() {
-                    acc.grow(&bin_box[b]);
-                    c += bin_cnt[b];
-                    right_area[b] = if c > 0 { acc.half_area() } else { 0.0 };
-                    right_cnt[b] = c;
-                }
-                let mut acc = Aabb::EMPTY;
-                let mut c = 0;
-                for b in 0..BINS - 1 {
-                    acc.grow(&bin_box[b]);
-                    c += bin_cnt[b];
-                    let rc = right_cnt[b + 1];
-                    if c == 0 || rc == 0 {
-                        continue;
-                    }
-                    let cost = TRAVERSAL_COST + INTERSECT_COST * (acc.half_area() * c as f32 + right_area[b + 1] * rc as f32) / node_area;
-                    if best.is_none_or(|(_, _, bc)| cost < bc) {
-                        best = Some((axis, b + 1, cost));
-                    }
-                }
-            }
-
-            let leaf_cost = INTERSECT_COST * count as f32;
-            let mid = match best {
-                Some((_, _, cost)) if cost >= leaf_cost && count <= MAX_LEAF => {
-                    make_leaf(&mut nodes);
-                    continue;
-                }
-                Some((axis, split_bin, _)) => {
-                    let scale = BINS as f32 / ext[axis];
-                    let slice = &mut idx[start..start + count];
-                    let mut i = 0;
-                    let mut j = slice.len();
-                    while i < j {
-                        let p = slice[i] as usize;
-                        let b = (((centroids[p][axis] - cb.min[axis]) * scale) as usize).min(BINS - 1);
-                        if b < split_bin {
-                            i += 1;
-                        } else {
-                            j -= 1;
-                            slice.swap(i, j);
-                        }
-                    }
-                    i
-                }
-                None => {
-                    // Tutti i centroidi coincidono: nessuno split informativo.
-                    if count <= MAX_LEAF {
-                        make_leaf(&mut nodes);
-                        continue;
-                    }
-                    count / 2
-                }
-            };
-            let mid = if mid == 0 || mid == count { count / 2 } else { mid };
-
-            let left = nodes.len();
-            nodes.push(BvhNode::default());
-            nodes.push(BvhNode::default());
-            nodes[ni].left_or_first = left as u32;
-            nodes[ni].count = 0;
-            stack.push((left + 1, start + mid, count - mid, depth + 1));
-            stack.push((left, start, mid, depth + 1));
-        }
+        let nodes = build_subtree(bounds, centroids, &mut idx, 0, 0);
         Bvh { nodes, prim_indices: idx }
     }
 

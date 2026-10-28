@@ -1,8 +1,8 @@
 //! Nebbie volumetriche nella scena compilata: voxelizzazione degli oggetti
 //! (collisioni) dalla BVH e cache dei volumi calcolati.
 //!
-//! Il calcolo di una nebbia richiede da decimi di secondo a qualche secondo:
-//! viene rifatto solo quando cambiano i suoi parametri o la geometria.
+//! Il calcolo di una nebbia richiede da qualche secondo a qualche minuto: viene rifatto
+//! solo quando cambiano i suoi parametri o gli oggetti dentro la sua zona.
 
 use crate::RenderGeometry;
 use forge_math::Vec3;
@@ -98,13 +98,84 @@ pub fn ground_under(f: &FogVolume, geo: &RenderGeometry) -> Option<f32> {
     ground
 }
 
-fn geo_key(f: &FogVolume, geo: &RenderGeometry) -> u64 {
-    // La geometria conta solo con le collisioni.
-    if f.collisions {
-        geo.id
-    } else {
-        0
+/// Ostacoli "visti" da una nebbia: il suolo sotto la zona e le celle occupate dagli
+/// oggetti sulle sue due griglie, con un'impronta del contenuto. La simulazione si rifà
+/// solo se l'impronta cambia: spostare un oggetto lontano dalla nebbia non la tocca.
+struct Obstacles {
+    ground: Option<f32>,
+    specs: (GridSpec, GridSpec),
+    sim: Vec<bool>,
+    fine: Vec<bool>,
+    hash: u64,
+}
+
+impl Obstacles {
+    /// Celle solide per la griglia richiesta (quelle già calcolate, se è una delle due).
+    fn solid(&self, geo: &RenderGeometry, spec: &GridSpec) -> Vec<bool> {
+        if *spec == self.specs.0 {
+            self.sim.clone()
+        } else if *spec == self.specs.1 {
+            self.fine.clone()
+        } else {
+            voxelize(geo, spec)
+        }
     }
+}
+
+type ObstacleCache = Mutex<HashMap<(u64, String), Arc<Obstacles>>>;
+
+fn obstacle_cache() -> &'static ObstacleCache {
+    static C: OnceLock<ObstacleCache> = OnceLock::new();
+    C.get_or_init(Default::default)
+}
+
+fn obstacles(f: &FogVolume, geo: &RenderGeometry) -> Arc<Obstacles> {
+    let f = f.sanitized();
+    // Solo i parametri che decidono zona e griglie.
+    let zk = format!(
+        "{:?} {:?} {:?} {} {} {}",
+        f.emitter, f.size, f.zone_offset, f.resolution, f.sim_cells, f.collisions
+    );
+    let k = (geo.id, zk);
+    if let Some(o) = obstacle_cache().lock().unwrap().get(&k) {
+        return o.clone();
+    }
+    let o = if f.collisions {
+        let ground = ground_under(&f, geo);
+        let specs = forge_volume::grid_specs(&f, ground);
+        let sim = voxelize(geo, &specs.0);
+        let fine = voxelize(geo, &specs.1);
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        ground.map(f32::to_bits).hash(&mut h);
+        sim.hash(&mut h);
+        fine.hash(&mut h);
+        // 0 è riservato a "nessuna collisione".
+        let hash = h.finish().max(1);
+        Obstacles {
+            ground,
+            specs,
+            sim,
+            fine,
+            hash,
+        }
+    } else {
+        let specs = forge_volume::grid_specs(&f, None);
+        Obstacles {
+            ground: None,
+            specs,
+            sim: Vec::new(),
+            fine: Vec::new(),
+            hash: 0,
+        }
+    };
+    let o = Arc::new(o);
+    let mut c = obstacle_cache().lock().unwrap();
+    if c.len() > 8 {
+        c.clear();
+    }
+    c.insert(k, o.clone());
+    o
 }
 
 fn key(f: &FogVolume, geo: &RenderGeometry) -> (String, u64) {
@@ -117,7 +188,7 @@ fn key(f: &FogVolume, geo: &RenderGeometry) -> (String, u64) {
             ..f.clone()
         }
     );
-    (k, geo_key(&f, geo))
+    (k, obstacles(&f, geo).hash)
 }
 
 /// Nebbie attive della scena già calcolate (senza calcolarne di nuove)?
@@ -135,9 +206,10 @@ pub fn bake_fogs(scene: &Scene, geo: &RenderGeometry) -> Vec<Arc<BakedFog>> {
             out.push(b.clone());
             continue;
         }
-        let solid = |spec: &GridSpec| voxelize(geo, spec);
-        let ground = ground_under(f, geo);
-        let sk = (forge_volume::sim_key(f), geo_key(&f.sanitized(), geo));
+        let obs = obstacles(f, geo);
+        let solid = |spec: &GridSpec| obs.solid(geo, spec);
+        let ground = obs.ground;
+        let sk = (forge_volume::sim_key(f), obs.hash);
         let cached_sim = sim_cache().lock().unwrap().get(&sk).cloned();
         let sim = match cached_sim {
             Some(s) => s,
@@ -191,5 +263,42 @@ mod tests {
             ..high
         };
         assert_eq!(ground_under(&low, &geo), None);
+    }
+
+    /// Spostare un oggetto fuori dalla zona della nebbia non cambia la chiave (niente nuova
+    /// simulazione); spostarne uno dentro sì.
+    #[test]
+    fn only_obstacles_inside_the_zone_invalidate_the_fog() {
+        let build = |far_x: f32, near_x: f32| {
+            let mut s = Scene::default();
+            let floor = s.add_mesh(primitives::plane(4.0, 4.0));
+            s.add_node(None, ComponentId("tavolo".into()), "tavolo", Mat4::IDENTITY, Some(floor));
+            for (name, x) in [("lontano", far_x), ("vicino", near_x)] {
+                let m = s.add_mesh(primitives::cuboid(Vec3::splat(0.1)));
+                s.add_node(
+                    None,
+                    ComponentId(name.into()),
+                    name,
+                    Mat4::from_translation(Vec3::new(x, 0.05, 0.0)),
+                    Some(m),
+                );
+            }
+            RenderGeometry::build(&s)
+        };
+        let fog = FogVolume {
+            emitter: Vec3::new(0.0, 0.3, 0.0),
+            size: Vec3::new(0.6, 0.5, 0.6),
+            resolution: 48,
+            ..Default::default()
+        };
+        let a = build(1.5, 0.15);
+        let moved_far = build(1.7, 0.15);
+        let moved_near = build(1.5, 0.05);
+        assert_ne!(a.id, moved_far.id);
+        assert_eq!(key(&fog, &a), key(&fog, &moved_far), "oggetto fuori dalla zona");
+        assert_ne!(key(&fog, &a), key(&fog, &moved_near), "oggetto dentro la zona");
+        // Senza collisioni la geometria non conta mai.
+        let free = FogVolume { collisions: false, ..fog };
+        assert_eq!(key(&free, &a), key(&free, &moved_near));
     }
 }

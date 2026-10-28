@@ -266,4 +266,54 @@ mod tests {
         let a = TriangleAccel::build(&vec![t; 100]);
         assert!(a.intersect(Vec3::new(0.2, 0.2, -1.0), Vec3::Z, 0.0, 10.0).is_some());
     }
+
+    /// Oltre la soglia del parallelo: stesso risultato della ricerca esaustiva, ogni
+    /// primitiva in una sola foglia, figli dentro il box del padre, qualità SAH come la
+    /// costruzione seriale.
+    #[test]
+    fn parallel_build_is_correct() {
+        let tris = random_soup(60_000, 7);
+        let t0 = std::time::Instant::now();
+        let accel = TriangleAccel::build(&tris);
+        eprintln!(
+            "BVH parallela di {} triangoli in {:.0} ms",
+            tris.len(),
+            t0.elapsed().as_secs_f64() * 1e3
+        );
+        let bvh = &accel.bvh;
+        let mut seen = vec![0u8; tris.len()];
+        for n in &bvh.nodes {
+            if n.is_leaf() {
+                for k in n.left_or_first..n.left_or_first + n.count {
+                    seen[bvh.prim_indices[k as usize] as usize] += 1;
+                }
+            } else {
+                let b = n.aabb();
+                for c in [n.left_or_first, n.left_or_first + 1] {
+                    let cb = bvh.nodes[c as usize].aabb();
+                    assert!(cb.min.cmpge(b.min - Vec3::splat(1e-4)).all() && cb.max.cmple(b.max + Vec3::splat(1e-4)).all());
+                }
+            }
+        }
+        assert!(seen.iter().all(|&c| c == 1), "primitive mancanti o ripetute");
+        let one = std::thread::scope(|_| {
+            let pool = rayon::ThreadPoolBuilder::new().num_threads(1).build().unwrap();
+            pool.install(|| TriangleAccel::build(&tris))
+        });
+        let (a, b) = (bvh.stats().sah_cost, one.bvh.stats().sah_cost);
+        assert!((a - b).abs() < 1e-3 * b, "SAH {a} contro {b} (1 thread)");
+        let mut rng = Pcg32::new(3, 3);
+        for _ in 0..500 {
+            let o = Vec3::new(rng.next_f32() - 0.5, rng.next_f32() - 0.5, rng.next_f32() - 0.5) * 30.0;
+            let (u, v) = rng.next_2d();
+            let d = forge_math::sampling::uniform_sphere(u, v);
+            let got = accel.intersect(o, d, 0.0, f32::INFINITY).map(|h| h.t);
+            let exp = brute(&tris, o, d).map(|h| h.0);
+            match (got, exp) {
+                (Some(g), Some(e)) => assert!((g - e).abs() < 1e-3, "{g} vs {e}"),
+                (None, None) => {}
+                x => panic!("risultato diverso: {x:?}"),
+            }
+        }
+    }
 }
