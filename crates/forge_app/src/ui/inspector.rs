@@ -598,6 +598,33 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
             }
         }
     });
+    // Portale sulla finestra selezionata: rettangolo grande come il pezzo, sul suo lato più
+    // sottile, rivolto verso il centro della scena (l'interno della stanza).
+    let portal_from_selection = {
+        let mut b = forge_math::Aabb::EMPTY;
+        for &i in &app.selection {
+            b.grow(&app.scene.exact_bounds_of(i));
+        }
+        (!b.is_empty()).then(|| {
+            let s = b.max - b.min;
+            let c = b.center();
+            let axis = if s.x <= s.y && s.x <= s.z {
+                0
+            } else if s.y <= s.z {
+                1
+            } else {
+                2
+            };
+            let mut n = Vec3::ZERO;
+            n[axis] = if (center - c)[axis] >= 0.0 { 1.0 } else { -1.0 };
+            // Larghezza e altezza come le disegna il renderer (u orizzontale, v verticale).
+            let hint = if n.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
+            let u = hint.cross(n).normalize();
+            let v = n.cross(u);
+            let ext = |d: Vec3| (d.x.abs() * s.x + d.y.abs() * s.y + d.z.abs() * s.z).max(0.01);
+            Light::portal("Portale finestra", c, c + n, ext(u), ext(v))
+        })
+    };
     ui.horizontal_wrapped(|ui| {
         ui.label("Aggiungi:");
         let at = center + Vec3::new(1.0, 2.0, 1.5) * radius;
@@ -629,6 +656,17 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 ..Light::point("Sole", at, 3.0)
             });
         }
+        if ui
+            .button("Portale (finestra)")
+            .on_hover_text(
+                "Per gli interni illuminati dall'HDRI: il renderer cerca la luce del cielo \
+                 attraverso questo rettangolo invece che a caso, molta meno grana. \
+                 Selezionare prima il vetro o il foro della finestra lo mette già al posto giusto.",
+            )
+            .clicked()
+        {
+            add(portal_from_selection.unwrap_or_else(|| Light::portal("Portale finestra", at, center, radius, radius)));
+        }
     });
     ui.separator();
 
@@ -650,6 +688,7 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
             LightKind::Point => 1,
             LightKind::Spot { .. } => 2,
             LightKind::Directional => 3,
+            LightKind::Portal { .. } => 4,
         };
         let before = kind_idx;
         egui::ComboBox::from_label("Tipo").selected_text(l.kind.label()).show_ui(ui, |ui| {
@@ -657,6 +696,7 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
             ui.selectable_value(&mut kind_idx, 1, "Puntiforme");
             ui.selectable_value(&mut kind_idx, 2, "Spot");
             ui.selectable_value(&mut kind_idx, 3, "Direzionale");
+            ui.selectable_value(&mut kind_idx, 4, "Portale (finestra)");
         });
         if kind_idx != before {
             let r = radius;
@@ -667,12 +707,36 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
                     inner_angle_deg: 25.0,
                     outer_angle_deg: 40.0,
                 },
+                4 => LightKind::Portal { width: r, height: r },
                 _ => LightKind::Directional,
             };
             changed = true;
         }
         changed |= ui.checkbox(&mut l.enabled, "Accesa").changed();
+        let portal = matches!(l.kind, LightKind::Portal { .. });
+        if portal {
+            ui.label(
+                egui::RichText::new(
+                    "Il portale non emette luce: indica da dove entra quella dell'ambiente (HDRI). \
+                     Mettilo sul foro della finestra, con la freccia verso l'interno e grande quanto \
+                     l'apertura. Togli o rendi invisibile il vetro della finestra, altrimenti blocca i raggi.",
+                )
+                .small()
+                .weak(),
+            );
+        }
         egui::Grid::new("light-grid").num_columns(2).spacing([10.0, 6.0]).show(ui, |ui| {
+            if portal {
+                if let LightKind::Portal { width, height } = &mut l.kind {
+                    ui.label("Larghezza (m)");
+                    changed |= ui.add(egui::DragValue::new(width).speed(0.01).range(1e-4..=1e4)).changed();
+                    ui.end_row();
+                    ui.label("Altezza (m)");
+                    changed |= ui.add(egui::DragValue::new(height).speed(0.01).range(1e-4..=1e4)).changed();
+                    ui.end_row();
+                }
+                return;
+            }
             ui.label("Colore");
             changed |= ui.color_edit_button_rgb(&mut l.color).changed();
             ui.end_row();
@@ -748,7 +812,9 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 changed = true;
             }
         }
-        changed |= ui.checkbox(&mut l.cast_shadows, "Proietta ombre").changed();
+        if !portal {
+            changed |= ui.checkbox(&mut l.cast_shadows, "Proietta ombre").changed();
+        }
         if matches!(l.kind, LightKind::Area { .. }) {
             changed |= ui.checkbox(&mut l.visible_to_camera, "Visibile alla camera").changed();
         }

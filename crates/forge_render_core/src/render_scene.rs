@@ -137,6 +137,98 @@ pub struct RenderLight {
     pub visible_to_camera: bool,
 }
 
+/// Portale di luce (finestra): rettangolo da cui entra la luce dell'ambiente.
+/// `normal` punta verso l'interno (la direzione in cui viaggia la luce che entra).
+#[derive(Clone, Copy, Debug)]
+pub struct Portal {
+    pub center: Vec3,
+    pub normal: Vec3,
+    pub u: Vec3,
+    pub v: Vec3,
+    pub half_w: f32,
+    pub half_h: f32,
+}
+
+impl Portal {
+    pub fn area(&self) -> f32 {
+        4.0 * self.half_w * self.half_h
+    }
+
+    /// Distanza lungo il raggio (o, d) a cui attraversa il portale uscendo dalla stanza
+    /// (in verso opposto alla normale), se lo attraversa.
+    #[inline]
+    pub fn hit(&self, o: Vec3, d: Vec3) -> Option<f32> {
+        let dn = d.dot(self.normal);
+        if dn >= -1e-8 {
+            return None;
+        }
+        let t = (self.center - o).dot(self.normal) / dn;
+        if t <= 0.0 {
+            return None;
+        }
+        let q = o + d * t - self.center;
+        (q.dot(self.u).abs() <= self.half_w && q.dot(self.v).abs() <= self.half_h).then_some(t)
+    }
+}
+
+/// Insieme dei portali: si sceglie un punto uniforme sull'area totale.
+#[derive(Clone, Debug, Default)]
+pub struct Portals {
+    pub list: Vec<Portal>,
+    pub total_area: f32,
+}
+
+impl Portals {
+    pub fn is_empty(&self) -> bool {
+        self.list.is_empty()
+    }
+
+    /// Direzione verso un punto uniforme dei portali visto da `p`, con la PDF in angolo
+    /// solido. `None` se il punto scelto non è visibile dal lato interno.
+    pub fn sample(&self, p: Vec3, u0: f32, u1: f32, u2: f32) -> Option<(Vec3, f32)> {
+        if self.list.is_empty() || self.total_area <= 0.0 {
+            return None;
+        }
+        // Portale scelto in proporzione all'area.
+        let mut x = u0 * self.total_area;
+        let mut pick = self.list[self.list.len() - 1];
+        for q in &self.list {
+            if x < q.area() {
+                pick = *q;
+                break;
+            }
+            x -= q.area();
+        }
+        let q = pick.center + pick.u * ((2.0 * u1 - 1.0) * pick.half_w) + pick.v * ((2.0 * u2 - 1.0) * pick.half_h);
+        let d = q - p;
+        let d2 = d.length_squared();
+        if d2 <= 1e-12 {
+            return None;
+        }
+        let wi = d / d2.sqrt();
+        let cos = -wi.dot(pick.normal);
+        if cos <= 1e-6 {
+            return None;
+        }
+        Some((wi, self.pdf(p, wi)))
+    }
+
+    /// PDF in angolo solido della direzione `wi` da `p` (somma sui portali attraversati).
+    pub fn pdf(&self, p: Vec3, wi: Vec3) -> f32 {
+        if self.total_area <= 0.0 {
+            return 0.0;
+        }
+        let mut pdf = 0.0;
+        for q in &self.list {
+            if let Some(t) = q.hit(p, wi) {
+                let cos = (-wi.dot(q.normal)).max(1e-8);
+                pdf += t * t / (cos * self.total_area);
+            }
+        }
+        pdf
+    }
+}
+
 /// Geometria compilata: triangoli in spazio mondo con BVH e attributi per
 /// primitiva (nell'ordine originale, indicizzati da `TriangleHit::prim`).
 /// Dipende solo da mesh, trasformazioni e visibilità: cambiare materiali,
@@ -386,6 +478,8 @@ pub struct RenderScene {
     /// Superfici emissive campionabili come luci.
     pub emissive: Option<Arc<EmissiveSet>>,
     pub camera: Camera,
+    /// Portali di luce: se presenti l'ambiente si campiona attraverso di loro.
+    pub portals: Portals,
     /// Qualche materiale ha una mappa di opacità (ritaglio): le intersezioni vanno filtrate.
     pub has_cutout: bool,
     /// Nebbie volumetriche già calcolate.
@@ -417,10 +511,29 @@ impl RenderScene {
             })
             .collect();
 
+        let mut portals = Portals::default();
+        for l in scene.lights.iter().filter(|l| l.enabled) {
+            if let LightKind::Portal { width, height } = l.kind {
+                let n = l.direction();
+                let hint = if n.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
+                let u = hint.cross(n).normalize();
+                let v = n.cross(u);
+                let portal = Portal {
+                    center: l.position,
+                    normal: n,
+                    u,
+                    v,
+                    half_w: width.max(1e-4) * 0.5,
+                    half_h: height.max(1e-4) * 0.5,
+                };
+                portals.total_area += portal.area();
+                portals.list.push(portal);
+            }
+        }
         let lights = scene
             .lights
             .iter()
-            .filter(|l| l.enabled && l.intensity > 0.0)
+            .filter(|l| l.enabled && l.intensity > 0.0 && !matches!(l.kind, LightKind::Portal { .. }))
             .map(|l| {
                 let kind = match l.kind {
                     LightKind::Point => RenderLightKind::Point { position: l.position },
@@ -438,6 +551,7 @@ impl RenderScene {
                         }
                     }
                     LightKind::Directional => RenderLightKind::Directional { direction: l.direction() },
+                    LightKind::Portal { .. } => unreachable!("portali filtrati sopra"),
                     LightKind::Area { width, height } => {
                         let n = l.direction();
                         let hint = if n.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
@@ -500,6 +614,7 @@ impl RenderScene {
             environment,
             env_map,
             camera: scene.render_camera().clone(),
+            portals,
         }
     }
 
@@ -518,6 +633,7 @@ impl RenderScene {
             env_map: self.env_map.clone(),
             emissive: self.emissive.clone(),
             camera,
+            portals: self.portals.clone(),
             has_cutout: self.has_cutout,
             fogs: self.fogs.clone(),
         }
@@ -540,6 +656,22 @@ impl RenderScene {
 
     pub fn bounds(&self) -> Aabb {
         self.geometry.bounds
+    }
+
+    /// L'ambiente è una "luce" campionata direttamente (NEE): con una HDRI o con dei portali.
+    pub fn samples_environment(&self) -> bool {
+        self.env_map.is_some() || !self.portals.is_empty()
+    }
+
+    /// PDF (angolo solido) con cui la NEE sceglie la direzione `wi` dell'ambiente da `p`.
+    pub fn env_light_pdf(&self, p: Vec3, wi: Vec3) -> f32 {
+        if !self.portals.is_empty() {
+            self.portals.pdf(p, wi)
+        } else if let Some((m, _, rot)) = &self.env_map {
+            m.pdf(wi, *rot)
+        } else {
+            0.0
+        }
     }
 
     /// Indice del materiale del triangolo `prim`.

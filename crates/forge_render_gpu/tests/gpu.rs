@@ -649,3 +649,71 @@ fn gpu_dry_ice_fog_matches_cpu() {
         rmse(&a, &c)
     );
 }
+
+/// Stanza chiusa con una finestra 1×1 m e cielo uniforme fuori (come il test CPU dei portali).
+fn portal_room(with_portal: bool) -> Scene {
+    use std::f32::consts::FRAC_PI_2;
+    let mut s = Scene {
+        environment: Environment::Uniform {
+            color: [1.0; 3],
+            strength: 3.0,
+        },
+        ..Default::default()
+    };
+    let quad = |s: &mut Scene, name: &str, w: f32, h: f32, xf: Mat4| {
+        let m = s.add_mesh(primitives::plane(w, h));
+        s.add_node(None, ComponentId(name.into()), name, xf, Some(m));
+    };
+    quad(&mut s, "pavimento", 4.0, 4.0, Mat4::IDENTITY);
+    quad(&mut s, "soffitto", 4.0, 4.0, Mat4::from_translation(Vec3::Y * 3.0));
+    let wall_x = |x: f32| Mat4::from_translation(Vec3::new(x, 1.5, 0.0)) * Mat4::from_rotation_z(FRAC_PI_2);
+    let wall_z = |z: f32| Mat4::from_translation(Vec3::new(0.0, 1.5, z)) * Mat4::from_rotation_x(FRAC_PI_2);
+    quad(&mut s, "parete -x", 3.0, 4.0, wall_x(-2.0));
+    quad(&mut s, "parete -z", 4.0, 3.0, wall_z(-2.0));
+    quad(&mut s, "parete +z", 4.0, 3.0, wall_z(2.0));
+    let piece = |y: f32, z: f32| Mat4::from_translation(Vec3::new(2.0, y, z)) * Mat4::from_rotation_z(FRAC_PI_2);
+    quad(&mut s, "sotto", 1.0, 4.0, piece(0.5, 0.0));
+    quad(&mut s, "sopra", 1.0, 4.0, piece(2.5, 0.0));
+    quad(&mut s, "sinistra", 1.0, 1.5, piece(1.5, -1.25));
+    quad(&mut s, "destra", 1.0, 1.5, piece(1.5, 1.25));
+    if with_portal {
+        s.lights.push(Light::portal(
+            "Finestra",
+            Vec3::new(2.0, 1.5, 0.0),
+            Vec3::new(0.0, 1.5, 0.0),
+            1.0,
+            1.0,
+        ));
+    }
+    s.camera = Camera {
+        position: Vec3::new(1.5, 1.6, 1.5),
+        target: Vec3::new(-2.0, 0.6, -1.0),
+        up: Vec3::Y,
+        vfov_deg: 70.0,
+        ..Default::default()
+    };
+    s
+}
+
+/// Portali sulla GPU: stessa luce media della CPU e molto meno rumore che senza portale.
+#[test]
+fn gpu_portal_matches_cpu_and_reduces_noise() {
+    let Some(mut g) = gpu() else { return };
+    let st = settings(24, 16);
+    let mean = |img: &[[f32; 3]]| img.iter().map(|p| p[0] as f64).sum::<f64>() / img.len() as f64;
+    let rmse = |a: &[[f32; 3]], b: &[[f32; 3]]| {
+        (a.iter().zip(b).map(|(x, y)| ((x[0] - y[0]) as f64).powi(2)).sum::<f64>() / a.len() as f64).sqrt()
+    };
+    let mut cpu = CpuBackend::new(4).unwrap();
+    let cpu_ref = render_with(&mut cpu, &portal_room(true), &st, 2048);
+    let gpu_ref = render_with(&mut g, &portal_room(true), &st, 2048);
+    let (mc, mg) = (mean(&cpu_ref), mean(&gpu_ref));
+    assert!((mc - mg).abs() < 0.02 * mc, "media CPU {mc:.4}, GPU {mg:.4}");
+    let e_plain = rmse(&render_with(&mut g, &portal_room(false), &st, 64), &cpu_ref);
+    let e_portal = rmse(
+        &render_with(&mut g, &portal_room(true), &RenderSettings { seed: 5, ..st.clone() }, 64),
+        &cpu_ref,
+    );
+    eprintln!("GPU a 64 campioni: senza portale {e_plain:.4}, con portale {e_portal:.4}");
+    assert!(e_portal < 0.5 * e_plain, "senza {e_plain:.4}, con {e_portal:.4}");
+}

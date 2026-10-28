@@ -25,12 +25,14 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
     let mut beta = Vec3::ONE;
     let mut specular_bounce = true; // il raggio camera si comporta come un rimbalzo delta
     let mut prev_pdf = 0.0f32;
-    // La HDRI, se presente, è una "luce" in più nella scelta uniforme della NEE.
+    // L'ambiente (HDRI, o qualsiasi ambiente se ci sono portali) è una "luce" in più
+    // nella scelta uniforme della NEE.
     let n_lights = scene.lights.len();
-    // Scelta uniforme tra: luci della scena, HDRI (se presente), superfici emissive (se presenti).
-    let env_slot = scene.env_map.is_some().then_some(n_lights);
-    let emissive_slot = scene.emissive.is_some().then_some(n_lights + scene.env_map.is_some() as usize);
-    let n_select = n_lights + scene.env_map.is_some() as usize + scene.emissive.is_some() as usize;
+    let has_env = scene.samples_environment();
+    // Scelta uniforme tra: luci della scena, ambiente (se campionato), superfici emissive (se presenti).
+    let env_slot = has_env.then_some(n_lights);
+    let emissive_slot = scene.emissive.is_some().then_some(n_lights + has_env as usize);
+    let n_select = n_lights + has_env as usize + scene.emissive.is_some() as usize;
     let light_select_pdf = if n_select > 0 { 1.0 / n_select as f32 } else { 0.0 };
     let slots = LightSlots {
         n_lights,
@@ -127,15 +129,15 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
                 if settings.environment_visible {
                     add(&mut l, beta * scene.env_radiance(d, true), depth);
                 }
-            } else if let Some((map, strength, rot)) = &scene.env_map {
-                let w = if specular_bounce {
+            } else {
+                // Peso MIS rispetto alla NEE dell'ambiente (HDRI o portali); con i portali la
+                // PDF è zero per le direzioni che non passano da una finestra.
+                let w = if specular_bounce || !has_env {
                     1.0
                 } else {
-                    power_heuristic(prev_pdf, map.pdf(d, *rot) * light_select_pdf)
+                    power_heuristic(prev_pdf, scene.env_light_pdf(o, d) * light_select_pdf)
                 };
-                add(&mut l, beta * map.radiance(d, *rot) * (*strength * w), depth);
-            } else {
-                add(&mut l, beta * scene.env_radiance(d, false), depth);
+                add(&mut l, beta * scene.env_radiance(d, false) * w, depth);
             }
             break;
         };
@@ -249,6 +251,22 @@ fn sample_any_light(scene: &RenderScene, s: &LightSlots, p: Vec3, rng: &mut Pcg3
         sample_emissive(scene, em, p, rng.next_f32(), u1, u2).map(|x| (x, true))
     } else {
         debug_assert_eq!(Some(li_idx), s.env_slot);
+        if !scene.portals.is_empty() {
+            // Con i portali la luce dell'ambiente si cerca solo attraverso le finestre.
+            let u0 = rng.next_f32();
+            return scene.portals.sample(p, u0, u1, u2).map(|(wi, pdf)| {
+                (
+                    LightSample {
+                        wi,
+                        dist: f32::INFINITY,
+                        li: scene.env_radiance(wi, false),
+                        pdf,
+                        delta: false,
+                    },
+                    true,
+                )
+            });
+        }
         let (map, strength, rot) = scene.env_map.as_ref().expect("env map");
         map.sample(u1, u2, *rot).map(|(wi, li, pdf)| {
             (

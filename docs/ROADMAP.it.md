@@ -115,6 +115,9 @@ accumulo corretto, export PNG.
 ## Fase 3 — Materiali e illuminazione ✅
 - ✅ BRDF GGX, metalli, dielettrici, riflessi, rifrazioni, Fresnel, editor dei materiali
 - ✅ HDRI equirettangolari (.hdr/.exr) con importance sampling e MIS, rotazione e intensità
+- ✅ Portali di luce per gli interni: rettangoli sulle finestre attraverso cui si campiona
+  l'ambiente (con MIS); stessa immagine e circa 6 volte meno rumore a parità di campioni in una
+  stanza illuminata da una finestra (test CPU e GPU)
 - ✅ Set PBR completo: colore base, rugosità (o lucidità), metallicità, normal map (OpenGL o
   DirectX), height (bump), occlusione ambientale, ritaglio con opacità; mapping UV o proiezione
   box in metri per CAD senza UV; dimensione della ripetizione, rotazione, spostamento

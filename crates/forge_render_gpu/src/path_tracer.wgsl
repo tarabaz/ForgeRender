@@ -96,6 +96,10 @@ const P_ENV_H: u32 = 63u;
 const P_ENV_MINT: u32 = 64u;
 const P_EM_INTEGRAL: u32 = 65u;
 const P_N_SELECT: u32 = 66u;
+const P_OFF_PORTALS: u32 = 76u;
+const P_N_PORTALS: u32 = 77u;
+const P_PORTAL_AREA: u32 = 78u;
+const PORTAL_WORDS: u32 = 16u;
 
 const TRI_WORDS: u32 = 12u;
 const PRIM_WORDS: u32 = 28u;
@@ -856,6 +860,83 @@ fn env_pdf(d: vec3<f32>) -> f32 {
     return pm * pc / (2.0 * PI * PI * sin_d);
 }
 
+// ---------------------------------------------------------------- Portali di luce
+// Finestre da cui entra l'ambiente: la NEE sceglie un punto uniforme sulla loro area
+// (stesso algoritmo di `Portals` in forge_render_core).
+fn portal_base(i: u32) -> u32 { return pu(P_OFF_PORTALS) + i * PORTAL_WORDS; }
+
+// Distanza a cui il raggio esce dalla stanza attraverso il portale i (−1 se non lo attraversa).
+fn portal_hit(i: u32, o: vec3<f32>, d: vec3<f32>) -> f32 {
+    let b = portal_base(i);
+    let c = sv3(b);
+    let n = sv3(b + 4u);
+    let dn = dot(d, n);
+    if (dn >= -1e-8) { return -1.0; }
+    let t = dot(c - o, n) / dn;
+    if (t <= 0.0) { return -1.0; }
+    let q = o + d * t - c;
+    if (abs(dot(q, sv3(b + 8u))) > sf(b + 3u) || abs(dot(q, sv3(b + 12u))) > sf(b + 7u)) { return -1.0; }
+    return t;
+}
+
+fn portal_pdf(o: vec3<f32>, d: vec3<f32>) -> f32 {
+    let total = pf(P_PORTAL_AREA);
+    if (total <= 0.0) { return 0.0; }
+    var pdf = 0.0;
+    for (var i: u32 = 0u; i < pu(P_N_PORTALS); i = i + 1u) {
+        let t = portal_hit(i, o, d);
+        if (t > 0.0) {
+            let cosv = max(-dot(d, sv3(portal_base(i) + 4u)), 1e-8);
+            pdf = pdf + t * t / (cosv * total);
+        }
+    }
+    return pdf;
+}
+
+fn portal_sample(p: vec3<f32>, u0: f32, u1: f32, u2: f32) -> LSample {
+    var s: LSample;
+    s.ok = false;
+    let n_p = pu(P_N_PORTALS);
+    let total = pf(P_PORTAL_AREA);
+    if (n_p == 0u || total <= 0.0) { return s; }
+    var x = u0 * total;
+    var pick = n_p - 1u;
+    for (var i: u32 = 0u; i < n_p; i = i + 1u) {
+        let b = portal_base(i);
+        let a = 4.0 * sf(b + 3u) * sf(b + 7u);
+        if (x < a) { pick = i; break; }
+        x = x - a;
+    }
+    let b = portal_base(pick);
+    let q = sv3(b) + sv3(b + 8u) * ((2.0 * u1 - 1.0) * sf(b + 3u)) + sv3(b + 12u) * ((2.0 * u2 - 1.0) * sf(b + 7u));
+    let dv = q - p;
+    let d2 = dot(dv, dv);
+    if (d2 <= 1e-12) { return s; }
+    let wi = dv / sqrt(d2);
+    if (-dot(wi, sv3(b + 4u)) <= 1e-6) { return s; }
+    let pdf = portal_pdf(p, wi);
+    if (pdf <= 0.0) { return s; }
+    s.wi = wi;
+    s.li = env_radiance(wi, false);
+    s.dist = INF;
+    s.pdf = pdf;
+    s.delta = false;
+    s.shadows = true;
+    s.ok = true;
+    return s;
+}
+
+// NEE dell'ambiente: attraverso i portali se ci sono, altrimenti la HDRI.
+fn env_light_sample(p: vec3<f32>, u1: f32, u2: f32) -> LSample {
+    if (pu(P_N_PORTALS) > 0u) { return portal_sample(p, rnd(), u1, u2); }
+    return env_sample(u1, u2);
+}
+
+fn env_light_pdf(o: vec3<f32>, d: vec3<f32>) -> f32 {
+    if (pu(P_N_PORTALS) > 0u) { return portal_pdf(o, d); }
+    return env_pdf(d);
+}
+
 fn env_sample(u1: f32, u2: f32) -> LSample {
     var s: LSample;
     s.ok = false;
@@ -1084,8 +1165,9 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
     let has_em = pu(P_N_EMISSIVE) > 0u;
     var sel_pdf = 0.0;
     if (n_select > 0u) { sel_pdf = 1.0 / f32(n_select); }
+    let has_env = has_env_map || pu(P_N_PORTALS) > 0u;
     var env_slot = 0xffffffffu;
-    if (has_env_map) { env_slot = n_lights; }
+    if (has_env) { env_slot = n_lights; }
     let clamp_v = pf(P_CLAMP);
     let max_b = pu(P_MAX_BOUNCES);
 
@@ -1126,7 +1208,7 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
                     if (li_idx < n_lights) {
                         ls = sample_light(li_idx, p, u1, u2);
                     } else if (li_idx == env_slot) {
-                        ls = env_sample(u1, u2);
+                        ls = env_light_sample(p, u1, u2);
                     } else {
                         ls = emissive_sample(p, rnd(), u1, u2);
                     }
@@ -1176,9 +1258,9 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
             var c = vec3<f32>(0.0);
             if (depth == 0u) {
                 if ((pu(P_FLAGS) & 1u) != 0u) { c = beta * env_radiance(d, true); }
-            } else if (has_env_map) {
+            } else if (has_env) {
                 var w = 1.0;
-                if (!specular) { w = power_heuristic(prev_pdf, env_pdf(d) * sel_pdf); }
+                if (!specular) { w = power_heuristic(prev_pdf, env_light_pdf(o, d) * sel_pdf); }
                 c = beta * env_radiance(d, false) * w;
             } else {
                 c = beta * env_radiance(d, false);
@@ -1227,7 +1309,7 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
             if (li_idx < n_lights) {
                 ls = sample_light(li_idx, p, u1, u2);
             } else if (li_idx == env_slot) {
-                ls = env_sample(u1, u2);
+                ls = env_light_sample(p, u1, u2);
             } else {
                 ls = emissive_sample(p, rnd(), u1, u2);
             }

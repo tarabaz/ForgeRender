@@ -550,7 +550,14 @@ fn draw_lights(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
         let stroke = egui::Stroke::new(if selected { 2.0 } else { 1.2 }, color);
         let Some(p) = project(cam, rect, l.position) else { continue };
         match l.kind {
-            LightKind::Area { width, height } => {
+            LightKind::Area { width, height } | LightKind::Portal { width, height } => {
+                // Portale: azzurro tratteggiato, la freccia indica l'interno della stanza.
+                let portal = matches!(l.kind, LightKind::Portal { .. });
+                let stroke = if portal && l.enabled && !selected {
+                    egui::Stroke::new(1.2, egui::Color32::from_rgb(120, 200, 255))
+                } else {
+                    stroke
+                };
                 let n = l.direction();
                 let hint = if n.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
                 let u = hint.cross(n).normalize() * width * 0.5;
@@ -558,7 +565,15 @@ fn draw_lights(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
                 let corners = [l.position - u - v, l.position + u - v, l.position + u + v, l.position - u + v];
                 let pts: Vec<_> = corners.iter().filter_map(|c| project(cam, rect, *c)).collect();
                 if pts.len() == 4 {
-                    painter.add(egui::Shape::closed_line(pts, stroke));
+                    if portal {
+                        let mut ring = pts.clone();
+                        ring.push(pts[0]);
+                        painter.add(egui::Shape::dashed_line(&ring, stroke, 6.0, 4.0));
+                        painter.line_segment([pts[0], pts[2]], egui::Stroke::new(0.8, stroke.color.gamma_multiply(0.6)));
+                        painter.line_segment([pts[1], pts[3]], egui::Stroke::new(0.8, stroke.color.gamma_multiply(0.6)));
+                    } else {
+                        painter.add(egui::Shape::closed_line(pts, stroke));
+                    }
                 }
                 let scale = (width + height) * 0.25;
                 if let Some(q) = project(cam, rect, l.position + n * scale) {

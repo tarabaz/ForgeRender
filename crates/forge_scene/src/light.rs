@@ -4,13 +4,17 @@ use serde::{Deserialize, Serialize};
 /// Tipi di sorgente luminosa. Unità:
 /// - Point/Spot: intensità radiante (W/sr) = `intensity * color`;
 /// - Directional: irradianza (W/m²) sulla superficie perpendicolare;
-/// - Area: radianza emessa (W·sr⁻¹·m⁻²) dalla faccia frontale del rettangolo.
+/// - Area: radianza emessa (W·sr⁻¹·m⁻²) dalla faccia frontale del rettangolo;
+/// - Portal: non emette. È un'apertura (finestra) da cui entra la luce dell'ambiente:
+///   il renderer manda verso il rettangolo i raggi diretti all'HDRI invece che a caso.
+///   Il lato frontale (verso `target`) è l'interno della stanza.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum LightKind {
     Point,
     Spot { inner_angle_deg: f32, outer_angle_deg: f32 },
     Directional,
     Area { width: f32, height: f32 },
+    Portal { width: f32, height: f32 },
 }
 
 impl LightKind {
@@ -20,6 +24,7 @@ impl LightKind {
             LightKind::Spot { .. } => "Spot",
             LightKind::Directional => "Direzionale",
             LightKind::Area { .. } => "Area (rettangolare)",
+            LightKind::Portal { .. } => "Portale (finestra)",
         }
     }
 }
@@ -62,6 +67,15 @@ impl Light {
             enabled: true,
             cast_shadows: true,
             visible_to_camera: false,
+        }
+    }
+
+    /// Portale di luce sulla finestra centrata in `position`, rivolto verso `target` (l'interno).
+    pub fn portal(name: &str, position: Vec3, target: Vec3, width: f32, height: f32) -> Self {
+        Self {
+            kind: LightKind::Portal { width, height },
+            cast_shadows: true,
+            ..Self::area(name, position, target, width, height, 0.0)
         }
     }
 

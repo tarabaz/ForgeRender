@@ -73,6 +73,12 @@ pub const P_SHIFT_Y: usize = 73;
 /// Nebbie volumetriche: offset delle intestazioni e numero.
 pub const P_OFF_FOGS: usize = 74;
 pub const P_N_FOGS: usize = 75;
+/// Portali di luce: offset, numero, area totale.
+pub const P_OFF_PORTALS: usize = 76;
+pub const P_N_PORTALS: usize = 77;
+pub const P_PORTAL_AREA: usize = 78;
+/// Portale: centro(3), mezza larghezza, normale(3), mezza altezza, u(3), 0, v(3), 0.
+pub const PORTAL_WORDS: usize = 16;
 
 pub const NODE_WORDS: usize = 8;
 pub const TRI_WORDS: usize = 12;
@@ -308,6 +314,21 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
     }
     assert_eq!(w.pos() as usize - p[P_OFF_LIGHTS] as usize, scene.lights.len() * LIGHT_WORDS);
 
+    // --- Portali ---
+    p[P_OFF_PORTALS] = w.pos();
+    p[P_N_PORTALS] = scene.portals.list.len() as u32;
+    set_f(&mut p, P_PORTAL_AREA, scene.portals.total_area);
+    for q in &scene.portals.list {
+        w.v3(q.center);
+        w.f(q.half_w);
+        w.v3(q.normal);
+        w.f(q.half_h);
+        w.v3(q.u);
+        w.f(0.0);
+        w.v3(q.v);
+        w.f(0.0);
+    }
+
     // --- Ambiente ---
     match &scene.environment {
         Environment::Uniform { color, strength } => {
@@ -437,7 +458,7 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
         h.copy_from_slice(&words);
     }
 
-    p[P_N_SELECT] = scene.lights.len() as u32 + scene.env_map.is_some() as u32 + scene.emissive.is_some() as u32;
+    p[P_N_SELECT] = scene.lights.len() as u32 + scene.samples_environment() as u32 + scene.emissive.is_some() as u32;
     p[P_HAS_CUTOUT] = scene.has_cutout as u32;
     if w.w.is_empty() {
         w.u(0);

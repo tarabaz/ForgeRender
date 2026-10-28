@@ -548,7 +548,7 @@ pub fn update(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::
         Some(Target::Light(i)) => {
             let k = &app.scene.lights[i].kind;
             (app.gizmo.mode == GizmoMode::Rotate && matches!(k, LightKind::Point))
-                || (app.gizmo.mode == GizmoMode::Scale && !matches!(k, LightKind::Area { .. }))
+                || (app.gizmo.mode == GizmoMode::Scale && !matches!(k, LightKind::Area { .. } | LightKind::Portal { .. }))
         }
         Some(Target::Fog(_)) => app.gizmo.mode == GizmoMode::Rotate,
         _ => false,
@@ -774,14 +774,21 @@ fn apply_drag(app: &mut ForgeApp, rect: egui::Rect, drag: &Drag, pos: egui::Pos2
                     l.position = m.transform_point3(st.position);
                     l.target = m.transform_point3(st.target);
                 }
-                Op::Scale(s) => {
-                    if let LightKind::Area { width, height } = st.kind {
+                Op::Scale(s) => match st.kind {
+                    LightKind::Area { width, height } => {
                         l.kind = LightKind::Area {
                             width: (width * s.x.abs()).max(1e-3),
                             height: (height * s.y.abs()).max(1e-3),
                         };
                     }
-                }
+                    LightKind::Portal { width, height } => {
+                        l.kind = LightKind::Portal {
+                            width: (width * s.x.abs()).max(1e-3),
+                            height: (height * s.y.abs()).max(1e-3),
+                        };
+                    }
+                    _ => {}
+                },
             }
             app.shading_changed();
         }

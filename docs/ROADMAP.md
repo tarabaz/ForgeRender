@@ -111,6 +111,9 @@ correct accumulation, PNG export.
 ## Phase 3 — Materials and lighting ✅
 - ✅ GGX BRDF, metals, dielectrics, reflections, refractions, Fresnel, material editor
 - ✅ Equirectangular HDRI (.hdr/.exr) with importance sampling and MIS, rotation and strength
+- ✅ Light portals for interiors: rectangles on the windows; the environment is sampled through
+  them (with MIS), same image and ~6× less noise at equal samples in a room lit through a window
+  (CPU and GPU tests)
 - ✅ Full PBR texture set: base colour, roughness (or gloss), metallic, normal map (OpenGL or
   DirectX), height (bump), ambient occlusion, opacity cutout; UV mapping or world-space box
   projection in metres for CAD without UVs; repeat size, rotation, offset
