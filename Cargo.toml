@@ -6,6 +6,7 @@ default-members = [
     "crates/forge_math",
     "crates/forge_scene",
     "crates/forge_accel",
+    "crates/forge_volume",
     "crates/forge_render_core",
     "crates/forge_render_cpu",
     "crates/forge_render_gpu",
@@ -38,6 +39,7 @@ forge_library = { path = "crates/forge_library" }
 forge_import = { path = "crates/forge_import" }
 forge_project = { path = "crates/forge_project" }
 forge_image_io = { path = "crates/forge_image_io" }
+forge_volume = { path = "crates/forge_volume" }
 forge_telemetry = { path = "crates/forge_telemetry" }
 
 glam = { version = "0.30", features = ["serde", "bytemuck"] }

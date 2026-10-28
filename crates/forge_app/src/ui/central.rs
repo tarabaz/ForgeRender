@@ -148,6 +148,7 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
         }
     }
     draw_lights(app, &painter, rect);
+    draw_fogs(app, &painter, rect);
     draw_cameras(app, &painter, rect);
     draw_depth_of_field(app, &painter, rect);
     if app.focus_pick {
@@ -160,7 +161,9 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
         );
     }
     // Il gizmo ha la precedenza: se usa il mouse la camera non si muove e il clic non seleziona.
-    let gizmo_used = crate::ui::gizmo::update(app, ui, rect, &resp, &painter);
+    // Maniglie del cono dello spot (precedenza sul gizmo quando le si usa).
+    let cone_used = crate::ui::gizmo::cone_handles(app, ui, rect, &resp, &painter);
+    let gizmo_used = cone_used || crate::ui::gizmo::update(app, ui, rect, &resp, &painter);
     let nav_used = crate::ui::navigator::show(app, ui, rect, &painter);
     let gizmo_used = gizmo_used || nav_used;
     if !gizmo_used {
@@ -196,8 +199,40 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
             let ndc_y = 1.0 - (pos.y - rect.top()) / rect.height() * 2.0;
             let cam = app.scene.camera.clone();
             let dir = cam.ray_dir(ndc_x, ndc_y, rect.width() / rect.height());
+            // Luci ed emettitori di nebbia: si scelgono cliccando vicino all'icona.
+            let near = |p: Vec3| project(&cam, rect, p).map(|q| q.distance(pos)).filter(|d| *d < 10.0);
+            let mut best: Option<(f32, bool, usize)> = None;
+            for (i, l) in app.scene.lights.iter().enumerate() {
+                if let Some(d) = near(l.position) {
+                    if best.is_none_or(|b| d < b.0) {
+                        best = Some((d, true, i));
+                    }
+                }
+            }
+            for (i, f) in app.scene.fogs.iter().enumerate() {
+                if let Some(d) = near(f.emitter) {
+                    if best.is_none_or(|b| d < b.0) {
+                        best = Some((d, false, i));
+                    }
+                }
+            }
+            if let Some((_, is_light, i)) = best {
+                app.selection.clear();
+                if is_light {
+                    app.selected_light = Some(i);
+                    app.selected_fog = None;
+                    app.tab = crate::app::InspectorTab::Lights;
+                } else {
+                    app.selected_fog = Some(i);
+                    app.selected_light = None;
+                    app.tab = crate::app::InspectorTab::Environment;
+                }
+                return;
+            }
             let geo = app.geometry_now();
             let multi = ui.input(|i| i.modifiers.command);
+            app.selected_light = None;
+            app.selected_fog = None;
             match forge_render_core::pick(&geo, cam.position, dir) {
                 Some((node, _)) => {
                     crate::ui::tree::select(&mut app.selection, node, multi);
@@ -406,6 +441,67 @@ fn draw_depth_of_field(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect
     );
 }
 
+/// Nebbie: riquadro della zona simulata (tratteggiato) ed emettitore con la caduta.
+fn draw_fogs(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
+    let cam = &app.scene.camera;
+    let color = egui::Color32::from_rgb(140, 210, 255);
+    for f in &app.scene.fogs {
+        let c = if f.enabled { color } else { egui::Color32::from_gray(90) };
+        let (lo, hi) = f.sanitized().bounds();
+        let corner = |i: usize| Vec3::new([lo.x, hi.x][i & 1], [lo.y, hi.y][(i >> 1) & 1], [lo.z, hi.z][(i >> 2) & 1]);
+        for (a, b) in [
+            (0, 1),
+            (2, 3),
+            (4, 5),
+            (6, 7),
+            (0, 2),
+            (1, 3),
+            (4, 6),
+            (5, 7),
+            (0, 4),
+            (1, 5),
+            (2, 6),
+            (3, 7),
+        ] {
+            if let (Some(p), Some(q)) = (project(cam, rect, corner(a)), project(cam, rect, corner(b))) {
+                painter.add(egui::Shape::dashed_line(
+                    &[p, q],
+                    egui::Stroke::new(1.0, c.gamma_multiply(0.6)),
+                    6.0,
+                    4.0,
+                ));
+            }
+        }
+        let Some(p) = project(cam, rect, f.emitter) else { continue };
+        // Bocca della sorgente: cerchio orizzontale del raggio impostato.
+        let ring: Vec<_> = (0..=32)
+            .filter_map(|k| {
+                let a = k as f32 / 32.0 * std::f32::consts::TAU;
+                project(cam, rect, f.emitter + Vec3::new(a.cos(), 0.0, a.sin()) * f.source_radius)
+            })
+            .collect();
+        if ring.len() > 2 {
+            painter.add(egui::Shape::line(ring, egui::Stroke::new(1.5, c)));
+        }
+        painter.circle_filled(p, 4.0, c);
+        if let Some(q) = project(cam, rect, Vec3::new(f.emitter.x, lo.y, f.emitter.z)) {
+            painter.add(egui::Shape::dashed_line(
+                &[p, q],
+                egui::Stroke::new(1.0, c.gamma_multiply(0.5)),
+                4.0,
+                4.0,
+            ));
+        }
+        painter.text(
+            p + egui::vec2(8.0, -8.0),
+            egui::Align2::LEFT_BOTTOM,
+            &f.name,
+            egui::FontId::proportional(11.0),
+            c,
+        );
+    }
+}
+
 fn draw_lights(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
     let cam = &app.scene.camera;
     for (i, l) in app.scene.lights.iter().enumerate() {
@@ -438,7 +534,36 @@ fn draw_lights(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
             LightKind::Point => {
                 painter.circle_stroke(p, 6.0, stroke);
             }
-            LightKind::Spot { .. } | LightKind::Directional => {
+            LightKind::Spot {
+                inner_angle_deg,
+                outer_angle_deg,
+            } => {
+                painter.circle_stroke(p, 5.0, stroke);
+                if let Some(q) = project(cam, rect, l.target) {
+                    painter.line_segment([p, q], egui::Stroke::new(1.0, color.gamma_multiply(0.5)));
+                }
+                // Cono: bordo esterno pieno, inizio della sfumatura tratteggiato, alla distanza del bersaglio.
+                let c = crate::ui::gizmo::SpotCone::of(l);
+                let outer: Vec<_> = c.circle(outer_angle_deg).iter().filter_map(|v| project(cam, rect, *v)).collect();
+                let inner: Vec<_> = c.circle(inner_angle_deg).iter().filter_map(|v| project(cam, rect, *v)).collect();
+                if outer.len() > 2 {
+                    for k in [0, 16, 32, 48] {
+                        if let Some(e) = outer.get(k) {
+                            painter.line_segment([p, *e], egui::Stroke::new(1.0, color.gamma_multiply(0.7)));
+                        }
+                    }
+                    painter.add(egui::Shape::line(outer, stroke));
+                }
+                if inner.len() > 2 {
+                    painter.add(egui::Shape::dashed_line(
+                        &inner,
+                        egui::Stroke::new(1.0, color.gamma_multiply(0.8)),
+                        5.0,
+                        4.0,
+                    ));
+                }
+            }
+            LightKind::Directional => {
                 painter.circle_stroke(p, 5.0, stroke);
                 if let Some(q) = project(cam, rect, l.target) {
                     painter.line_segment([p, q], egui::Stroke::new(1.0, color.gamma_multiply(0.5)));

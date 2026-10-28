@@ -10,6 +10,7 @@ pub mod bsdf;
 mod guides;
 mod integrator;
 pub mod lights;
+pub mod medium;
 mod textures;
 
 pub use guides::{render_guides, GUIDE_SAMPLES};

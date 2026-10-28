@@ -97,6 +97,21 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
     if structural {
         return;
     }
+    // Snap a contatto: impostazione dell'oggetto (salvata nel progetto), non globale.
+    let mut contact = sel.iter().all(|&i| app.scene.nodes[i].contact_snap);
+    if ui
+        .checkbox(&mut contact, "Snap a contatto")
+        .on_hover_text(
+            "Spostandolo con il gizmo si ferma quando tocca un altro oggetto e non lo attraversa \
+             (può comunque scivolare lungo le superfici). Vale per questo oggetto.",
+        )
+        .changed()
+    {
+        for &i in &sel {
+            app.scene.nodes[i].contact_snap = contact;
+        }
+        app.unsaved = true;
+    }
     ui.horizontal_wrapped(|ui| {
         ui.label("Ruota 90°:");
         for (name, axis) in [("X", Vec3::X), ("Y", Vec3::Y), ("Z", Vec3::Z)] {

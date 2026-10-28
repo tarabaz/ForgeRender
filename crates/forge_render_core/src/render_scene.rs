@@ -142,6 +142,8 @@ pub struct RenderLight {
 /// Dipende solo da mesh, trasformazioni e visibilità: cambiare materiali,
 /// luci o camera non richiede di ricostruirla.
 pub struct RenderGeometry {
+    /// Identificativo univoco (per processo): chiave delle cache che dipendono dalla geometria.
+    pub id: u64,
     pub accel: TriangleAccel,
     pub geometric_normals: Vec<Vec3>,
     /// Normali di shading ai tre vertici (uguali alla geometrica se la mesh non ne ha).
@@ -292,7 +294,9 @@ impl RenderGeometry {
             accel.bvh.nodes.len(),
             t0.elapsed().as_secs_f64() * 1e3
         );
+        static NEXT_GEO: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         RenderGeometry {
+            id: NEXT_GEO.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             accel,
             geometric_normals: gn,
             shading_normals: sn,
@@ -381,6 +385,8 @@ pub struct RenderScene {
     pub camera: Camera,
     /// Qualche materiale ha una mappa di opacità (ritaglio): le intersezioni vanno filtrate.
     pub has_cutout: bool,
+    /// Nebbie volumetriche già calcolate.
+    pub fogs: Vec<Arc<forge_volume::BakedFog>>,
 }
 
 impl RenderScene {
@@ -475,9 +481,11 @@ impl RenderScene {
         let emissive = build_emissive(&geometry, &node_material, &materials);
 
         let has_cutout = material_textures.iter().flatten().any(|t| t.opacity.is_some());
+        let fogs = crate::fog::bake_fogs(scene, &geometry);
         static NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         RenderScene {
             has_cutout,
+            fogs,
             id: NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             emissive,
             geometry,

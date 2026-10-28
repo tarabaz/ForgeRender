@@ -49,6 +49,17 @@
 - README e ROADMAP in inglese con copie italiane; sintesi delle prossime funzionalità con la
   complessità (vedi docs/ROADMAP.it.md).
 
+## Fatto nella settima parte
+- Nebbia volumetrica da ghiaccio secco: crate forge_volume (rumore con seed, simulazione di caduta,
+  deposito ed espansione come corrente di gravità con ostacoli, turbolenza da curl noise, bake su
+  griglia a 16 bit con majorant per strato), trasporto nel path tracer CPU (delta tracking, ratio
+  tracking, Henyey–Greenstein, NEE con MIS) e lo stesso in WGSL sulla GPU, calcolo in background
+  nell'app, pannello nella scheda Ambiente, zona ed emettitore nella viewport, guide del denoiser.
+- Gizmo per luci (sposta/ruota, dimensioni delle luci ad area) ed emettitori di nebbia; cono dello
+  spot nella viewport con maniglie per apertura e sfumatura; selezione col clic sulle icone.
+- Snap a contatto per oggetto (salvato nel progetto): lo spostamento si ferma al primo contatto,
+  si può scivolare lungo le superfici.
+
 ## Prossimi passi
 Vedi la tabella di sintesi in docs/ROADMAP.it.md (gizmo luci, snap a contatto, lingue,
 campionamento adattivo, nebbia volumetrica…).

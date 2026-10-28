@@ -27,13 +27,17 @@ but also working without a dedicated GPU.
   folder with previews.
 - **Lights and environment**: area, point, spot and directional lights, studio presets;
   uniform, gradient or HDRI environment (.hdr/.exr) with importance sampling.
+- **Volumetric fog**: procedural dry-ice fog (seeded, deterministic) that falls from a point
+  emitter, settles, spreads sideways and flows around objects; rendered as a real participating
+  medium (delta tracking, Henyey–Greenstein phase, shadows through fog) on CPU and GPU.
 - **Cameras**: orbit viewport camera plus render cameras with a professional lens: focal length
   in mm, f-stop, depth of field (focus plane and near/far limits drawn in the viewport),
   aperture blades, lens shift.
 - **Import**: glTF/GLB (recommended export from SolidWorks), OBJ (with .mtl), STL, Blender
   `.blend` (through an installed Blender); STEP via Open CASCADE and SolidWorks SLDPRT/SLDASM
   are experimental.
-- **Editing**: move/rotate/scale gizmo with snapping, undo/redo, hide (H), duplicate,
+- **Editing**: move/rotate/scale gizmo with snapping (also for lights, spot cone handles and fog
+  emitters), per-object contact snap, undo/redo, hide (H), duplicate,
   exact drop to floor, Blender-style axis navigator, component tree, persistent material
   assignment by stable id.
 - Start / pause / resume / stop / automatic restart when the scene changes, PNG export.

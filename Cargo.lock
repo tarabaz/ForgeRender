@@ -913,6 +913,7 @@ dependencies = [
  "anyhow",
  "bytemuck",
  "eframe",
+ "forge_accel",
  "forge_denoise",
  "forge_image_io",
  "forge_import",
@@ -925,6 +926,7 @@ dependencies = [
  "forge_scene",
  "forge_telemetry",
  "image",
+ "rayon",
  "rfd",
  "tracing",
 ]
@@ -1033,6 +1035,7 @@ dependencies = [
  "forge_accel",
  "forge_math",
  "forge_scene",
+ "forge_volume",
  "image",
  "rayon",
  "serde",
@@ -1048,6 +1051,7 @@ dependencies = [
  "forge_math",
  "forge_render_core",
  "forge_scene",
+ "forge_volume",
  "image",
  "rayon",
  "tracing",
@@ -1063,6 +1067,7 @@ dependencies = [
  "forge_render_core",
  "forge_render_cpu",
  "forge_scene",
+ "forge_volume",
  "image",
  "pollster 1.0.1",
  "tracing",
@@ -1098,6 +1103,16 @@ dependencies = [
  "sysinfo",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "forge_volume"
+version = "0.1.0"
+dependencies = [
+ "forge_math",
+ "forge_scene",
+ "rayon",
+ "tracing",
 ]
 
 [[package]]

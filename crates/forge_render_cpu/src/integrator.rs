@@ -32,6 +32,12 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
     let emissive_slot = scene.emissive.is_some().then_some(n_lights + scene.env_map.is_some() as usize);
     let n_select = n_lights + scene.env_map.is_some() as usize + scene.emissive.is_some() as usize;
     let light_select_pdf = if n_select > 0 { 1.0 / n_select as f32 } else { 0.0 };
+    let slots = LightSlots {
+        n_lights,
+        env_slot,
+        emissive_slot,
+        n_select,
+    };
     let clamp = settings.clamp_indirect;
 
     let add = |l: &mut Vec3, c: Vec3, depth: u32| {
@@ -60,6 +66,50 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
                 light_hit = Some(h);
             }
         }
+        // Nebbie: collisione nel mezzo prima della superficie o della luce (delta tracking:
+        // se non avviene la throughput resta invariata).
+        if !scene.fogs.is_empty() {
+            let t_end = light_hit.map(|x| x.0).unwrap_or(t_surf);
+            if let Some((tm, fi)) = crate::medium::sample_collision(scene, o, d, t_end, rng) {
+                let fog = &scene.fogs[fi];
+                let p = o + d * tm;
+                beta *= fog.albedo;
+                if beta == Vec3::ZERO {
+                    break;
+                }
+                let g = fog.anisotropy;
+                if n_select > 0 {
+                    if let Some((ls, cast_shadows)) = sample_any_light(scene, &slots, p, rng) {
+                        let phase = crate::medium::hg_pdf(g, d.dot(ls.wi));
+                        let vis = shadow(scene, p, &ls, cast_shadows, rng);
+                        if vis > 0.0 {
+                            let contrib = if ls.delta {
+                                ls.li * (phase / light_select_pdf)
+                            } else {
+                                let lp = ls.pdf * light_select_pdf;
+                                ls.li * (phase * power_heuristic(lp, phase) / lp)
+                            };
+                            add(&mut l, beta * contrib * vis, depth);
+                        }
+                    }
+                }
+                let (u1, u2) = rng.next_2d();
+                let wi = crate::medium::hg_sample(g, d, u1, u2);
+                prev_pdf = crate::medium::hg_pdf(g, d.dot(wi));
+                specular_bounce = false;
+                o = p;
+                d = wi;
+                if depth + 1 >= settings.russian_roulette_start {
+                    let q = beta.max_element().min(0.95);
+                    if rng.next_f32() >= q {
+                        break;
+                    }
+                    beta /= q;
+                }
+                continue;
+            }
+        }
+
         if let Some((_, le, light_pdf)) = light_hit {
             if le != Vec3::ZERO {
                 let w = if specular_bounce {
@@ -135,47 +185,20 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
 
         // Next Event Estimation.
         if n_select > 0 && bsdf.has_non_delta() {
-            let li_idx = ((rng.next_f32() * n_select as f32) as usize).min(n_select - 1);
-            let (u1, u2) = rng.next_2d();
-            let (sample, cast_shadows) = if li_idx < n_lights {
-                let light = &scene.lights[li_idx];
-                (sample_light(light, p, u1, u2), light.cast_shadows)
-            } else if Some(li_idx) == emissive_slot {
-                let em = scene.emissive.as_ref().expect("emissivi");
-                (sample_emissive(scene, em, p, rng.next_f32(), u1, u2), true)
-            } else {
-                debug_assert_eq!(Some(li_idx), env_slot);
-                let (map, strength, rot) = scene.env_map.as_ref().expect("env map");
-                let s = map.sample(u1, u2, *rot).map(|(wi, li, pdf)| LightSample {
-                    wi,
-                    dist: f32::INFINITY,
-                    li: li * *strength,
-                    pdf,
-                    delta: false,
-                });
-                (s, true)
-            };
-            if let Some(ls) = sample {
+            if let Some((ls, cast_shadows)) = sample_any_light(scene, &slots, p, rng) {
                 let (f, bsdf_pdf) = bsdf.eval(wo, ls.wi);
                 if f != Vec3::ZERO {
                     let cos = ls.wi.dot(ns).abs();
-                    let visible = !cast_shadows || {
-                        let so = offset_ray_origin(p, if ls.wi.dot(ng) >= 0.0 { ng } else { -ng });
-                        let t_max = if ls.dist.is_finite() {
-                            ls.dist * (1.0 - 1e-4)
-                        } else {
-                            f32::INFINITY
-                        };
-                        !crate::textures::occluded(scene, so, ls.wi, 0.0, t_max)
-                    };
-                    if visible {
+                    let so = offset_ray_origin(p, if ls.wi.dot(ng) >= 0.0 { ng } else { -ng });
+                    let vis = shadow(scene, so, &ls, cast_shadows, rng);
+                    if vis > 0.0 {
                         let contrib = if ls.delta {
                             f * ls.li * (cos / light_select_pdf)
                         } else {
                             let lp = ls.pdf * light_select_pdf;
                             f * ls.li * (cos * power_heuristic(lp, bsdf_pdf) / lp)
                         };
-                        add(&mut l, beta * contrib, depth);
+                        add(&mut l, beta * contrib * vis, depth);
                     }
                 }
             }
@@ -203,6 +226,65 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
         }
     }
     l
+}
+
+/// Luci tra cui scegliere per la NEE: luci della scena, HDRI, superfici emissive.
+struct LightSlots {
+    n_lights: usize,
+    env_slot: Option<usize>,
+    emissive_slot: Option<usize>,
+    n_select: usize,
+}
+
+/// Sceglie uniformemente una "luce" e ne campiona una direzione dal punto `p`.
+/// Restituisce anche se la luce proietta ombre.
+fn sample_any_light(scene: &RenderScene, s: &LightSlots, p: Vec3, rng: &mut Pcg32) -> Option<(LightSample, bool)> {
+    let li_idx = ((rng.next_f32() * s.n_select as f32) as usize).min(s.n_select - 1);
+    let (u1, u2) = rng.next_2d();
+    if li_idx < s.n_lights {
+        let light = &scene.lights[li_idx];
+        sample_light(light, p, u1, u2).map(|x| (x, light.cast_shadows))
+    } else if Some(li_idx) == s.emissive_slot {
+        let em = scene.emissive.as_ref().expect("emissivi");
+        sample_emissive(scene, em, p, rng.next_f32(), u1, u2).map(|x| (x, true))
+    } else {
+        debug_assert_eq!(Some(li_idx), s.env_slot);
+        let (map, strength, rot) = scene.env_map.as_ref().expect("env map");
+        map.sample(u1, u2, *rot).map(|(wi, li, pdf)| {
+            (
+                LightSample {
+                    wi,
+                    dist: f32::INFINITY,
+                    li: li * *strength,
+                    pdf,
+                    delta: false,
+                },
+                true,
+            )
+        })
+    }
+}
+
+/// Visibilità della luce dal punto `so` (già spostato dalla superficie): 0 se un
+/// oggetto la copre, altrimenti la trasmittanza delle nebbie lungo il raggio.
+/// Una luce senza ombre ignora oggetti e nebbie.
+fn shadow(scene: &RenderScene, so: Vec3, ls: &LightSample, cast_shadows: bool, rng: &mut Pcg32) -> f32 {
+    if !cast_shadows {
+        return 1.0;
+    }
+    let t_max = if ls.dist.is_finite() {
+        ls.dist * (1.0 - 1e-4)
+    } else {
+        f32::INFINITY
+    };
+    if crate::textures::occluded(scene, so, ls.wi, 0.0, t_max) {
+        return 0.0;
+    }
+    if scene.fogs.is_empty() {
+        1.0
+    } else {
+        crate::medium::transmittance(scene, so, ls.wi, t_max, rng)
+    }
 }
 
 /// Campiona un punto su una superficie emissiva (triangolo scelto in proporzione alla potenza).

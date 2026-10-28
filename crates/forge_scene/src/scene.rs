@@ -91,6 +91,8 @@ pub struct Node {
     pub user: UserTransform,
     /// Centro del componente nella posizione del file sorgente (punto di rotazione/scala).
     pub pivot: Vec3,
+    /// Snap a contatto: spostandolo con il gizmo si ferma quando tocca un altro oggetto.
+    pub contact_snap: bool,
 }
 
 /// Copia di un componente (con il suo sotto-albero) creata dall'utente. Le copie
@@ -125,6 +127,8 @@ pub struct Scene {
     pub active_camera: Option<usize>,
     /// Copie create dall'utente, nell'ordine di creazione.
     pub copies: Vec<CopyRecord>,
+    /// Nebbie volumetriche (ghiaccio secco).
+    pub fogs: Vec<crate::fog::FogVolume>,
 }
 
 impl Default for Scene {
@@ -142,6 +146,7 @@ impl Default for Scene {
             render_cameras: Vec::new(),
             active_camera: None,
             copies: Vec::new(),
+            fogs: Vec::new(),
         }
     }
 }
@@ -191,6 +196,7 @@ impl Scene {
             visible: true,
             user: UserTransform::default(),
             pivot: Vec3::ZERO,
+            contact_snap: false,
         });
         match parent {
             Some(p) => self.nodes[p].children.push(idx),

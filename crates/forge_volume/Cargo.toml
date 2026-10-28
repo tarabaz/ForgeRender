@@ -1,0 +1,12 @@
+[package]
+name = "forge_volume"
+description = "Nebbia volumetrica procedurale (ghiaccio secco): rumore con seed, simulazione di caduta ed espansione con ostacoli, griglia di densità."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+forge_math.workspace = true
+forge_scene.workspace = true
+rayon.workspace = true
+tracing.workspace = true

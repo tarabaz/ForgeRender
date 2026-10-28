@@ -35,6 +35,9 @@ pub struct ComponentState {
     /// Trasformazione impostata dall'utente (assente se identità).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transform: Option<forge_scene::UserTransform>,
+    /// Snap a contatto attivo per il componente.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub contact_snap: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -65,6 +68,9 @@ pub struct ProjectFile {
     pub render_cameras: Vec<forge_scene::RenderCamera>,
     #[serde(default)]
     pub active_camera: Option<usize>,
+    /// Nebbie volumetriche.
+    #[serde(default)]
+    pub fogs: Vec<forge_scene::FogVolume>,
     #[serde(default)]
     pub render: RenderSettings,
 }
@@ -148,6 +154,7 @@ pub fn to_project_file(scene: &Scene, meta: &ProjectMeta, settings: &RenderSetti
                     ComponentState {
                         visible: n.visible,
                         transform: (!n.user.is_identity()).then_some(n.user),
+                        contact_snap: n.contact_snap,
                     },
                 )
             })
@@ -158,6 +165,7 @@ pub fn to_project_file(scene: &Scene, meta: &ProjectMeta, settings: &RenderSetti
         copies: scene.copies.clone(),
         render_cameras: scene.render_cameras.clone(),
         active_camera: scene.active_camera,
+        fogs: scene.fogs.clone(),
         render: settings.clone(),
     }
 }
@@ -272,6 +280,7 @@ pub fn load(path: &Path) -> anyhow::Result<LoadedProject> {
     for (id, st) in pf.components {
         if let Some(i) = scene.find(&id) {
             scene.nodes[i].visible = st.visible;
+            scene.nodes[i].contact_snap = st.contact_snap;
             if let Some(t) = st.transform {
                 scene.nodes[i].user = t;
             }
@@ -291,6 +300,7 @@ pub fn load(path: &Path) -> anyhow::Result<LoadedProject> {
     scene.camera = pf.camera;
     scene.active_camera = pf.active_camera.filter(|&i| i < pf.render_cameras.len());
     scene.render_cameras = pf.render_cameras;
+    scene.fogs = pf.fogs;
 
     if !report.missing_components.is_empty() {
         tracing::warn!(
@@ -357,7 +367,13 @@ mod tests {
         scene.assignments.insert(vite.clone(), MaterialId::new("mio"));
         let vi = scene.find(&vite).unwrap();
         scene.nodes[vi].visible = false;
+        scene.nodes[vi].contact_snap = true;
         scene.lights.push(Light::point("P", Vec3::new(1.0, 2.0, 3.0), 5.0));
+        scene.fogs.push(forge_scene::FogVolume {
+            seed: 77,
+            emitter: Vec3::new(0.2, 0.9, -0.1),
+            ..Default::default()
+        });
         scene.camera.vfov_deg = 27.0;
         scene.render_cameras.push(forge_scene::RenderCamera {
             name: "Frontale".into(),
@@ -402,10 +418,12 @@ mod tests {
         assert_eq!(s2.materials.get(&MaterialId::new("mio")), Some(&custom));
         assert!(!s2.nodes[s2.find(&vite).unwrap()].visible);
         assert_eq!(s2.nodes[s2.find(&staffa).unwrap()].user, scene.nodes[si].user);
+        assert!(s2.nodes[s2.find(&vite).unwrap()].contact_snap);
         assert!((s2.bounds_of(s2.find(&staffa).unwrap()).center() - scene.bounds_of(si).center()).length() < 1e-6);
         assert_eq!(s2.lights, scene.lights);
         assert_eq!(s2.camera, scene.camera);
         assert_eq!(s2.render_cameras, scene.render_cameras);
+        assert_eq!(s2.fogs, scene.fogs);
         let c2 = s2.find(&copy_id).expect("la copia è ricreata");
         assert_eq!(s2.nodes[c2].user.translation, Vec3::new(0.5, 0.0, 0.0));
         assert_eq!(s2.resolve_material(c2), &MaterialId::new("mio"));

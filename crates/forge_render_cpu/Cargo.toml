@@ -10,6 +10,7 @@ forge_math.workspace = true
 forge_scene.workspace = true
 forge_accel.workspace = true
 forge_render_core.workspace = true
+forge_volume.workspace = true
 rayon.workspace = true
 anyhow.workspace = true
 tracing.workspace = true

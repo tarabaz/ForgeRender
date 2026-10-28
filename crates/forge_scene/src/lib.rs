@@ -6,6 +6,7 @@
 
 pub mod camera;
 pub mod environment;
+pub mod fog;
 pub mod light;
 pub mod material;
 pub mod mesh;
@@ -15,6 +16,7 @@ pub mod units;
 
 pub use camera::{Camera, OrbitController, RenderCamera};
 pub use environment::Environment;
+pub use fog::FogVolume;
 pub use light::{Light, LightKind};
 pub use material::{Material, MaterialId, MaterialLibrary, Projection, TextureMapping};
 pub use mesh::Mesh;

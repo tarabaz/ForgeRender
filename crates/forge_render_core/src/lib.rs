@@ -12,6 +12,7 @@ mod backend;
 mod denoise;
 pub mod displace;
 pub mod env_map;
+pub mod fog;
 mod render_scene;
 mod session;
 mod settings;

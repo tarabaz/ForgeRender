@@ -70,12 +70,18 @@ pub const P_BLADES: usize = 70;
 pub const P_BLADE_ROT: usize = 71;
 pub const P_SHIFT_X: usize = 72;
 pub const P_SHIFT_Y: usize = 73;
+/// Nebbie volumetriche: offset delle intestazioni e numero.
+pub const P_OFF_FOGS: usize = 74;
+pub const P_N_FOGS: usize = 75;
 
 pub const NODE_WORDS: usize = 8;
 pub const TRI_WORDS: usize = 12;
 pub const PRIM_WORDS: usize = 28;
 pub const MAT_WORDS: usize = 32;
 pub const LIGHT_WORDS: usize = 24;
+/// Intestazione di una nebbia: min(3), lato cella, risoluzione(3), unità di densità,
+/// albedo(3), anisotropia, offset dei dati (u16 a coppie), offset dei majorant, 2 libere.
+pub const FOG_WORDS: usize = 16;
 
 pub struct SceneBuffer {
     pub words: Vec<u32>,
@@ -390,6 +396,45 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
     p[P_OFF_MSLUT] = w.pos();
     for &x in forge_render_cpu::bsdf::ggx_albedo_table() {
         w.f(x);
+    }
+
+    // --- Nebbie: intestazioni, poi densità a 16 bit (due per parola) e majorant per strato ---
+    p[P_N_FOGS] = scene.fogs.len() as u32;
+    p[P_OFF_FOGS] = w.pos();
+    let header_at = w.pos() as usize;
+    for _ in 0..scene.fogs.len() * FOG_WORDS {
+        w.u(0);
+    }
+    for (k, f) in scene.fogs.iter().enumerate() {
+        let off_data = w.pos();
+        for pair in f.data.chunks(2) {
+            w.u(pair[0] as u32 | (*pair.get(1).unwrap_or(&0) as u32) << 16);
+        }
+        let off_major = w.pos();
+        for &m in &f.slab_majorant {
+            w.f(m);
+        }
+        let h = &mut w.w[header_at + k * FOG_WORDS..header_at + (k + 1) * FOG_WORDS];
+        let g = &f.spec;
+        let words = [
+            g.min.x.to_bits(),
+            g.min.y.to_bits(),
+            g.min.z.to_bits(),
+            g.cell.to_bits(),
+            g.res[0] as u32,
+            g.res[1] as u32,
+            g.res[2] as u32,
+            f.unit.to_bits(),
+            f.albedo.x.to_bits(),
+            f.albedo.y.to_bits(),
+            f.albedo.z.to_bits(),
+            f.anisotropy.to_bits(),
+            off_data,
+            off_major,
+            0,
+            0,
+        ];
+        h.copy_from_slice(&words);
     }
 
     p[P_N_SELECT] = scene.lights.len() as u32 + scene.env_map.is_some() as u32 + scene.emissive.is_some() as u32;

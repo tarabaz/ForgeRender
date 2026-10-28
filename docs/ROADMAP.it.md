@@ -13,14 +13,14 @@ La complessità è una stima di lavoro e rischio per questo codice:
 
 | # | Funzionalità | Complessità | Dipende da | Note |
 |---|---|---|---|---|
-| 1 | Gizmo per le luci: spostare puntiformi/spot come gli oggetti, cono dello spot visibile e modificabile (maniglie per apertura e sfumatura) | Media | gizmo | In corso: cursori nel pannello già fatti |
-| 2 | Snap a contatto per oggetto: durante lo spostamento l'oggetto si ferma quando tocca un'altra mesh | Media | picking BVH | Impostazione dell'oggetto, salvata nel progetto |
+| 1 | ✅ Gizmo per le luci: spostare puntiformi/spot come gli oggetti, cono dello spot visibile e modificabile (maniglie per apertura e sfumatura) | Media | gizmo | Fatto: sposta/ruota le luci, scala le luci ad area, maniglie del cono |
+| 2 | ✅ Snap a contatto per oggetto: durante lo spostamento l'oggetto si ferma quando tocca un'altra mesh | Media | picking BVH | Fatto: impostazione dell'oggetto salvata nel progetto, si può scivolare sulle superfici |
 | 3 | Campionamento adattivo: arresto quando il rumore scende sotto una soglia | Media | — | La voce "Arresto a soglia di rumore" nella scheda Render |
 | 4 | Lingue dell'interfaccia in file esterni (`Lan_ita`, `Lan_eng`, chiunque può aggiungere `Lan_spa`) | Media | — | Lavoro meccanico ma tocca tutte le scritte |
 | 5 | Decal / adesivi (immagine proiettata sulla superficie, piana e cilindrica, con posizione/scala/rotazione) | Media | texture | — |
-| 6 | Nebbia volumetrica da ghiaccio secco, statica e procedurale (rumore con seed, path tracer CPU con delta tracking) | Alta | — | Piano sotto |
-| 7 | Collisione della nebbia con gli oggetti + emettitore puntiforme con durata simulata (calcolata una volta, senza timeline) | Alta | 6 | Piano sotto |
-| 8 | Volumetrici sulla GPU | Alta | 6 | Stesso algoritmo della CPU, test statistico CPU/GPU |
+| 6 | ✅ Nebbia volumetrica da ghiaccio secco, statica e procedurale (rumore con seed, path tracer CPU con delta tracking) | Alta | — | Fatto, vedi sotto |
+| 7 | ✅ Collisione della nebbia con gli oggetti + emettitore puntiforme con durata simulata (calcolata una volta, senza timeline) | Alta | 6 | Fatto |
+| 8 | ✅ Volumetrici sulla GPU | Alta | 6 | Fatto: stesso algoritmo, test statistico CPU/GPU |
 | 9 | Nebbia animata (timeline, simulazione fluidodinamica) | Molto alta | 6, 7 | Architettura predisposta in 6–7 |
 | 10 | Anteprima del displacement nella viewport di modellazione | Media | displacement ✅ | Oggi il displacement si vede solo nel render |
 | 11 | Mip-mapping / filtraggio delle texture | Media | — | Meno sfarfallio sulle texture lontane |
@@ -29,9 +29,9 @@ La complessità è una stima di lavoro e rischio per questo codice:
 | 14 | Generatore di edera: rampicanti fotorealistici che crescono sugli oggetti | Alta | — | **Da fare più avanti**, non pianificato ora |
 | 15 | Utilizzo GPU / VRAM tramite NVML | Bassa | — | — |
 
-Ordine consigliato: 1 → 2 → 4 → 3 → 6 → 7 → 8 → 5, poi il resto secondo necessità.
+Ordine consigliato per ciò che resta: 4 → 3 → 5, poi il resto secondo necessità.
 
-## Nebbia volumetrica da ghiaccio secco: piano tecnico
+## Nebbia volumetrica da ghiaccio secco: progetto (implementato)
 
 Obiettivo: mezzi partecipanti 3D veri dentro il path tracer Monte Carlo esistente, non sprite
 o piani con texture, senza toccare la qualità di ciò che già funziona.
@@ -69,6 +69,14 @@ o piani con texture, senza toccare la qualità di ciò che già funziona.
    salvataggio nel progetto.
 6. Più avanti: timeline e calcolo per fotogramma (il generatore riceve già un parametro di tempo),
    poi un vero solutore fluidodinamico che scrive lo stesso formato di griglia.
+
+**Stato:** le fasi 1–5 sono implementate e testate (crate `forge_volume`, `medium.rs` sulla CPU,
+lo stesso codice in WGSL sulla GPU, pannello nebbia nella scheda Ambiente, emettitore e zona
+disegnati nella viewport, gizmo sull'emettitore). Test: determinismo col seed e indipendenza dal
+numero di thread, deposito ed espansione laterale, muro che ferma la nebbia, majorant, campionamento
+Henyey–Greenstein, Beer–Lambert, white furnace con nebbia che diffonde, ratio tracking non distorto,
+ombra attraverso la nebbia, GPU contro CPU su una nebbia simulata. Misure in
+[BENCHMARK.md](BENCHMARK.md).
 
 ## Fase 1 — Fondamenta ✅
 Workspace, app desktop, viewport con camera orbitale, mesh di test, test e documentazione.
@@ -137,7 +145,9 @@ Gerarchia, mesh, materiali Principled e texture, camere, luci `KHR_lights_punctu
   appoggio esatto sul pavimento, navigatore degli assi stile Blender
 - ✅ Camere di rendering con obiettivo professionale: focale in mm, diaframma f/, profondità di
   campo con piano di fuoco e limiti vicino/lontano nella viewport, lamelle, decentramento
-- ⏳ Gizmo per le luci, snap a contatto, decal, lingue, regole di assegnazione avanzate
+- ✅ Gizmo per le luci (sposta/ruota, dimensioni delle luci ad area, maniglie del cono dello spot), snap a contatto per oggetto
+- ✅ Nebbia volumetrica da ghiaccio secco (procedurale, con seed, collisioni, CPU e GPU)
+- ⏳ Decal, lingue, regole di assegnazione avanzate
 
 ## NVIDIA: CUDA, OptiX e DLSS (piano)
 

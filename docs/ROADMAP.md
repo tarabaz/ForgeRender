@@ -13,14 +13,14 @@ Complexity is a rough estimate of the effort and risk for this codebase:
 
 | # | Feature | Complexity | Depends on | Notes |
 |---|---|---|---|---|
-| 1 | Light gizmo: move point/spot lights like objects, visible and editable spot cone (angle + edge softness handles) | Medium | gizmo | In progress: panel sliders done |
-| 2 | Per-object contact snap: while moving, the object stops when it touches another mesh | Medium | BVH picking | Per-object setting, saved in the project |
+| 1 | ✅ Light gizmo: move point/spot lights like objects, visible and editable spot cone (angle + edge softness handles) | Medium | gizmo | Done: move/rotate lights, scale area lights, cone handles |
+| 2 | ✅ Per-object contact snap: while moving, the object stops when it touches another mesh | Medium | BVH picking | Done: per-object setting saved in the project, can slide along surfaces |
 | 3 | Adaptive sampling: stop when noise is below a threshold | Medium | — | The "noise threshold stop" placeholder in the Render tab |
 | 4 | UI localization with external language files (`Lan_ita`, `Lan_eng`, anyone can add `Lan_spa`) | Medium | — | Mechanical but touches every UI string |
 | 5 | Decals / stickers (image projected on a surface, planar and cylindrical, with position/scale/rotation) | Medium | textures | — |
-| 6 | Volumetric dry-ice fog, static and procedural (seeded noise, CPU path tracer with delta tracking) | High | — | Plan below |
-| 7 | Fog collision with objects + point emitter with simulated duration (baked, no timeline) | High | 6 | Plan below |
-| 8 | Volumetrics on the GPU | High | 6 | Same algorithm as CPU, statistical test CPU vs GPU |
+| 6 | ✅ Volumetric dry-ice fog, static and procedural (seeded noise, CPU path tracer with delta tracking) | High | — | Done, see below |
+| 7 | ✅ Fog collision with objects + point emitter with simulated duration (baked, no timeline) | High | 6 | Done |
+| 8 | ✅ Volumetrics on the GPU | High | 6 | Done: same algorithm, CPU/GPU statistical test |
 | 9 | Animated fog (timeline, fluid simulation) | Very high | 6, 7 | Architecture prepared in 6–7 |
 | 10 | Displacement preview in the modelling viewport | Medium | displacement ✅ | Today displacement shows in the render only |
 | 11 | Texture mip-mapping / filtering | Medium | — | Less aliasing on distant textures |
@@ -29,9 +29,9 @@ Complexity is a rough estimate of the effort and risk for this codebase:
 | 14 | Ivy generator: photorealistic climbing plants growing on objects | High | — | **To do later**, not scheduled now |
 | 15 | GPU usage / VRAM readout via NVML | Low | — | — |
 
-Suggested order: 1 → 2 → 4 → 3 → 6 → 7 → 8 → 5, then the rest by need.
+Suggested order for what is left: 4 → 3 → 5, then the rest by need.
 
-## Volumetric dry-ice fog: technical plan
+## Volumetric dry-ice fog: design (implemented)
 
 Goal: real 3D participating media inside the existing Monte Carlo path tracer,
 not sprites or textured planes, without changing the quality of what already works.
@@ -66,6 +66,14 @@ not sprites or textured planes, without changing the quality of what already wor
    time, collision on/off), bounding box and emitter drawn in the viewport, project save.
 6. Later: timeline and per-frame bake (the generator already takes a time parameter), then a
    real fluid solver writing the same grid format.
+
+**Status:** phases 1–5 are implemented and tested (`forge_volume` crate, `medium.rs` on the CPU,
+the same code in WGSL on the GPU, fog panel in the Environment tab, emitter and simulated
+area drawn in the viewport, gizmo on the emitter). Tests: determinism by seed and independence
+from the thread count, settling and lateral spread, a wall that stops the fog, majorant bound,
+Henyey–Greenstein sampling, Beer–Lambert, white furnace with scattering fog, unbiased ratio
+tracking, shadow through fog, GPU vs CPU on a simulated dry-ice fog. Measurements in
+[BENCHMARK.md](BENCHMARK.md).
 
 ## Phase 1 — Foundations ✅
 Workspace, desktop app, viewport with orbit camera, test meshes, tests and documentation.
@@ -133,7 +141,9 @@ Hierarchy, meshes, Principled materials and textures, cameras, `KHR_lights_punct
   drop to floor, Blender-style axis navigator
 - ✅ Render cameras with professional lens: focal length in mm, f-stop, depth of field with focus
   plane and near/far limits shown in the viewport, aperture blades, lens shift
-- ⏳ Light gizmo, contact snap, decals, localization, advanced assignment rules
+- ✅ Light gizmo (move/rotate, area size, spot cone handles), per-object contact snap
+- ✅ Volumetric dry-ice fog (procedural, seeded, collisions, CPU and GPU)
+- ⏳ Decals, localization, advanced assignment rules
 
 ## NVIDIA: CUDA, OptiX and DLSS (plan)
 

@@ -15,7 +15,7 @@ use crate::app::ForgeApp;
 use crate::viewport::project;
 use eframe::egui;
 use forge_math::{Mat4, Quat, Vec3};
-use forge_scene::{Scene, UserTransform};
+use forge_scene::{Light, LightKind, Scene, UserTransform};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum GizmoMode {
@@ -49,12 +49,152 @@ enum Handle {
     ScaleUniform,
 }
 
+/// Stato iniziale del bersaglio del trascinamento (per ricalcolare e per Esc).
+enum DragStart {
+    Nodes(Vec<(usize, UserTransform)>),
+    Light(usize, Light),
+    /// Emettitore e zona simulata della nebbia.
+    Fog(usize, Vec3, Vec3),
+}
+
+/// Su cosa agisce il gizmo.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Target {
+    Nodes,
+    Light(usize),
+    Fog(usize),
+}
+
+/// Dati per lo snap a contatto, preparati all'inizio del trascinamento: gli ostacoli
+/// non si muovono, quindi le loro BVH restano valide per tutto il trascinamento.
+struct Contact {
+    /// Vertici (in spazio mondo, all'inizio) dei componenti spostati.
+    verts: Vec<Vec3>,
+    /// Centro dei componenti spostati (per capire da che lato sta l'oggetto a contatto).
+    moving_center: Vec3,
+    /// Centro dell'ostacolo a cui appartiene ogni vertice di `obstacle_verts`.
+    obstacle_centers: Vec<Vec3>,
+    moving: forge_accel::TriangleAccel,
+    moving_n: Vec<Vec3>,
+    obstacles: forge_accel::TriangleAccel,
+    obstacle_n: Vec<Vec3>,
+    obstacle_verts: Vec<Vec3>,
+}
+
+/// Distanza di sicurezza lasciata tra le superfici a contatto (m).
+const CONTACT_GAP: f32 = 2e-4;
+/// Massimo di vertici usati per lato (oltre si campiona a passo regolare).
+const CONTACT_MAX_VERTS: usize = 40_000;
+
+impl Contact {
+    /// Prepara il contatto se uno dei componenti trascinati ha lo snap attivo.
+    fn build(scene: &Scene, sel: &[usize]) -> Option<Contact> {
+        if !sel.iter().any(|&i| scene.nodes[i].contact_snap) {
+            return None;
+        }
+        // Componenti che si muovono: i selezionati con tutti i discendenti.
+        let mut moving = vec![false; scene.nodes.len()];
+        let mut stack: Vec<usize> = sel.to_vec();
+        while let Some(i) = stack.pop() {
+            moving[i] = true;
+            stack.extend(scene.nodes[i].children.iter().copied());
+        }
+        let (mut mt, mut ot) = (Vec::new(), Vec::new());
+        let (mut mv, mut ov, mut oc) = (Vec::new(), Vec::new(), Vec::new());
+        for (i, n) in scene.nodes.iter().enumerate() {
+            let Some(mi) = n.mesh else { continue };
+            if !scene.is_visible(i) {
+                continue;
+            }
+            let m = &scene.meshes[mi];
+            let xf = scene.world_transform(i);
+            let wp: Vec<Vec3> = m.positions.iter().map(|p| xf.transform_point3(*p)).collect();
+            let tris = if moving[i] { &mut mt } else { &mut ot };
+            for idx in &m.indices {
+                tris.push(idx.map(|k| wp[k as usize]));
+            }
+            if moving[i] {
+                mv.extend(wp);
+            } else {
+                let c = forge_math::Aabb::from_points(&wp).center();
+                oc.extend(std::iter::repeat_n(c, wp.len()));
+                ov.extend(wp);
+            }
+        }
+        let step = |n: usize| n.div_ceil(CONTACT_MAX_VERTS).max(1);
+        let (sm, so) = (step(mv.len()), step(ov.len()));
+        let moving_center = forge_math::Aabb::from_points(&mv).center();
+        let normals = |t: &[[Vec3; 3]]| t.iter().map(|t| (t[1] - t[0]).cross(t[2] - t[0]).normalize_or_zero()).collect();
+        Some(Contact {
+            verts: mv.into_iter().step_by(sm).collect(),
+            moving_center,
+            moving_n: normals(&mt),
+            moving: forge_accel::TriangleAccel::build(&mt),
+            obstacle_n: normals(&ot),
+            obstacles: forge_accel::TriangleAccel::build(&ot),
+            obstacle_verts: ov.into_iter().step_by(so).collect(),
+            obstacle_centers: oc.into_iter().step_by(so).collect(),
+        })
+    }
+
+    /// Lunghezza ammessa dello spostamento `d` (≤ |d|) prima di toccare un ostacolo.
+    /// Le superfici quasi parallele al movimento non fermano (si può scivolare su un piano).
+    fn limit(&self, d: Vec3) -> f32 {
+        use rayon::prelude::*;
+        let len = d.length();
+        if len < 1e-9 {
+            return len;
+        }
+        let dir = d / len;
+        // Raggi da ogni punto lungo `dir`; i contatti già in essere (t ≈ 0) fermano solo se
+        // il movimento entra nell'ostacolo (dal lato del proprio centro verso l'altro).
+        let cast =
+            |accel: &forge_accel::TriangleAccel, normals: &[Vec3], from: &[Vec3], centers: &(dyn Fn(usize) -> Vec3 + Sync), dir: Vec3| {
+                from.par_iter()
+                    .enumerate()
+                    .filter_map(|(k, v)| {
+                        let center = centers(k);
+                        accel
+                            .intersect_filtered(*v, dir, -CONTACT_GAP, len + CONTACT_GAP, |prim, t, _, _| {
+                                let n = normals[prim as usize];
+                                let along = n.dot(dir);
+                                if along.abs() < 0.05 {
+                                    return false; // superficie parallela al movimento: si scivola
+                                }
+                                if t > CONTACT_GAP {
+                                    return true;
+                                }
+                                let side = n.dot(center - *v);
+                                side != 0.0 && along * side.signum() < 0.0
+                            })
+                            .map(|h| h.t)
+                    })
+                    .reduce(|| f32::INFINITY, f32::min)
+            };
+        // Vertici dell'oggetto contro gli ostacoli, e vertici degli ostacoli contro l'oggetto.
+        let mc = self.moving_center;
+        let t = cast(&self.obstacles, &self.obstacle_n, &self.verts, &|_| mc, dir).min(cast(
+            &self.moving,
+            &self.moving_n,
+            &self.obstacle_verts,
+            &|k| self.obstacle_centers[k],
+            -dir,
+        ));
+        if t.is_finite() {
+            (t - CONTACT_GAP).clamp(0.0, len)
+        } else {
+            len
+        }
+    }
+}
+
 struct Drag {
+    contact: Option<Contact>,
     handle: Handle,
     origin: egui::Pos2,
     center: Vec3,
     axes: [Vec3; 3],
-    start: Vec<(usize, UserTransform)>,
+    start: DragStart,
     /// Parametro iniziale (posizione sull'asse, punto sul piano, angolo o distanza a schermo).
     start_param: f32,
     start_hit: Vec3,
@@ -72,6 +212,8 @@ pub struct Gizmo {
     hovered: Option<Handle>,
     drag: Option<Drag>,
     readout: Option<String>,
+    /// Maniglia del cono dello spot trascinata: (esterna?, tipo di luce iniziale per Esc).
+    cone_drag: Option<(bool, LightKind)>,
 }
 
 impl Default for Gizmo {
@@ -85,6 +227,7 @@ impl Default for Gizmo {
             hovered: None,
             drag: None,
             readout: None,
+            cone_drag: None,
         }
     }
 }
@@ -239,6 +382,47 @@ fn inside_quad(p: egui::Pos2, q: &[egui::Pos2; 4]) -> bool {
     true
 }
 
+/// Bersaglio del gizmo: i componenti selezionati, altrimenti la luce o la nebbia selezionata.
+pub fn target(app: &ForgeApp) -> Option<Target> {
+    if !app.selection.is_empty() {
+        return Some(Target::Nodes);
+    }
+    if let Some(i) = app.selected_light.filter(|&i| i < app.scene.lights.len()) {
+        return Some(Target::Light(i));
+    }
+    app.selected_fog.filter(|&i| i < app.scene.fogs.len()).map(Target::Fog)
+}
+
+/// Assi propri di una luce: (destra, su, direzione) attorno alla direzione di emissione.
+fn light_axes(l: &Light) -> [Vec3; 3] {
+    let n = l.direction();
+    let hint = if n.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
+    let u = hint.cross(n).normalize_or(Vec3::X);
+    [u, n.cross(u).normalize_or(Vec3::Y), n]
+}
+
+fn frame_for(app: &ForgeApp, rect: egui::Rect, t: Target, sel: &[usize]) -> Option<Frame> {
+    let (center, axes) = match t {
+        Target::Nodes => return frame(app, rect, sel),
+        Target::Light(i) => {
+            let l = &app.scene.lights[i];
+            let local = app.gizmo.local || app.gizmo.mode == GizmoMode::Scale;
+            let axes = if local && !matches!(l.kind, LightKind::Point) {
+                light_axes(l)
+            } else {
+                [Vec3::X, Vec3::Y, Vec3::Z]
+            };
+            (l.position, axes)
+        }
+        Target::Fog(i) => (app.scene.fogs[i].emitter, [Vec3::X, Vec3::Y, Vec3::Z]),
+    };
+    let cam = &app.scene.camera;
+    let dist = (center - cam.position).length().max(1e-4);
+    let len = dist * 2.0 * (cam.vfov_deg.to_radians() * 0.5).tan() * GIZMO_PX / rect.height().max(1.0);
+    let c2 = project(cam, rect, center)?;
+    Some(Frame { center, c2, axes, len })
+}
+
 fn frame(app: &ForgeApp, rect: egui::Rect, sel: &[usize]) -> Option<Frame> {
     let center = if sel.len() == 1 {
         world_pivot(&app.scene, sel[0])
@@ -347,12 +531,25 @@ fn screen_angle(c: egui::Pos2, p: egui::Pos2) -> f32 {
 /// gizmo usa il mouse (la camera non deve orbitare e il clic non seleziona).
 pub fn update(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::Response, painter: &egui::Painter) -> bool {
     let sel = top_selected(app);
-    if app.gizmo.mode == GizmoMode::Select || sel.is_empty() || ui.input(|i| i.modifiers.alt) {
+    let tgt = target(app);
+    // Modalità senza senso per il bersaglio: ruotare una luce puntiforme o la nebbia,
+    // scalare una luce che non sia ad area.
+    let pointless = match tgt {
+        Some(Target::Light(i)) => {
+            let k = &app.scene.lights[i].kind;
+            (app.gizmo.mode == GizmoMode::Rotate && matches!(k, LightKind::Point))
+                || (app.gizmo.mode == GizmoMode::Scale && !matches!(k, LightKind::Area { .. }))
+        }
+        Some(Target::Fog(_)) => app.gizmo.mode == GizmoMode::Rotate,
+        _ => false,
+    };
+    if app.gizmo.mode == GizmoMode::Select || tgt.is_none() || pointless || ui.input(|i| i.modifiers.alt) {
         app.gizmo.drag = None;
         app.gizmo.hovered = None;
         return false;
     }
-    let Some(f) = frame(app, rect, &sel) else { return false };
+    let tgt = tgt.expect("bersaglio");
+    let Some(f) = frame_for(app, rect, tgt, &sel) else { return false };
 
     // Inizio del trascinamento: si usa il punto in cui è stato premuto il tasto.
     if app.gizmo.drag.is_none() && resp.drag_started_by(egui::PointerButton::Primary) {
@@ -372,9 +569,20 @@ pub fn update(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::
                     }
                     Handle::ScaleUniform => (f.c2.distance(origin).max(4.0), Vec3::ZERO, 0.0),
                 };
-                let start = sel.iter().map(|&i| (i, app.scene.nodes[i].user)).collect::<Vec<_>>();
-                app.push_undo(&sel);
+                let start = match tgt {
+                    Target::Nodes => {
+                        app.push_undo(&sel);
+                        DragStart::Nodes(sel.iter().map(|&i| (i, app.scene.nodes[i].user)).collect())
+                    }
+                    Target::Light(i) => DragStart::Light(i, app.scene.lights[i].clone()),
+                    Target::Fog(i) => DragStart::Fog(i, app.scene.fogs[i].emitter, app.scene.fogs[i].size),
+                };
+                let contact = match (tgt, h) {
+                    (Target::Nodes, Handle::Axis(_) | Handle::Plane(_) | Handle::Screen) => Contact::build(&app.scene, &sel),
+                    _ => None,
+                };
                 app.gizmo.drag = Some(Drag {
+                    contact,
                     handle: h,
                     origin,
                     center: f.center,
@@ -391,11 +599,24 @@ pub fn update(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::
     if let Some(drag) = app.gizmo.drag.take() {
         let cancel = ui.input(|i| i.key_pressed(egui::Key::Escape));
         if cancel {
-            for (i, u) in &drag.start {
-                app.scene.nodes[*i].user = *u;
+            match &drag.start {
+                DragStart::Nodes(start) => {
+                    for (i, u) in start {
+                        app.scene.nodes[*i].user = *u;
+                    }
+                    app.discard_last_undo();
+                    app.geometry_changed();
+                }
+                DragStart::Light(i, l) => {
+                    app.scene.lights[*i] = l.clone();
+                    app.shading_changed();
+                }
+                DragStart::Fog(i, e, size) => {
+                    app.scene.fogs[*i].emitter = *e;
+                    app.scene.fogs[*i].size = *size;
+                    app.shading_changed();
+                }
             }
-            app.discard_last_undo();
-            app.geometry_changed();
             app.gizmo.readout = None;
             return true;
         }
@@ -429,7 +650,7 @@ fn apply_drag(app: &mut ForgeApp, rect: egui::Rect, drag: &Drag, pos: egui::Pos2
         World(Mat4),
         Scale(Vec3),
     }
-    let (op, text) = match drag.handle {
+    let (op, mut text) = match drag.handle {
         Handle::Axis(k) => {
             let Some(s) = axis_param(o, d, drag.center, drag.axes[k]) else {
                 return;
@@ -505,18 +726,61 @@ fn apply_drag(app: &mut ForgeApp, rect: egui::Rect, drag: &Drag, pos: egui::Pos2
             (Op::Scale(Vec3::splat(factor)), format!("Scala ×{factor:.3}"))
         }
     };
-    for (i, start) in &drag.start {
-        let u = match &op {
-            Op::World(m) => apply_world(&app.scene, *i, start, *m),
-            Op::Scale(s) => UserTransform {
-                scale: start.scale * *s,
-                ..*start
-            },
-        };
-        app.scene.nodes[*i].user = u;
+    match &drag.start {
+        DragStart::Nodes(start) => {
+            // Snap a contatto: lo spostamento si accorcia fino al primo ostacolo.
+            let mut op = op;
+            if let (Some(c), Op::World(m)) = (&drag.contact, &op) {
+                let t = m.w_axis.truncate();
+                let allowed = c.limit(t);
+                if allowed < t.length() - 1e-7 {
+                    let t = t.normalize_or_zero() * allowed;
+                    op = Op::World(Mat4::from_translation(t));
+                    text = format!("{text}  · a contatto ({:.1} mm)", allowed * 1000.0);
+                }
+            }
+            for (i, st) in start {
+                let u = match &op {
+                    Op::World(m) => apply_world(&app.scene, *i, st, *m),
+                    Op::Scale(s) => UserTransform {
+                        scale: st.scale * *s,
+                        ..*st
+                    },
+                };
+                app.scene.nodes[*i].user = u;
+            }
+            app.geometry_changed();
+        }
+        DragStart::Light(i, st) => {
+            let l = &mut app.scene.lights[*i];
+            match &op {
+                // Spostamento: posizione e bersaglio insieme (la direzione resta);
+                // rotazione attorno alla luce: ruota il bersaglio.
+                Op::World(m) => {
+                    l.position = m.transform_point3(st.position);
+                    l.target = m.transform_point3(st.target);
+                }
+                Op::Scale(s) => {
+                    if let LightKind::Area { width, height } = st.kind {
+                        l.kind = LightKind::Area {
+                            width: (width * s.x.abs()).max(1e-3),
+                            height: (height * s.y.abs()).max(1e-3),
+                        };
+                    }
+                }
+            }
+            app.shading_changed();
+        }
+        DragStart::Fog(i, e, size) => {
+            let f = &mut app.scene.fogs[*i];
+            match &op {
+                Op::World(m) => f.emitter = m.transform_point3(*e),
+                Op::Scale(s) => f.size = (*size * s.abs()).max(Vec3::splat(0.05)),
+            }
+            app.shading_changed();
+        }
     }
     app.gizmo.readout = Some(text);
-    app.geometry_changed();
 }
 
 #[allow(clippy::needless_range_loop)] // k indicizza assi, colori e nomi insieme
@@ -604,6 +868,139 @@ fn draw(app: &ForgeApp, rect: egui::Rect, painter: &egui::Painter, f: &Frame, ac
         );
         painter.galley(pos, galley, egui::Color32::WHITE);
     }
+}
+
+/// Geometria del cono di uno spot: apice nella luce, base alla distanza del bersaglio.
+pub struct SpotCone {
+    apex: Vec3,
+    axis: Vec3,
+    u: Vec3,
+    v: Vec3,
+    len: f32,
+}
+
+impl SpotCone {
+    pub fn of(l: &Light) -> SpotCone {
+        let [u, v, axis] = light_axes(l);
+        SpotCone {
+            apex: l.position,
+            axis,
+            u,
+            v,
+            len: (l.target - l.position).length().max(0.1),
+        }
+    }
+
+    fn end(&self) -> Vec3 {
+        self.apex + self.axis * self.len
+    }
+
+    /// Punto del bordo per un'apertura (angolo pieno, in gradi) e un azimut.
+    fn point(&self, angle_deg: f32, az: f32) -> Vec3 {
+        let r = self.len * (angle_deg.to_radians() * 0.5).min(1.48).tan();
+        self.end() + (self.u * az.cos() + self.v * az.sin()) * r
+    }
+
+    /// Azimut del lato del cono rivolto verso `eye` (lì le maniglie sono sempre visibili).
+    fn front_az(&self, eye: Vec3) -> f32 {
+        let d = eye - self.end();
+        let (x, y) = (d.dot(self.u), d.dot(self.v));
+        if x * x + y * y < 1e-12 {
+            0.0
+        } else {
+            y.atan2(x)
+        }
+    }
+
+    /// Cerchio del bordo (65 punti, chiuso).
+    pub fn circle(&self, angle_deg: f32) -> Vec<Vec3> {
+        (0..=64)
+            .map(|k| self.point(angle_deg, k as f32 / 64.0 * std::f32::consts::TAU))
+            .collect()
+    }
+}
+
+/// Maniglie del cono dello spot selezionato: quadrato = apertura del cono, cerchio =
+/// inizio della sfumatura del bordo. Restituisce vero se usano il mouse.
+pub fn cone_handles(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::Response, painter: &egui::Painter) -> bool {
+    let Some(Target::Light(i)) = target(app) else {
+        app.gizmo.cone_drag = None;
+        return false;
+    };
+    let l = &app.scene.lights[i];
+    let LightKind::Spot {
+        inner_angle_deg: inner,
+        outer_angle_deg: outer,
+    } = l.kind
+    else {
+        app.gizmo.cone_drag = None;
+        return false;
+    };
+    let cone = SpotCone::of(l);
+    let cam = &app.scene.camera;
+    let az = cone.front_az(cam.position);
+    let (Some(po), Some(pi)) = (project(cam, rect, cone.point(outer, az)), project(cam, rect, cone.point(inner, az))) else {
+        return false;
+    };
+    if app.gizmo.cone_drag.is_none() && resp.drag_started_by(egui::PointerButton::Primary) {
+        if let Some(origin) = ui.input(|i| i.pointer.press_origin()) {
+            if origin.distance(po) < 9.0 {
+                app.gizmo.cone_drag = Some((true, l.kind.clone()));
+            } else if origin.distance(pi) < 9.0 {
+                app.gizmo.cone_drag = Some((false, l.kind.clone()));
+            }
+        }
+    }
+    let hover = resp.hover_pos().filter(|p| p.distance(po) < 9.0 || p.distance(pi) < 9.0);
+    if let Some((is_outer, start)) = app.gizmo.cone_drag.clone() {
+        if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+            app.scene.lights[i].kind = start;
+            app.gizmo.cone_drag = None;
+            app.gizmo.readout = None;
+            app.shading_changed();
+            return true;
+        }
+        if let Some(pos) = resp.interact_pointer_pos().filter(|_| resp.dragged()) {
+            let (o, d) = mouse_ray(app, rect, pos);
+            if let Some(hit) = plane_hit(o, d, cone.end(), cone.axis) {
+                let rho = (hit - cone.end()).length();
+                let ang = (2.0 * (rho / cone.len).atan().to_degrees()).clamp(1.0, 170.0);
+                let (ni, no) = if is_outer {
+                    // L'apertura cambia mantenendo la stessa proporzione di sfumatura.
+                    (inner / outer.max(1e-3) * ang, ang)
+                } else {
+                    (ang.min(outer), outer)
+                };
+                app.scene.lights[i].kind = LightKind::Spot {
+                    inner_angle_deg: ni,
+                    outer_angle_deg: no,
+                };
+                app.gizmo.readout = Some(format!("Cono {no:.1}°  ·  sfumatura {:.0}%", (1.0 - ni / no.max(1e-3)) * 100.0));
+                app.shading_changed();
+            }
+        }
+        if resp.drag_stopped() || !ui.input(|i| i.pointer.primary_down()) {
+            app.gizmo.cone_drag = None;
+            app.gizmo.readout = None;
+        }
+    }
+    let active = app.gizmo.cone_drag.as_ref().map(|c| c.0);
+    let hot = |is_outer: bool, p: egui::Pos2| active == Some(is_outer) || (active.is_none() && hover.is_some_and(|h| h.distance(p) < 9.0));
+    let col = |h: bool| if h { HOVER } else { egui::Color32::from_rgb(240, 220, 120) };
+    painter.rect_filled(egui::Rect::from_center_size(po, egui::vec2(9.0, 9.0)), 1.0, col(hot(true, po)));
+    painter.circle_filled(pi, 5.0, col(hot(false, pi)));
+    if let (Some(t), Some(p)) = (&app.gizmo.readout, painter.ctx().pointer_latest_pos()) {
+        if active.is_some() {
+            painter.text(
+                p + egui::vec2(16.0, 18.0),
+                egui::Align2::LEFT_TOP,
+                t,
+                egui::FontId::proportional(13.0),
+                egui::Color32::WHITE,
+            );
+        }
+    }
+    active.is_some() || hover.is_some()
 }
 
 /// Barra degli strumenti nella viewport: modalità, assi globali/locali, passi di snap.
@@ -722,6 +1119,76 @@ mod tests {
         assert!(u2.translation.length() < 1e-4);
         s.nodes[child].user = u2;
         assert!((world_pivot(&s, child) - c).length() < 1e-4);
+    }
+
+    /// Pavimento 10×10 a y = 0, cubo A di 1 m a quota `y` in x = 0, cubo B di 1 m in x = 3 appoggiato.
+    fn contact_scene(y: f32) -> (Scene, usize) {
+        let mut s = Scene::default();
+        let floor = s.add_mesh(forge_scene::primitives::plane(10.0, 10.0));
+        let cube = s.add_mesh(forge_scene::primitives::cuboid(Vec3::ONE));
+        s.add_node(None, ComponentId("pavimento".into()), "Pavimento", Mat4::IDENTITY, Some(floor));
+        let a = s.add_node(
+            None,
+            ComponentId("a".into()),
+            "A",
+            Mat4::from_translation(Vec3::new(0.0, y + 0.5, 0.0)),
+            Some(cube),
+        );
+        s.add_node(
+            None,
+            ComponentId("b".into()),
+            "B",
+            Mat4::from_translation(Vec3::new(3.0, 0.5, 0.0)),
+            Some(cube),
+        );
+        s.refresh_pivots();
+        s.nodes[a].contact_snap = true;
+        (s, a)
+    }
+
+    #[test]
+    fn contact_snap_stops_on_the_floor_and_against_objects() {
+        // Cubo sospeso a 1 m: scendendo di 3 m si ferma dopo 1 m (tocca il pavimento).
+        let (s, a) = contact_scene(1.0);
+        let c = Contact::build(&s, &[a]).expect("snap attivo");
+        let down = c.limit(Vec3::new(0.0, -3.0, 0.0));
+        assert!((down - 1.0).abs() < 1e-3, "si ferma a {down}");
+        // Verso l'alto e di lato nessun ostacolo.
+        assert!((c.limit(Vec3::new(0.0, 2.0, 0.0)) - 2.0).abs() < 1e-6);
+        // Appoggiato: scivola sul pavimento, ma si ferma contro il cubo B (facce a 1 m e 2.5 m).
+        let (s, a) = contact_scene(0.0);
+        let c = Contact::build(&s, &[a]).unwrap();
+        let side = c.limit(Vec3::new(4.0, 0.0, 0.0));
+        assert!((side - 2.0).abs() < 1e-3, "contro B a {side}");
+        assert!(
+            (c.limit(Vec3::new(0.0, 0.0, 2.0)) - 2.0).abs() < 1e-6,
+            "deve scivolare sul pavimento"
+        );
+        // Non scende sotto il pavimento.
+        assert!(c.limit(Vec3::new(0.0, -0.5, 0.0)) < 1e-3);
+        // Spostamento in diagonale verso B: si ferma quando le facce si toccano lungo x.
+        let diag = c.limit(Vec3::new(4.0, 0.0, 0.4));
+        assert!((diag / Vec3::new(4.0, 0.0, 0.4).length() * 4.0 - 2.0).abs() < 1e-2, "{diag}");
+        // Senza snap sull'oggetto non si prepara nulla.
+        let (mut s, a) = contact_scene(1.0);
+        s.nodes[a].contact_snap = false;
+        assert!(Contact::build(&s, &[a]).is_none());
+    }
+
+    #[test]
+    fn spot_cone_radius_matches_angle() {
+        let mut l = Light::point("S", Vec3::new(0.0, 2.0, 0.0), 1.0);
+        l.kind = LightKind::Spot {
+            inner_angle_deg: 20.0,
+            outer_angle_deg: 60.0,
+        };
+        l.target = Vec3::ZERO;
+        let c = SpotCone::of(&l);
+        for p in c.circle(60.0) {
+            // Base a y = 0, raggio 2·tan(30°).
+            assert!(p.y.abs() < 1e-5);
+            assert!((Vec3::new(p.x, 0.0, p.z).length() - 2.0 * 30f32.to_radians().tan()).abs() < 1e-4);
+        }
     }
 
     #[test]

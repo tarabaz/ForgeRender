@@ -6,6 +6,7 @@
 //! non speculare, come raccomandato dalla documentazione di Open Image Denoise:
 //! l'albedo viene moltiplicato per la trasmittanza del percorso speculare.
 //! Sfondo e luci: albedo = radianza limitata a [0, 1], normale nulla.
+//! Nebbie: albedo della nebbia e normale verso la camera, pesati per la trasmittanza.
 
 use crate::bsdf::Bsdf;
 use crate::lights::intersect_area;
@@ -78,6 +79,14 @@ fn guide_sample(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
             let t_max = light.map(|x| x.0).unwrap_or(t_surf);
             if let Some(h) = intersect_area(l, o, d, t_max) {
                 light = Some(h);
+            }
+        }
+        // Nebbia: dove il raggio vi si ferma la guida è l'albedo della nebbia con la normale
+        // rivolta alla camera (la media sui campioni pesa nebbia e superficie per la trasmittanza).
+        if !scene.fogs.is_empty() {
+            let t_end = light.map(|x| x.0).unwrap_or(t_surf);
+            if let Some((_, fi)) = crate::medium::sample_collision(scene, o, d, t_end, rng) {
+                return (tint * clamp01(scene.fogs[fi].albedo), -d);
             }
         }
         if let Some((_, le, _)) = light {

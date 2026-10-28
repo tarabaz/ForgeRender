@@ -522,3 +522,129 @@ fn gpu_displacement_matches_cpu() {
     assert!((ma - mg).abs() / ma < 0.02, "media CPU {ma} vs GPU {mg}");
     assert!(diff < noise * 1.5, "RMSE GPU−CPU {diff} vs rumore CPU−CPU {noise}");
 }
+
+fn render_rs(be: &mut dyn RenderBackend, rs: &RenderScene, st: &RenderSettings, spp: u32) -> Vec<[f32; 3]> {
+    let mut acc = Accumulator::new(st.width, st.height);
+    let mut pass = vec![[0.0; 3]; acc.pixel_count()];
+    let cancel = AtomicBool::new(false);
+    while acc.samples < spp {
+        let n = be.render_pass(rs, st, acc.samples, spp - acc.samples, &mut pass, &cancel).unwrap();
+        acc.add_samples(&pass, n);
+    }
+    acc.resolve()
+}
+
+/// White furnace con nebbia che solo diffonde e Beer–Lambert con nebbia assorbente, sulla GPU.
+#[test]
+fn gpu_fog_furnace_and_beer_lambert() {
+    let Some(mut g) = gpu() else { return };
+    let make = |density: f32, albedo: f32, gg: f32| {
+        let mut s = Scene {
+            environment: Environment::Uniform {
+                color: [1.0; 3],
+                strength: 1.0,
+            },
+            ..Default::default()
+        };
+        s.camera = Camera {
+            position: Vec3::new(0.0, 0.0, 5.0),
+            target: Vec3::ZERO,
+            up: Vec3::Y,
+            vfov_deg: 2.0,
+            ..Default::default()
+        };
+        let mut rs = RenderScene::compile(&s);
+        rs.fogs.push(std::sync::Arc::new(forge_volume::BakedFog::uniform(
+            Vec3::splat(-0.5),
+            Vec3::splat(0.5),
+            density,
+            Vec3::splat(albedo),
+            gg,
+        )));
+        rs
+    };
+    let st = RenderSettings {
+        width: 8,
+        height: 8,
+        max_bounces: 10_000,
+        ..Default::default()
+    };
+    let mean = |img: &[[f32; 3]]| img.iter().map(|p| p[0]).sum::<f32>() / img.len() as f32;
+    for (sigma, gg) in [(3.0f32, 0.0f32), (6.0, 0.7)] {
+        let c = mean(&render_rs(&mut g, &make(sigma, 1.0, gg), &st, 256));
+        assert!((c - 1.0).abs() < 0.02, "furnace σ={sigma} g={gg}: {c}");
+    }
+    for sigma in [0.5f32, 2.0] {
+        let c = mean(&render_rs(&mut g, &make(sigma, 0.0, 0.0), &st, 512));
+        let e = (-sigma).exp();
+        assert!((c - e).abs() < 0.02 * e, "Beer σ={sigma}: {c} invece di {e}");
+    }
+}
+
+/// Nebbia da ghiaccio secco simulata (con collisioni) in una scena con luci e oggetti:
+/// la GPU converge alla stessa immagine della CPU.
+#[test]
+fn gpu_dry_ice_fog_matches_cpu() {
+    let Some(mut g) = gpu() else { return };
+    // Pavimento scuro: la nebbia bianca deve risaltare.
+    let dark = |s: &mut Scene| {
+        s.materials.upsert(Material {
+            id: MaterialId::new("scuro"),
+            base_color: [0.03; 3],
+            ..Default::default()
+        });
+        s.assignments
+            .insert(ComponentId("test/Scena/pavimento".into()), MaterialId::new("scuro"));
+    };
+    let mut s = Scene::test_scene();
+    dark(&mut s);
+    s.fogs.push(forge_scene::FogVolume {
+        emitter: Vec3::new(0.2, 0.75, -0.6),
+        size: Vec3::new(2.4, 0.9, 2.4),
+        resolution: 64,
+        sim_time: 3.0,
+        ..Default::default()
+    });
+    let rs = RenderScene::compile(&s);
+    assert_eq!(rs.fogs.len(), 1);
+    assert!(rs.fogs[0].max_density > 0.0);
+    let st = RenderSettings {
+        width: 32,
+        height: 18,
+        ..Default::default()
+    };
+    let spp = 256;
+    let mut cpu = CpuBackend::new(4).unwrap();
+    let a = render_rs(&mut cpu, &rs, &st, spp);
+    let b = render_rs(&mut cpu, &rs, &RenderSettings { seed: 999, ..st.clone() }, spp);
+    let gi = render_rs(&mut g, &rs, &st, spp);
+    let rmse = |x: &[[f32; 3]], y: &[[f32; 3]]| {
+        let e: f64 = x
+            .iter()
+            .zip(y)
+            .map(|(p, q)| (0..3).map(|k| ((p[k] - q[k]) as f64).powi(2)).sum::<f64>())
+            .sum();
+        (e / (x.len() * 3) as f64).sqrt()
+    };
+    let mean = |x: &[[f32; 3]]| x.iter().map(|p| (p[0] + p[1] + p[2]) as f64).sum::<f64>() / (x.len() * 3) as f64;
+    let (noise, diff) = (rmse(&a, &b), rmse(&a, &gi));
+    let (ma, mg) = (mean(&a), mean(&gi));
+    eprintln!("nebbia: media CPU {ma:.4} GPU {mg:.4} | RMSE CPU−CPU {noise:.4} GPU−CPU {diff:.4}");
+    assert!((ma - mg).abs() / ma < 0.02, "media CPU {ma} vs GPU {mg}");
+    assert!(diff < noise * 1.5, "RMSE GPU−CPU {diff} vs rumore CPU−CPU {noise}");
+    // La nebbia cambia davvero l'immagine.
+    let mut clear = Scene::test_scene();
+    dark(&mut clear);
+    let c = render_with(&mut cpu, &clear, &st, spp);
+    eprintln!(
+        "senza nebbia media {:.4}, con {:.4}; ottica {:.4} m³",
+        mean(&c),
+        ma,
+        rs.fogs[0].optical_volume()
+    );
+    assert!(
+        rmse(&a, &c) > 2.0 * noise,
+        "la nebbia non si vede: {} vs rumore {noise}",
+        rmse(&a, &c)
+    );
+}

@@ -26,13 +26,18 @@ per Windows 11 (sviluppato per Ryzen 9 9900X + RTX 5070) ma funzionante anche se
   o importati da cartelle/zip, conservati nella cartella locale `Libreria` con anteprime.
 - **Luci e ambiente**: luci ad area, puntiformi, spot e direzionali, preset da studio; ambiente
   uniforme, a gradiente o HDRI (.hdr/.exr) con importance sampling.
+- **Nebbia volumetrica**: nebbia da ghiaccio secco procedurale (con seed, riproducibile) che
+  esce da un emettitore puntiforme, cade, si deposita, si allarga e scorre attorno agli oggetti;
+  resa come vero mezzo partecipante (delta tracking, fase Henyey–Greenstein, ombre nella nebbia)
+  su CPU e GPU.
 - **Camere**: camera orbitale della viewport più camere di rendering con obiettivo professionale:
   focale in mm, diaframma f/, profondità di campo (piano di fuoco e limiti vicino/lontano
   disegnati nella viewport), lamelle, decentramento.
 - **Import**: glTF/GLB (esportazione consigliata da SolidWorks), OBJ (con .mtl), STL, Blender
   `.blend` (tramite Blender installato); STEP con Open CASCADE e SolidWorks SLDPRT/SLDASM sono
   sperimentali.
-- **Modifica**: gizmo sposta/ruota/scala con snap, annulla/ripeti, nascondi (H), duplica, appoggio
+- **Modifica**: gizmo sposta/ruota/scala con snap (anche per le luci, con le maniglie del cono
+  dello spot, e per l'emettitore della nebbia), snap a contatto per oggetto, annulla/ripeti, nascondi (H), duplica, appoggio
   esatto sul pavimento, navigatore degli assi stile Blender, albero dei componenti, assegnazione
   dei materiali persistente per id stabile.
 - Avvio / pausa / ripresa / stop / riavvio automatico quando la scena cambia, export PNG.

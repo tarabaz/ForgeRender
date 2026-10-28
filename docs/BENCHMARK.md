@@ -21,3 +21,20 @@ import + normali 1590 ms, costruzione BVH 914 ms (1 080 743 nodi), rendering 0.6
 ## Ryzen 9 9900X + RTX 5070
 
 Da eseguire sul PC: `forgerender-cli bench --json bench-9900x.json`.
+
+## Nebbia volumetrica (ghiaccio secco), container di sviluppo, 28/10/2026
+
+Stessa macchina (4 vCPU Xeon, 3 thread di rendering). Scena di test con pavimento scuro, nebbia
+predefinita sopra il box (zona 3.2 × 0.95 × 3.2 m, 5 s simulati, collisioni attive),
+`render --width 480 --height 270 --spp 64`:
+
+| | Calcolo nebbia | ms/passata | Mcampioni/s |
+|---|---:|---:|---:|
+| Nebbia vuota (0 s simulati) | 0.13 s | 102.9 | 1.26 |
+| Nebbia piena | 2.6 s (simulazione 64×24×64, 562 passi: 2.5 s; densità 160×60×160: 0.11 s) | 384.3 | 0.34 |
+
+- Il calcolo della nebbia si fa una volta e resta in cache finché non cambiano i suoi parametri o
+  la geometria; nell'app gira in background.
+- Il costo del rendering dipende dalla densità e dai rimbalzi nella nebbia (scattering multiplo).
+  Ottimizzazione prevista: majorant su una griglia 3D grossolana con attraversamento DDA (oggi è
+  per strato orizzontale).

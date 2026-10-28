@@ -79,6 +79,8 @@ pub struct StartupOptions {
     pub tab: Option<String>,
     /// Seleziona il componente con questo nome.
     pub select: Option<String>,
+    /// Luce da selezionare all'avvio (per nome).
+    pub light: Option<String>,
     /// Modalità del gizmo: move | rotate | scale.
     pub gizmo: Option<String>,
     /// Crea una camera di rendering: "lato" sposta la vista per mostrarla, "attraverso" la guarda.
@@ -120,6 +122,8 @@ pub struct ForgeApp {
     pub orbit: OrbitController,
     pub selection: BTreeSet<usize>,
     pub selected_light: Option<usize>,
+    /// Nebbia selezionata (il gizmo sposta il suo emettitore).
+    pub selected_fog: Option<usize>,
     pub selected_material: MaterialId,
     pub view: View,
     pub tab: InspectorTab,
@@ -146,11 +150,14 @@ pub struct ForgeApp {
     pub appearance_rev: u64,
     /// Componente da selezionare all'avvio (anche dopo il caricamento del progetto).
     startup_select: Option<String>,
+    startup_light: Option<String>,
     /// Impronta dei parametri di displacement: se cambia va ricostruita la geometria.
     displacement_sig: u64,
 
     geometry: Option<(u64, Arc<RenderGeometry>)>,
     pending_geometry: Option<PendingGeometry>,
+    /// Calcolo delle nebbie in corso (in background); al termine parte il render.
+    pending_fog: Option<Receiver<()>>,
     job: Option<JobInfo>,
     pub session: RenderSession,
 
@@ -205,6 +212,7 @@ impl ForgeApp {
             orbit,
             selection: BTreeSet::new(),
             selected_light: None,
+            selected_fog: None,
             selected_material: MaterialId::new("default"),
             view: View::Viewport,
             tab: InspectorTab::Materials,
@@ -227,8 +235,10 @@ impl ForgeApp {
             appearance_rev: 1,
             displacement_sig: 0,
             startup_select: None,
+            startup_light: None,
             geometry: None,
             pending_geometry: None,
+            pending_fog: None,
             job: None,
             session: RenderSession::new(),
             viewport,
@@ -286,6 +296,7 @@ impl ForgeApp {
             app.open_any(p);
         }
         app.startup_select = startup.select.clone();
+        app.startup_light = startup.light.clone();
         app.gizmo.mode = match startup.gizmo.as_deref() {
             Some("rotate") => crate::ui::gizmo::GizmoMode::Rotate,
             Some("scale") => crate::ui::gizmo::GizmoMode::Scale,
@@ -661,7 +672,27 @@ impl ForgeApp {
     }
 
     pub fn is_preparing(&self) -> bool {
-        self.pending_geometry.is_some()
+        self.pending_geometry.is_some() || self.pending_fog.is_some()
+    }
+
+    /// Nebbie in calcolo (per l'indicazione nell'interfaccia).
+    pub fn is_baking_fog(&self) -> bool {
+        self.pending_fog.is_some()
+    }
+
+    fn poll_fog(&mut self) {
+        let Some(rx) = &self.pending_fog else { return };
+        match rx.try_recv() {
+            Ok(()) => {
+                self.pending_fog = None;
+                self.start_render();
+            }
+            Err(std::sync::mpsc::TryRecvError::Empty) => {}
+            Err(_) => {
+                self.pending_fog = None;
+                self.error = Some("calcolo della nebbia fallito".into());
+            }
+        }
     }
 
     fn poll_geometry(&mut self) {
@@ -693,6 +724,24 @@ impl ForgeApp {
             self.view = View::Render;
             return;
         };
+        // Nebbie da calcolare: in background, poi si riparte da qui (le trova in cache).
+        if !forge_render_core::fog::fogs_ready(&self.scene, &geometry) {
+            if self.pending_fog.is_none() {
+                let (tx, rx) = std::sync::mpsc::channel();
+                let scene = self.scene.clone();
+                let geo = geometry.clone();
+                std::thread::Builder::new()
+                    .name("forge-fog".into())
+                    .spawn(move || {
+                        forge_render_core::fog::bake_fogs(&scene, &geo);
+                        let _ = tx.send(());
+                    })
+                    .expect("thread della nebbia");
+                self.pending_fog = Some(rx);
+            }
+            self.view = View::Render;
+            return;
+        }
         let backend: Box<dyn forge_render_core::RenderBackend> = match self.settings.backend {
             forge_render_core::BackendKind::Gpu => match self.gpu_backend() {
                 Ok(g) => Box::new(g),
@@ -866,6 +915,7 @@ impl ForgeApp {
         }
         self.selection.clear();
         self.selected_light = None;
+        self.selected_fog = None;
         self.collapsed.clear();
         self.sync_orbit_from_camera();
         self.geometry_changed();
@@ -1297,6 +1347,14 @@ impl ForgeApp {
     /// Chiamata a ogni frame prima del disegno dell'interfaccia.
     /// Selezione richiesta da riga di comando: applicata appena il componente esiste.
     fn apply_startup_select(&mut self) {
+        if self.pending.is_none() {
+            if let Some(name) = self.startup_light.take() {
+                if let Some(i) = self.scene.lights.iter().position(|l| l.name == name) {
+                    self.selected_light = Some(i);
+                    self.tab = InspectorTab::Lights;
+                }
+            }
+        }
         let Some(name) = &self.startup_select else { return };
         if self.pending.is_some() {
             return; // progetto in caricamento
@@ -1311,6 +1369,7 @@ impl ForgeApp {
     pub fn tick(&mut self, ctx: &egui::Context) {
         self.frames += 1;
         self.poll_geometry();
+        self.poll_fog();
         self.poll_pending();
         self.apply_startup_select();
         if let Some(rx) = &self.gpu_warmup {

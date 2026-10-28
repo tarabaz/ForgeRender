@@ -31,6 +31,9 @@ const P_BLADES: u32 = 70u;
 const P_BLADE_ROT: u32 = 71u;
 const P_SHIFT_X: u32 = 72u;
 const P_SHIFT_Y: u32 = 73u;
+const P_OFF_FOGS: u32 = 74u;
+const P_N_FOGS: u32 = 75u;
+const FOG_WORDS: u32 = 16u;
 
 // Punto dell'apertura (come forge_render_cpu::sample_aperture): disco o poligono regolare.
 fn sample_aperture(u0: f32, u1: f32, u2: f32) -> vec2<f32> {
@@ -923,6 +926,150 @@ fn emissive_sample(p: vec3<f32>, u0: f32, u1: f32, u2: f32) -> LSample {
     return s;
 }
 
+// ---------------------------------------------------------------- Nebbie (come forge_render_cpu::medium)
+fn fog_base(k: u32) -> u32 { return pu(P_OFF_FOGS) + k * FOG_WORDS; }
+fn fog_res(b: u32) -> vec3<u32> { return vec3<u32>(S[b + 4u], S[b + 5u], S[b + 6u]); }
+
+fn fog_texel(b: u32, res: vec3<u32>, i: vec3<i32>) -> f32 {
+    let c = clamp(i, vec3<i32>(0), vec3<i32>(res) - vec3<i32>(1));
+    let idx = (u32(c.y) * res.z + u32(c.z)) * res.x + u32(c.x);
+    let w = S[S[b + 12u] + (idx >> 1u)];
+    return f32((w >> ((idx & 1u) * 16u)) & 0xffffu);
+}
+
+// σt nel punto (interpolazione trilineare, 0 fuori dalla griglia).
+fn fog_density(b: u32, p: vec3<f32>) -> f32 {
+    let res = fog_res(b);
+    let cell = sf(b + 3u);
+    var q = (p - sv3(b)) / cell;
+    let size = vec3<f32>(res);
+    if (!(q.x >= 0.0 && q.y >= 0.0 && q.z >= 0.0 && q.x <= size.x && q.y <= size.y && q.z <= size.z)) { return 0.0; }
+    q = q - vec3<f32>(0.5);
+    let f = floor(q);
+    let t = q - f;
+    let i = vec3<i32>(f);
+    let x00 = mix(fog_texel(b, res, i), fog_texel(b, res, i + vec3<i32>(1, 0, 0)), t.x);
+    let x10 = mix(fog_texel(b, res, i + vec3<i32>(0, 1, 0)), fog_texel(b, res, i + vec3<i32>(1, 1, 0)), t.x);
+    let x01 = mix(fog_texel(b, res, i + vec3<i32>(0, 0, 1)), fog_texel(b, res, i + vec3<i32>(1, 0, 1)), t.x);
+    let x11 = mix(fog_texel(b, res, i + vec3<i32>(0, 1, 1)), fog_texel(b, res, i + vec3<i32>(1, 1, 1)), t.x);
+    return mix(mix(x00, x10, t.y), mix(x01, x11, t.y), t.z) * sf(b + 7u);
+}
+
+// Intervallo del raggio nel riquadro della nebbia, limitato a [0, tmax]; x > y se vuoto.
+fn fog_clip(b: u32, o: vec3<f32>, d: vec3<f32>, tmax: f32) -> vec2<f32> {
+    let lo = sv3(b);
+    let hi = lo + vec3<f32>(fog_res(b)) * sf(b + 3u);
+    let inv = 1.0 / d;
+    let t0 = (lo - o) * inv;
+    let t1 = (hi - o) * inv;
+    let tn = max(max(max(min(t0.x, t1.x), min(t0.y, t1.y)), min(t0.z, t1.z)), 0.0);
+    let tf = min(min(min(max(t0.x, t1.x), max(t0.y, t1.y)), max(t0.z, t1.z)), tmax);
+    return vec2<f32>(tn, tf);
+}
+
+// Strato del majorant alla distanza t e fine del tratto: (fine, majorant).
+fn fog_segment(b: u32, o: vec3<f32>, d: vec3<f32>, t: f32, t1: f32) -> vec2<f32> {
+    let n = S[b + 5u];
+    let y0 = sf(b + 1u);
+    let h = sf(b + 3u);
+    let y = o.y + d.y * t;
+    let k = min(u32(max(floor((y - y0) / h - 0.5), 0.0)), n - 1u);
+    var tb = INF;
+    if (d.y > 1e-9 && k + 1u < n) {
+        tb = (y0 + (f32(k) + 1.5) * h - o.y) / d.y;
+    } else if (d.y < -1e-9 && k > 0u) {
+        tb = (y0 + (f32(k) + 0.5) * h - o.y) / d.y;
+    }
+    tb = min(max(tb, t + 1e-6 * (1.0 + abs(t))), t1);
+    return vec2<f32>(tb, sf(S[b + 13u] + k));
+}
+
+// Prima collisione reale (delta tracking): (t, indice nebbia), t < 0 se nessuna.
+fn fog_collision(o: vec3<f32>, d: vec3<f32>, tmax: f32) -> vec2<f32> {
+    var best_t = -1.0;
+    var best_k = 0u;
+    for (var k: u32 = 0u; k < pu(P_N_FOGS); k = k + 1u) {
+        let b = fog_base(k);
+        var limit = tmax;
+        if (best_t >= 0.0) { limit = best_t; }
+        let c = fog_clip(b, o, d, limit);
+        var t = c.x;
+        var found = false;
+        var guard = 0u;
+        loop {
+            if (t >= c.y || found || guard > 100000u) { break; }
+            guard = guard + 1u;
+            let seg = fog_segment(b, o, d, t, c.y);
+            if (seg.y <= 0.0) { t = seg.x; continue; }
+            var ts = t;
+            loop {
+                ts = ts - log(1.0 - rnd()) / seg.y;
+                if (ts >= seg.x) { break; }
+                if (rnd() * seg.y < fog_density(b, o + d * ts)) { found = true; break; }
+            }
+            if (found) { best_t = ts; best_k = k; } else { t = seg.x; }
+        }
+    }
+    return vec2<f32>(best_t, f32(best_k));
+}
+
+// Trasmittanza stimata con il ratio tracking.
+fn fog_transmittance(o: vec3<f32>, d: vec3<f32>, tmax: f32) -> f32 {
+    var tr = 1.0;
+    for (var k: u32 = 0u; k < pu(P_N_FOGS); k = k + 1u) {
+        let b = fog_base(k);
+        let c = fog_clip(b, o, d, tmax);
+        var t = c.x;
+        var guard = 0u;
+        loop {
+            if (t >= c.y || tr == 0.0 || guard > 100000u) { break; }
+            guard = guard + 1u;
+            let seg = fog_segment(b, o, d, t, c.y);
+            if (seg.y > 0.0) {
+                var ts = t;
+                loop {
+                    ts = ts - log(1.0 - rnd()) / seg.y;
+                    if (ts >= seg.x) { break; }
+                    tr = tr * (1.0 - min(fog_density(b, o + d * ts) / seg.y, 1.0));
+                    if (tr < 0.1) {
+                        if (rnd() < 0.5) { tr = 0.0; break; }
+                        tr = tr * 2.0;
+                    }
+                }
+            }
+            t = seg.x;
+        }
+        if (tr == 0.0) { return 0.0; }
+    }
+    return tr;
+}
+
+fn hg_pdf(g: f32, c: f32) -> f32 {
+    let den = 1.0 + g * g - 2.0 * g * c;
+    return (1.0 - g * g) / (4.0 * PI * den * sqrt(max(den, 1e-12)));
+}
+
+fn hg_sample(g: f32, d: vec3<f32>, u1: f32, u2: f32) -> vec3<f32> {
+    var c = 1.0 - 2.0 * u1;
+    if (abs(g) >= 1e-3) {
+        let s = (1.0 - g * g) / (1.0 + g - 2.0 * g * u1);
+        c = clamp((1.0 + g * g - s * s) / (2.0 * g), -1.0, 1.0);
+    }
+    let sn = sqrt(max(1.0 - c * c, 0.0));
+    let phi = 2.0 * PI * u2;
+    return to_world(onb(d), vec3<f32>(sn * cos(phi), sn * sin(phi), c));
+}
+
+// Visibilità di una luce campionata da `so`: 0 se coperta, altrimenti trasmittanza delle nebbie.
+fn light_visibility(so: vec3<f32>, ls: LSample) -> f32 {
+    if (!ls.shadows) { return 1.0; }
+    var tmax = INF;
+    if (ls.dist < INF) { tmax = ls.dist * (1.0 - 1e-4); }
+    if (trace(so, ls.wi, 0.0, tmax, true).found) { return 0.0; }
+    if (pu(P_N_FOGS) == 0u) { return 1.0; }
+    return fog_transmittance(so, ls.wi, tmax);
+}
+
 // ---------------------------------------------------------------- Integratore
 fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
     var o = o_in;
@@ -960,6 +1107,60 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
             let r = intersect_area(i, o, d, tm);
             if (r.x > 0.0) { lt = r.x; lpdf = r.y; lfront = r.z; lem = sv3(light_base(i) + 4u); }
         }
+        // Nebbie: collisione prima della superficie o della luce (delta tracking).
+        if (pu(P_N_FOGS) > 0u) {
+            var t_end = t_surf;
+            if (lt > 0.0) { t_end = lt; }
+            let ev = fog_collision(o, d, t_end);
+            if (ev.x >= 0.0) {
+                let fb = fog_base(u32(ev.y));
+                let p = o + d * ev.x;
+                beta = beta * sv3(fb + 8u);
+                if (beta.x == 0.0 && beta.y == 0.0 && beta.z == 0.0) { break; }
+                let g = sf(fb + 11u);
+                if (n_select > 0u) {
+                    let li_idx = min(u32(rnd() * f32(n_select)), n_select - 1u);
+                    let u1 = rnd();
+                    let u2 = rnd();
+                    var ls: LSample;
+                    if (li_idx < n_lights) {
+                        ls = sample_light(li_idx, p, u1, u2);
+                    } else if (li_idx == env_slot) {
+                        ls = env_sample(u1, u2);
+                    } else {
+                        ls = emissive_sample(p, rnd(), u1, u2);
+                    }
+                    if (ls.ok) {
+                        let ph = hg_pdf(g, dot(d, ls.wi));
+                        let vis = light_visibility(p, ls);
+                        if (vis > 0.0) {
+                            var c: vec3<f32>;
+                            if (ls.delta) {
+                                c = ls.li * (ph / sel_pdf);
+                            } else {
+                                let lp = ls.pdf * sel_pdf;
+                                c = ls.li * (ph * power_heuristic(lp, ph) / lp);
+                            }
+                            c = beta * c * vis;
+                            if (clamp_v > 0.0 && depth > 0u && luminance(c) > clamp_v) { c = c * (clamp_v / luminance(c)); }
+                            l = l + c;
+                        }
+                    }
+                }
+                let wi = hg_sample(g, d, rnd(), rnd());
+                prev_pdf = hg_pdf(g, dot(d, wi));
+                specular = false;
+                o = p;
+                d = wi;
+                if (depth + 1u >= pu(P_RR_START)) {
+                    let q = min(max(max(beta.x, beta.y), beta.z), 0.95);
+                    if (rnd() >= q) { break; }
+                    beta = beta / q;
+                }
+                continue;
+            }
+        }
+
         if (lt > 0.0) {
             if (lfront > 0.0) {
                 var w = 1.0;
@@ -1034,15 +1235,10 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
                 let e = bsdf_eval(bs, wo, ls.wi);
                 if (e.x != 0.0 || e.y != 0.0 || e.z != 0.0) {
                     let cosv = abs(dot(ls.wi, ns));
-                    var visible = true;
-                    if (ls.shadows) {
-                        var side = ng;
-                        if (dot(ls.wi, ng) < 0.0) { side = -ng; }
-                        var tmax = INF;
-                        if (ls.dist < INF) { tmax = ls.dist * (1.0 - 1e-4); }
-                        visible = !trace(offset_ray(p, side), ls.wi, 0.0, tmax, true).found;
-                    }
-                    if (visible) {
+                    var side = ng;
+                    if (dot(ls.wi, ng) < 0.0) { side = -ng; }
+                    let vis = light_visibility(offset_ray(p, side), ls);
+                    if (vis > 0.0) {
                         var c: vec3<f32>;
                         if (ls.delta) {
                             c = e.xyz * ls.li * (cosv / sel_pdf);
@@ -1050,7 +1246,7 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
                             let lp = ls.pdf * sel_pdf;
                             c = e.xyz * ls.li * (cosv * power_heuristic(lp, e.w) / lp);
                         }
-                        c = beta * c;
+                        c = beta * c * vis;
                         if (clamp_v > 0.0 && depth > 0u && luminance(c) > clamp_v) { c = c * (clamp_v / luminance(c)); }
                         l = l + c;
                     }

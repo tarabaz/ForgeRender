@@ -881,6 +881,165 @@ fn environment(app: &mut ForgeApp, ui: &mut egui::Ui) {
             .small(),
         );
     }
+    fogs(app, ui);
+}
+
+/// Nebbie volumetriche (ghiaccio secco): elenco e parametri.
+fn fogs(app: &mut ForgeApp, ui: &mut egui::Ui) {
+    ui.separator();
+    ui.horizontal(|ui| {
+        ui.strong("Nebbia / ghiaccio secco");
+        if app.is_baking_fog() {
+            ui.spinner();
+            ui.label(egui::RichText::new("calcolo della nebbia…").small());
+        }
+    });
+    // Sopra la selezione: centro del lato superiore dei componenti selezionati.
+    let above_selection = {
+        let mut b = forge_math::Aabb::EMPTY;
+        for &i in &app.selection {
+            b.grow(&app.scene.bounds_of(i));
+        }
+        (!b.is_empty()).then(|| Vec3::new(b.center().x, b.max.y + 0.03, b.center().z))
+    };
+    if ui
+        .button("Aggiungi ghiaccio secco")
+        .on_hover_text("Emettitore sopra l'oggetto selezionato (o al centro della scena): la nebbia cade, si deposita e si allarga")
+        .clicked()
+    {
+        let n = app.scene.fogs.len() + 1;
+        app.scene.fogs.push(forge_scene::FogVolume {
+            name: if n == 1 {
+                "Ghiaccio secco".into()
+            } else {
+                format!("Ghiaccio secco {n}")
+            },
+            seed: n as u32,
+            emitter: above_selection.unwrap_or(Vec3::new(0.0, 0.3, 0.0)),
+            ..Default::default()
+        });
+        app.shading_changed();
+    }
+    let mut remove = None;
+    let mut changed = false;
+    for (i, f) in app.scene.fogs.iter_mut().enumerate() {
+        ui.push_id(("nebbia", i), |ui| {
+            egui::CollapsingHeader::new(f.name.clone()).default_open(true).show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    changed |= ui.checkbox(&mut f.enabled, "Attiva").changed();
+                    ui.text_edit_singleline(&mut f.name);
+                    if ui.small_button("Elimina").clicked() {
+                        remove = Some(i);
+                    }
+                });
+                changed |= vec3_edit(ui, "Emettitore (m)", &mut f.emitter, 0.01);
+                if let Some(p) = above_selection {
+                    if ui
+                        .small_button("Metti sopra la selezione")
+                        .on_hover_text("Sposta l'emettitore sul lato superiore dei componenti selezionati")
+                        .clicked()
+                    {
+                        f.emitter = p;
+                        changed = true;
+                    }
+                }
+                changed |= vec3_edit(ui, "Zona simulata (m)", &mut f.size, 0.01);
+                egui::Grid::new("fog-grid").num_columns(2).spacing([10.0, 6.0]).show(ui, |ui| {
+                    ui.label("Seed");
+                    ui.horizontal(|ui| {
+                        changed |= ui.add(egui::DragValue::new(&mut f.seed)).changed();
+                        if ui
+                            .small_button("Nuovo")
+                            .on_hover_text("Un'altra forma con gli stessi parametri")
+                            .clicked()
+                        {
+                            f.seed = f.seed.wrapping_mul(747_796_405).wrapping_add(2_891_336_453) % 100_000;
+                            changed = true;
+                        }
+                    });
+                    ui.end_row();
+                    ui.label("Tempo simulato (s)");
+                    changed |= ui
+                        .add(egui::Slider::new(&mut f.sim_time, 0.0..=30.0).max_decimals(1))
+                        .on_hover_text("Secondi di emissione: la nebbia è calcolata in quell'istante (più tempo = pozza più grande)")
+                        .changed();
+                    ui.end_row();
+                    ui.label("Quantità emessa");
+                    changed |= ui.add(egui::Slider::new(&mut f.emission_rate, 0.0..=5.0)).changed();
+                    ui.end_row();
+                    ui.label("Raggio sorgente (m)");
+                    changed |= ui
+                        .add(egui::Slider::new(&mut f.source_radius, 0.01..=1.0).logarithmic(true))
+                        .changed();
+                    ui.end_row();
+                    ui.label("Densità");
+                    changed |= ui
+                        .add(egui::Slider::new(&mut f.density, 0.0..=500.0).logarithmic(true))
+                        .on_hover_text("Coefficiente di estinzione della nebbia piena (1/m): più alto = più opaca")
+                        .changed();
+                    ui.end_row();
+                    ui.label("Scala dettagli (m)");
+                    changed |= ui
+                        .add(egui::Slider::new(&mut f.scale, 0.02..=2.0).logarithmic(true))
+                        .on_hover_text("Dimensione di sbuffi, filamenti e vortici")
+                        .changed();
+                    ui.end_row();
+                    ui.label("Turbolenza");
+                    changed |= ui.add(egui::Slider::new(&mut f.turbulence, 0.0..=1.0)).changed();
+                    ui.end_row();
+                    ui.label("Dissolvenza");
+                    changed |= ui
+                        .add(egui::Slider::new(&mut f.dissipation, 0.0..=4.0))
+                        .on_hover_text("Velocità con cui la nebbia si dissolve nell'aria (0 = mai)")
+                        .changed();
+                    ui.end_row();
+                    ui.label("Colore scattering");
+                    changed |= ui.color_edit_button_rgb(&mut f.albedo).changed();
+                    ui.end_row();
+                    ui.label("Intensità scattering");
+                    let mut a = f.albedo.iter().cloned().fold(0.0f32, f32::max);
+                    if ui
+                        .add(egui::Slider::new(&mut a, 0.0..=1.0))
+                        .on_hover_text("Quanta luce la nebbia diffonde invece di assorbire (1 = bianca, 0 = fumo nero)")
+                        .changed()
+                    {
+                        let cur = f.albedo.iter().cloned().fold(0.0f32, f32::max).max(1e-4);
+                        f.albedo = f.albedo.map(|v| (v / cur * a).clamp(0.0, 1.0));
+                        if cur <= 1e-4 {
+                            f.albedo = [a; 3];
+                        }
+                        changed = true;
+                    }
+                    ui.end_row();
+                    ui.label("Anisotropia");
+                    changed |= ui
+                        .add(egui::Slider::new(&mut f.anisotropy, -0.9..=0.9))
+                        .on_hover_text("0 = diffusione uniforme; positiva = più luminosa in controluce")
+                        .changed();
+                    ui.end_row();
+                    ui.label("Collisioni");
+                    changed |= ui
+                        .checkbox(&mut f.collisions, "Non attraversa gli oggetti")
+                        .on_hover_text("La nebbia si appoggia sugli oggetti e ci scorre attorno")
+                        .changed();
+                    ui.end_row();
+                    ui.label("Risoluzione");
+                    changed |= ui
+                        .add(egui::Slider::new(&mut f.resolution, 32..=320))
+                        .on_hover_text("Celle sul lato più lungo della zona: più alta = più dettagli, calcolo più lento")
+                        .changed();
+                    ui.end_row();
+                });
+            });
+        });
+    }
+    if let Some(i) = remove {
+        app.scene.fogs.remove(i);
+        changed = true;
+    }
+    if changed {
+        app.shading_changed();
+    }
 }
 
 /// Elenco delle HDRI della cartella `Libreria/HDRI`: un clic e diventano l'ambiente.
