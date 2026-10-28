@@ -46,6 +46,14 @@ fn parse_args() -> StartupOptions {
                 i += 1;
                 o.light = args.get(i).cloned();
             }
+            "--fog" => {
+                i += 1;
+                o.fog = args.get(i).cloned();
+            }
+            "--aim" => {
+                i += 1;
+                o.aim = args.get(i).cloned();
+            }
             "--gizmo" => {
                 i += 1;
                 o.gizmo = args.get(i).cloned();

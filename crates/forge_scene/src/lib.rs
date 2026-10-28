@@ -18,7 +18,7 @@ pub mod units;
 pub use added::{AddedKind, AddedRecord};
 pub use camera::{Camera, OrbitController, RenderCamera};
 pub use environment::Environment;
-pub use fog::{FogPreset, FogVolume, FOG_PRESETS};
+pub use fog::{FogPreset, FogVolume, FOG_PRESETS, FOG_QUALITY};
 pub use light::{Light, LightKind};
 pub use material::{Material, MaterialId, MaterialLibrary, Projection, TextureMapping};
 pub use mesh::Mesh;

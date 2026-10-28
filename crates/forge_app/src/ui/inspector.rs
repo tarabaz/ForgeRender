@@ -944,6 +944,7 @@ fn effects(app: &mut ForgeApp, ui: &mut egui::Ui) {
     let mut changed = false;
     let mut select = None;
     let selected = app.selected_fog;
+    let mut zone_mode = app.fog_gizmo_zone;
     for (i, f) in app.scene.fogs.iter_mut().enumerate() {
         ui.push_id(("nebbia", i), |ui| {
             let id = ui.make_persistent_id("effetto");
@@ -978,6 +979,22 @@ fn effects(app: &mut ForgeApp, ui: &mut egui::Ui) {
                         ui.label("Nome");
                         ui.text_edit_singleline(&mut f.name);
                     });
+                    ui.horizontal(|ui| {
+                        ui.label("Il gizmo sposta");
+                        for (zone, name, tip) in [
+                            (false, "Emettitore", "Sposta il punto da cui esce la nebbia (la zona lo segue)"),
+                            (
+                                true,
+                                "Zona",
+                                "Sposta il riquadro simulato lasciando l'emettitore dov'è (es. più in alto per gli sbuffi)",
+                            ),
+                        ] {
+                            if ui.selectable_label(zone_mode == zone, name).on_hover_text(tip).clicked() {
+                                zone_mode = zone;
+                                select = Some(i);
+                            }
+                        }
+                    });
                     changed |= vec3_edit(ui, "Emettitore (m)", &mut f.emitter, 0.01);
                     if let Some(p) = above_selection {
                         if ui
@@ -990,6 +1007,22 @@ fn effects(app: &mut ForgeApp, ui: &mut egui::Ui) {
                         }
                     }
                     changed |= vec3_edit(ui, "Zona simulata (m)", &mut f.size, 0.01);
+                    ui.horizontal(|ui| {
+                        changed |= vec3_edit(ui, "Spostamento zona (m)", &mut f.zone_offset, 0.01);
+                        if f.zone_offset != Vec3::ZERO
+                            && ui
+                                .small_button("Azzera")
+                                .on_hover_text("Zona di nuovo attorno all'emettitore")
+                                .clicked()
+                        {
+                            f.zone_offset = Vec3::ZERO;
+                            changed = true;
+                        }
+                    });
+                    let (lo, hi) = f.bounds();
+                    if (f.emitter.cmplt(lo) | f.emitter.cmpgt(hi)).any() {
+                        ui.colored_label(ui.visuals().warn_fg_color, "L'emettitore è fuori dalla zona: non uscirà nebbia.");
+                    }
                     // Preset scenografici: impostano tutto il look; l'emettitore resta dov'è.
                     ui.label("Preset (passa sopra per vedere dove mettere l'emettitore):");
                     ui.horizontal_wrapped(|ui| {
@@ -1036,7 +1069,7 @@ fn effects(app: &mut ForgeApp, ui: &mut egui::Ui) {
                         ui.end_row();
                         ui.label("Scala dettagli (m)");
                         changed |= ui
-                            .add(egui::Slider::new(&mut f.scale, 0.02..=2.0).logarithmic(true))
+                            .add(egui::Slider::new(&mut f.scale, 0.005..=2.0).logarithmic(true))
                             .on_hover_text("Dimensione di sbuffi, filamenti e vortici")
                             .changed();
                         ui.end_row();
@@ -1088,16 +1121,37 @@ fn effects(app: &mut ForgeApp, ui: &mut egui::Ui) {
                             .on_hover_text("La nebbia si appoggia sugli oggetti e ci scorre attorno")
                             .changed();
                         ui.end_row();
-                        ui.label("Risoluzione");
+                        ui.label("Qualità griglia");
+                        ui.horizontal_wrapped(|ui| {
+                            for (name, cells, res) in forge_scene::FOG_QUALITY {
+                                let on = f.sim_cells == cells && f.resolution == res;
+                                let hint = format!(
+                                    "Simulazione fino a {cells} celle, dettaglio {res} celle sul lato più lungo della zona. \
+                                     Ogni livello in su rende il moto più fine ma il calcolo 3–5 volte più lento \
+                                     (Ultra: minuti e qualche centinaio di MB di memoria)."
+                                );
+                                if ui.selectable_label(on, name).on_hover_text(hint).clicked() {
+                                    f.sim_cells = cells;
+                                    f.resolution = res;
+                                    changed = true;
+                                }
+                            }
+                        });
+                        ui.end_row();
+                        ui.label("Dettaglio");
                         changed |= ui
-                            .add(egui::Slider::new(&mut f.resolution, 32..=320))
-                            .on_hover_text("Celle sul lato più lungo della zona: più alta = più dettagli, calcolo più lento")
+                            .add(egui::Slider::new(&mut f.resolution, 32..=400))
+                            .on_hover_text(
+                                "Celle della griglia del dettaglio (sbuffi, bordi) sul lato più lungo. \
+                                 Il moto lo decide la qualità della griglia; una zona più piccola dà celle più fini.",
+                            )
                             .changed();
                         ui.end_row();
                     });
                 });
         });
     }
+    app.fog_gizmo_zone = zone_mode;
     if let Some(i) = select {
         app.selected_fog = Some(i);
         app.selected_light = None;
@@ -1217,6 +1271,32 @@ pub(crate) fn set_hdri(app: &mut ForgeApp, path: std::path::PathBuf) {
 
 fn camera(app: &mut ForgeApp, ui: &mut egui::Ui) {
     render_cameras(app, ui);
+    ui.separator();
+    ui.horizontal(|ui| {
+        if ui
+            .selectable_label(app.aim_pick, "Punta su oggetto")
+            .on_hover_text(
+                "Poi clicca un oggetto nella viewport: la camera lo inquadra, lo mette a fuoco \
+                 e ci gira attorno restando agganciata",
+            )
+            .clicked()
+        {
+            app.aim_pick = !app.aim_pick;
+            app.focus_pick = false;
+            app.view = crate::app::View::Viewport;
+        }
+        let locked = app
+            .aim_lock
+            .as_ref()
+            .and_then(|id| app.scene.find(id))
+            .map(|i| app.scene.nodes[i].name.clone());
+        if let Some(name) = locked {
+            ui.label(egui::RichText::new(format!("agganciata a «{name}»")).color(style::ACCENT));
+            if ui.small_button("Sgancia").clicked() {
+                app.release_aim();
+            }
+        }
+    });
     ui.separator();
 
     // Parametri della camera di rendering attiva, oppure della vista se non ce n'è una.

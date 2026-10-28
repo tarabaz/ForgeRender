@@ -38,6 +38,7 @@ fn camera_input(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui
             || resp.dragged_by(egui::PointerButton::Middle)
             || (shift && resp.dragged_by(egui::PointerButton::Primary));
         if pan {
+            app.release_aim();
             app.orbit.pan(delta.x / rect.height(), delta.y / rect.height());
         } else if resp.dragged_by(egui::PointerButton::Primary) {
             app.orbit.orbit(delta.x * 0.008, delta.y * 0.008);
@@ -151,6 +152,15 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
     draw_fogs(app, &painter, rect);
     draw_cameras(app, &painter, rect);
     draw_depth_of_field(app, &painter, rect);
+    if app.aim_pick {
+        painter.text(
+            rect.center_top() + egui::vec2(0.0, 52.0),
+            egui::Align2::CENTER_TOP,
+            "Clic sull'oggetto da inquadrare (Esc annulla)",
+            egui::FontId::proportional(14.0),
+            style::ACCENT,
+        );
+    }
     if app.focus_pick {
         painter.text(
             rect.center_top() + egui::vec2(0.0, 52.0),
@@ -171,6 +181,27 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
     }
     crate::ui::gizmo::toolbar(app, ui, rect);
 
+    app.follow_aim();
+    // Punta su oggetto: il clic sceglie l'oggetto a cui agganciare la camera.
+    if app.aim_pick {
+        if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+            app.aim_pick = false;
+        }
+        if resp.clicked() {
+            if let Some(pos) = resp.interact_pointer_pos() {
+                let ndc_x = (pos.x - rect.left()) / rect.width() * 2.0 - 1.0;
+                let ndc_y = 1.0 - (pos.y - rect.top()) / rect.height() * 2.0;
+                let view = app.scene.camera.clone();
+                let dir = view.ray_dir(ndc_x, ndc_y, rect.width() / rect.height());
+                let geo = app.geometry_now();
+                if let Some((node, _)) = forge_render_core::pick(&geo, view.position, dir) {
+                    app.aim_at(node);
+                }
+            }
+            app.aim_pick = false;
+            return;
+        }
+    }
     // Messa a fuoco col clic: distanza lungo l'asse della camera che si sta regolando.
     if app.focus_pick {
         if ui.input(|i| i.key_pressed(egui::Key::Escape)) {

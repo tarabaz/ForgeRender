@@ -83,6 +83,10 @@ pub struct StartupOptions {
     pub select: Option<String>,
     /// Luce da selezionare all'avvio (per nome).
     pub light: Option<String>,
+    /// Seleziona la nebbia con questo nome (prove automatiche).
+    pub fog: Option<String>,
+    /// Aggancia la camera all'oggetto con questo nome (prove automatiche).
+    pub aim: Option<String>,
     /// Modalità del gizmo: move | rotate | scale.
     pub gizmo: Option<String>,
     /// Crea una camera di rendering: "lato" sposta la vista per mostrarla, "attraverso" la guarda.
@@ -126,6 +130,8 @@ pub struct ForgeApp {
     pub selected_light: Option<usize>,
     /// Nebbia selezionata (il gizmo sposta il suo emettitore).
     pub selected_fog: Option<usize>,
+    /// Il gizmo della nebbia sposta la zona simulata invece dell'emettitore.
+    pub fog_gizmo_zone: bool,
     pub selected_material: MaterialId,
     pub view: View,
     pub tab: InspectorTab,
@@ -157,6 +163,8 @@ pub struct ForgeApp {
     /// Componente da selezionare all'avvio (anche dopo il caricamento del progetto).
     startup_select: Option<String>,
     startup_light: Option<String>,
+    startup_fog: Option<String>,
+    startup_aim: Option<String>,
     /// Impronta dei parametri di displacement: se cambia va ricostruita la geometria.
     displacement_sig: u64,
 
@@ -184,6 +192,12 @@ pub struct ForgeApp {
     pub nav_anim: Option<crate::ui::navigator::NavAnim>,
     /// Il prossimo clic nella viewport sceglie la distanza di messa a fuoco.
     pub focus_pick: bool,
+    /// In attesa del clic sull'oggetto da inquadrare ("Punta su oggetto").
+    pub aim_pick: bool,
+    /// Oggetto a cui la camera è agganciata: si orbita attorno a lui e resta a fuoco.
+    pub aim_lock: Option<forge_scene::ComponentId>,
+    /// Centro dell'oggetto agganciato nel suo sistema locale (segue i suoi spostamenti).
+    aim_local: forge_math::Vec3,
     /// Annulla/ripeti delle trasformazioni: stato precedente dei componenti toccati
     /// (con il numero di nodi della scena, per scartare voci non più valide).
     undo_stack: Vec<(usize, Vec<(usize, NodeState)>)>,
@@ -219,6 +233,7 @@ impl ForgeApp {
             selection: BTreeSet::new(),
             selected_light: None,
             selected_fog: None,
+            fog_gizmo_zone: false,
             selected_material: MaterialId::new("default"),
             view: View::Viewport,
             tab: InspectorTab::Materials,
@@ -244,6 +259,8 @@ impl ForgeApp {
             displacement_sig: 0,
             startup_select: None,
             startup_light: None,
+            startup_fog: None,
+            startup_aim: None,
             geometry: None,
             pending_geometry: None,
             pending_fog: None,
@@ -261,6 +278,9 @@ impl ForgeApp {
             camera_follow: false,
             nav_anim: None,
             focus_pick: false,
+            aim_pick: false,
+            aim_lock: None,
+            aim_local: forge_math::Vec3::ZERO,
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             logs,
@@ -305,6 +325,8 @@ impl ForgeApp {
         }
         app.startup_select = startup.select.clone();
         app.startup_light = startup.light.clone();
+        app.startup_fog = startup.fog.clone();
+        app.startup_aim = startup.aim.clone();
         app.gizmo.mode = match startup.gizmo.as_deref() {
             Some("rotate") => crate::ui::gizmo::GizmoMode::Rotate,
             Some("scale") => crate::ui::gizmo::GizmoMode::Scale,
@@ -652,6 +674,10 @@ impl ForgeApp {
 
     /// Camera spostata dall'utente (orbita/pan/zoom).
     pub fn camera_changed(&mut self) {
+        if self.aim_lock.is_some() {
+            // Agganciata a un oggetto: il fuoco resta sul suo centro mentre si gira o si zooma.
+            self.orbit.lens.focus_distance = self.orbit.distance.max(0.01);
+        }
         self.scene.camera = self.orbit.camera();
         match self.scene.active_camera {
             // La vista si muove liberamente: l'inquadratura del render non cambia.
@@ -683,6 +709,50 @@ impl ForgeApp {
             self.camera_follow = false;
         }
         self.render_camera_changed();
+    }
+
+    /// Aggancia la camera all'oggetto `node` (o al componente che lo contiene): lo inquadra,
+    /// lo mette a fuoco e da lì in poi si orbita attorno a lui. Con una camera di rendering
+    /// attiva, la camera segue la vista.
+    pub fn aim_at(&mut self, node: usize) {
+        let mut idx = node;
+        // Le mesh importate stanno sotto un nodo col nome del pezzo: si aggancia quello.
+        if let Some(p) = self.scene.nodes[idx].parent {
+            if self.scene.nodes[idx].name.ends_with("(mesh)") {
+                idx = p;
+            }
+        }
+        let b = self.scene.exact_bounds_of(idx);
+        if b.is_empty() {
+            return;
+        }
+        self.aim_lock = Some(self.scene.nodes[idx].id.clone());
+        self.aim_local = self.scene.world_transform(idx).inverse().transform_point3(b.center());
+        self.orbit.frame(&b);
+        self.orbit.lens.dof = true;
+        if self.scene.active_camera.is_some() {
+            self.camera_follow = true;
+        }
+        self.camera_changed();
+    }
+
+    /// Sgancia la camera dall'oggetto.
+    pub fn release_aim(&mut self) {
+        self.aim_lock = None;
+    }
+
+    /// Se l'oggetto agganciato si è spostato, la camera lo segue (una volta per frame).
+    pub fn follow_aim(&mut self) {
+        let Some(id) = &self.aim_lock else { return };
+        let Some(i) = self.scene.find(id) else {
+            self.aim_lock = None;
+            return;
+        };
+        let c = self.scene.world_transform(i).transform_point3(self.aim_local);
+        if (c - self.orbit.target).length() > 1e-5 * self.orbit.distance.max(1.0) {
+            self.orbit.target = c;
+            self.camera_changed();
+        }
     }
 
     /// Porta la vista della viewport sull'inquadratura della camera di rendering.
@@ -1453,6 +1523,18 @@ impl ForgeApp {
                 if let Some(i) = self.scene.lights.iter().position(|l| l.name == name) {
                     self.selected_light = Some(i);
                     self.tab = InspectorTab::Lights;
+                }
+            }
+            if let Some(name) = self.startup_fog.take() {
+                if let Some(i) = self.scene.fogs.iter().position(|f| f.name == name) {
+                    self.selected_fog = Some(i);
+                    self.tab = InspectorTab::Effects;
+                }
+            }
+            if let Some(name) = self.startup_aim.take() {
+                if let Some(i) = self.scene.nodes.iter().position(|n| n.name == name) {
+                    self.aim_at(i);
+                    self.tab = InspectorTab::Camera;
                 }
             }
         }

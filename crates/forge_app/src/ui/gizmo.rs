@@ -54,7 +54,8 @@ enum DragStart {
     Nodes(Vec<(usize, UserTransform)>),
     Light(usize, Light),
     /// Emettitore e zona simulata della nebbia.
-    Fog(usize, Vec3, Vec3),
+    /// Nebbia: emettitore, dimensioni e spostamento della zona all'inizio.
+    Fog(usize, Vec3, Vec3, Vec3),
 }
 
 /// Su cosa agisce il gizmo.
@@ -414,7 +415,16 @@ fn frame_for(app: &ForgeApp, rect: egui::Rect, t: Target, sel: &[usize]) -> Opti
             };
             (l.position, axes)
         }
-        Target::Fog(i) => (app.scene.fogs[i].emitter, [Vec3::X, Vec3::Y, Vec3::Z]),
+        Target::Fog(i) => {
+            let f = &app.scene.fogs[i];
+            let c = if app.fog_gizmo_zone {
+                let (lo, hi) = f.bounds();
+                (lo + hi) * 0.5
+            } else {
+                f.emitter
+            };
+            (c, [Vec3::X, Vec3::Y, Vec3::Z])
+        }
     };
     let cam = &app.scene.camera;
     let dist = (center - cam.position).length().max(1e-4);
@@ -575,7 +585,10 @@ pub fn update(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::
                         DragStart::Nodes(sel.iter().map(|&i| (i, app.scene.nodes[i].user)).collect())
                     }
                     Target::Light(i) => DragStart::Light(i, app.scene.lights[i].clone()),
-                    Target::Fog(i) => DragStart::Fog(i, app.scene.fogs[i].emitter, app.scene.fogs[i].size),
+                    Target::Fog(i) => {
+                        let f = &app.scene.fogs[i];
+                        DragStart::Fog(i, f.emitter, f.size, f.zone_offset)
+                    }
                 };
                 let contact = match (tgt, h) {
                     (Target::Nodes, Handle::Axis(_) | Handle::Plane(_) | Handle::Screen) => Contact::build(&app.scene, &sel),
@@ -611,9 +624,10 @@ pub fn update(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::
                     app.scene.lights[*i] = l.clone();
                     app.shading_changed();
                 }
-                DragStart::Fog(i, e, size) => {
+                DragStart::Fog(i, e, size, off) => {
                     app.scene.fogs[*i].emitter = *e;
                     app.scene.fogs[*i].size = *size;
+                    app.scene.fogs[*i].zone_offset = *off;
                     app.shading_changed();
                 }
             }
@@ -771,9 +785,12 @@ fn apply_drag(app: &mut ForgeApp, rect: egui::Rect, drag: &Drag, pos: egui::Pos2
             }
             app.shading_changed();
         }
-        DragStart::Fog(i, e, size) => {
+        DragStart::Fog(i, e, size, off) => {
+            let zone = app.fog_gizmo_zone;
             let f = &mut app.scene.fogs[*i];
             match &op {
+                // Modalità zona: si sposta il riquadro, l'emettitore resta dov'è.
+                Op::World(m) if zone => f.zone_offset = m.transform_point3(*e + *off) - *e,
                 Op::World(m) => f.emitter = m.transform_point3(*e),
                 Op::Scale(s) => f.size = (*size * s.abs()).max(Vec3::splat(0.05)),
             }

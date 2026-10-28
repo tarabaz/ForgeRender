@@ -23,7 +23,7 @@ pub use grid::GridSpec;
 use rayon::prelude::*;
 
 /// Lato massimo (in celle) della griglia di simulazione.
-const SIM_MAX: usize = 128;
+const SIM_MAX: usize = 256;
 
 /// Nebbia pronta per il rendering.
 #[derive(Clone, Debug)]
@@ -124,8 +124,9 @@ pub struct SimState {
 pub fn sim_key(fog: &FogVolume) -> String {
     let f = fog.sanitized();
     format!(
-        "{:?} {:?} {} {} {} {} {} {} {} {} {} {}",
+        "{:?} {:?} {:?} {} {} {} {} {} {} {} {} {} {} {}",
         f.emitter,
+        f.zone_offset,
         f.size,
         f.seed,
         f.sim_time,
@@ -136,6 +137,7 @@ pub fn sim_key(fog: &FogVolume) -> String {
         f.rise,
         f.collisions,
         f.resolution,
+        f.sim_cells,
         f.enabled
     )
 }
@@ -176,7 +178,11 @@ pub fn simulate_fog(fog: &FogVolume, solid: Option<SolidFn>, ground: Option<f32>
     let t0 = std::time::Instant::now();
     // Simulazione al 70% della risoluzione del dettaglio (il tappeto e le colate devono
     // avere qualche cella di spessore per scorrere bene).
-    let spec = GridSpec::covering(min, max, ((f.resolution as f32 * 0.7) as usize).clamp(32, SIM_MAX));
+    let spec = GridSpec::covering(
+        min,
+        max,
+        ((f.resolution as f32 * 0.7) as usize).clamp(32, (f.sim_cells as usize).min(SIM_MAX)),
+    );
     let sim_solid = match (f.collisions, solid) {
         (true, Some(s)) => s(&spec),
         _ => vec![false; spec.len()],

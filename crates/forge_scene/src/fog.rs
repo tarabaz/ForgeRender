@@ -42,9 +42,24 @@ pub struct FogVolume {
     pub rise: f32,
     /// La nebbia non attraversa gli oggetti della scena.
     pub collisions: bool,
-    /// Risoluzione della griglia (celle sul lato più lungo).
+    /// Risoluzione della griglia del dettaglio (celle sul lato più lungo).
     pub resolution: u32,
+    /// Celle massime della simulazione sul lato più lungo (qualità della griglia):
+    /// più alta = moto più fine (riccioli, colate sottili), calcolo molto più lento.
+    pub sim_cells: u32,
+    /// Spostamento della zona simulata rispetto alla posizione predefinita attorno
+    /// all'emettitore (es. più in alto per lasciare spazio agli sbuffi).
+    pub zone_offset: Vec3,
 }
+
+/// Livelli di qualità della griglia: (nome, celle della simulazione, risoluzione del dettaglio).
+pub const FOG_QUALITY: [(&str, u32, u32); 5] = [
+    ("Bozza", 48, 96),
+    ("Media", 96, 160),
+    ("Alta", 128, 200),
+    ("Molto alta", 192, 300),
+    ("Ultra", 256, 400),
+];
 
 impl Default for FogVolume {
     fn default() -> Self {
@@ -66,6 +81,8 @@ impl Default for FogVolume {
             rise: 0.4,
             collisions: true,
             resolution: 160,
+            sim_cells: 128,
+            zone_offset: Vec3::ZERO,
         }
     }
 }
@@ -75,8 +92,9 @@ impl FogVolume {
     /// l'emettitore (dove la nebbia cade) e il 45% sopra (sbuffi che risalgono).
     pub fn bounds(&self) -> (Vec3, Vec3) {
         let s = self.size.max(Vec3::splat(0.01));
-        let min = Vec3::new(self.emitter.x - s.x * 0.5, self.emitter.y - s.y * 0.55, self.emitter.z - s.z * 0.5);
-        let max = Vec3::new(self.emitter.x + s.x * 0.5, self.emitter.y + s.y * 0.45, self.emitter.z + s.z * 0.5);
+        let c = self.emitter + self.zone_offset;
+        let min = Vec3::new(c.x - s.x * 0.5, c.y - s.y * 0.55, c.z - s.z * 0.5);
+        let max = Vec3::new(c.x + s.x * 0.5, c.y + s.y * 0.45, c.z + s.z * 0.5);
         (min, max)
     }
 
@@ -112,6 +130,8 @@ impl FogVolume {
         f.dissipation = fin(f.dissipation, 1.0).clamp(0.0, 10.0);
         f.rise = fin(f.rise, 0.4).clamp(0.0, 1.0);
         f.resolution = f.resolution.clamp(16, 400);
+        f.sim_cells = f.sim_cells.clamp(32, 256);
+        f.zone_offset = if f.zone_offset.is_finite() { f.zone_offset } else { Vec3::ZERO };
         f
     }
 }

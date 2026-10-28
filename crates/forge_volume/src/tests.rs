@@ -253,3 +253,40 @@ fn appearance_changes_reuse_the_simulation() {
     assert_eq!(a.data, b.data);
     assert_eq!(a.albedo, b.albedo);
 }
+
+/// La qualità della griglia decide le celle della simulazione; lo spostamento della zona
+/// sposta il riquadro ma non l'emettitore, e rifà la simulazione.
+#[test]
+fn grid_quality_and_zone_offset() {
+    let base = FogVolume {
+        sim_time: 0.5,
+        ..small_fog()
+    };
+    let coarse = simulate_fog(
+        &FogVolume {
+            sim_cells: 32,
+            ..base.clone()
+        },
+        None,
+        None,
+    );
+    let fine = simulate_fog(
+        &FogVolume {
+            sim_cells: 64,
+            resolution: 120,
+            ..base.clone()
+        },
+        None,
+        None,
+    );
+    assert_eq!(*coarse.spec.res.iter().max().unwrap(), 32);
+    assert_eq!(*fine.spec.res.iter().max().unwrap(), 64);
+    let moved = FogVolume {
+        zone_offset: Vec3::new(0.0, 0.2, 0.0),
+        ..base.clone()
+    };
+    let (a, b) = (base.bounds(), moved.bounds());
+    assert!((b.0.y - a.0.y - 0.2).abs() < 1e-6 && (b.1.y - a.1.y - 0.2).abs() < 1e-6);
+    assert_eq!(moved.emitter, base.emitter);
+    assert_ne!(sim_key(&base), sim_key(&moved));
+}
