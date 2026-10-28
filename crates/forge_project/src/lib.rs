@@ -61,6 +61,9 @@ pub struct ProjectFile {
     pub lights: Vec<Light>,
     pub environment: Environment,
     pub camera: Camera,
+    /// Oggetti aggiunti dall'utente (pavimento, fondale, forme), ricreati all'apertura.
+    #[serde(default)]
+    pub added: Vec<forge_scene::AddedRecord>,
     /// Copie create dall'utente (ricreate all'apertura, prima di stati e assegnazioni).
     #[serde(default)]
     pub copies: Vec<forge_scene::CopyRecord>,
@@ -162,6 +165,7 @@ pub fn to_project_file(scene: &Scene, meta: &ProjectMeta, settings: &RenderSetti
         lights: scene.lights.clone(),
         environment: scene.environment.clone(),
         camera: scene.camera.clone(),
+        added: scene.added.clone(),
         copies: scene.copies.clone(),
         render_cameras: scene.render_cameras.clone(),
         active_camera: scene.active_camera,
@@ -254,6 +258,10 @@ pub fn load(path: &Path) -> anyhow::Result<LoadedProject> {
         }
     }
 
+    for r in pf.added {
+        scene.instantiate_added(&r);
+        scene.added.push(r);
+    }
     for c in pf.copies {
         match scene.find(&c.of) {
             Some(i) => {
@@ -326,7 +334,7 @@ pub fn load(path: &Path) -> anyhow::Result<LoadedProject> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use forge_math::Vec3;
+    use forge_math::{Mat4, Vec3};
 
     fn tmpdir() -> PathBuf {
         let d = std::env::temp_dir().join(format!("forge_project_{}_{}", std::process::id(), rand_suffix()));
@@ -369,6 +377,8 @@ mod tests {
         scene.nodes[vi].visible = false;
         scene.nodes[vi].contact_snap = true;
         scene.lights.push(Light::point("P", Vec3::new(1.0, 2.0, 3.0), 5.0));
+        let floor = scene.add_object(forge_scene::AddedKind::Floor { size: 5.0 }, Mat4::from_translation(Vec3::new(0.0, -0.1, 0.0)));
+        scene.nodes[floor].user.translation = Vec3::new(0.3, 0.0, 0.0);
         scene.fogs.push(forge_scene::FogVolume {
             seed: 77,
             emitter: Vec3::new(0.2, 0.9, -0.1),
@@ -424,6 +434,9 @@ mod tests {
         assert_eq!(s2.camera, scene.camera);
         assert_eq!(s2.render_cameras, scene.render_cameras);
         assert_eq!(s2.fogs, scene.fogs);
+        assert_eq!(s2.added, scene.added);
+        let f2 = s2.find(&scene.added[0].id).expect("pavimento ricreato");
+        assert_eq!(s2.nodes[f2].user.translation, Vec3::new(0.3, 0.0, 0.0));
         let c2 = s2.find(&copy_id).expect("la copia è ricreata");
         assert_eq!(s2.nodes[c2].user.translation, Vec3::new(0.5, 0.0, 0.0));
         assert_eq!(s2.resolve_material(c2), &MaterialId::new("mio"));
@@ -437,7 +450,7 @@ mod tests {
         std::fs::rename(&dir, &moved).unwrap();
         let loaded = load(&moved.join("progetto.frproject")).unwrap();
         assert!(loaded.report.missing_sources.is_empty());
-        assert_eq!(loaded.scene.triangle_count(), 3, "2 triangoli dal file + 1 della copia");
+        assert_eq!(loaded.scene.triangle_count(), 5, "2 triangoli dal file + 1 della copia + 2 del pavimento aggiunto");
         std::fs::remove_dir_all(moved).ok();
     }
 

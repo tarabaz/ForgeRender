@@ -129,6 +129,8 @@ pub struct Scene {
     pub copies: Vec<CopyRecord>,
     /// Nebbie volumetriche (ghiaccio secco).
     pub fogs: Vec<crate::fog::FogVolume>,
+    /// Oggetti aggiunti dall'utente (pavimento, fondale, forme).
+    pub added: Vec<crate::added::AddedRecord>,
 }
 
 impl Default for Scene {
@@ -147,6 +149,7 @@ impl Default for Scene {
             active_camera: None,
             copies: Vec::new(),
             fogs: Vec::new(),
+            added: Vec::new(),
         }
     }
 }

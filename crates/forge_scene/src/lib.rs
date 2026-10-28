@@ -4,6 +4,7 @@
 //! L'unità interna di lunghezza è il **metro**: gli importatori convertono
 //! dalle unità del file ([`LengthUnit`]).
 
+pub mod added;
 pub mod camera;
 pub mod environment;
 pub mod fog;
@@ -14,6 +15,7 @@ pub mod primitives;
 pub mod scene;
 pub mod units;
 
+pub use added::{AddedKind, AddedRecord};
 pub use camera::{Camera, OrbitController, RenderCamera};
 pub use environment::Environment;
 pub use fog::{FogPreset, FogVolume, FOG_PRESETS};

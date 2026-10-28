@@ -54,10 +54,10 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             app.duplicate_selection();
             structural = true;
         }
-        if sel.iter().any(|&i| app.scene.is_copy(i))
+        if sel.iter().any(|&i| app.scene.is_copy(i) || app.scene.is_added(i))
             && ui
-                .button("Elimina copia")
-                .on_hover_text("Canc: elimina le copie selezionate")
+                .button("Elimina")
+                .on_hover_text("Canc: elimina le copie e gli oggetti aggiunti selezionati")
                 .clicked()
         {
             app.delete_selected_copies();

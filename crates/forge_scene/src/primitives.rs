@@ -272,3 +272,69 @@ mod cup_tests {
         }
     }
 }
+
+/// Fondale da studio (cyclorama): pavimento che sale in una curva senza spigolo fino a
+/// una parete verticale. Larghezza lungo X, pavimento da z = `depth` a z = 0, curva di
+/// raggio `radius`, parete alta `height` a z = −`radius`. Base a y = 0.
+pub fn backdrop(width: f32, depth: f32, height: f32, radius: f32, segments: u32) -> Mesh {
+    let mut m = Mesh {
+        name: "Fondale".into(),
+        ..Default::default()
+    };
+    let r = radius.clamp(0.01, height.max(0.02));
+    // Profilo nel piano (z, y): pavimento, quarto di cerchio, parete.
+    let mut profile: Vec<(f32, f32)> = vec![(depth, 0.0), (0.0, 0.0)];
+    let segs = segments.max(4);
+    for k in 1..segs {
+        let a = k as f32 / segs as f32 * std::f32::consts::FRAC_PI_2;
+        profile.push((-r * a.sin(), r - r * a.cos()));
+    }
+    profile.push((-r, r));
+    profile.push((-r, height.max(r)));
+    let w = width * 0.5;
+    // Lunghezza del profilo per le UV (la texture non si stira nella curva).
+    let mut len = vec![0.0f32];
+    for k in 1..profile.len() {
+        let (a, b) = (profile[k - 1], profile[k]);
+        len.push(len[k - 1] + ((b.0 - a.0).powi(2) + (b.1 - a.1).powi(2)).sqrt());
+    }
+    for (k, &(z, y)) in profile.iter().enumerate() {
+        for x in [-w, w] {
+            m.positions.push(Vec3::new(x, y, z));
+            m.uvs.push(Vec2::new((x + w) / width.max(1e-6), len[k] / len[len.len() - 1].max(1e-6)));
+        }
+    }
+    for k in 0..profile.len() as u32 - 1 {
+        let (a, b, c, d) = (2 * k, 2 * k + 1, 2 * k + 2, 2 * k + 3);
+        // Normali verso +Y sul pavimento e verso +Z sulla parete (lato della scena).
+        m.indices.push([a, b, d]);
+        m.indices.push([a, d, c]);
+    }
+    m.compute_normals(30.0);
+    m
+}
+
+#[cfg(test)]
+mod backdrop_tests {
+    use super::*;
+
+    #[test]
+    fn backdrop_faces_the_scene() {
+        let m = backdrop(4.0, 3.0, 2.5, 0.6, 12);
+        let b = m.bounds();
+        assert!((b.max.y - 2.5).abs() < 1e-5 && b.min.y.abs() < 1e-6);
+        for t in &m.indices {
+            let [a, b, c] = t.map(|i| m.positions[i as usize]);
+            let n = (b - a).cross(c - a).normalize();
+            let ctr = (a + b + c) / 3.0;
+            // Pavimento: normale in su; parete: verso +Z (dove sta la scena).
+            if ctr.y < 1e-4 {
+                assert!(n.y > 0.99, "pavimento {n}");
+            } else if ctr.y > 0.61 {
+                assert!(n.z > 0.99, "parete {n}");
+            } else {
+                assert!(n.y > -1e-3 && n.z > -1e-3, "curva {n}");
+            }
+        }
+    }
+}

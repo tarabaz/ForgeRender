@@ -36,6 +36,7 @@ struct JobInfo {
     backend: forge_render_core::BackendKind,
     geometry_rev: u64,
     shading_rev: u64,
+    camera_rev: u64,
     key: (u32, u32, u32, u32, u32, u64, bool),
     threads: usize,
     target: u32,
@@ -147,6 +148,10 @@ pub struct ForgeApp {
     pub geometry_rev: u64,
     /// Revisione di materiali, luci, ambiente, camera: invalida l'accumulo.
     pub shading_rev: u64,
+    /// Solo la camera del render è cambiata: si riusa la scena compilata (e quella in VRAM).
+    camera_rev: u64,
+    /// Ultima scena compilata per il render, con le revisioni da cui è nata.
+    last_render_scene: Option<(u64, u64, Arc<RenderScene>)>,
     /// Revisione di materiali e assegnazioni (colori della viewport).
     pub appearance_rev: u64,
     /// Componente da selezionare all'avvio (anche dopo il caricamento del progetto).
@@ -233,6 +238,8 @@ impl ForgeApp {
             show_import_options: false,
             geometry_rev: 1,
             shading_rev: 1,
+            camera_rev: 0,
+            last_render_scene: None,
             appearance_rev: 1,
             displacement_sig: 0,
             startup_select: None,
@@ -343,7 +350,14 @@ impl ForgeApp {
     // Revisioni e invalidazione
     // ------------------------------------------------------------------
 
-    /// Materiali, luci, ambiente o camera modificati.
+    /// Cambiata solo la camera del render (posizione, obiettivo, camera attiva):
+    /// il render riparte riusando la scena già compilata e già in memoria video.
+    pub fn render_camera_changed(&mut self) {
+        self.camera_rev += 1;
+        self.unsaved = true;
+    }
+
+    /// Materiali, luci, ambiente o geometria modificati.
     pub fn shading_changed(&mut self) {
         self.shading_rev += 1;
         self.unsaved = true;
@@ -479,6 +493,71 @@ impl ForgeApp {
         self.show_selection_tab();
     }
 
+    /// Crea un oggetto semplice dimensionato e posizionato rispetto alla scena:
+    /// pavimento e fondale sotto/dietro tutto, le forme di lato sul pavimento.
+    pub fn add_object(&mut self, kind: AddKind) {
+        use forge_math::{Mat4, Vec3};
+        use forge_scene::AddedKind as K;
+        let b = self.scene.bounds();
+        let (c, ground, e, back, right) = if b.is_empty() {
+            (Vec3::ZERO, 0.0, 1.0, -0.5, 0.5)
+        } else {
+            let s = b.max - b.min;
+            let c = (b.min + b.max) * 0.5;
+            (c, b.min.y, s.x.max(s.z).max(0.5), b.min.z, b.max.x)
+        };
+        let at = |x: f32, z: f32| Mat4::from_translation(Vec3::new(x, ground, z));
+        let side = right + 0.4 * e;
+        let r = 0.15 * e;
+        let (kind, placement) = match kind {
+            AddKind::Floor => (K::Floor { size: (4.0 * e).max(4.0) }, at(c.x, c.z)),
+            AddKind::Backdrop => {
+                let height = (1.5 * e).max(2.0);
+                let radius = 0.25 * height;
+                // La parete del fondale sta a z = -raggio rispetto all'origine della mesh.
+                let wall = back - 0.3 * e + radius;
+                // Il piano si estende davanti alla scena quanto basta a uscire dall'inquadratura.
+                let depth = (c.z - wall) + 2.0 * e;
+                (
+                    K::Backdrop {
+                        width: (3.0 * e).max(3.0),
+                        depth,
+                        height,
+                        radius,
+                    },
+                    at(c.x, wall),
+                )
+            }
+            AddKind::Wall => (
+                K::Wall {
+                    width: (3.0 * e).max(3.0),
+                    height: (1.5 * e).max(2.0),
+                },
+                at(c.x, back - 0.3 * e),
+            ),
+            AddKind::Box => (K::Box { size: Vec3::splat(2.0 * r) }, at(side, c.z)),
+            AddKind::Sphere => (K::Sphere { radius: r }, at(side, c.z)),
+            AddKind::Cylinder => (
+                K::Cylinder {
+                    radius: r,
+                    height: 2.0 * r,
+                },
+                at(side, c.z),
+            ),
+            AddKind::Cup => (
+                K::Cup {
+                    radius: 0.6 * r,
+                    height: 1.4 * r,
+                },
+                at(side, c.z),
+            ),
+        };
+        let i = self.scene.add_object(kind, placement);
+        self.selection = [i].into_iter().collect();
+        self.geometry_changed();
+        self.show_selection_tab();
+    }
+
     /// Canc: elimina le copie selezionate (i componenti dei file importati si nascondono, non si eliminano).
     pub fn delete_selected_copies(&mut self) {
         let ids: Vec<forge_scene::ComponentId> = crate::ui::gizmo::top_selected(self)
@@ -490,6 +569,7 @@ impl ForgeApp {
         for id in ids {
             match self.scene.find(&id) {
                 Some(i) if self.scene.delete_copy(i) => deleted += 1,
+                Some(i) if self.scene.delete_added(i) => deleted += 1,
                 Some(_) => originals += 1,
                 None => {}
             }
@@ -501,7 +581,7 @@ impl ForgeApp {
         if originals > 0 {
             self.info = Some(
                 "I componenti dei file importati non si eliminano (il file sorgente resta com'è): \
-                 nascondili con H. Si eliminano solo le copie create con Duplica."
+                 nascondili con H. Si eliminano solo le copie create con Duplica e gli oggetti del menu Aggiungi."
                     .into(),
             );
         }
@@ -575,10 +655,10 @@ impl ForgeApp {
                 if let Some(c) = self.scene.render_cameras.get_mut(i) {
                     c.camera = self.scene.camera.clone();
                 }
-                self.shading_rev += 1;
+                self.camera_rev += 1;
                 self.unsaved = true;
             }
-            None => self.shading_rev += 1,
+            None => self.camera_rev += 1,
         }
     }
 
@@ -597,7 +677,7 @@ impl ForgeApp {
         if self.scene.active_camera.is_none() {
             self.camera_follow = false;
         }
-        self.shading_changed();
+        self.render_camera_changed();
     }
 
     /// Porta la vista della viewport sull'inquadratura della camera di rendering.
@@ -761,11 +841,19 @@ impl ForgeApp {
                 }
             },
         };
-        let rs = Arc::new(RenderScene::compile_with_geometry(&self.scene, geometry));
+        let rs = match &self.last_render_scene {
+            // Cambiata solo la camera: niente ricompilazione né nuovo caricamento sulla GPU.
+            Some((g, sh, prev)) if *g == self.geometry_rev && *sh == self.shading_rev => {
+                Arc::new(prev.with_camera(self.scene.render_camera().clone()))
+            }
+            _ => Arc::new(RenderScene::compile_with_geometry(&self.scene, geometry)),
+        };
+        self.last_render_scene = Some((self.geometry_rev, self.shading_rev, rs.clone()));
         self.session.start(rs, self.settings.clone(), backend);
         self.job = Some(JobInfo {
             geometry_rev: self.geometry_rev,
             shading_rev: self.shading_rev,
+            camera_rev: self.camera_rev,
             key: self.settings.accumulation_key(),
             threads: self.settings.effective_threads(),
             target: self.settings.target_samples,
@@ -800,6 +888,7 @@ impl ForgeApp {
             Some(j) => {
                 j.geometry_rev != self.geometry_rev
                     || j.shading_rev != self.shading_rev
+                    || j.camera_rev != self.camera_rev
                     || j.key != self.settings.accumulation_key()
                     || j.threads != self.settings.effective_threads()
                     || j.backend != self.settings.backend
@@ -1438,3 +1527,25 @@ fn with_extension(p: PathBuf, ext: &str) -> PathBuf {
         p.with_extension(ext)
     }
 }
+
+/// Voci del menu "Aggiungi".
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AddKind {
+    Floor,
+    Backdrop,
+    Wall,
+    Box,
+    Sphere,
+    Cylinder,
+    Cup,
+}
+
+pub const ADD_MENU: &[(&str, AddKind)] = &[
+    ("Pavimento", AddKind::Floor),
+    ("Fondale da studio", AddKind::Backdrop),
+    ("Parete", AddKind::Wall),
+    ("Cubo", AddKind::Box),
+    ("Sfera", AddKind::Sphere),
+    ("Cilindro", AddKind::Cylinder),
+    ("Tazza", AddKind::Cup),
+];

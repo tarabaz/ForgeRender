@@ -52,6 +52,15 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             }
         });
 
+        ui.menu_button("Aggiungi", |ui| {
+            for (label, kind) in crate::app::ADD_MENU {
+                if ui.button(*label).clicked() {
+                    app.add_object(*kind);
+                    ui.close();
+                }
+            }
+        });
+
         ui.separator();
         if ui.button("Importa").on_hover_text("Importa mesh OBJ/STL (Ctrl+I)").clicked() {
             app.import_dialog();
