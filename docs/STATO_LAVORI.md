@@ -40,7 +40,15 @@
   "anteprima veloce" (8, 16, 32… campioni), qualità, intensità, viste di controllo. Errore
   ridotto ~10× a 8 campioni nei test (MSE contro riferimento a 512 campioni).
 
+## Fatto nella sesta parte
+- Gizmo sposta/ruota/scala, annulla/ripeti, H per nascondere, duplica, appoggio esatto,
+  navigatore degli assi, camere di rendering con obiettivo professionale e profondità di campo.
+- Libreria materiali/HDRI con download ambientCG e Poly Haven, mappe PBR complete.
+- Displacement vero dalla height map (suddivisione al render, CPU e GPU) e pannello "Scala e
+  posizionamento texture" nel materiale.
+- README e ROADMAP in inglese con copie italiane; sintesi delle prossime funzionalità con la
+  complessità (vedi docs/ROADMAP.it.md).
+
 ## Prossimi passi
-1. Prova sul PC con RTX 5070: denoiser CUDA, render GPU, benchmark, file STEP/SLDASM reali.
-2. DLSS Ray Reconstruction come anteprima interattiva su RTX (vedi docs/ROADMAP.md, "NVIDIA").
-3. Arresto a soglia di rumore; NVML per utilizzo/VRAM della GPU.
+Vedi la tabella di sintesi in docs/ROADMAP.it.md (gizmo luci, snap a contatto, lingue,
+campionamento adattivo, nebbia volumetrica…).

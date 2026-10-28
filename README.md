@@ -1,60 +1,78 @@
 # ForgeRender
 
-Renderer fotorealistico per modelli CAD e assiemi meccanici, scritto in Rust.
-Path tracing progressivo fisicamente basato, interfaccia desktop in italiano,
-pensato per Windows 11 (Ryzen 9 9900X + RTX 5070) ma funzionante anche senza GPU.
+🇮🇹 [Leggi in italiano](README.it.md)
 
-> Stato: **Milestone 1 completata** (renderer CPU, GUI, progetti). Vedi
-> [docs/ROADMAP.md](docs/ROADMAP.md) per cosa è realmente operativo e cosa no.
+A photorealistic renderer for CAD models, mechanical assemblies and general 3D scenes,
+written in Rust. Physically based progressive path tracing on the CPU and on the GPU,
+desktop interface, designed for Windows 11 (developed for a Ryzen 9 9900X + RTX 5070)
+but also working without a dedicated GPU.
 
-## Cosa fa oggi
+> See [docs/ROADMAP.md](docs/ROADMAP.md) for what really works today, what comes next and
+> how complex each next step is.
 
-- Path tracer su CPU (tutti i core) e su GPU (compute shader wgpu, Vulkan/DX12) con accumulo progressivo reale dei campioni
-  (16…1024, personalizzato o illimitato), modificabile durante il render.
-- Next Event Estimation + Multiple Importance Sampling, Russian roulette, BVH SAH.
-- Materiali: diffuso, metalli e plastiche GGX (campionamento VNDF), vetro con Fresnel esatto, emissivi.
-  Texture colore/roughness/normal map con mapping UV o proiezione box (per CAD senza UV).
-  Libreria di ~120 materiali pronti in 11 categorie, con ricerca.
-- Luci ad area, puntiformi, spot, direzionali; ambiente uniforme, a gradiente o HDRI (.hdr/.exr)
-  con importance sampling; 5 preset da studio.
-- Import STEP/STP (assiemi con nomi, colori, trasformazioni; Open CASCADE in un processo separato),
-  glTF/GLB e progetti Blender `.blend` (camera, luci, materiali, texture; serve Blender installato
-  per i `.blend`), OBJ (con .mtl) e STL; SolidWorks SLDPRT/SLDASM sperimentale tramite SolidWorks installato.
-- Trasformazioni non distruttive: sposta, ruota, ridimensiona (anche in mm), appoggia sul pavimento.
-- Viewport 3D wgpu (orbita/pan/zoom, selezione col clic), albero dei componenti,
-  assegnazione materiali persistente per id stabile (singola, multipla, per nome, ereditata).
-- Avvio / pausa / ripresa / stop / riavvio automatico quando la scena cambia, export PNG.
-- Progetti `.frproject` (JSON versionato, salvataggio atomico, percorsi relativi).
-- CLI per render headless e benchmark.
+## What it does today
 
-## Scaricare la versione Windows
+- **Path tracing** on the CPU (all cores) and on the GPU (wgpu compute shaders, Vulkan/DX12)
+  with real progressive accumulation (16…1024 samples, custom or unlimited, changeable while
+  rendering). Next Event Estimation + Multiple Importance Sampling, Russian roulette, SAH BVH.
+- **Denoiser**: Intel Open Image Denoise loaded at runtime, CPU or CUDA device, albedo/normal
+  guide buffers, final-only or progressive preview mode.
+- **Materials**: diffuse, GGX metals and plastics with multiple-scattering compensation, glass
+  with exact Fresnel, frosted glass, emissive surfaces sampled as lights.
+  Full PBR maps: base colour, roughness/gloss, metallic, normal (OpenGL/DirectX), height (bump),
+  **true displacement**, ambient occlusion, opacity cutout; UV mapping or world-space box
+  projection in metres for CAD models without UVs, with repeat size, rotation and offset.
+- **Library**: ~120 ready-made materials, plus materials and HDRIs downloaded from
+  ambientCG and Poly Haven or imported from folders/zip files, kept in a local `Library`
+  folder with previews.
+- **Lights and environment**: area, point, spot and directional lights, studio presets;
+  uniform, gradient or HDRI environment (.hdr/.exr) with importance sampling.
+- **Cameras**: orbit viewport camera plus render cameras with a professional lens: focal length
+  in mm, f-stop, depth of field (focus plane and near/far limits drawn in the viewport),
+  aperture blades, lens shift.
+- **Import**: glTF/GLB (recommended export from SolidWorks), OBJ (with .mtl), STL, Blender
+  `.blend` (through an installed Blender); STEP via Open CASCADE and SolidWorks SLDPRT/SLDASM
+  are experimental.
+- **Editing**: move/rotate/scale gizmo with snapping, undo/redo, hide (H), duplicate,
+  exact drop to floor, Blender-style axis navigator, component tree, persistent material
+  assignment by stable id.
+- Start / pause / resume / stop / automatic restart when the scene changes, PNG export.
+- `.frproject` projects (versioned JSON, atomic save, relative paths).
+- CLI for headless rendering, benchmarks and library import.
 
-Ogni push compila automaticamente su GitHub Actions (job *Build e pacchetti (Windows)*)
-due pacchetti scaricabili dalla pagina del run, sezione *Artifacts*:
+The interface is currently in Italian; external language files (Italian and English first)
+are on the roadmap.
 
-| Pacchetto | Contenuto |
+## Download the Windows build
+
+Every push is built by GitHub Actions (job *Build e pacchetti (Windows)*); two packages are
+available in the *Artifacts* section of the run:
+
+| Package | Contents |
 |---|---|
-| `ForgeRender-portable-x64` | zip: si estrae e si avvia `forgerender.exe`, nessuna installazione |
-| `ForgeRender-setup-x64` | installer (menu Start, disinstallazione, associazione `.frproject`) |
+| `ForgeRender-portable-x64` | zip: extract and run `forgerender.exe`, no installation |
+| `ForgeRender-setup-x64` | installer (Start menu, uninstaller, `.frproject` association) |
 
-Entrambi sono eseguibili autonomi: CRT collegato staticamente, solo DLL di sistema di Windows.
+Both are self-contained: static CRT, only Windows system DLLs plus the bundled Open Image
+Denoise libraries.
 
-## Compilare in locale
+## Build locally
 
-Requisiti: Rust stable (`rustup`), su Windows i *Visual Studio Build Tools* (C++).
+Requirements: stable Rust (`rustup`); on Windows the *Visual Studio Build Tools* (C++).
 
 ```
 cargo test --workspace --release
-cargo run --release -p forge_app            # interfaccia grafica
+cargo run --release -p forge_app            # graphical interface
 cargo run --release -p forge_cli -- bench   # benchmark
 ```
 
-Pacchetti Windows in locale: `powershell -ExecutionPolicy Bypass -File packaging\windows\package.ps1`
-(per l'installer serve [Inno Setup 6](https://jrsoftware.org/isdl.php)).
+Windows packages locally: `powershell -ExecutionPolicy Bypass -File packaging\windows\package.ps1`
+(the installer needs [Inno Setup 6](https://jrsoftware.org/isdl.php)).
 
-## Documentazione
+## Documentation
 
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architettura, scelte tecniche, rischi
-- [docs/ROADMAP.md](docs/ROADMAP.md) — fasi, stato reale delle funzionalità
-- [docs/BENCHMARK.md](docs/BENCHMARK.md) — misure eseguite (solo dati reali)
-- [docs/STATO_LAVORI.md](docs/STATO_LAVORI.md) — punto di ripresa dello sviluppo
+- [docs/ROADMAP.md](docs/ROADMAP.md) — status, next steps with complexity, technical plans
+  ([italiano](docs/ROADMAP.it.md))
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architecture, technical choices, risks (Italian)
+- [docs/BENCHMARK.md](docs/BENCHMARK.md) — measurements actually performed (Italian)
+- [docs/STATO_LAVORI.md](docs/STATO_LAVORI.md) — development log (Italian)
