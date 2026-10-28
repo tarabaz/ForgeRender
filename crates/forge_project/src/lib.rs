@@ -210,14 +210,18 @@ pub fn parse(json: &str) -> anyhow::Result<ProjectFile> {
 
 /// Se un file esterno (HDRI, texture) non esiste più nel percorso salvato, lo
 /// cerca accanto al progetto o nelle sottocartelle indicate.
-fn relocate_asset(path: &mut PathBuf, project_dir: Option<&Path>, subdirs: &[&str], report: &mut LoadReport) {
+fn relocate_asset(path: &mut PathBuf, project_dir: Option<&Path>, subdirs: &[&str], source_dirs: &[PathBuf], report: &mut LoadReport) {
     if path.is_file() {
         return;
     }
     let Some(name) = path.file_name().map(PathBuf::from) else { return };
+    // Texture estratte da un modello (es. `modello_texture/colore_0.png` accanto al .glb):
+    // si cercano con la loro cartella accanto ai file sorgente, ovunque siano adesso.
+    let with_parent = path.parent().and_then(|p| p.file_name()).map(|d| Path::new(d).join(&name));
     let found = std::iter::once(name.clone())
         .chain(subdirs.iter().map(|d| Path::new(d).join(&name)))
         .filter_map(|r| project_dir.map(|d| d.join(r)))
+        .chain(source_dirs.iter().filter_map(|d| with_parent.as_ref().map(|r| d.join(r))))
         .find(|p| p.is_file());
     match found {
         Some(p) => *path = p,
@@ -297,12 +301,16 @@ pub fn load(path: &Path) -> anyhow::Result<LoadedProject> {
     scene.lights = pf.lights;
     scene.environment = pf.environment;
     // HDRI e texture spostate insieme al progetto: si cercano nella cartella del progetto.
+    let source_dirs: Vec<PathBuf> = sources
+        .iter()
+        .filter_map(|s| s.absolute_path.parent().map(Path::to_path_buf))
+        .collect();
     if let forge_scene::Environment::Hdri { path: hdri, .. } = &mut scene.environment {
-        relocate_asset(hdri, project_dir, &["hdri"], &mut report);
+        relocate_asset(hdri, project_dir, &["hdri"], &source_dirs, &mut report);
     }
     for m in &mut scene.materials.materials {
         for slot in m.texture_slots_mut().into_iter().flatten() {
-            relocate_asset(slot, project_dir, &["textures", "texture"], &mut report);
+            relocate_asset(slot, project_dir, &["textures", "texture"], &source_dirs, &mut report);
         }
     }
     scene.camera = pf.camera;
@@ -480,6 +488,22 @@ mod tests {
         assert_eq!(l.report.missing_components, vec![ComponentId("sparito/pezzo".into())]);
         // L'assegnazione orfana viene conservata (il componente potrebbe ricomparire).
         assert!(l.scene.assignments.contains_key(&ComponentId("sparito/pezzo".into())));
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    /// Texture estratte da un .glb (cartella `modello_texture` accanto al file): spostato il
+    /// progetto su un altro PC, si ritrovano accanto al modello nella nuova posizione.
+    #[test]
+    fn extracted_model_textures_follow_the_model() {
+        let dir = tmpdir();
+        let tex = dir.join("modelli").join("piatto_texture");
+        std::fs::create_dir_all(&tex).unwrap();
+        std::fs::write(tex.join("colore_3.png"), b"x").unwrap();
+        let mut path = PathBuf::from("/vecchio/pc/modelli/piatto_texture/colore_3.png");
+        let mut report = LoadReport::default();
+        relocate_asset(&mut path, Some(&dir), &["textures"], &[dir.join("modelli")], &mut report);
+        assert_eq!(path, tex.join("colore_3.png"));
+        assert!(report.warnings.is_empty());
         std::fs::remove_dir_all(dir).ok();
     }
 
