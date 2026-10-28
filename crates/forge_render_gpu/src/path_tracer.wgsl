@@ -386,7 +386,19 @@ fn tex_coords(m: Mat, prim: u32, bu: f32, bv: f32, p: vec3<f32>) -> TexCoords {
     var t: vec3<f32>;
     var b: vec3<f32>;
     var is_box = false;
-    if (use_uv) {
+    let flags = S[pb + 27u];
+    if ((flags & 1u) != 0u) {
+        // Superficie spostata dal displacement: coordinate box della superficie originale.
+        is_box = true;
+        let a0 = vec2<f32>(sf(pb + 16u), sf(pb + 17u));
+        let a1 = vec2<f32>(sf(pb + 18u), sf(pb + 19u));
+        let a2 = vec2<f32>(sf(pb + 20u), sf(pb + 21u));
+        base = a0 * (1.0 - bu - bv) + a1 * bu + a2 * bv;
+        let axis = (flags >> 1u) & 3u;
+        if (axis == 0u) { t = vec3<f32>(0.0, 0.0, 1.0); b = vec3<f32>(0.0, 1.0, 0.0); }
+        else if (axis == 1u) { t = vec3<f32>(1.0, 0.0, 0.0); b = vec3<f32>(0.0, 0.0, 1.0); }
+        else { t = vec3<f32>(1.0, 0.0, 0.0); b = vec3<f32>(0.0, 1.0, 0.0); }
+    } else if (use_uv) {
         let a0 = vec2<f32>(sf(pb + 16u), sf(pb + 17u));
         let a1 = vec2<f32>(sf(pb + 18u), sf(pb + 19u));
         let a2 = vec2<f32>(sf(pb + 20u), sf(pb + 21u));

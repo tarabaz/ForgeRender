@@ -144,6 +144,10 @@ pub struct ForgeApp {
     pub shading_rev: u64,
     /// Revisione di materiali e assegnazioni (colori della viewport).
     pub appearance_rev: u64,
+    /// Componente da selezionare all'avvio (anche dopo il caricamento del progetto).
+    startup_select: Option<String>,
+    /// Impronta dei parametri di displacement: se cambia va ricostruita la geometria.
+    displacement_sig: u64,
 
     geometry: Option<(u64, Arc<RenderGeometry>)>,
     pending_geometry: Option<PendingGeometry>,
@@ -221,6 +225,8 @@ impl ForgeApp {
             geometry_rev: 1,
             shading_rev: 1,
             appearance_rev: 1,
+            displacement_sig: 0,
+            startup_select: None,
             geometry: None,
             pending_geometry: None,
             job: None,
@@ -279,11 +285,7 @@ impl ForgeApp {
         if let Some(p) = &startup.open {
             app.open_any(p);
         }
-        if let Some(name) = &startup.select {
-            if let Some(i) = app.scene.nodes.iter().position(|n| &n.name == name) {
-                app.selection.insert(i);
-            }
-        }
+        app.startup_select = startup.select.clone();
         app.gizmo.mode = match startup.gizmo.as_deref() {
             Some("rotate") => crate::ui::gizmo::GizmoMode::Rotate,
             Some("scale") => crate::ui::gizmo::GizmoMode::Scale,
@@ -337,7 +339,47 @@ impl ForgeApp {
     /// Materiali o assegnazioni modificati (cambiano anche i colori della viewport).
     pub fn appearance_changed(&mut self) {
         self.appearance_rev += 1;
+        // Il displacement sposta i triangoli: cambiarlo richiede una nuova geometria.
+        let sig = self.displacement_signature();
+        if sig != self.displacement_sig {
+            self.displacement_sig = sig;
+            self.geometry_rev += 1;
+        }
         self.shading_changed();
+    }
+
+    /// Impronta di componenti e parametri con displacement (0 = nessuno).
+    fn displacement_signature(&self) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        let mut any = false;
+        for i in 0..self.scene.nodes.len() {
+            let Some(m) = self.scene.materials.get(self.scene.resolve_material(i)) else {
+                continue;
+            };
+            if !m.has_displacement() || self.scene.nodes[i].mesh.is_none() {
+                continue;
+            }
+            any = true;
+            i.hash(&mut h);
+            m.height_texture.hash(&mut h);
+            for v in [
+                m.displacement_mm,
+                m.displacement_mid,
+                m.mapping.scale,
+                m.mapping.rotation_deg,
+                m.mapping.offset[0],
+                m.mapping.offset[1],
+            ] {
+                v.to_bits().hash(&mut h);
+            }
+            (m.mapping.projection == forge_scene::Projection::Uv).hash(&mut h);
+        }
+        if any {
+            h.finish() | 1
+        } else {
+            0
+        }
     }
 
     /// Geometria, visibilità o struttura modificate.
@@ -1253,10 +1295,24 @@ impl ForgeApp {
     }
 
     /// Chiamata a ogni frame prima del disegno dell'interfaccia.
+    /// Selezione richiesta da riga di comando: applicata appena il componente esiste.
+    fn apply_startup_select(&mut self) {
+        let Some(name) = &self.startup_select else { return };
+        if self.pending.is_some() {
+            return; // progetto in caricamento
+        }
+        if let Some(i) = self.scene.nodes.iter().position(|n| &n.name == name) {
+            self.selection.insert(i);
+            self.selected_material = self.scene.resolve_material(i).clone();
+            self.startup_select = None;
+        }
+    }
+
     pub fn tick(&mut self, ctx: &egui::Context) {
         self.frames += 1;
         self.poll_geometry();
         self.poll_pending();
+        self.apply_startup_select();
         if let Some(rx) = &self.gpu_warmup {
             if let Ok(r) = rx.try_recv() {
                 if let Err(e) = &r {

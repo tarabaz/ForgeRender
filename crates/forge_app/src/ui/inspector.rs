@@ -241,6 +241,14 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
     });
 
     ui.separator();
+    // Lato più lungo dei componenti selezionati (per contare le ripetizioni della texture).
+    let obj_size = {
+        let mut b = forge_math::Aabb::EMPTY;
+        for &i in &app.selection {
+            b.grow(&app.scene.bounds_of(i));
+        }
+        (!b.is_empty()).then(|| (b.max - b.min).max_element()).filter(|s| *s > 0.0)
+    };
     let Some(m) = app.scene.materials.get_mut(&app.selected_material) else {
         return;
     };
@@ -249,6 +257,16 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
         ui.label("Nome");
         changed |= ui.text_edit_singleline(&mut m.name).changed();
     });
+    if m.has_textures() {
+        egui::CollapsingHeader::new("Scala e posizionamento texture")
+            .default_open(true)
+            .show(ui, |ui| changed |= mapping_controls(ui, m, obj_size));
+        if m.normal_texture.is_some() || m.height_texture.is_some() {
+            egui::CollapsingHeader::new("Rilievo (normal, bump, displacement)")
+                .default_open(true)
+                .show(ui, |ui| changed |= relief_controls(ui, m));
+        }
+    }
     egui::Grid::new("mat-grid").num_columns(2).spacing([10.0, 6.0]).show(ui, |ui| {
         ui.label("Colore base");
         changed |= ui.color_edit_button_rgb(&mut m.base_color).changed();
@@ -335,14 +353,6 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
         ui.label("Rilievo (height)");
         changed |= texture_slot(ui, &mut m.height_texture, "height");
         ui.end_row();
-        if m.height_texture.is_some() {
-            ui.label("Profondità rilievo (mm)");
-            changed |= ui
-                .add(egui::DragValue::new(&mut m.bump_mm).speed(0.05).range(0.0..=100.0))
-                .on_hover_text("Bump mapping: 0 = spento. Con una normal map il rilievo è di solito già incluso.")
-                .changed();
-            ui.end_row();
-        }
         ui.label("Occlusione (AO)");
         changed |= texture_slot(ui, &mut m.ao_texture, "ao");
         ui.end_row();
@@ -357,53 +367,176 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
         ui.label("Opacità (ritaglio)");
         changed |= texture_slot(ui, &mut m.opacity_texture, "opacity");
         ui.end_row();
-        if m.has_textures() {
-            ui.label("Proiezione");
-            ui.horizontal(|ui| {
-                changed |= ui
-                    .radio_value(&mut m.mapping.projection, forge_scene::Projection::Box, "Box (CAD)")
-                    .on_hover_text("Proiezione cubica in spazio mondo: non richiede UV")
-                    .changed();
-                changed |= ui
-                    .radio_value(&mut m.mapping.projection, forge_scene::Projection::Uv, "UV della mesh")
-                    .changed();
-            });
-            ui.end_row();
-            match m.mapping.projection {
-                forge_scene::Projection::Box => {
-                    ui.label("Dimensione ripetizione (m)");
-                    changed |= ui
-                        .add(egui::DragValue::new(&mut m.mapping.scale).speed(0.001).range(0.0001..=100.0))
-                        .changed();
-                }
-                forge_scene::Projection::Uv => {
-                    ui.label("Ripetizioni");
-                    changed |= ui
-                        .add(egui::DragValue::new(&mut m.mapping.scale).speed(0.05).range(0.001..=1000.0))
-                        .changed();
-                }
-            }
-            ui.end_row();
-            ui.label("Rotazione (°)");
-            changed |= ui.add(egui::Slider::new(&mut m.mapping.rotation_deg, -180.0..=180.0)).changed();
-            ui.end_row();
-            ui.label("Spostamento");
-            ui.horizontal(|ui| {
-                changed |= ui.add(egui::DragValue::new(&mut m.mapping.offset[0]).speed(0.01)).changed();
-                changed |= ui.add(egui::DragValue::new(&mut m.mapping.offset[1]).speed(0.01)).changed();
-            });
-            ui.end_row();
-        }
-        if m.normal_texture.is_some() {
-            ui.label("Intensità normal map");
-            changed |= ui.add(egui::Slider::new(&mut m.normal_strength, 0.0..=4.0)).changed();
-            ui.end_row();
-        }
     });
     if changed {
         app.appearance_changed();
     }
     crate::ui::central::material_preview(app, ui);
+}
+
+/// Scala, proiezione, rotazione e spostamento delle texture del materiale.
+fn mapping_controls(ui: &mut egui::Ui, m: &mut Material, obj_size: Option<f32>) -> bool {
+    let mut changed = false;
+    let mp = &mut m.mapping;
+    ui.horizontal(|ui| {
+        ui.label("Proiezione");
+        changed |= ui
+            .radio_value(&mut mp.projection, forge_scene::Projection::Box, "Box (CAD)")
+            .on_hover_text("Proiezione cubica in spazio mondo: non richiede UV, la scala è in metri reali")
+            .changed();
+        changed |= ui
+            .radio_value(&mut mp.projection, forge_scene::Projection::Uv, "UV della mesh")
+            .on_hover_text("Usa le coordinate UV del modello (glTF/OBJ esportati con UV)")
+            .changed();
+    });
+    match mp.projection {
+        forge_scene::Projection::Box => {
+            ui.label("Dimensione di una ripetizione")
+                .on_hover_text("Lato reale di una piastrella della texture: più piccola = più ripetizioni (es. mattoni più piccoli)");
+            ui.horizontal(|ui| {
+                changed |= ui
+                    .add(
+                        egui::Slider::new(&mut mp.scale, 0.002..=50.0)
+                            .logarithmic(true)
+                            .custom_formatter(|v, _| fmt_len(v as f32))
+                            .custom_parser(parse_len),
+                    )
+                    .changed();
+                if ui
+                    .small_button("÷2")
+                    .on_hover_text("Texture più piccola (il doppio delle ripetizioni)")
+                    .clicked()
+                {
+                    mp.scale = (mp.scale * 0.5).max(0.0001);
+                    changed = true;
+                }
+                if ui
+                    .small_button("×2")
+                    .on_hover_text("Texture più grande (metà delle ripetizioni)")
+                    .clicked()
+                {
+                    mp.scale = (mp.scale * 2.0).min(1000.0);
+                    changed = true;
+                }
+            });
+            if let Some(size) = obj_size {
+                let mut reps = size / mp.scale.max(1e-6);
+                ui.horizontal(|ui| {
+                    ui.label("Ripetizioni sull'oggetto");
+                    if ui
+                        .add(egui::DragValue::new(&mut reps).speed(0.1).range(0.01..=100000.0).max_decimals(1))
+                        .on_hover_text(format!(
+                            "Quante volte la texture si ripete sul lato più lungo dell'oggetto selezionato ({})",
+                            fmt_len(size)
+                        ))
+                        .changed()
+                    {
+                        mp.scale = (size / reps.max(0.01)).clamp(0.0001, 1000.0);
+                        changed = true;
+                    }
+                });
+            }
+        }
+        forge_scene::Projection::Uv => {
+            ui.horizontal(|ui| {
+                ui.label("Ripetizioni");
+                changed |= ui
+                    .add(egui::Slider::new(&mut mp.scale, 0.01..=1000.0).logarithmic(true).max_decimals(2))
+                    .on_hover_text("Quante volte la texture si ripete sull'intervallo UV 0–1 del modello")
+                    .changed();
+            });
+        }
+    }
+    ui.horizontal(|ui| {
+        ui.label("Rotazione");
+        changed |= ui
+            .add(egui::Slider::new(&mut mp.rotation_deg, -180.0..=180.0).suffix("°"))
+            .changed();
+    });
+    ui.horizontal(|ui| {
+        ui.label("Spostamento");
+        changed |= ui.add(egui::DragValue::new(&mut mp.offset[0]).speed(0.01).prefix("U ")).changed();
+        changed |= ui.add(egui::DragValue::new(&mut mp.offset[1]).speed(0.01).prefix("V ")).changed();
+        if ui.small_button("Azzera").clicked() {
+            mp.offset = [0.0; 2];
+            mp.rotation_deg = 0.0;
+            changed = true;
+        }
+    });
+    changed
+}
+
+/// Normal map, bump e displacement vero.
+fn relief_controls(ui: &mut egui::Ui, m: &mut Material) -> bool {
+    let mut changed = false;
+    egui::Grid::new("relief-grid").num_columns(2).spacing([10.0, 6.0]).show(ui, |ui| {
+        if m.normal_texture.is_some() {
+            ui.label("Intensità normal map");
+            changed |= ui
+                .add(egui::Slider::new(&mut m.normal_strength, 0.0..=4.0))
+                .on_hover_text("Dettaglio fine dell'ombreggiatura (non cambia la sagoma)")
+                .changed();
+            ui.end_row();
+        }
+        if m.height_texture.is_some() {
+            ui.label("Bump (mm)");
+            changed |= ui
+                .add(egui::Slider::new(&mut m.bump_mm, 0.0..=20.0).max_decimals(2))
+                .on_hover_text("Bump mapping dalla height: solo ombreggiatura. 0 = spento (con la normal map di solito non serve)")
+                .changed();
+            ui.end_row();
+            ui.label("Displacement (mm)");
+            changed |= ui
+                .add(egui::Slider::new(&mut m.displacement_mm, 0.0..=200.0).max_decimals(1))
+                .on_hover_text(
+                    "Displacement vero: la superficie viene suddivisa e spostata secondo la height map, \
+                     cambia anche la sagoma e le ombre. 0 = spento. Più pesante da preparare.",
+                )
+                .changed();
+            ui.end_row();
+            if m.displacement_mm > 0.0 {
+                ui.label("Livello medio");
+                changed |= ui
+                    .add(egui::Slider::new(&mut m.displacement_mid, 0.0..=1.0))
+                    .on_hover_text("Grigio che lascia la superficie dov'è: 0.5 = metà in fuori e metà in dentro, 0 = solo in fuori")
+                    .changed();
+                ui.end_row();
+            }
+        }
+    });
+    if m.displacement_mm > 0.0 && m.height_texture.is_some() {
+        ui.label(
+            egui::RichText::new("Il displacement si vede nel render (non nella viewport di modellazione).")
+                .small()
+                .weak(),
+        );
+    }
+    changed
+}
+
+fn fmt_len(m: f32) -> String {
+    if m < 0.01 {
+        format!("{:.1} mm", m * 1000.0)
+    } else if m < 1.0 {
+        format!("{:.1} cm", m * 100.0)
+    } else {
+        format!("{m:.2} m")
+    }
+}
+
+/// Legge "25 cm", "3mm", "1.5 m" o un numero (metri).
+fn parse_len(s: &str) -> Option<f64> {
+    let t = s.trim().replace(',', ".").to_lowercase();
+    let (num, mul) = if let Some(x) = t.strip_suffix("mm") {
+        (x, 0.001)
+    } else if let Some(x) = t.strip_suffix("cm") {
+        (x, 0.01)
+    } else if let Some(x) = t.strip_suffix('m') {
+        (x, 1.0)
+    } else {
+        (t.as_str(), 1.0)
+    };
+    num.trim().parse::<f64>().ok().map(|v| v * mul)
 }
 
 /// Slot di una texture: nome del file, "Scegli…" e rimozione. Restituisce `true` se cambiato.
@@ -574,11 +707,32 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
                     inner_angle_deg,
                     outer_angle_deg,
                 } => {
-                    ui.label("Cono esterno (°)");
-                    changed |= ui.add(egui::Slider::new(outer_angle_deg, 1.0..=170.0)).changed();
+                    // Apertura = angolo pieno del cono; sfumatura = parte del bordo che passa
+                    // gradualmente da luce piena a buio (angolo interno = apertura × (1 − sfumatura)).
+                    let mut soft = if *outer_angle_deg > 0.0 {
+                        (1.0 - *inner_angle_deg / *outer_angle_deg).clamp(0.0, 1.0) * 100.0
+                    } else {
+                        0.0
+                    };
+                    ui.label("Apertura cono (°)");
+                    if ui
+                        .add(egui::Slider::new(outer_angle_deg, 1.0..=170.0))
+                        .on_hover_text("Angolo pieno del fascio (si regola anche trascinando la maniglia piena del cono nella viewport)")
+                        .changed()
+                    {
+                        *inner_angle_deg = *outer_angle_deg * (1.0 - soft / 100.0);
+                        changed = true;
+                    }
                     ui.end_row();
-                    ui.label("Cono interno (°)");
-                    changed |= ui.add(egui::Slider::new(inner_angle_deg, 0.0..=170.0)).changed();
+                    ui.label("Sfumatura bordo (%)");
+                    if ui
+                        .add(egui::Slider::new(&mut soft, 0.0..=100.0).suffix(" %"))
+                        .on_hover_text("0 % = bordo netto, 100 % = sfuma dal centro (maniglia vuota nella viewport)")
+                        .changed()
+                    {
+                        *inner_angle_deg = *outer_angle_deg * (1.0 - soft / 100.0);
+                        changed = true;
+                    }
                     ui.end_row();
                 }
                 _ => {}

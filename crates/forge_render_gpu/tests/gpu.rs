@@ -453,3 +453,72 @@ fn gpu_depth_of_field_matches_cpu() {
     assert!(vs_pinhole > 2.0 * noise, "la profondità di campo deve cambiare l'immagine");
     assert!(diff < noise * 1.5, "RMSE GPU−CPU {diff} vs rumore CPU−CPU {noise}");
 }
+
+/// Displacement vero (cubo suddiviso e spostato) con colore, normal map, bump e
+/// metallicità: la GPU converge alla stessa immagine della CPU.
+#[test]
+fn gpu_displacement_matches_cpu() {
+    let Some(mut g) = gpu() else { return };
+    let mut s = Scene {
+        environment: Environment::Uniform {
+            color: [1.0; 3],
+            strength: 0.3,
+        },
+        ..Default::default()
+    };
+    s.lights.push(Light::point("P", Vec3::new(3.0, 2.0, 1.0), 40.0));
+    s.materials.upsert(Material {
+        id: MaterialId::new("pietra"),
+        base_color_texture: Some(pattern_png("d_col.png", 1, true)),
+        height_texture: Some(pattern_png("d_height.png", 5, false)),
+        normal_texture: Some(pattern_png("d_nor.png", 7, true)),
+        normal_directx: true,
+        metallic_texture: Some(pattern_png("d_metal.png", 4, false)),
+        metallic: 1.0,
+        roughness: 0.6,
+        bump_mm: 2.0,
+        displacement_mm: 60.0,
+        mapping: forge_scene::TextureMapping {
+            scale: 0.5,
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+    let mesh = s.add_mesh(primitives::cuboid(Vec3::ONE));
+    let cid = ComponentId("cubo".into());
+    s.add_node(None, cid.clone(), "Cubo", Mat4::IDENTITY, Some(mesh));
+    s.assignments.insert(cid, MaterialId::new("pietra"));
+    s.camera = Camera {
+        position: Vec3::new(1.6, 1.3, 2.2),
+        target: Vec3::ZERO,
+        up: Vec3::Y,
+        vfov_deg: 40.0,
+        ..Default::default()
+    };
+    let st = RenderSettings {
+        width: 48,
+        height: 36,
+        ..Default::default()
+    };
+    let rs = RenderScene::compile(&s);
+    assert!(rs.triangle_count() > 10_000, "geometria non suddivisa: {}", rs.triangle_count());
+    let spp = 128;
+    let mut cpu = CpuBackend::new(4).unwrap();
+    let a = render_with(&mut cpu, &s, &st, spp);
+    let b = render_with(&mut cpu, &s, &RenderSettings { seed: 999, ..st.clone() }, spp);
+    let gpu_img = render_with(&mut g, &s, &st, spp);
+    let rmse = |x: &[[f32; 3]], y: &[[f32; 3]]| {
+        let e: f64 = x
+            .iter()
+            .zip(y)
+            .map(|(p, q)| (0..3).map(|k| ((p[k] - q[k]) as f64).powi(2)).sum::<f64>())
+            .sum();
+        (e / (x.len() * 3) as f64).sqrt()
+    };
+    let mean = |x: &[[f32; 3]]| x.iter().map(|p| (p[0] + p[1] + p[2]) as f64).sum::<f64>() / (x.len() * 3) as f64;
+    let (noise, diff) = (rmse(&a, &b), rmse(&a, &gpu_img));
+    let (ma, mg) = (mean(&a), mean(&gpu_img));
+    eprintln!("media CPU {ma:.4} GPU {mg:.4} | RMSE CPU−CPU {noise:.4} GPU−CPU {diff:.4}");
+    assert!((ma - mg).abs() / ma < 0.02, "media CPU {ma} vs GPU {mg}");
+    assert!(diff < noise * 1.5, "RMSE GPU−CPU {diff} vs rumore CPU−CPU {noise}");
+}

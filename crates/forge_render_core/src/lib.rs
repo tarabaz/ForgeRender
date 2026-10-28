@@ -10,6 +10,7 @@
 mod accum;
 mod backend;
 mod denoise;
+pub mod displace;
 pub mod env_map;
 mod render_scene;
 mod session;

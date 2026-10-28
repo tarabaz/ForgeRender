@@ -152,6 +152,8 @@ pub struct RenderGeometry {
     pub tri_uvs: Vec<[Vec2; 3]>,
     /// Tangente ∂p/∂u in spazio mondo (zero se la mesh non ha UV).
     pub tri_tangents: Vec<Vec3>,
+    /// Flag per primitiva (vedi [`crate::displace::FLAG_BOX_UV`]).
+    pub tri_flags: Vec<u32>,
     /// Posizione di ogni primitiva (ordine originale) dentro `accel.tris` (ordine BVH).
     pub prim_to_slot: Vec<u32>,
     pub bounds: Aabb,
@@ -201,6 +203,8 @@ impl RenderGeometry {
         let mut tnode = Vec::new();
         let mut tuv = Vec::new();
         let mut ttan = Vec::new();
+        let mut tflags = Vec::new();
+        let displaced = displacement_plan(scene);
         for (i, node) in scene.nodes.iter().enumerate() {
             let Some(mi) = node.mesh else { continue };
             if !scene.is_visible(i) {
@@ -213,6 +217,31 @@ impl RenderGeometry {
             let mirrored = Mat3::from_mat4(xf).determinant() < 0.0;
             let has_n = mesh.has_normals();
             let has_uv = mesh.uvs.len() == mesh.positions.len();
+            if let Some((params, target)) = displaced.get(&i) {
+                for t in crate::displace::tessellate(mesh, &xf, mirrored, params, *target) {
+                    let p = t.p;
+                    let ng = (p[1] - p[0]).cross(p[2] - p[0]);
+                    let ng = if mirrored { -ng } else { ng }.normalize_or_zero();
+                    if ng == Vec3::ZERO || !p.iter().all(|v| v.is_finite()) {
+                        continue;
+                    }
+                    let (d1, d2) = (t.uv[1] - t.uv[0], t.uv[2] - t.uv[0]);
+                    let det = d1.x * d2.y - d1.y * d2.x;
+                    let tangent = if t.flags == 0 && det.abs() > 1e-12 {
+                        ((p[1] - p[0]) * d2.y - (p[2] - p[0]) * d1.y) / det
+                    } else {
+                        Vec3::ZERO
+                    };
+                    tris.push(p);
+                    gn.push(ng);
+                    sn.push(t.n);
+                    tnode.push(i as u32);
+                    tuv.push(t.uv);
+                    ttan.push(if tangent.is_finite() { tangent } else { Vec3::ZERO });
+                    tflags.push(t.flags);
+                }
+                continue;
+            }
             for idx in &mesh.indices {
                 let p = idx.map(|k| xf.transform_point3(mesh.positions[k as usize]));
                 let mut ng = (p[1] - p[0]).cross(p[2] - p[0]);
@@ -248,6 +277,7 @@ impl RenderGeometry {
                 tnode.push(i as u32);
                 tuv.push(uv);
                 ttan.push(tangent);
+                tflags.push(0);
             }
         }
         let accel = TriangleAccel::build(&tris);
@@ -269,10 +299,66 @@ impl RenderGeometry {
             tri_node: tnode,
             tri_uvs: tuv,
             tri_tangents: ttan,
+            tri_flags: tflags,
             prim_to_slot,
             bounds,
         }
     }
+}
+
+/// Componenti da suddividere per il displacement, con parametri e lato dei
+/// triangoli (allungato in modo uniforme se si supera il budget di triangoli).
+fn displacement_plan(scene: &Scene) -> std::collections::HashMap<usize, (crate::displace::Params, f32)> {
+    use crate::displace::{estimate, Params, BUDGET};
+    let mut plan = std::collections::HashMap::new();
+    for (i, node) in scene.nodes.iter().enumerate() {
+        let Some(mi) = node.mesh else { continue };
+        if !scene.is_visible(i) {
+            continue;
+        }
+        let Some(m) = scene.materials.get(scene.resolve_material(i)) else {
+            continue;
+        };
+        if !m.has_displacement() {
+            continue;
+        }
+        let m = m.sanitized();
+        let path = m.height_texture.as_ref().expect("height");
+        let height = match crate::texture::load_cached(path, false) {
+            Ok(t) => t,
+            Err(e) => {
+                tracing::error!("displacement di «{}»: {e:#}", m.name);
+                continue;
+            }
+        };
+        let mesh = &scene.meshes[mi];
+        let params = Params {
+            height,
+            mapping: m.mapping,
+            amount_m: m.displacement_mm * 1e-3,
+            mid: m.displacement_mid,
+            use_uv: m.mapping.projection == forge_scene::Projection::Uv && mesh.uvs.len() == mesh.positions.len(),
+        };
+        let target = params.target_edge(mesh, &scene.world_transform(i));
+        plan.insert(i, (params, target));
+    }
+    // Budget: se serve si allunga il lato di tutti finché il totale rientra.
+    for _ in 0..12 {
+        let total: usize = plan
+            .iter()
+            .map(|(&i, (_, t))| estimate(&scene.meshes[scene.nodes[i].mesh.unwrap()], &scene.world_transform(i), *t))
+            .sum();
+        if total <= BUDGET {
+            if !plan.is_empty() {
+                tracing::info!("displacement: {} componenti, circa {total} triangoli", plan.len());
+            }
+            break;
+        }
+        for (_, t) in plan.values_mut() {
+            *t *= 2.0;
+        }
+    }
+    plan
 }
 
 /// Scena compilata per il rendering, indipendente dal backend.

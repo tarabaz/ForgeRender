@@ -5,15 +5,21 @@
 use forge_accel::TriangleHit;
 use forge_math::{Vec2, Vec3};
 use forge_render_core::texture::Texture;
-use forge_render_core::{MaterialTextures, RenderGeometry, RenderMaterial, RenderScene};
+use forge_render_core::{displace, MaterialTextures, RenderGeometry, RenderMaterial, RenderScene};
 use forge_scene::Projection;
 
 /// Coordinate di texture e direzioni tangenti (∂p/∂u, ∂p/∂v) in spazio mondo,
 /// più i metri per unità di UV (per la scala del rilievo).
 fn coordinates(tex: &MaterialTextures, geo: &RenderGeometry, prim: usize, bu: f32, bv: f32, p: Vec3) -> (Vec2, Vec3, Vec3, f32) {
     let tangent = geo.tri_tangents[prim];
+    let flags = geo.tri_flags[prim];
     let use_uv = tex.mapping.projection == Projection::Uv && tangent != Vec3::ZERO;
-    let (base, t, b, is_box) = if use_uv {
+    let (base, t, b, is_box) = if flags & displace::FLAG_BOX_UV != 0 {
+        // Superficie spostata: coordinate box della superficie originale.
+        let [a, b, c] = geo.tri_uvs[prim];
+        let (t, bb) = displace::box_frame(displace::box_axis(flags));
+        (a * (1.0 - bu - bv) + b * bu + c * bv, t, bb, true)
+    } else if use_uv {
         let [a, b, c] = geo.tri_uvs[prim];
         let uv = a * (1.0 - bu - bv) + b * bu + c * bv;
         let n = geo.geometric_normals[prim];

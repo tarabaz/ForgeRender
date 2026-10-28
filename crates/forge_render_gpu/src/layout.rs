@@ -161,7 +161,8 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
         w.u(em);
         // Posizione del triangolo nell'ordine BVH (per campionare i vertici degli emissivi).
         w.u(geo.prim_to_slot[prim]);
-        w.u(0);
+        // Flag (coordinate box della superficie originale per il displacement).
+        w.u(geo.tri_flags[prim]);
     }
     assert_eq!(w.pos() as usize - p[P_OFF_PRIMS] as usize, geo.tri_node.len() * PRIM_WORDS);
 

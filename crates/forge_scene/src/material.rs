@@ -63,6 +63,11 @@ pub struct Material {
     pub roughness_is_gloss: bool,
     /// Profondità del rilievo della mappa height, in millimetri.
     pub bump_mm: f32,
+    /// Displacement vero (la geometria viene suddivisa e spostata lungo la normale
+    /// secondo la mappa height): escursione totale in millimetri, 0 = spento.
+    pub displacement_mm: f32,
+    /// Livello della height che non sposta la superficie (0 = tutto in fuori, 0.5 = metà dentro e metà fuori).
+    pub displacement_mid: f32,
     /// Intensità dell'occlusione ambientale (0 = ignorata, 1 = piena).
     pub ao_strength: f32,
     pub mapping: TextureMapping,
@@ -140,6 +145,8 @@ impl Default for Material {
             normal_directx: false,
             roughness_is_gloss: false,
             bump_mm: 1.0,
+            displacement_mm: 0.0,
+            displacement_mid: 0.5,
             ao_strength: 0.5,
             mapping: TextureMapping::default(),
             category: "Generico".into(),
@@ -171,10 +178,21 @@ impl Material {
         };
         m.bump_mm = if m.bump_mm.is_finite() { m.bump_mm.clamp(0.0, 100.0) } else { 1.0 };
         m.ao_strength = c01(m.ao_strength);
+        m.displacement_mm = if m.displacement_mm.is_finite() {
+            m.displacement_mm.clamp(0.0, 1000.0)
+        } else {
+            0.0
+        };
+        m.displacement_mid = c01(m.displacement_mid);
         if !m.mapping.scale.is_finite() || m.mapping.scale <= 0.0 {
             m.mapping.scale = TextureMapping::default().scale;
         }
         m
+    }
+
+    /// Il materiale sposta davvero la geometria (mappa height + escursione > 0).
+    pub fn has_displacement(&self) -> bool {
+        self.height_texture.is_some() && self.displacement_mm.is_finite() && self.displacement_mm > 0.0
     }
 
     pub fn has_textures(&self) -> bool {

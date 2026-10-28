@@ -77,8 +77,9 @@ pub fn material_from_maps(name: &str, id: &str, set: &MapSet, size_m: Option<f32
         normal_directx: set.normal_directx,
         metallic_texture: set.metallic.clone(),
         height_texture: set.height.clone(),
-        // Con la normal map il rilievo è già incluso: la height resta disponibile ma spenta.
+        // Con la normal map il rilievo fine è già incluso: la height serve al displacement.
         bump_mm: if has(&set.normal) { 0.0 } else { 1.0 },
+        displacement_mm: if has(&set.height) { default_displacement_mm(size_m) } else { 0.0 },
         ao_texture: set.ao.clone(),
         opacity_texture: set.opacity.clone(),
         mapping: TextureMapping {
@@ -89,6 +90,11 @@ pub fn material_from_maps(name: &str, id: &str, set: &MapSet, size_m: Option<f32
         category: "Libreria".into(),
         ..Default::default()
     }
+}
+
+/// Escursione di displacement proposta: 1% del lato della texture (2–20 mm).
+pub fn default_displacement_mm(size_m: Option<f32>) -> f32 {
+    (size_m.filter(|s| s.is_finite() && *s > 0.0).unwrap_or(1.0) * 10.0).clamp(2.0, 20.0)
 }
 
 /// Elenco dei materiali della libreria, in ordine alfabetico.
@@ -117,6 +123,10 @@ pub fn load(dir: &Path) -> anyhow::Result<LibraryMaterial> {
     let text = std::fs::read_to_string(dir.join(MATERIAL_FILE))?;
     let f: MaterialFile = serde_json::from_str(&text).context("materiale.json non valido")?;
     let mut material = f.material;
+    // Materiali salvati prima del displacement: si attiva con il valore proposto.
+    if material.height_texture.is_some() && !text.contains("\"displacement_mm\"") {
+        material.displacement_mm = default_displacement_mm(Some(material.mapping.scale));
+    }
     for slot in material.texture_slots_mut().into_iter().flatten() {
         if slot.is_relative() {
             *slot = dir.join(&*slot);
