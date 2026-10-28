@@ -25,6 +25,35 @@ const P_MAX_BOUNCES: u32 = 6u;
 const P_RR_START: u32 = 7u;
 const P_FLAGS: u32 = 8u;
 const P_HAS_CUTOUT: u32 = 67u;
+const P_LENS_R: u32 = 68u;
+const P_FOCUS: u32 = 69u;
+const P_BLADES: u32 = 70u;
+const P_BLADE_ROT: u32 = 71u;
+const P_SHIFT_X: u32 = 72u;
+const P_SHIFT_Y: u32 = 73u;
+
+// Punto dell'apertura (come forge_render_cpu::sample_aperture): disco o poligono regolare.
+fn sample_aperture(u0: f32, u1: f32, u2: f32) -> vec2<f32> {
+    let blades = pu(P_BLADES);
+    if (blades < 3u) {
+        // Mappatura concentrica di Shirley-Chiu.
+        let a = 2.0 * u1 - 1.0;
+        let b = 2.0 * u2 - 1.0;
+        if (a == 0.0 && b == 0.0) { return vec2<f32>(0.0); }
+        var rr: f32;
+        var th: f32;
+        if (abs(a) > abs(b)) { rr = a; th = 0.78539816 * (b / a); }
+        else { rr = b; th = 1.57079633 - 0.78539816 * (a / b); }
+        return rr * vec2<f32>(cos(th), sin(th));
+    }
+    let n = f32(blades);
+    let k = min(floor(u0 * n), n - 1.0);
+    let step = 6.28318531 / n;
+    let a0 = pf(P_BLADE_ROT) + k * step;
+    let a1 = a0 + step;
+    let su = sqrt(u1);
+    return vec2<f32>(cos(a0), sin(a0)) * (su * (1.0 - u2)) + vec2<f32>(cos(a1), sin(a1)) * (su * u2);
+}
 const P_N_LIGHTS: u32 = 9u;
 const P_ENV_KIND: u32 = 10u;
 const P_N_EMISSIVE: u32 = 11u;
@@ -1060,10 +1089,22 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         rng = pcg_hash(gid.x ^ pcg_hash(gid.y ^ pcg_hash((first + s) ^ pcg_hash(pu(P_SEED_LO) ^ pcg_hash(pu(P_SEED_HI))))));
         let jx = rnd();
         let jy = rnd();
-        let ndc_x = 2.0 * (f32(gid.x) + jx) / f32(w) - 1.0;
-        let ndc_y = 1.0 - 2.0 * (f32(gid.y) + jy) / f32(h);
-        let dir = normalize(f + r * (ndc_x * th * aspect) + u * (ndc_y * th));
-        let c = radiance(cam_pos, dir);
+        let ndc_x = 2.0 * (f32(gid.x) + jx) / f32(w) - 1.0 + 2.0 * pf(P_SHIFT_X);
+        let ndc_y = 1.0 - 2.0 * (f32(gid.y) + jy) / f32(h) + 2.0 * pf(P_SHIFT_Y);
+        var dir = normalize(f + r * (ndc_x * th * aspect) + u * (ndc_y * th));
+        var origin = cam_pos;
+        let lr = pf(P_LENS_R);
+        if (lr > 0.0) {
+            // Lente sottile messa a fuoco sul piano a distanza P_FOCUS.
+            let focus = cam_pos + dir * (pf(P_FOCUS) / max(dot(dir, f), 1e-6));
+            let u0 = rnd();
+            let u1 = rnd();
+            let u2 = rnd();
+            let a = sample_aperture(u0, u1, u2) * lr;
+            origin = cam_pos + r * a.x + u * a.y;
+            dir = normalize(focus - origin);
+        }
+        let c = radiance(origin, dir);
         // Campioni non finiti scartati (come nell'accumulatore CPU).
         if (c.x < INF && c.y < INF && c.z < INF && c.x == c.x && c.y == c.y && c.z == c.z) { sum = sum + c; }
     }

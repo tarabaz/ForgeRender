@@ -63,6 +63,13 @@ pub const P_EM_INTEGRAL: usize = 65;
 pub const P_N_SELECT: usize = 66;
 /// 1 se qualche materiale ha una mappa di opacità (ritaglio nelle intersezioni).
 pub const P_HAS_CUTOUT: usize = 67;
+// Obiettivo: raggio della lente (0 = pinhole), fuoco, lamelle, rotazione, decentramento.
+pub const P_LENS_R: usize = 68;
+pub const P_FOCUS: usize = 69;
+pub const P_BLADES: usize = 70;
+pub const P_BLADE_ROT: usize = 71;
+pub const P_SHIFT_X: usize = 72;
+pub const P_SHIFT_Y: usize = 73;
 
 pub const NODE_WORDS: usize = 8;
 pub const TRI_WORDS: usize = 12;

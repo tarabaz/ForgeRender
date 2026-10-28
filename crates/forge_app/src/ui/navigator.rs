@@ -199,6 +199,7 @@ mod tests {
                 yaw,
                 pitch,
                 vfov_deg: 40.0,
+                lens: Default::default(),
             };
             let cam_dir = (o.camera().position - o.target).normalize();
             assert!(cam_dir.dot(d) > 0.999, "{d}: camera da {cam_dir}");

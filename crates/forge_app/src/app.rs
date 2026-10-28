@@ -165,6 +165,8 @@ pub struct ForgeApp {
     pub camera_follow: bool,
     /// Animazione della vista avviata dal navigatore degli assi.
     pub nav_anim: Option<crate::ui::navigator::NavAnim>,
+    /// Il prossimo clic nella viewport sceglie la distanza di messa a fuoco.
+    pub focus_pick: bool,
     /// Annulla/ripeti delle trasformazioni: stato precedente dei componenti toccati
     /// (con il numero di nodi della scena, per scartare voci non più valide).
     undo_stack: Vec<(usize, Vec<(usize, NodeState)>)>,
@@ -234,6 +236,7 @@ impl ForgeApp {
             library: Default::default(),
             camera_follow: false,
             nav_anim: None,
+            focus_pick: false,
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             logs,
@@ -288,6 +291,13 @@ impl ForgeApp {
         };
         if let Some(mode) = &startup.camera_test {
             app.add_render_camera(Some("Frontale".into()));
+            if mode == "dof" {
+                let c = &mut app.scene.render_cameras[0].camera;
+                c.set_focal_mm(85.0);
+                c.lens.dof = true;
+                c.lens.f_stop = 2.8;
+                c.lens.focus_distance = (c.target - c.position).length();
+            }
             if mode != "attraverso" {
                 app.orbit.yaw += 1.2;
                 app.orbit.pitch += 0.35;
@@ -541,6 +551,23 @@ impl ForgeApp {
             self.scene.camera = c.camera.clone();
             self.sync_orbit_from_camera();
         }
+    }
+
+    /// Mette a fuoco la camera che si sta regolando (quella attiva, o la vista) sul punto `p`.
+    pub fn set_focus_point(&mut self, p: forge_math::Vec3) {
+        let through = self.viewing_through_active();
+        let cam = match self.scene.active_camera {
+            Some(i) => &mut self.scene.render_cameras[i].camera,
+            None => &mut self.scene.camera,
+        };
+        cam.lens.focus_distance = (p - cam.position).dot(cam.forward()).max(0.01);
+        cam.lens.dof = true;
+        let lens = cam.lens.clone();
+        if through || self.scene.active_camera.is_none() {
+            self.scene.camera.lens = lens.clone();
+            self.orbit.lens = lens;
+        }
+        self.shading_changed();
     }
 
     /// Vero se la viewport mostra esattamente l'inquadratura della camera attiva.

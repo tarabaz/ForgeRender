@@ -57,6 +57,7 @@ fn sphere_scene(mat: Material, env: f32) -> Scene {
         target: Vec3::ZERO,
         up: Vec3::Y,
         vfov_deg: 40.0,
+        ..Default::default()
     };
     s
 }
@@ -139,6 +140,7 @@ fn plane_scene(rho: f32) -> Scene {
         target: Vec3::ZERO,
         up: Vec3::Y,
         vfov_deg: 0.5,
+        ..Default::default()
     };
     s
 }
@@ -322,6 +324,7 @@ fn box_mapped_texture_in_furnace() {
             target: Vec3::new(x, 0.0, 0.3),
             up: Vec3::Z,
             vfov_deg: 0.3,
+            ..Default::default()
         };
         let img = render(&s, &settings(8, 8), 16, 2);
         let c = mean_region(&img, 8, 0, 0, 8, 8);
@@ -386,6 +389,7 @@ fn emissive_mesh_matches_form_factor() {
         target: Vec3::ZERO,
         up: Vec3::Y,
         vfov_deg: 0.5,
+        ..Default::default()
     };
     let img = render(&s, &settings(8, 8), 1024, 4);
     let c = mean_region(&img, 8, 0, 0, 8, 8);
@@ -459,6 +463,7 @@ fn opacity_cutout_lets_half_the_light_through() {
         target: Vec3::new(0.003, 0.0, 0.002),
         up: Vec3::Z,
         vfov_deg: 1.0,
+        ..Default::default()
     };
     let st = settings(8, 8);
     let c = mean_region(&render(&s, &st, 1024, 4), 8, 0, 0, 8, 8);
@@ -470,4 +475,88 @@ fn opacity_cutout_lets_half_the_light_through() {
     s.camera.vfov_deg = 20.0;
     let c = mean_region(&render(&s, &settings(32, 32), 64, 4), 32, 0, 0, 32, 32);
     assert!(c.x > 0.15 && c.x < 0.35, "vista attraverso la lastra {c} (≈ metà di ≈0.5)");
+}
+
+/// Larghezza (pixel) del bordo tra 10 % e 90 % del salto di luminosità, lungo la riga centrale.
+fn edge_width(img: &[[f32; 3]], w: u32, h: u32) -> f32 {
+    let row: Vec<f32> = (0..w).map(|x| img[((h / 2) * w + x) as usize][0]).collect();
+    let (lo, hi) = (row[2], row[w as usize - 3]);
+    let at = |frac: f32| {
+        let level = lo + (hi - lo) * frac;
+        (1..w as usize).find(|&x| row[x] >= level).map(|x| {
+            let (a, b) = (row[x - 1], row[x]);
+            x as f32 - 1.0 + (level - a) / (b - a).max(1e-6)
+        })
+    };
+    at(0.9).unwrap() - at(0.1).unwrap()
+}
+
+/// Profondità di campo: un bordo bianco/nero sul piano di fuoco resta nitido; lo stesso
+/// bordo fuori fuoco si sfoca della quantità prevista dalla lente sottile.
+#[test]
+fn depth_of_field_blur_matches_thin_lens() {
+    // Piano verticale: metà sinistra nera, metà destra emissiva bianca (nessuna luce).
+    let make = |distance: f32| {
+        let mut s = Scene {
+            environment: Environment::Uniform {
+                color: [0.0; 3],
+                strength: 0.0,
+            },
+            ..Default::default()
+        };
+        let white = Material {
+            id: MaterialId::new("bianco"),
+            base_color: [0.0; 3],
+            emission: [1.0; 3],
+            emission_strength: 1.0,
+            specular: 0.0,
+            ..Default::default()
+        };
+        s.materials.upsert(white);
+        let mesh = s.add_mesh(primitives::plane(10.0, 10.0));
+        let cid = ComponentId("bianco".into());
+        // Piano XZ ruotato verso la camera (+Z), spostato a destra di metà larghezza.
+        s.add_node(
+            None,
+            cid.clone(),
+            "bianco",
+            Mat4::from_translation(Vec3::new(5.0, 0.0, -distance)) * Mat4::from_rotation_x(std::f32::consts::FRAC_PI_2),
+            Some(mesh),
+        );
+        s.assignments.insert(cid, MaterialId::new("bianco"));
+        s.camera = Camera {
+            position: Vec3::ZERO,
+            target: Vec3::new(0.0, 0.0, -1.0),
+            up: Vec3::Y,
+            vfov_deg: 20.0,
+            ..Default::default()
+        };
+        s.camera.lens.dof = true;
+        s.camera.lens.f_stop = 1.4;
+        s.camera.lens.focus_distance = 1.0;
+        s
+    };
+    let (w, h) = (160u32, 64u32);
+    let st = settings(w, h);
+    // Bordo sul piano di fuoco: nitido (solo l'antialiasing del pixel).
+    let sharp = edge_width(&render(&make(1.0), &st, 256, 4), w, h);
+    assert!(sharp < 2.0, "bordo a fuoco largo {sharp} px");
+    // Bordo a 4 m con fuoco a 1 m: diametro del cerchio di confusione proiettato sul piano di
+    // fuoco = 2R·|d−s|/d; in pixel rispetto all'altezza del fotogramma a quella distanza.
+    let s = make(4.0);
+    let r = s.camera.lens_radius();
+    let blur_m = 2.0 * r * (4.0 - 1.0) / 4.0;
+    let frame_h = 2.0 * 1.0 * (s.camera.vfov_deg.to_radians() * 0.5).tan();
+    let blur_px = blur_m / frame_h * h as f32;
+    assert!(blur_px > 5.0, "lo sfocato atteso deve essere ben misurabile: {blur_px}");
+    let soft = edge_width(&render(&s, &st, 256, 4), w, h);
+    // Chiudendo a f/8 lo sfocato si riduce in proporzione (1.4/8).
+    let mut s8 = make(4.0);
+    s8.camera.lens.f_stop = 8.0;
+    let soft8 = edge_width(&render(&s8, &st, 256, 4), w, h);
+    eprintln!("f/8: bordo {soft8:.2} px (atteso ≈ {:.2})", blur_px * 1.4 / 8.0 * 0.8);
+    assert!(soft8 < soft * 0.35, "f/8 deve sfocare molto meno di f/1.4: {soft8} vs {soft}");
+    // Per un disco uniforme la larghezza 10–90 % del bordo vale ≈ 0.8 del diametro.
+    eprintln!("bordo fuori fuoco {soft:.2} px, cerchio di confusione {blur_px:.2} px");
+    assert!(soft > 0.6 * blur_px && soft < blur_px + 1.0, "{soft} vs {blur_px}");
 }

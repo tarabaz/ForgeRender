@@ -50,6 +50,7 @@ fn guides_see_albedo_and_normal_through_glass() {
         target: Vec3::ZERO,
         up: Vec3::Z,
         vfov_deg: 30.0,
+        ..Default::default()
     };
     let rs = RenderScene::compile(&s);
     let settings = RenderSettings {

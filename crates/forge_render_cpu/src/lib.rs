@@ -15,8 +15,9 @@ mod textures;
 pub use guides::{render_guides, GUIDE_SAMPLES};
 pub use integrator::radiance;
 
-use forge_math::Pcg32;
+use forge_math::{Pcg32, Vec2, Vec3};
 use forge_render_core::{RenderBackend, RenderScene, RenderSettings};
+use forge_scene::Camera;
 use rayon::prelude::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -44,16 +45,51 @@ impl CpuBackend {
     }
 }
 
+/// Punto dell'apertura nel disco unitario: cerchio (0 lamelle) o poligono regolare
+/// con `blades` lati (bokeh poligonale), campionato uniformemente.
+#[inline]
+pub fn sample_aperture(blades: u32, rotation_rad: f32, u0: f32, u1: f32, u2: f32) -> Vec2 {
+    if blades < 3 {
+        return forge_math::sampling::concentric_disk(u1, u2);
+    }
+    let n = blades as f32;
+    let k = (u0 * n).floor().min(n - 1.0);
+    let step = std::f32::consts::TAU / n;
+    let (a0, a1) = (rotation_rad + k * step, rotation_rad + (k + 1.0) * step);
+    let (v0, v1) = (Vec2::new(a0.cos(), a0.sin()), Vec2::new(a1.cos(), a1.sin()));
+    // Punto uniforme nel triangolo (centro, v0, v1).
+    let su = u1.sqrt();
+    v0 * (su * (1.0 - u2)) + v1 * (su * u2)
+}
+
+/// Raggio camera per il pixel `(x, y)`: jitter nel pixel, decentramento (shift) e,
+/// con la profondità di campo, lente sottile messa a fuoco sul piano a `focus_distance`.
+/// Le stesse formule sono nello shader GPU (`main` in `path_tracer.wgsl`).
+#[inline]
+pub fn camera_ray(cam: &Camera, width: u32, height: u32, x: u32, y: u32, rng: &mut Pcg32) -> (Vec3, Vec3) {
+    let (w, h) = (width as f32, height as f32);
+    let (jx, jy) = rng.next_2d();
+    let ndc_x = 2.0 * (x as f32 + jx) / w - 1.0 + 2.0 * cam.lens.shift_x;
+    let ndc_y = 1.0 - 2.0 * (y as f32 + jy) / h + 2.0 * cam.lens.shift_y;
+    let dir = cam.ray_dir(ndc_x, ndc_y, w / h);
+    let lr = cam.lens_radius();
+    if lr <= 0.0 {
+        return (cam.position, dir);
+    }
+    let (r, u, f) = cam.basis();
+    let focus = cam.position + dir * (cam.lens.focus_distance.max(1e-4) / dir.dot(f).max(1e-6));
+    let (u0, u1, u2) = (rng.next_f32(), rng.next_f32(), rng.next_f32());
+    let a = sample_aperture(cam.lens.blades, cam.lens.blade_rotation_deg.to_radians(), u0, u1, u2) * lr;
+    let o = cam.position + r * a.x + u * a.y;
+    (o, (focus - o).normalize())
+}
+
 /// Calcola un campione per il pixel `(x, y)`.
 #[inline]
 pub fn render_pixel(scene: &RenderScene, settings: &RenderSettings, x: u32, y: u32, sample: u32) -> [f32; 3] {
     let mut rng = Pcg32::for_pixel(settings.seed, x, y, sample);
-    let (w, h) = (settings.width as f32, settings.height as f32);
-    let (jx, jy) = rng.next_2d();
-    let ndc_x = 2.0 * (x as f32 + jx) / w - 1.0;
-    let ndc_y = 1.0 - 2.0 * (y as f32 + jy) / h;
-    let dir = scene.camera.ray_dir(ndc_x, ndc_y, w / h);
-    radiance(scene, settings, scene.camera.position, dir, &mut rng).to_array()
+    let (o, dir) = camera_ray(&scene.camera, settings.width, settings.height, x, y, &mut rng);
+    radiance(scene, settings, o, dir, &mut rng).to_array()
 }
 
 impl RenderBackend for CpuBackend {

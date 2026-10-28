@@ -323,6 +323,12 @@ impl RenderBackend for GpuBackend {
         }
         fv(&mut p, P_TAN_HALF, (cam.vfov_deg.to_radians() * 0.5).tan());
         fv(&mut p, P_ASPECT, w as f32 / h as f32);
+        fv(&mut p, P_LENS_R, cam.lens_radius());
+        fv(&mut p, P_FOCUS, cam.lens.focus_distance.max(1e-4));
+        p[P_BLADES] = cam.lens.blades;
+        fv(&mut p, P_BLADE_ROT, cam.lens.blade_rotation_deg.to_radians());
+        fv(&mut p, P_SHIFT_X, cam.lens.shift_x);
+        fv(&mut p, P_SHIFT_Y, cam.lens.shift_y);
         self.queue.write_buffer(&self.uniform, 0, bytemuck::cast_slice(&p));
 
         let t = self.target.as_ref().expect("target");

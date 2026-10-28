@@ -311,6 +311,7 @@ fn visit(scene: &mut Scene, ctx: &mut Ctx, node: &gltf::Node, parent: usize, par
                         target: position + fwd,
                         up,
                         vfov_deg: p.yfov().to_degrees(),
+                        ..Default::default()
                     });
                 }
                 gltf::camera::Projection::Orthographic(o) => {
@@ -325,6 +326,7 @@ fn visit(scene: &mut Scene, ctx: &mut Ctx, node: &gltf::Node, parent: usize, par
                         target: center,
                         up,
                         vfov_deg: VFOV,
+                        ..Default::default()
                     });
                 }
             }

@@ -575,6 +575,7 @@ impl Scene {
             target: Vec3::new(0.0, 0.35, 0.0),
             up: Vec3::Y,
             vfov_deg: 38.0,
+            ..Default::default()
         };
         s
     }

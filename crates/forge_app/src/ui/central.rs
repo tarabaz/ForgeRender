@@ -149,6 +149,16 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
     }
     draw_lights(app, &painter, rect);
     draw_cameras(app, &painter, rect);
+    draw_depth_of_field(app, &painter, rect);
+    if app.focus_pick {
+        painter.text(
+            rect.center_top() + egui::vec2(0.0, 52.0),
+            egui::Align2::CENTER_TOP,
+            "Clic sul punto da mettere a fuoco (Esc annulla)",
+            egui::FontId::proportional(14.0),
+            style::ACCENT,
+        );
+    }
     // Il gizmo ha la precedenza: se usa il mouse la camera non si muove e il clic non seleziona.
     let gizmo_used = crate::ui::gizmo::update(app, ui, rect, &resp, &painter);
     let nav_used = crate::ui::navigator::show(app, ui, rect, &painter);
@@ -158,6 +168,27 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
     }
     crate::ui::gizmo::toolbar(app, ui, rect);
 
+    // Messa a fuoco col clic: distanza lungo l'asse della camera che si sta regolando.
+    if app.focus_pick {
+        if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+            app.focus_pick = false;
+        }
+        if resp.clicked() {
+            if let Some(pos) = resp.interact_pointer_pos() {
+                let ndc_x = (pos.x - rect.left()) / rect.width() * 2.0 - 1.0;
+                let ndc_y = 1.0 - (pos.y - rect.top()) / rect.height() * 2.0;
+                let view = app.scene.camera.clone();
+                let dir = view.ray_dir(ndc_x, ndc_y, rect.width() / rect.height());
+                let geo = app.geometry_now();
+                if let Some((_, t)) = forge_render_core::pick(&geo, view.position, dir) {
+                    let hit = view.position + dir * t;
+                    app.set_focus_point(hit);
+                }
+            }
+            app.focus_pick = false;
+            return;
+        }
+    }
     // Picking con un clic (senza trascinamento).
     if resp.clicked() && !gizmo_used {
         if let Some(pos) = resp.interact_pointer_pos() {
@@ -292,6 +323,87 @@ fn draw_cameras(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
             color,
         );
     }
+}
+
+/// Profondità di campo della camera di rendering: linea dalla camera al punto di fuoco con
+/// la distanza, rettangolo del piano di fuoco e i due limiti della zona nitida.
+fn draw_depth_of_field(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
+    let Some(i) = app.scene.active_camera else { return };
+    let rc = &app.scene.render_cameras[i].camera;
+    if !rc.lens.dof {
+        return;
+    }
+    let view = &app.scene.camera;
+    let (r, u, f) = rc.basis();
+    let aspect = app.settings.aspect();
+    let th = (rc.vfov_deg.to_radians() * 0.5).tan();
+    // Sezione dell'inquadratura (shift compreso) alla distanza d.
+    let section = |d: f32| -> Option<Vec<egui::Pos2>> {
+        let (hh, hw) = (th * d, th * d * aspect);
+        let c = rc.position + f * d + r * (2.0 * rc.lens.shift_x * hw) + u * (2.0 * rc.lens.shift_y * hh);
+        [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)]
+            .iter()
+            .map(|(a, b)| project(view, rect, c + r * (a * hw) + u * (b * hh)))
+            .collect()
+    };
+    let focus = rc.lens.focus_distance;
+    let (near, far) = rc.dof_limits();
+    let accent = style::ACCENT;
+    let zone = egui::Color32::from_rgb(90, 200, 230);
+    let through = app.viewing_through_active();
+    if !through {
+        // Linea di mira fino al punto di fuoco, con la distanza.
+        let fp = rc.position + f * focus;
+        if let (Some(a), Some(b)) = (project(view, rect, rc.position), project(view, rect, fp)) {
+            painter.line_segment([a, b], egui::Stroke::new(1.5, accent));
+            painter.circle_filled(b, 4.0, accent);
+            painter.text(
+                b + egui::vec2(8.0, -6.0),
+                egui::Align2::LEFT_BOTTOM,
+                format!("Fuoco {:.2} m", focus),
+                egui::FontId::proportional(12.0),
+                accent,
+            );
+        }
+        if let Some(p) = section(focus) {
+            painter.add(egui::Shape::closed_line(p, egui::Stroke::new(1.5, accent)));
+        }
+        for (d, label) in [(near, "nitido da"), (far, "fino a")] {
+            if !d.is_finite() {
+                continue;
+            }
+            if let Some(p) = section(d) {
+                painter.add(egui::Shape::dashed_line(
+                    &[p[0], p[1], p[2], p[3], p[0]],
+                    egui::Stroke::new(1.2, zone),
+                    6.0,
+                    4.0,
+                ));
+                // Etichette su angoli opposti: non si sovrappongono quando i limiti sono vicini.
+                let (anchor, align, off) = if label == "nitido da" {
+                    (p[3], egui::Align2::LEFT_BOTTOM, egui::vec2(4.0, -4.0))
+                } else {
+                    (p[1], egui::Align2::RIGHT_TOP, egui::vec2(-4.0, 4.0))
+                };
+                painter.text(
+                    anchor + off,
+                    align,
+                    format!("{label} {:.2} m", d),
+                    egui::FontId::proportional(11.0),
+                    zone,
+                );
+            }
+        }
+    }
+    // Riepilogo in basso a destra (utile anche guardando attraverso la camera).
+    let far_txt = if far.is_finite() { format!("{far:.2} m") } else { "∞".into() };
+    painter.text(
+        rect.right_bottom() + egui::vec2(-10.0, -10.0),
+        egui::Align2::RIGHT_BOTTOM,
+        format!("f/{:.1} · fuoco {:.2} m · nitido {:.2} m – {far_txt}", rc.lens.f_stop, focus, near),
+        egui::FontId::proportional(12.0),
+        zone,
+    );
 }
 
 fn draw_lights(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
@@ -500,6 +612,7 @@ pub(crate) fn render_preview(mat: &Material) -> Vec<u8> {
         target: Vec3::new(0.0, 0.9, 0.0),
         up: Vec3::Y,
         vfov_deg: 32.0,
+        ..Default::default()
     };
     let rs = RenderScene::compile(&s);
     let settings = RenderSettings {

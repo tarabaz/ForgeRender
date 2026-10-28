@@ -68,6 +68,7 @@ fn sphere_scene(mat: Material) -> Scene {
         target: Vec3::ZERO,
         up: Vec3::Y,
         vfov_deg: 40.0,
+        ..Default::default()
     };
     s
 }
@@ -119,6 +120,7 @@ fn gpu_area_light_form_factor() {
         target: Vec3::ZERO,
         up: Vec3::Y,
         vfov_deg: 0.5,
+        ..Default::default()
     };
     s.lights
         .push(Light::area("a", Vec3::new(0.0, h, 0.0), Vec3::ZERO, 2.0 * a, 2.0 * b, le));
@@ -181,6 +183,7 @@ fn plane_scene(rho: f32) -> Scene {
         target: Vec3::ZERO,
         up: Vec3::Y,
         vfov_deg: 0.5,
+        ..Default::default()
     };
     s
 }
@@ -282,6 +285,7 @@ fn gpu_box_mapped_texture() {
             target: Vec3::new(x, 0.0, 0.3),
             up: Vec3::Z,
             vfov_deg: 0.3,
+            ..Default::default()
         };
         let c = mean_region(&render_with(&mut g, &s, &settings(8, 8), 16), 8, 0, 0, 8, 8);
         let (main, other) = if red { (c.x, c.z) } else { (c.z, c.x) };
@@ -380,6 +384,7 @@ fn gpu_all_texture_maps_match_cpu() {
         target: Vec3::new(0.0, 0.0, 0.0),
         up: Vec3::Y,
         vfov_deg: 50.0,
+        ..Default::default()
     };
     let st = RenderSettings {
         width: 32,
@@ -404,5 +409,47 @@ fn gpu_all_texture_maps_match_cpu() {
     let (ma, mg) = (mean(&a), mean(&gpu_img));
     eprintln!("media CPU {ma:.4} GPU {mg:.4} | RMSE CPU−CPU {noise:.4} GPU−CPU {diff:.4}");
     assert!((ma - mg).abs() / ma < 0.02, "media CPU {ma} vs GPU {mg}");
+    assert!(diff < noise * 1.5, "RMSE GPU−CPU {diff} vs rumore CPU−CPU {noise}");
+}
+
+/// Profondità di campo con diaframma a 6 lamelle e decentramento: la GPU converge
+/// alla stessa immagine della CPU.
+#[test]
+fn gpu_depth_of_field_matches_cpu() {
+    let Some(mut g) = gpu() else { return };
+    let mut s = Scene::test_scene();
+    s.camera.lens.dof = true;
+    // Diaframma molto aperto e fuoco vicino: sfocato ben visibile anche a bassa risoluzione.
+    s.camera.lens.f_stop = 0.7;
+    // Fuoco a 0.44 m, oggetti a ~4.4 m: cerchio di confusione ≈ 14 % dell'altezza (≈ 5 px).
+    s.camera.lens.focus_distance = (s.camera.target - s.camera.position).length() * 0.1;
+    s.camera.lens.blades = 6;
+    s.camera.lens.blade_rotation_deg = 15.0;
+    s.camera.lens.shift_y = 0.08;
+    let st = RenderSettings {
+        width: 64,
+        height: 36,
+        ..Default::default()
+    };
+    let spp = 128;
+    let mut cpu = CpuBackend::new(4).unwrap();
+    let a = render_with(&mut cpu, &s, &st, spp);
+    let b = render_with(&mut cpu, &s, &RenderSettings { seed: 4321, ..st.clone() }, spp);
+    let gpu_img = render_with(&mut g, &s, &st, spp);
+    // Senza DOF l'immagine è diversa: il confronto ha senso.
+    let mut pin = s.clone();
+    pin.camera.lens.dof = false;
+    let p = render_with(&mut cpu, &pin, &st, spp);
+    let rmse = |x: &[[f32; 3]], y: &[[f32; 3]]| {
+        let e: f64 = x
+            .iter()
+            .zip(y)
+            .map(|(p, q)| (0..3).map(|k| ((p[k] - q[k]) as f64).powi(2)).sum::<f64>())
+            .sum();
+        (e / (x.len() * 3) as f64).sqrt()
+    };
+    let (noise, diff, vs_pinhole) = (rmse(&a, &b), rmse(&a, &gpu_img), rmse(&a, &p));
+    eprintln!("RMSE CPU−CPU {noise:.4} GPU−CPU {diff:.4} DOF−pinhole {vs_pinhole:.4}");
+    assert!(vs_pinhole > 2.0 * noise, "la profondità di campo deve cambiare l'immagine");
     assert!(diff < noise * 1.5, "RMSE GPU−CPU {diff} vs rumore CPU−CPU {noise}");
 }

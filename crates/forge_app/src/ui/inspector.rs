@@ -843,12 +843,8 @@ fn camera(app: &mut ForgeApp, ui: &mut egui::Ui) {
     });
     let mut changed = false;
     let mut cam = app.scene.render_camera().clone();
-    ui.horizontal(|ui| {
-        ui.label("Campo visivo verticale (°)");
-        changed |= ui.add(egui::Slider::new(&mut cam.vfov_deg, 5.0..=120.0)).changed();
-    });
-    let focal = 12.0 / (cam.vfov_deg.to_radians() * 0.5).tan();
-    ui.label(egui::RichText::new(format!("≈ obiettivo {focal:.0} mm (equivalente full-frame)")).weak());
+    changed |= lens_controls(app, ui, &mut cam);
+    ui.add_space(4.0);
     let r = app.scene.bounds().radius().max(0.01) as f64;
     changed |= vec3_edit(ui, "Posizione", &mut cam.position, r * 0.005);
     changed |= vec3_edit(ui, "Bersaglio", &mut cam.target, r * 0.005);
@@ -898,7 +894,6 @@ fn camera(app: &mut ForgeApp, ui: &mut egui::Ui) {
             .weak()
             .small(),
     );
-    unavailable(ui, "Profondità di campo", "Fase 7");
 }
 
 // ----------------------------------------------------------------------
@@ -1289,4 +1284,208 @@ pub(crate) fn camera_picker(app: &mut ForgeApp, ui: &mut egui::Ui, id: &str) {
             app.set_active_camera(c);
         }
     }
+}
+
+/// Diaframmi standard (stop interi) delle fotocamere.
+const F_STOPS: [f32; 11] = [1.2, 1.4, 2.0, 2.8, 4.0, 5.6, 8.0, 11.0, 16.0, 22.0, 32.0];
+
+fn fmt_m(m: f32) -> String {
+    if m.is_infinite() {
+        "∞".into()
+    } else if m < 1.0 {
+        format!("{:.0} cm", m * 100.0)
+    } else {
+        format!("{m:.2} m")
+    }
+}
+
+/// Obiettivo: focale, profondità di campo (diaframma, fuoco, lamelle) e decentramento.
+fn lens_controls(app: &mut ForgeApp, ui: &mut egui::Ui, cam: &mut forge_scene::Camera) -> bool {
+    let mut changed = false;
+    egui::Grid::new("lens-grid").num_columns(2).spacing([10.0, 6.0]).show(ui, |ui| {
+        ui.label("Obiettivo");
+        ui.horizontal(|ui| {
+            let mut mm = cam.focal_mm();
+            if ui
+                .add(
+                    egui::DragValue::new(&mut mm)
+                        .range(4.0..=2000.0)
+                        .speed(0.5)
+                        .suffix(" mm")
+                        .max_decimals(0),
+                )
+                .on_hover_text("Focale equivalente full frame (sensore 36×24 mm)")
+                .changed()
+            {
+                cam.set_focal_mm(mm);
+                changed = true;
+            }
+            ui.label(egui::RichText::new(format!("{:.1}° vert.", cam.vfov_deg)).weak().small());
+        });
+        ui.end_row();
+        ui.label("");
+        ui.horizontal_wrapped(|ui| {
+            for mm in [14.0, 24.0, 35.0, 50.0, 85.0, 135.0, 200.0] {
+                if ui.small_button(format!("{mm:.0}")).clicked() {
+                    cam.set_focal_mm(mm);
+                    changed = true;
+                }
+            }
+        });
+        ui.end_row();
+        ui.label("Profondità di campo");
+        changed |= ui
+            .checkbox(&mut cam.lens.dof, "attiva")
+            .on_hover_text("Sfocato ottico reale (lente sottile): nitido sul piano di fuoco, sfocato davanti e dietro")
+            .changed();
+        ui.end_row();
+        if cam.lens.dof {
+            ui.label("Diaframma");
+            ui.horizontal(|ui| {
+                egui::ComboBox::from_id_salt("fstop")
+                    .selected_text(format!("f/{}", trim(cam.lens.f_stop)))
+                    .width(70.0)
+                    .show_ui(ui, |ui| {
+                        for f in F_STOPS {
+                            if ui
+                                .selectable_label((cam.lens.f_stop - f).abs() < 1e-3, format!("f/{}", trim(f)))
+                                .clicked()
+                            {
+                                cam.lens.f_stop = f;
+                                changed = true;
+                            }
+                        }
+                    })
+                    .response
+                    .on_hover_text("Numero f: più basso = più sfocato (zona nitida stretta), più alto = più nitido");
+                changed |= ui
+                    .add(
+                        egui::DragValue::new(&mut cam.lens.f_stop)
+                            .range(0.7..=64.0)
+                            .speed(0.05)
+                            .prefix("f/")
+                            .max_decimals(1),
+                    )
+                    .changed();
+            });
+            ui.end_row();
+            ui.label("Messa a fuoco");
+            ui.horizontal(|ui| {
+                changed |= ui
+                    .add(
+                        egui::DragValue::new(&mut cam.lens.focus_distance)
+                            .range(0.01..=10000.0)
+                            .speed(0.01)
+                            .suffix(" m")
+                            .max_decimals(3),
+                    )
+                    .changed();
+                if ui
+                    .selectable_label(app.focus_pick, "Scegli col clic")
+                    .on_hover_text("Clicca nella viewport il punto da mettere a fuoco")
+                    .clicked()
+                {
+                    app.focus_pick = !app.focus_pick;
+                    app.view = crate::app::View::Viewport;
+                }
+                if ui
+                    .add_enabled(!app.selection.is_empty(), egui::Button::new("Sulla selezione"))
+                    .on_hover_text("Mette a fuoco il centro dei componenti selezionati")
+                    .clicked()
+                {
+                    let mut b = forge_math::Aabb::EMPTY;
+                    for &i in &app.selection {
+                        b.grow(&app.scene.exact_bounds_of(i));
+                    }
+                    if !b.is_empty() {
+                        cam.lens.focus_distance = (b.center() - cam.position).dot(cam.forward()).max(0.01);
+                        changed = true;
+                    }
+                }
+            });
+            ui.end_row();
+            let (near, far) = cam.dof_limits();
+            ui.label("Zona nitida");
+            ui.label(
+                egui::RichText::new(format!(
+                    "da {} a {}{}",
+                    fmt_m(near),
+                    fmt_m(far),
+                    if far.is_finite() {
+                        format!("  (profondità {})", fmt_m(far - near))
+                    } else {
+                        String::new()
+                    }
+                ))
+                .strong(),
+            )
+            .on_hover_text("Calcolata come su una fotocamera full frame (circolo di confusione 0,03 mm)");
+            ui.end_row();
+            ui.label("Lamelle");
+            ui.horizontal(|ui| {
+                egui::ComboBox::from_id_salt("blades")
+                    .selected_text(if cam.lens.blades < 3 {
+                        "circolare".to_string()
+                    } else {
+                        format!("{}", cam.lens.blades)
+                    })
+                    .width(80.0)
+                    .show_ui(ui, |ui| {
+                        changed |= ui.selectable_value(&mut cam.lens.blades, 0, "circolare").changed();
+                        for n in 5..=9 {
+                            changed |= ui.selectable_value(&mut cam.lens.blades, n, format!("{n} lamelle")).changed();
+                        }
+                    })
+                    .response
+                    .on_hover_text("Forma del bokeh: le luci sfocate diventano poligoni come negli obiettivi veri");
+                if cam.lens.blades >= 3 {
+                    changed |= ui
+                        .add(
+                            egui::DragValue::new(&mut cam.lens.blade_rotation_deg)
+                                .range(-180.0..=180.0)
+                                .suffix("°"),
+                        )
+                        .on_hover_text("Rotazione del diaframma")
+                        .changed();
+                }
+            });
+            ui.end_row();
+        }
+        ui.label("Decentramento");
+        ui.horizontal(|ui| {
+            let mut x = cam.lens.shift_x * 100.0;
+            let mut y = cam.lens.shift_y * 100.0;
+            let rx = ui.add(
+                egui::DragValue::new(&mut x)
+                    .range(-100.0..=100.0)
+                    .speed(0.2)
+                    .prefix("orizz. ")
+                    .suffix(" %"),
+            );
+            let ry = ui.add(
+                egui::DragValue::new(&mut y)
+                    .range(-100.0..=100.0)
+                    .speed(0.2)
+                    .prefix("vert. ")
+                    .suffix(" %"),
+            );
+            if rx.changed() || ry.changed() {
+                cam.lens.shift_x = x / 100.0;
+                cam.lens.shift_y = y / 100.0;
+                changed = true;
+            }
+            ry.on_hover_text(
+                "Shift (come un obiettivo decentrabile): sposta l'inquadratura senza inclinare la camera, \
+                 così le verticali restano dritte (prodotti alti, architettura)",
+            );
+        });
+        ui.end_row();
+    });
+    changed
+}
+
+/// "2.8" invece di "2.80", "8" invece di "8.0".
+fn trim(v: f32) -> String {
+    let s = format!("{v:.1}");
+    s.strip_suffix(".0").map(str::to_string).unwrap_or(s)
 }

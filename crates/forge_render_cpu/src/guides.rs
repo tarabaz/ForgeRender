@@ -40,11 +40,10 @@ pub fn render_guides(scene: &RenderScene, settings: &RenderSettings, spp: u32, c
                 for s in 0..spp {
                     // Sequenza casuale distinta da quella del rendering (seed diverso).
                     let mut rng = Pcg32::for_pixel(settings.seed ^ 0x006A_1DE5, x as u32, y as u32, s);
-                    let (jx, jy) = rng.next_2d();
-                    let ndc_x = 2.0 * (x as f32 + jx) / w as f32 - 1.0;
-                    let ndc_y = 1.0 - 2.0 * (y as f32 + jy) / h as f32;
-                    let dir = scene.camera.ray_dir(ndc_x, ndc_y, w as f32 / h as f32);
-                    let (sa, sn) = guide_sample(scene, settings, scene.camera.position, dir, &mut rng);
+                    // Stessa camera del render (anche profondità di campo e shift): le guide
+                    // sono sfocate come l'immagine, come richiede il denoiser.
+                    let (o, dir) = crate::camera_ray(&scene.camera, w, h, x as u32, y as u32, &mut rng);
+                    let (sa, sn) = guide_sample(scene, settings, o, dir, &mut rng);
                     a += sa;
                     nn += sn;
                 }
