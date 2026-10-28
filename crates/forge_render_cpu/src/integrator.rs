@@ -53,8 +53,33 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
         *l += c;
     };
 
+    // Volumi trasparenti in cui si trova il percorso (vetro, liquido): assorbimento e IOR relativo.
+    let mut media = Media::default();
+
     for depth in 0..settings.max_bounces {
-        let hit = crate::textures::intersect(scene, o, d, 0.0, f32::INFINITY);
+        // Superficie successiva; le facce di un volume "perdente" (priorità più bassa del
+        // volume in cui si è) non sono interfacce vere: si attraversano senza rimbalzo.
+        let mut hit = crate::textures::intersect(scene, o, d, 0.0, f32::INFINITY);
+        let mut skipped = 0;
+        while let Some(h) = hit {
+            let mi = scene.material_index(h.prim as usize);
+            let front = geo.geometric_normals[h.prim as usize].dot(d) < 0.0;
+            if skipped >= 8 || !media.is_false_hit(scene, mi, front) {
+                break;
+            }
+            beta *= media.transmittance(scene, h.t);
+            media.cross(mi, front);
+            o = offset_ray_origin(
+                o + d * h.t,
+                if front {
+                    -geo.geometric_normals[h.prim as usize]
+                } else {
+                    geo.geometric_normals[h.prim as usize]
+                },
+            );
+            hit = crate::textures::intersect(scene, o, d, 0.0, f32::INFINITY);
+            skipped += 1;
+        }
         let t_surf = hit.map(|h| h.t).unwrap_or(f32::INFINITY);
 
         // Luci ad area (non sono nella BVH: poche e analitiche).
@@ -66,6 +91,13 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
             let t_max = light_hit.map(|x| x.0).unwrap_or(t_surf);
             if let Some(h) = intersect_area(light, o, d, t_max) {
                 light_hit = Some(h);
+            }
+        }
+        // Assorbimento del volume trasparente attraversato fino alla superficie (o alla luce).
+        if media.n > 0 {
+            let t_end = light_hit.map(|x| x.0).unwrap_or(t_surf);
+            if t_end.is_finite() {
+                beta *= media.transmittance(scene, t_end);
             }
         }
         // Nebbie: collisione nel mezzo prima della superficie o della luce (delta tracking:
@@ -147,6 +179,14 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
         let p = o + d * hit.t;
         let mat_idx = scene.material_index(prim);
         let mut mat_local = scene.materials[mat_idx];
+        let front_face = geo.geometric_normals[prim].dot(d) < 0.0;
+        if mat_local.transmission > 0.0 {
+            // IOR relativo al volume dall'altra parte (aria, oppure il vetro attorno al liquido).
+            let outside = media.outside_ior(scene, mat_idx, front_face);
+            // Può scendere sotto 1 (dal vetro al liquido, 1.34 / 1.5): la BSDF gestisce il caso.
+            mat_local.ior = (mat_local.ior / outside).max(1e-3);
+            mat_local.f0_dielectric = ((mat_local.ior - 1.0) / (mat_local.ior + 1.0)).powi(2);
+        }
         let mut ng = geo.geometric_normals[prim];
         let [n0, n1, n2] = geo.shading_normals[prim];
         let mut ns = (n0 * (1.0 - hit.u - hit.v) + n1 * hit.u + n2 * hit.v).normalize_or(ng);
@@ -215,6 +255,10 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
         }
         specular_bounce = s.delta;
         prev_pdf = s.pdf;
+        if s.wi.dot(ng) < 0.0 && mat.transmission > 0.0 {
+            // Rifratto: si entra nel volume (o se ne esce).
+            media.cross(mat_idx, front_face);
+        }
         let side = if s.wi.dot(ng) >= 0.0 { ng } else { -ng };
         o = offset_ray_origin(p, side);
         d = s.wi;
@@ -228,6 +272,75 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
         }
     }
     l
+}
+
+/// Volumi trasparenti attraversati dal percorso (al più 4 annidati), per gestire liquidi
+/// nei bicchieri: il volume "corrente" è quello con priorità più alta (a pari priorità
+/// l'ultimo in cui si è entrati).
+#[derive(Default)]
+pub(crate) struct Media {
+    ids: [u32; 4],
+    pub(crate) n: usize,
+}
+
+impl Media {
+    fn current(&self, scene: &RenderScene) -> Option<u32> {
+        let mut best: Option<u32> = None;
+        for &m in &self.ids[..self.n] {
+            if best.is_none_or(|b| scene.materials[m as usize].priority >= scene.materials[b as usize].priority) {
+                best = Some(m);
+            }
+        }
+        best
+    }
+
+    /// Faccia di un volume con priorità minore di quello corrente: non è un'interfaccia.
+    fn is_false_hit(&self, scene: &RenderScene, mat: usize, front: bool) -> bool {
+        if scene.materials[mat].transmission <= 0.0 {
+            return false;
+        }
+        let Some(cur) = self.current(scene) else { return false };
+        let p = scene.materials[mat].priority;
+        let pc = scene.materials[cur as usize].priority;
+        if front {
+            p < pc
+        } else {
+            cur as usize != mat && self.ids[..self.n].contains(&(mat as u32)) && p < pc
+        }
+    }
+
+    /// Entra nel volume (faccia frontale) o ne esce.
+    fn cross(&mut self, mat: usize, front: bool) {
+        if front {
+            if self.n < self.ids.len() {
+                self.ids[self.n] = mat as u32;
+                self.n += 1;
+            }
+        } else if let Some(i) = self.ids[..self.n].iter().rposition(|&m| m as usize == mat) {
+            self.ids.copy_within(i + 1..self.n, i);
+            self.n -= 1;
+        }
+    }
+
+    /// IOR del volume dall'altra parte della superficie del materiale `mat`.
+    fn outside_ior(&self, scene: &RenderScene, mat: usize, front: bool) -> f32 {
+        let mut other = Media { ids: self.ids, n: self.n };
+        if !front {
+            other.cross(mat, false);
+        }
+        other.current(scene).map(|m| scene.materials[m as usize].ior).unwrap_or(1.0)
+    }
+
+    /// Trasmittanza del volume corrente lungo un tratto di lunghezza `t`.
+    fn transmittance(&self, scene: &RenderScene, t: f32) -> Vec3 {
+        match self.current(scene) {
+            Some(m) => {
+                let s = scene.materials[m as usize].sigma_a;
+                Vec3::new((-s.x * t).exp(), (-s.y * t).exp(), (-s.z * t).exp())
+            }
+            None => Vec3::ONE,
+        }
+    }
 }
 
 /// Luci tra cui scegliere per la NEE: luci della scena, HDRI, superfici emissive.

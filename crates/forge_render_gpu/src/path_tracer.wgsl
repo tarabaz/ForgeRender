@@ -103,7 +103,7 @@ const PORTAL_WORDS: u32 = 16u;
 
 const TRI_WORDS: u32 = 12u;
 const PRIM_WORDS: u32 = 28u;
-const MAT_WORDS: u32 = 32u;
+const MAT_WORDS: u32 = 36u;
 const LIGHT_WORDS: u32 = 24u;
 const ROUGH_GLASS: f32 = 0.03;
 
@@ -1151,8 +1151,77 @@ fn light_visibility(so: vec3<f32>, ls: LSample) -> f32 {
     return fog_transmittance(so, ls.wi, tmax);
 }
 
+// ---------------------------------------------------------------- Volumi trasparenti
+// Volumi in cui si trova il percorso (vetro, liquido), al più 4 annidati: il corrente è
+// quello con priorità più alta (a pari priorità l'ultimo in cui si è entrati). Stesso
+// algoritmo di `Media` nell'integratore CPU.
+var<private> media_ids: array<u32, 4>;
+var<private> media_n: u32;
+
+fn mat_word(i: u32, k: u32) -> f32 { return sf(pu(P_OFF_MATS) + i * MAT_WORDS + k); }
+
+fn media_current() -> i32 {
+    var best = -1;
+    for (var k: u32 = 0u; k < media_n; k = k + 1u) {
+        let m = media_ids[k];
+        if (best < 0 || mat_word(m, 33u) >= mat_word(u32(best), 33u)) { best = i32(m); }
+    }
+    return best;
+}
+
+fn media_contains(m: u32) -> bool {
+    for (var k: u32 = 0u; k < media_n; k = k + 1u) {
+        if (media_ids[k] == m) { return true; }
+    }
+    return false;
+}
+
+fn media_false_hit(m: u32, front: bool) -> bool {
+    if (mat_word(m, 8u) <= 0.0) { return false; }
+    let cur = media_current();
+    if (cur < 0) { return false; }
+    let p = mat_word(m, 33u);
+    let pc = mat_word(u32(cur), 33u);
+    if (front) { return p < pc; }
+    return u32(cur) != m && media_contains(m) && p < pc;
+}
+
+fn media_cross(m: u32, front: bool) {
+    if (front) {
+        if (media_n < 4u) { media_ids[media_n] = m; media_n = media_n + 1u; }
+        return;
+    }
+    var found = -1;
+    for (var k: u32 = 0u; k < media_n; k = k + 1u) {
+        if (media_ids[k] == m) { found = i32(k); }
+    }
+    if (found < 0) { return; }
+    for (var k: u32 = u32(found); k + 1u < media_n; k = k + 1u) { media_ids[k] = media_ids[k + 1u]; }
+    media_n = media_n - 1u;
+}
+
+// IOR dall'altra parte della superficie del materiale m (aria o il volume attorno).
+fn media_outside_ior(m: u32, front: bool) -> f32 {
+    let saved_ids = media_ids;
+    let saved_n = media_n;
+    if (!front) { media_cross(m, false); }
+    let cur = media_current();
+    media_ids = saved_ids;
+    media_n = saved_n;
+    if (cur < 0) { return 1.0; }
+    return mat_word(u32(cur), 5u);
+}
+
+fn media_transmittance(t: f32) -> vec3<f32> {
+    let cur = media_current();
+    if (cur < 0) { return vec3<f32>(1.0); }
+    let b = pu(P_OFF_MATS) + u32(cur) * MAT_WORDS + 30u;
+    return exp(-sv3(b) * t);
+}
+
 // ---------------------------------------------------------------- Integratore
 fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
+    media_n = 0u;
     var o = o_in;
     var d = d_in;
     var l = vec3<f32>(0.0);
@@ -1173,7 +1242,21 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
 
     for (var depth: u32 = 0u; depth < max_b; depth = depth + 1u) {
         var contrib_scale = 1.0;
-        let hit = trace(o, d, 0.0, INF, false);
+        var hit = trace(o, d, 0.0, INF, false);
+        // Facce di volumi con priorità più bassa del corrente: si attraversano senza rimbalzo.
+        for (var skip: u32 = 0u; skip < 8u && hit.found; skip = skip + 1u) {
+            let hpb = pu(P_OFF_PRIMS) + hit.prim * PRIM_WORDS;
+            let hm = S[hpb + 3u];
+            let hng = sv3(hpb + 12u);
+            let hfront = dot(hng, d) < 0.0;
+            if (!media_false_hit(hm, hfront)) { break; }
+            beta = beta * media_transmittance(hit.t);
+            media_cross(hm, hfront);
+            var hside = hng;
+            if (hfront) { hside = -hng; }
+            o = offset_ray(o + d * hit.t, hside);
+            hit = trace(o, d, 0.0, INF, false);
+        }
         var t_surf = INF;
         if (hit.found) { t_surf = hit.t; }
 
@@ -1188,6 +1271,12 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
             if (lt > 0.0) { tm = lt; }
             let r = intersect_area(i, o, d, tm);
             if (r.x > 0.0) { lt = r.x; lpdf = r.y; lfront = r.z; lem = sv3(light_base(i) + 4u); }
+        }
+        // Assorbimento del volume trasparente attraversato.
+        if (media_n > 0u) {
+            var t_end = t_surf;
+            if (lt > 0.0) { t_end = lt; }
+            if (t_end < INF) { beta = beta * media_transmittance(t_end); }
         }
         // Nebbie: collisione prima della superficie o della luce (delta tracking).
         if (pu(P_N_FOGS) > 0u) {
@@ -1273,8 +1362,15 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
         let prim = hit.prim;
         let pb = pu(P_OFF_PRIMS) + prim * PRIM_WORDS;
         let p = o + d * hit.t;
-        var m = load_mat(S[pb + 3u]);
+        let mat_id = S[pb + 3u];
+        var m = load_mat(mat_id);
         var ng = sv3(pb + 12u);
+        let front_face = dot(ng, d) < 0.0;
+        if (m.transmission > 0.0) {
+            // IOR relativo al volume dall'altra parte (aria, o il vetro attorno al liquido).
+            m.ior = max(m.ior / media_outside_ior(mat_id, front_face), 1e-3);
+            m.f0d = ((m.ior - 1.0) / (m.ior + 1.0)) * ((m.ior - 1.0) / (m.ior + 1.0));
+        }
         var ns = sv3(pb) * (1.0 - hit.u - hit.v) + sv3(pb + 4u) * hit.u + sv3(pb + 8u) * hit.v;
         if (dot(ns, ns) > 0.0) { ns = normalize(ns); } else { ns = ng; }
         if (has_textures(m)) { apply_textures(&m, prim, hit.u, hit.v, p, &ns); }
@@ -1346,6 +1442,7 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
         if (!(beta.x < INF && beta.y < INF && beta.z < INF) || (beta.x == 0.0 && beta.y == 0.0 && beta.z == 0.0)) { break; }
         specular = s.delta;
         prev_pdf = s.pdf;
+        if (dot(s.wi, ng) < 0.0 && m.transmission > 0.0) { media_cross(mat_id, front_face); }
         var side = ng;
         if (dot(s.wi, ng) < 0.0) { side = -ng; }
         o = offset_ray(p, side);

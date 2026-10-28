@@ -23,6 +23,10 @@ pub struct RenderMaterial {
     pub emission: Vec3,
     /// Roughness originale (serve per modularla con la texture).
     pub roughness: f32,
+    /// Coefficiente di assorbimento del volume (1/m), zero per i materiali opachi.
+    pub sigma_a: Vec3,
+    /// Priorità tra volumi trasparenti sovrapposti.
+    pub priority: f32,
 }
 
 /// Texture di un materiale, già caricate.
@@ -97,6 +101,12 @@ impl RenderMaterial {
             transmission: m.transmission,
             emission: Vec3::from_array(m.emission) * m.emission_strength,
             roughness: m.roughness,
+            sigma_a: if m.transmission > 0.0 {
+                Vec3::from_array(m.volume_color.map(|c| -c.ln())) / (m.volume_depth_cm * 0.01)
+            } else {
+                Vec3::ZERO
+            },
+            priority: m.priority as f32,
         }
     }
 }

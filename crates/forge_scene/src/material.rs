@@ -71,6 +71,16 @@ pub struct Material {
     /// Intensità dell'occlusione ambientale (0 = ignorata, 1 = piena).
     pub ao_strength: f32,
     pub mapping: TextureMapping,
+    /// Materiali trasparenti: colore che prende la luce dopo `volume_depth_cm` di percorso
+    /// dentro l'oggetto (legge di Beer). Bianco = nessun assorbimento. A differenza del colore
+    /// base (che tinge la superficie) dipende dallo spessore: un liquido è più scuro e saturo
+    /// dove è profondo, più chiaro sui bordi.
+    pub volume_color: [f32; 3],
+    pub volume_depth_cm: f32,
+    /// Priorità dei volumi trasparenti che si sovrappongono (liquido dentro un bicchiere):
+    /// nella parte comune vale quello con priorità più alta. Il liquido si modella un filo
+    /// più grande della cavità del vetro, con priorità maggiore del vetro.
+    pub priority: i32,
     /// Categoria per la libreria (solo UI).
     pub category: String,
 }
@@ -149,6 +159,9 @@ impl Default for Material {
             displacement_mid: 0.5,
             ao_strength: 0.5,
             mapping: TextureMapping::default(),
+            volume_color: [1.0; 3],
+            volume_depth_cm: 10.0,
+            priority: 0,
             category: "Generico".into(),
         }
     }
@@ -184,6 +197,13 @@ impl Material {
             0.0
         };
         m.displacement_mid = c01(m.displacement_mid);
+        m.volume_color = m.volume_color.map(|v| if v.is_finite() { v.clamp(1e-4, 1.0) } else { 1.0 });
+        m.volume_depth_cm = if m.volume_depth_cm.is_finite() {
+            m.volume_depth_cm.clamp(0.01, 1e5)
+        } else {
+            10.0
+        };
+        m.priority = m.priority.clamp(-100, 100);
         if !m.mapping.scale.is_finite() || m.mapping.scale <= 0.0 {
             m.mapping.scale = TextureMapping::default().scale;
         }

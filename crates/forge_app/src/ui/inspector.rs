@@ -291,9 +291,41 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
         ui.label("Transmission");
         changed |= ui
             .add(egui::Slider::new(&mut m.transmission, 0.0..=1.0))
-            .on_hover_text("Trasparenza dielettrica (vetro). In questa versione la trasmissione è liscia.")
+            .on_hover_text("Trasparenza dielettrica (vetro, liquidi)")
             .changed();
         ui.end_row();
+        if m.transmission > 0.0 {
+            ui.label("Colore in volume");
+            changed |= ui
+                .color_edit_button_rgb(&mut m.volume_color)
+                .on_hover_text(
+                    "Colore della luce dopo «Profondità colore» di percorso dentro l'oggetto. \
+                     Per i liquidi usa questo e lascia bianco il colore base: più scuro dove è \
+                     profondo, più chiaro sui bordi, come nella realtà.",
+                )
+                .changed();
+            ui.end_row();
+            ui.label("Profondità colore");
+            changed |= ui
+                .add(
+                    egui::DragValue::new(&mut m.volume_depth_cm)
+                        .range(0.01..=100000.0)
+                        .speed(0.1)
+                        .suffix(" cm"),
+                )
+                .changed();
+            ui.end_row();
+            ui.label("Priorità volume");
+            changed |= ui
+                .add(egui::DragValue::new(&mut m.priority).range(-100..=100))
+                .on_hover_text(
+                    "Liquido in un bicchiere: modella il liquido un filo più grande della cavità \
+                     (che entri nello spessore del vetro) e dagli priorità più alta del vetro. \
+                     Il motore usa allora l'interfaccia vetro→liquido giusta (IOR 1,5 → 1,33).",
+                )
+                .changed();
+            ui.end_row();
+        }
         ui.label("Emissione");
         changed |= ui.color_edit_button_rgb(&mut m.emission).changed();
         ui.end_row();

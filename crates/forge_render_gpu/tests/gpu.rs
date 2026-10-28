@@ -717,3 +717,62 @@ fn gpu_portal_matches_cpu_and_reduces_noise() {
     eprintln!("GPU a 64 campioni: senza portale {e_plain:.4}, con portale {e_portal:.4}");
     assert!(e_portal < 0.5 * e_plain, "senza {e_plain:.4}, con {e_portal:.4}");
 }
+
+/// Volumi trasparenti sulla GPU: legge di Beer e volumi annidati con priorità (come la CPU).
+#[test]
+fn gpu_volume_absorption_and_priority() {
+    let Some(mut g) = gpu() else { return };
+    let clear = |id: &str, c: f32, priority: i32| Material {
+        id: MaterialId::new(id),
+        base_color: [1.0; 3],
+        roughness: 0.0,
+        transmission: 1.0,
+        ior: 1.0,
+        specular: 0.0,
+        volume_color: [c, c * 0.5, 1.0],
+        volume_depth_cm: 100.0,
+        priority,
+        ..Default::default()
+    };
+    let scene = |boxes: &[(f32, Material)]| {
+        let mut s = Scene {
+            environment: Environment::Uniform {
+                color: [1.0; 3],
+                strength: 1.0,
+            },
+            ..Default::default()
+        };
+        for (i, (side, m)) in boxes.iter().enumerate() {
+            s.materials.upsert(m.clone());
+            let mesh = s.add_mesh(primitives::cuboid(Vec3::splat(*side)));
+            let id = ComponentId(format!("cubo{i}"));
+            s.add_node(None, id.clone(), "cubo", Mat4::IDENTITY, Some(mesh));
+            s.assignments.insert(id, m.id.clone());
+        }
+        s.camera = Camera {
+            position: Vec3::new(0.0, 0.0, 5.0),
+            target: Vec3::ZERO,
+            up: Vec3::Y,
+            vfov_deg: 1.0,
+            ..Default::default()
+        };
+        s
+    };
+    let st = RenderSettings {
+        russian_roulette_start: 64,
+        ..settings(4, 4)
+    };
+    let mean = |img: &[[f32; 3]]| img.iter().map(|p| Vec3::from_array(*p)).sum::<Vec3>() / img.len() as f32;
+    let c = mean(&render_with(&mut g, &scene(&[(1.0, clear("liquido", 0.5, 0))]), &st, 4));
+    assert!(
+        (c.x - 0.5).abs() < 0.01 && (c.y - 0.25).abs() < 0.01 && (c.z - 1.0).abs() < 0.01,
+        "Beer: {c}"
+    );
+    let nested = scene(&[(1.0, clear("vetro", 1.0, 0)), (0.6, clear("liquido", 0.5, 1))]);
+    let c = mean(&render_with(&mut g, &nested, &st, 4));
+    let exp = 0.5f32.powf(0.6);
+    assert!((c.x - exp).abs() < 0.01, "liquido prioritario: {c} invece di {exp}");
+    let glass_wins = scene(&[(1.0, clear("vetro", 1.0, 2)), (0.6, clear("liquido", 0.5, 1))]);
+    let c = mean(&render_with(&mut g, &glass_wins, &st, 4));
+    assert!((c.x - 1.0).abs() < 0.01, "vetro prioritario: {c}");
+}

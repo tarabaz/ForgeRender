@@ -77,6 +77,16 @@ fn main() -> anyhow::Result<()> {
         s.assignments.insert(id, MaterialId::new("legno-noce-bancone"));
     }
 
+    // Cocktail: colore in volume (più scuro al centro, più chiaro sui bordi), IOR dell'acqua
+    // con zucchero, priorità sul vetro (il liquido entra nello spessore della coppa).
+    if let Some(m) = s.materials.get_mut(&MaterialId::new("gltf:bar_cocktail:Cocktail")) {
+        m.base_color = [1.0; 3];
+        m.ior = 1.35;
+        m.volume_color = [0.88, 0.32, 0.1];
+        m.volume_depth_cm = 3.0;
+        m.priority = 1;
+    }
+
     // Luci: controluce caldo dietro il bicchiere (fa brillare la nebbia), riempimento morbido,
     // luce della candela.
     let target = Vec3::new(0.0, 0.11, 0.0);

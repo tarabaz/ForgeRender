@@ -81,6 +81,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Generico"
     },
     {
@@ -125,6 +132,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -169,6 +183,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -213,6 +234,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -257,6 +285,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -301,6 +336,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -345,6 +387,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -389,6 +438,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -433,6 +489,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -477,6 +540,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -521,6 +591,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -565,6 +642,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -609,6 +693,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -653,6 +744,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -697,6 +795,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -741,6 +846,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -785,6 +897,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -829,6 +948,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -873,6 +999,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -917,6 +1050,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -961,6 +1101,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -1005,6 +1152,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -1049,6 +1203,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -1093,6 +1254,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -1137,6 +1305,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -1181,6 +1356,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -1225,6 +1407,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Metalli"
     },
     {
@@ -1269,6 +1458,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Anodizzati"
     },
     {
@@ -1313,6 +1509,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Anodizzati"
     },
     {
@@ -1357,6 +1560,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Anodizzati"
     },
     {
@@ -1401,6 +1611,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Anodizzati"
     },
     {
@@ -1445,6 +1662,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Anodizzati"
     },
     {
@@ -1489,6 +1713,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Anodizzati"
     },
     {
@@ -1533,6 +1764,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Anodizzati"
     },
     {
@@ -1577,6 +1815,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Anodizzati"
     },
     {
@@ -1621,6 +1866,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Vernici"
     },
     {
@@ -1665,6 +1917,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Vernici"
     },
     {
@@ -1709,6 +1968,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Vernici"
     },
     {
@@ -1753,6 +2019,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Vernici"
     },
     {
@@ -1797,6 +2070,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Vernici"
     },
     {
@@ -1841,6 +2121,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Vernici"
     },
     {
@@ -1885,6 +2172,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Vernici"
     },
     {
@@ -1929,6 +2223,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Vernici"
     },
     {
@@ -1973,6 +2274,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Vernici"
     },
     {
@@ -2017,6 +2325,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Vernici"
     },
     {
@@ -2061,6 +2376,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Vernici"
     },
     {
@@ -2105,6 +2427,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Vernici"
     },
     {
@@ -2149,6 +2478,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Plastiche"
     },
     {
@@ -2193,6 +2529,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Plastiche"
     },
     {
@@ -2237,6 +2580,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Plastiche"
     },
     {
@@ -2281,6 +2631,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Plastiche"
     },
     {
@@ -2325,6 +2682,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Plastiche"
     },
     {
@@ -2369,6 +2733,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Plastiche"
     },
     {
@@ -2413,6 +2784,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Plastiche"
     },
     {
@@ -2457,6 +2835,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Plastiche"
     },
     {
@@ -2501,6 +2886,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Plastiche"
     },
     {
@@ -2545,6 +2937,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Plastiche"
     },
     {
@@ -2589,6 +2988,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Plastiche"
     },
     {
@@ -2633,6 +3039,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Plastiche"
     },
     {
@@ -2677,6 +3090,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Plastiche"
     },
     {
@@ -2721,6 +3141,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Plastiche"
     },
     {
@@ -2765,6 +3192,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Plastiche"
     },
     {
@@ -2809,6 +3243,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Stampa 3D"
     },
     {
@@ -2853,6 +3294,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Stampa 3D"
     },
     {
@@ -2897,6 +3345,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Stampa 3D"
     },
     {
@@ -2941,6 +3396,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Stampa 3D"
     },
     {
@@ -2985,6 +3447,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Stampa 3D"
     },
     {
@@ -3029,6 +3498,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Stampa 3D"
     },
     {
@@ -3073,6 +3549,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Stampa 3D"
     },
     {
@@ -3117,6 +3600,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Stampa 3D"
     },
     {
@@ -3161,6 +3651,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Stampa 3D"
     },
     {
@@ -3205,6 +3702,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Stampa 3D"
     },
     {
@@ -3249,6 +3753,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Stampa 3D"
     },
     {
@@ -3293,6 +3804,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Stampa 3D"
     },
     {
@@ -3337,6 +3855,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Stampa 3D"
     },
     {
@@ -3381,6 +3906,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Stampa 3D"
     },
     {
@@ -3425,6 +3957,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Stampa 3D"
     },
     {
@@ -3469,6 +4008,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Stampa 3D"
     },
     {
@@ -3513,6 +4059,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Stampa 3D"
     },
     {
@@ -3557,6 +4110,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Stampa 3D"
     },
     {
@@ -3601,6 +4161,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Gomme"
     },
     {
@@ -3645,6 +4212,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Gomme"
     },
     {
@@ -3689,6 +4263,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Gomme"
     },
     {
@@ -3733,6 +4314,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Gomme"
     },
     {
@@ -3777,6 +4365,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Gomme"
     },
     {
@@ -3821,6 +4416,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Vetri"
     },
     {
@@ -3865,6 +4467,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Vetri"
     },
     {
@@ -3909,6 +4518,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Vetri"
     },
     {
@@ -3953,6 +4569,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Vetri"
     },
     {
@@ -3997,6 +4620,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Vetri"
     },
     {
@@ -4041,6 +4671,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Vetri"
     },
     {
@@ -4085,6 +4722,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Vetri"
     },
     {
@@ -4129,6 +4773,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Vetri"
     },
     {
@@ -4173,6 +4824,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Vetri"
     },
     {
@@ -4217,6 +4875,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Vetri"
     },
     {
@@ -4261,6 +4926,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Ceramiche e pietre"
     },
     {
@@ -4305,6 +4977,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Ceramiche e pietre"
     },
     {
@@ -4349,6 +5028,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Ceramiche e pietre"
     },
     {
@@ -4393,6 +5079,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Ceramiche e pietre"
     },
     {
@@ -4437,6 +5130,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Ceramiche e pietre"
     },
     {
@@ -4481,6 +5181,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Ceramiche e pietre"
     },
     {
@@ -4525,6 +5232,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Ceramiche e pietre"
     },
     {
@@ -4569,6 +5283,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Ceramiche e pietre"
     },
     {
@@ -4613,6 +5334,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Legni"
     },
     {
@@ -4657,6 +5385,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Legni"
     },
     {
@@ -4701,6 +5436,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Legni"
     },
     {
@@ -4745,6 +5487,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Legni"
     },
     {
@@ -4789,6 +5538,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Legni"
     },
     {
@@ -4833,6 +5589,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Legni"
     },
     {
@@ -4877,6 +5640,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Legni"
     },
     {
@@ -4921,6 +5691,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Legni"
     },
     {
@@ -4965,6 +5742,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Tessuti e pelle"
     },
     {
@@ -5009,6 +5793,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Tessuti e pelle"
     },
     {
@@ -5053,6 +5844,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Tessuti e pelle"
     },
     {
@@ -5097,6 +5895,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Tessuti e pelle"
     },
     {
@@ -5141,6 +5946,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Tessuti e pelle"
     },
     {
@@ -5185,6 +5997,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Tessuti e pelle"
     },
     {
@@ -5229,6 +6048,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Emissivi"
     },
     {
@@ -5273,6 +6099,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Emissivi"
     },
     {
@@ -5317,6 +6150,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Emissivi"
     },
     {
@@ -5361,6 +6201,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Emissivi"
     },
     {
@@ -5405,6 +6252,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Emissivi"
     },
     {
@@ -5449,6 +6303,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Emissivi"
     },
     {
@@ -5493,6 +6354,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Emissivi"
     },
     {
@@ -5537,19 +6405,26 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Importati"
     },
     {
       "id": "gltf:bar_cocktail:Cocktail",
       "name": "Cocktail",
       "base_color": [
-        0.95,
-        0.42,
-        0.22
+        1.0,
+        1.0,
+        1.0
       ],
       "metallic": 0.0,
       "roughness": 0.0,
-      "ior": 1.34,
+      "ior": 1.35,
       "specular": 0.5,
       "transmission": 1.0,
       "emission": [
@@ -5581,6 +6456,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        0.88,
+        0.32,
+        0.1
+      ],
+      "volume_depth_cm": 3.0,
+      "priority": 1,
       "category": "Importati"
     },
     {
@@ -5625,6 +6507,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Importati"
     },
     {
@@ -5669,6 +6558,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Importati"
     },
     {
@@ -5713,6 +6609,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Importati"
     },
     {
@@ -5757,6 +6660,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Importati"
     },
     {
@@ -5801,6 +6711,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Importati"
     },
     {
@@ -5845,6 +6762,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Importati"
     },
     {
@@ -5889,6 +6813,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Importati"
     },
     {
@@ -5933,6 +6864,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Importati"
     },
     {
@@ -5977,6 +6915,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Importati"
     },
     {
@@ -6021,6 +6966,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Importati"
     },
     {
@@ -6065,6 +7017,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Importati"
     },
     {
@@ -6109,6 +7068,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Importati"
     },
     {
@@ -6153,6 +7119,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Importati"
     },
     {
@@ -6197,6 +7170,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Importati"
     },
     {
@@ -6241,6 +7221,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Importati"
     },
     {
@@ -6285,6 +7272,13 @@
           0.0
         ]
       },
+      "volume_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "volume_depth_cm": 10.0,
+      "priority": 0,
       "category": "Legno"
     }
   ],
@@ -6724,7 +7718,13 @@
       "dissipation": 0.8,
       "rise": 0.15,
       "collisions": true,
-      "resolution": 200
+      "resolution": 200,
+      "sim_cells": 128,
+      "zone_offset": [
+        0.0,
+        0.0,
+        0.0
+      ]
     }
   ],
   "render": {

@@ -175,7 +175,9 @@ glass_profile = (
 glass = lathe(glass_profile, seg=128)
 
 FILL_Y = 0.137
-liq_inner = [(max(r - 0.0003, 0.0), y) for r, y in bowl_inner() if y <= FILL_Y + 1e-4]
+# Il liquido entra di 0.6 mm nello spessore del vetro (1.6 mm): nella parte comune vale il
+# liquido (priorità più alta) e l'interfaccia vetro→liquido è quella fisica, senza aria in mezzo.
+liq_inner = [(r + 0.0006 if r > 0 else 0.0, y) for r, y in bowl_inner() if y <= FILL_Y + 1e-4]
 liq_inner = list(reversed(liq_inner))  # dal centro del fondo verso il bordo
 # Raggio alla quota del pelo libero.
 def inner_r_at(y):
@@ -187,8 +189,8 @@ def inner_r_at(y):
     return RIM_R - T
 
 
-r_top = inner_r_at(FILL_Y) - 0.0003
-liquid_profile = [(0.0, BOWL_BOTTOM + 0.0003)] + [(r, y + 0.0003) for r, y in liq_inner[1:]] + [(r_top, FILL_Y), (r_top * 0.98, FILL_Y + 0.0006), (0.0, FILL_Y + 0.0006)]
+r_top = inner_r_at(FILL_Y) + 0.0006
+liquid_profile = [(0.0, BOWL_BOTTOM - 0.0006)] + [(r, y - 0.0006) for r, y in liq_inner[1:]] + [(r_top, FILL_Y), (r_top * 0.98, FILL_Y + 0.0006), (0.0, FILL_Y + 0.0006)]
 # Il profilo del liquido va dal centro in basso verso l'esterno e poi torna all'asse in alto:
 # le normali (a destra del verso) puntano verso l'esterno del volume.
 liquid_profile = [(r, y) for r, y in liquid_profile]
@@ -256,7 +258,7 @@ for i in range(70):
 materials = [
     {"name": "Vetro coppa", "pbrMetallicRoughness": {"baseColorFactor": [1, 1, 1, 1], "metallicFactor": 0, "roughnessFactor": 0.0},
      "extensions": {"KHR_materials_transmission": {"transmissionFactor": 1.0}, "KHR_materials_ior": {"ior": 1.5}}},
-    {"name": "Cocktail", "pbrMetallicRoughness": {"baseColorFactor": [0.95, 0.42, 0.22, 1], "metallicFactor": 0, "roughnessFactor": 0.0},
+    {"name": "Cocktail", "pbrMetallicRoughness": {"baseColorFactor": [1, 1, 1, 1], "metallicFactor": 0, "roughnessFactor": 0.0},
      "extensions": {"KHR_materials_transmission": {"transmissionFactor": 1.0}, "KHR_materials_ior": {"ior": 1.34}}},
     {"name": "Ciliegia", "pbrMetallicRoughness": {"baseColorFactor": [0.45, 0.01, 0.02, 1], "metallicFactor": 0, "roughnessFactor": 0.12}},
     {"name": "Gambo", "pbrMetallicRoughness": {"baseColorFactor": [0.25, 0.12, 0.03, 1], "metallicFactor": 0, "roughnessFactor": 0.6}},
