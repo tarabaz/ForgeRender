@@ -225,7 +225,7 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
                 } else {
                     app.selected_fog = Some(i);
                     app.selected_light = None;
-                    app.tab = crate::app::InspectorTab::Environment;
+                    app.tab = crate::app::InspectorTab::Effects;
                 }
                 return;
             }

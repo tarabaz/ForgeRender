@@ -12,6 +12,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             (InspectorTab::Materials, "Materiali"),
             (InspectorTab::Lights, "Luci"),
             (InspectorTab::Environment, "Ambiente"),
+            (InspectorTab::Effects, "Effetti"),
             (InspectorTab::Camera, "Camera"),
             (InspectorTab::Render, "Render"),
         ] {
@@ -27,6 +28,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             InspectorTab::Materials => materials(app, ui),
             InspectorTab::Lights => lights(app, ui),
             InspectorTab::Environment => environment(app, ui),
+            InspectorTab::Effects => effects(app, ui),
             InspectorTab::Camera => camera(app, ui),
             InspectorTab::Render => render(app, ui),
         });
@@ -881,19 +883,11 @@ fn environment(app: &mut ForgeApp, ui: &mut egui::Ui) {
             .small(),
         );
     }
-    fogs(app, ui);
 }
 
-/// Nebbie volumetriche (ghiaccio secco): elenco e parametri.
-fn fogs(app: &mut ForgeApp, ui: &mut egui::Ui) {
-    ui.separator();
-    ui.horizontal(|ui| {
-        ui.strong("Nebbia / ghiaccio secco");
-        if app.is_baking_fog() {
-            ui.spinner();
-            ui.label(egui::RichText::new("calcolo della nebbia…").small());
-        }
-    });
+/// Effetti della scena: in alto i tipi che si possono aggiungere, sotto quelli presenti,
+/// ciascuno con la spunta per disattivarlo senza cancellarlo e le opzioni a scomparsa.
+fn effects(app: &mut ForgeApp, ui: &mut egui::Ui) {
     // Sopra la selezione: centro del lato superiore dei componenti selezionati.
     let above_selection = {
         let mut b = forge_math::Aabb::EMPTY;
@@ -902,192 +896,251 @@ fn fogs(app: &mut ForgeApp, ui: &mut egui::Ui) {
         }
         (!b.is_empty()).then(|| Vec3::new(b.center().x, b.max.y + 0.03, b.center().z))
     };
-    if ui
-        .button("Aggiungi ghiaccio secco")
-        .on_hover_text("Emettitore sopra l'oggetto selezionato (o al centro della scena): la nebbia cade, si deposita e si allarga")
-        .clicked()
-    {
-        let n = app.scene.fogs.len() + 1;
-        app.scene.fogs.push(forge_scene::FogVolume {
-            name: if n == 1 {
-                "Ghiaccio secco".into()
-            } else {
-                format!("Ghiaccio secco {n}")
-            },
-            seed: n as u32,
-            emitter: above_selection.unwrap_or(Vec3::new(0.0, 0.3, 0.0)),
-            ..Default::default()
-        });
-        app.shading_changed();
+    ui.strong("Aggiungi effetto");
+    ui.horizontal_wrapped(|ui| {
+        if ui
+            .button("Ghiaccio secco")
+            .on_hover_text(
+                "Nebbia pesante da un emettitore (sopra l'oggetto selezionato o al centro della scena): \
+                 cade, riempie i contenitori, trabocca e si stende a terra",
+            )
+            .clicked()
+        {
+            let n = app.scene.fogs.len() + 1;
+            app.scene.fogs.push(forge_scene::FogVolume {
+                name: if n == 1 {
+                    "Ghiaccio secco".into()
+                } else {
+                    format!("Ghiaccio secco {n}")
+                },
+                seed: n as u32,
+                emitter: above_selection.unwrap_or(Vec3::new(0.0, 0.3, 0.0)),
+                ..Default::default()
+            });
+            app.selected_fog = Some(app.scene.fogs.len() - 1);
+            app.selected_light = None;
+            app.shading_changed();
+        }
+        for (name, tip) in [
+            ("Foschia d'ambiente", "Aria velata e raggi di luce visibili (in roadmap)"),
+            ("Adesivo (decal)", "Immagine applicata su una superficie (in roadmap)"),
+        ] {
+            ui.add_enabled(false, egui::Button::new(name)).on_disabled_hover_text(tip);
+        }
+    });
+    ui.separator();
+    ui.horizontal(|ui| {
+        ui.strong(format!("Nella scena ({})", app.scene.fogs.len()));
+        if app.is_baking_fog() {
+            ui.spinner();
+            ui.label(egui::RichText::new("calcolo della nebbia…").small());
+        }
+    });
+    if app.scene.fogs.is_empty() {
+        ui.label(egui::RichText::new("Nessun effetto: aggiungine uno dai pulsanti qui sopra.").weak());
+        return;
     }
     let mut remove = None;
     let mut changed = false;
+    let mut select = None;
+    let selected = app.selected_fog;
     for (i, f) in app.scene.fogs.iter_mut().enumerate() {
         ui.push_id(("nebbia", i), |ui| {
-            egui::CollapsingHeader::new(f.name.clone()).default_open(true).show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    changed |= ui.checkbox(&mut f.enabled, "Attiva").changed();
-                    ui.text_edit_singleline(&mut f.name);
+            let id = ui.make_persistent_id("effetto");
+            let mut state = egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, false);
+            // Appena selezionato (anche dalla viewport) l'effetto si apre; poi lo si può richiudere.
+            let opened_for = egui::Id::NULL.with("effetto-aperto-per-selezione");
+            let last: Option<usize> = ui.ctx().data(|d| d.get_temp(opened_for)).flatten();
+            if selected == Some(i) && last != Some(i) {
+                state.set_open(true);
+                ui.ctx().data_mut(|d| d.insert_temp(opened_for, Some(i)));
+            }
+            state
+                .show_header(ui, |ui| {
+                    changed |= ui
+                        .checkbox(&mut f.enabled, "")
+                        .on_hover_text("Attivo nel render (togliendo la spunta resta nella scena, spento)")
+                        .changed();
+                    if ui
+                        .selectable_label(selected == Some(i), &f.name)
+                        .on_hover_text("Seleziona: il gizmo sposta l'emettitore")
+                        .clicked()
+                    {
+                        select = Some(i);
+                    }
+                    ui.label(egui::RichText::new("ghiaccio secco").small().weak());
                     if ui.small_button("Elimina").clicked() {
                         remove = Some(i);
                     }
-                });
-                changed |= vec3_edit(ui, "Emettitore (m)", &mut f.emitter, 0.01);
-                if let Some(p) = above_selection {
-                    if ui
-                        .small_button("Metti sopra la selezione")
-                        .on_hover_text("Sposta l'emettitore sul lato superiore dei componenti selezionati")
-                        .clicked()
-                    {
-                        f.emitter = p;
-                        changed = true;
-                    }
-                }
-                changed |= vec3_edit(ui, "Zona simulata (m)", &mut f.size, 0.01);
-                ui.horizontal(|ui| {
-                    ui.label("Scala della scena:");
-                    // Preset: stessa fisica, dimensioni e portate adatte alla scala.
-                    let mut preset = |ui: &mut egui::Ui, name: &str, tip: &str, zone: Vec3, src: f32, rate: f32, dens: f32, scale: f32| {
-                        if ui.small_button(name).on_hover_text(tip).clicked() {
-                            f.size = zone;
-                            f.source_radius = src;
-                            f.emission_rate = rate;
-                            f.density = dens;
-                            f.scale = scale;
-                            changed = true;
-                        }
-                    };
-                    preset(
-                        ui,
-                        "Bicchiere / tazza",
-                        "Zona 0.6 m: colate dal bordo, riccioli, tappeto sul tavolo",
-                        Vec3::new(0.6, 0.4, 0.6),
-                        0.03,
-                        0.08,
-                        250.0,
-                        0.03,
-                    );
-                    preset(
-                        ui,
-                        "Tavolo",
-                        "Zona 2 m: ciotola sul tavolo che cola a terra",
-                        Vec3::new(2.0, 1.0, 2.0),
-                        0.12,
-                        0.6,
-                        80.0,
-                        0.12,
-                    );
-                    preset(
-                        ui,
-                        "Palco",
-                        "Zona 6 m: macchina del ghiaccio secco, tappeto basso",
-                        Vec3::new(6.0, 1.2, 6.0),
-                        0.25,
-                        4.0,
-                        40.0,
-                        0.4,
-                    );
-                });
-                egui::Grid::new("fog-grid").num_columns(2).spacing([10.0, 6.0]).show(ui, |ui| {
-                    ui.label("Seed");
+                })
+                .body(|ui| {
                     ui.horizontal(|ui| {
-                        changed |= ui.add(egui::DragValue::new(&mut f.seed)).changed();
+                        ui.label("Nome");
+                        ui.text_edit_singleline(&mut f.name);
+                    });
+                    changed |= vec3_edit(ui, "Emettitore (m)", &mut f.emitter, 0.01);
+                    if let Some(p) = above_selection {
                         if ui
-                            .small_button("Nuovo")
-                            .on_hover_text("Un'altra forma con gli stessi parametri")
+                            .small_button("Metti sopra la selezione")
+                            .on_hover_text("Sposta l'emettitore sul lato superiore dei componenti selezionati")
                             .clicked()
                         {
-                            f.seed = f.seed.wrapping_mul(747_796_405).wrapping_add(2_891_336_453) % 100_000;
+                            f.emitter = p;
                             changed = true;
                         }
-                    });
-                    ui.end_row();
-                    ui.label("Tempo simulato (s)");
-                    changed |= ui
-                        .add(egui::Slider::new(&mut f.sim_time, 0.0..=30.0).max_decimals(1))
-                        .on_hover_text("Secondi di emissione: la nebbia è calcolata in quell'istante (più tempo = pozza più grande)")
-                        .changed();
-                    ui.end_row();
-                    ui.label("Quantità emessa");
-                    changed |= ui.add(egui::Slider::new(&mut f.emission_rate, 0.0..=5.0)).changed();
-                    ui.end_row();
-                    ui.label("Raggio sorgente (m)");
-                    changed |= ui
-                        .add(egui::Slider::new(&mut f.source_radius, 0.01..=1.0).logarithmic(true))
-                        .changed();
-                    ui.end_row();
-                    ui.label("Densità");
-                    changed |= ui
-                        .add(egui::Slider::new(&mut f.density, 0.0..=500.0).logarithmic(true))
-                        .on_hover_text("Coefficiente di estinzione della nebbia piena (1/m): più alto = più opaca")
-                        .changed();
-                    ui.end_row();
-                    ui.label("Scala dettagli (m)");
-                    changed |= ui
-                        .add(egui::Slider::new(&mut f.scale, 0.02..=2.0).logarithmic(true))
-                        .on_hover_text("Dimensione di sbuffi, filamenti e vortici")
-                        .changed();
-                    ui.end_row();
-                    ui.label("Turbolenza");
-                    changed |= ui.add(egui::Slider::new(&mut f.turbulence, 0.0..=1.0)).changed();
-                    ui.end_row();
-                    ui.label("Risalita");
-                    changed |= ui
-                        .add(egui::Slider::new(&mut f.rise, 0.0..=1.0))
-                        .on_hover_text(
-                            "Quanto la nebbia, scaldandosi, risale a sbuffi prima di svanire \
-                             (0 = resta a terra come un liquido; alta = sbuffi sopra la sorgente)",
-                        )
-                        .changed();
-                    ui.end_row();
-                    ui.label("Dissolvenza");
-                    changed |= ui
-                        .add(egui::Slider::new(&mut f.dissipation, 0.0..=4.0))
-                        .on_hover_text("Velocità con cui la nebbia si dissolve nell'aria (0 = mai)")
-                        .changed();
-                    ui.end_row();
-                    ui.label("Colore scattering");
-                    changed |= ui.color_edit_button_rgb(&mut f.albedo).changed();
-                    ui.end_row();
-                    ui.label("Intensità scattering");
-                    let mut a = f.albedo.iter().cloned().fold(0.0f32, f32::max);
-                    if ui
-                        .add(egui::Slider::new(&mut a, 0.0..=1.0))
-                        .on_hover_text("Quanta luce la nebbia diffonde invece di assorbire (1 = bianca, 0 = fumo nero)")
-                        .changed()
-                    {
-                        let cur = f.albedo.iter().cloned().fold(0.0f32, f32::max).max(1e-4);
-                        f.albedo = f.albedo.map(|v| (v / cur * a).clamp(0.0, 1.0));
-                        if cur <= 1e-4 {
-                            f.albedo = [a; 3];
-                        }
-                        changed = true;
                     }
-                    ui.end_row();
-                    ui.label("Anisotropia");
-                    changed |= ui
-                        .add(egui::Slider::new(&mut f.anisotropy, -0.9..=0.9))
-                        .on_hover_text("0 = diffusione uniforme; positiva = più luminosa in controluce")
-                        .changed();
-                    ui.end_row();
-                    ui.label("Collisioni");
-                    changed |= ui
-                        .checkbox(&mut f.collisions, "Non attraversa gli oggetti")
-                        .on_hover_text("La nebbia si appoggia sugli oggetti e ci scorre attorno")
-                        .changed();
-                    ui.end_row();
-                    ui.label("Risoluzione");
-                    changed |= ui
-                        .add(egui::Slider::new(&mut f.resolution, 32..=320))
-                        .on_hover_text("Celle sul lato più lungo della zona: più alta = più dettagli, calcolo più lento")
-                        .changed();
-                    ui.end_row();
+                    changed |= vec3_edit(ui, "Zona simulata (m)", &mut f.size, 0.01);
+                    ui.horizontal(|ui| {
+                        ui.label("Scala della scena:");
+                        // Preset: stessa fisica, dimensioni e portate adatte alla scala.
+                        let mut preset =
+                            |ui: &mut egui::Ui, name: &str, tip: &str, zone: Vec3, src: f32, rate: f32, dens: f32, scale: f32| {
+                                if ui.small_button(name).on_hover_text(tip).clicked() {
+                                    f.size = zone;
+                                    f.source_radius = src;
+                                    f.emission_rate = rate;
+                                    f.density = dens;
+                                    f.scale = scale;
+                                    changed = true;
+                                }
+                            };
+                        preset(
+                            ui,
+                            "Bicchiere / tazza",
+                            "Zona 0.6 m: colate dal bordo, riccioli, tappeto sul tavolo",
+                            Vec3::new(0.6, 0.4, 0.6),
+                            0.03,
+                            0.08,
+                            250.0,
+                            0.03,
+                        );
+                        preset(
+                            ui,
+                            "Tavolo",
+                            "Zona 2 m: ciotola sul tavolo che cola a terra",
+                            Vec3::new(2.0, 1.0, 2.0),
+                            0.12,
+                            0.6,
+                            80.0,
+                            0.12,
+                        );
+                        preset(
+                            ui,
+                            "Palco",
+                            "Zona 6 m: macchina del ghiaccio secco, tappeto basso",
+                            Vec3::new(6.0, 1.2, 6.0),
+                            0.25,
+                            4.0,
+                            40.0,
+                            0.4,
+                        );
+                    });
+                    egui::Grid::new("fog-grid").num_columns(2).spacing([10.0, 6.0]).show(ui, |ui| {
+                        ui.label("Seed");
+                        ui.horizontal(|ui| {
+                            changed |= ui.add(egui::DragValue::new(&mut f.seed)).changed();
+                            if ui
+                                .small_button("Nuovo")
+                                .on_hover_text("Un'altra forma con gli stessi parametri")
+                                .clicked()
+                            {
+                                f.seed = f.seed.wrapping_mul(747_796_405).wrapping_add(2_891_336_453) % 100_000;
+                                changed = true;
+                            }
+                        });
+                        ui.end_row();
+                        ui.label("Tempo simulato (s)");
+                        changed |= ui
+                            .add(egui::Slider::new(&mut f.sim_time, 0.0..=30.0).max_decimals(1))
+                            .on_hover_text("Secondi di emissione: la nebbia è calcolata in quell'istante (più tempo = pozza più grande)")
+                            .changed();
+                        ui.end_row();
+                        ui.label("Quantità emessa");
+                        changed |= ui.add(egui::Slider::new(&mut f.emission_rate, 0.0..=5.0)).changed();
+                        ui.end_row();
+                        ui.label("Raggio sorgente (m)");
+                        changed |= ui
+                            .add(egui::Slider::new(&mut f.source_radius, 0.01..=1.0).logarithmic(true))
+                            .changed();
+                        ui.end_row();
+                        ui.label("Densità");
+                        changed |= ui
+                            .add(egui::Slider::new(&mut f.density, 0.0..=500.0).logarithmic(true))
+                            .on_hover_text("Coefficiente di estinzione della nebbia piena (1/m): più alto = più opaca")
+                            .changed();
+                        ui.end_row();
+                        ui.label("Scala dettagli (m)");
+                        changed |= ui
+                            .add(egui::Slider::new(&mut f.scale, 0.02..=2.0).logarithmic(true))
+                            .on_hover_text("Dimensione di sbuffi, filamenti e vortici")
+                            .changed();
+                        ui.end_row();
+                        ui.label("Turbolenza");
+                        changed |= ui.add(egui::Slider::new(&mut f.turbulence, 0.0..=1.0)).changed();
+                        ui.end_row();
+                        ui.label("Risalita");
+                        changed |= ui
+                            .add(egui::Slider::new(&mut f.rise, 0.0..=1.0))
+                            .on_hover_text(
+                                "Quanto la nebbia, scaldandosi, risale a sbuffi prima di svanire \
+                             (0 = resta a terra come un liquido; alta = sbuffi sopra la sorgente)",
+                            )
+                            .changed();
+                        ui.end_row();
+                        ui.label("Dissolvenza");
+                        changed |= ui
+                            .add(egui::Slider::new(&mut f.dissipation, 0.0..=4.0))
+                            .on_hover_text("Velocità con cui la nebbia si dissolve nell'aria (0 = mai)")
+                            .changed();
+                        ui.end_row();
+                        ui.label("Colore scattering");
+                        changed |= ui.color_edit_button_rgb(&mut f.albedo).changed();
+                        ui.end_row();
+                        ui.label("Intensità scattering");
+                        let mut a = f.albedo.iter().cloned().fold(0.0f32, f32::max);
+                        if ui
+                            .add(egui::Slider::new(&mut a, 0.0..=1.0))
+                            .on_hover_text("Quanta luce la nebbia diffonde invece di assorbire (1 = bianca, 0 = fumo nero)")
+                            .changed()
+                        {
+                            let cur = f.albedo.iter().cloned().fold(0.0f32, f32::max).max(1e-4);
+                            f.albedo = f.albedo.map(|v| (v / cur * a).clamp(0.0, 1.0));
+                            if cur <= 1e-4 {
+                                f.albedo = [a; 3];
+                            }
+                            changed = true;
+                        }
+                        ui.end_row();
+                        ui.label("Anisotropia");
+                        changed |= ui
+                            .add(egui::Slider::new(&mut f.anisotropy, -0.9..=0.9))
+                            .on_hover_text("0 = diffusione uniforme; positiva = più luminosa in controluce")
+                            .changed();
+                        ui.end_row();
+                        ui.label("Collisioni");
+                        changed |= ui
+                            .checkbox(&mut f.collisions, "Non attraversa gli oggetti")
+                            .on_hover_text("La nebbia si appoggia sugli oggetti e ci scorre attorno")
+                            .changed();
+                        ui.end_row();
+                        ui.label("Risoluzione");
+                        changed |= ui
+                            .add(egui::Slider::new(&mut f.resolution, 32..=320))
+                            .on_hover_text("Celle sul lato più lungo della zona: più alta = più dettagli, calcolo più lento")
+                            .changed();
+                        ui.end_row();
+                    });
                 });
-            });
         });
+    }
+    if let Some(i) = select {
+        app.selected_fog = Some(i);
+        app.selected_light = None;
+        app.selection.clear();
     }
     if let Some(i) = remove {
         app.scene.fogs.remove(i);
+        app.selected_fog = None;
         changed = true;
     }
     if changed {

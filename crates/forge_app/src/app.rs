@@ -26,6 +26,7 @@ pub enum InspectorTab {
     Materials,
     Lights,
     Environment,
+    Effects,
     Camera,
     Render,
 }
@@ -325,6 +326,7 @@ impl ForgeApp {
                 "oggetto" => InspectorTab::Object,
                 "luci" => InspectorTab::Lights,
                 "ambiente" => InspectorTab::Environment,
+                "effetti" => InspectorTab::Effects,
                 "camera" => InspectorTab::Camera,
                 "render" => InspectorTab::Render,
                 _ => InspectorTab::Materials,
