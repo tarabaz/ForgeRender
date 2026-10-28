@@ -68,6 +68,36 @@ fn sim_cache() -> &'static Cache<SimState> {
     C.get_or_init(Default::default)
 }
 
+/// Superficie su cui si appoggia la nebbia sotto la sua zona: la più alta tra quelle che
+/// stanno sotto il fondo della zona, cercata con raggi verso il basso su una griglia 3×3
+/// attraverso la zona. `None` se la zona arriva già sulle superfici (o sotto non c'è nulla).
+///
+/// Non si usa il punto più basso della scena: in una scena con un bancone alto un metro
+/// la zona si allungherebbe fino al pavimento e le celle diventerebbero grossolane.
+pub fn ground_under(f: &FogVolume, geo: &RenderGeometry) -> Option<f32> {
+    if geo.accel.is_empty() {
+        return None;
+    }
+    let f = f.sanitized();
+    let (lo, hi) = f.bounds();
+    let mut ground: Option<f32> = None;
+    for i in 0..3 {
+        for j in 0..3 {
+            let x = lo.x + (hi.x - lo.x) * (0.1 + 0.4 * i as f32);
+            let z = lo.z + (hi.z - lo.z) * (0.1 + 0.4 * j as f32);
+            let o = Vec3::new(x, f.emitter.y.max(lo.y), z);
+            let Some(h) = geo.accel.intersect(o, -Vec3::Y, 0.0, f32::INFINITY) else {
+                continue;
+            };
+            let y = o.y - h.t;
+            if y < lo.y {
+                ground = Some(ground.map_or(y, |g: f32| g.max(y)));
+            }
+        }
+    }
+    ground
+}
+
 fn geo_key(f: &FogVolume, geo: &RenderGeometry) -> u64 {
     // La geometria conta solo con le collisioni.
     if f.collisions {
@@ -106,7 +136,7 @@ pub fn bake_fogs(scene: &Scene, geo: &RenderGeometry) -> Vec<Arc<BakedFog>> {
             continue;
         }
         let solid = |spec: &GridSpec| voxelize(geo, spec);
-        let ground = (!geo.accel.is_empty()).then_some(geo.bounds.min.y);
+        let ground = ground_under(f, geo);
         let sk = (forge_volume::sim_key(f), geo_key(&f.sanitized(), geo));
         let cached_sim = sim_cache().lock().unwrap().get(&sk).cloned();
         let sim = match cached_sim {
@@ -130,4 +160,36 @@ pub fn bake_fogs(scene: &Scene, geo: &RenderGeometry) -> Vec<Arc<BakedFog>> {
         out.push(b);
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use forge_math::Mat4;
+    use forge_scene::{primitives, ComponentId};
+
+    /// Bancone a y = 0 sopra un pavimento a y = −1: la nebbia sopra il bancone si appoggia
+    /// al bancone, non al pavimento (altrimenti la zona si allunga e le celle ingrossano).
+    #[test]
+    fn fog_rests_on_the_surface_below_not_on_the_lowest_point() {
+        let mut s = Scene::default();
+        for (name, size, y) in [("bancone", 2.0, 0.0), ("pavimento", 10.0, -1.0)] {
+            let m = s.add_mesh(primitives::plane(size, size));
+            s.add_node(None, ComponentId(name.into()), name, Mat4::from_translation(Vec3::Y * y), Some(m));
+        }
+        let geo = RenderGeometry::build(&s);
+        let high = FogVolume {
+            emitter: Vec3::new(0.0, 0.5, 0.0),
+            size: Vec3::splat(0.4),
+            ..Default::default()
+        };
+        let g = ground_under(&high, &geo).expect("superficie sotto la zona");
+        assert!(g.abs() < 1e-4, "{g}");
+        // La zona arriva già sotto il bancone: non si estende.
+        let low = FogVolume {
+            emitter: Vec3::new(0.0, 0.1, 0.0),
+            ..high
+        };
+        assert_eq!(ground_under(&low, &geo), None);
+    }
 }

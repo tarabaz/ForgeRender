@@ -137,7 +137,9 @@ fn main() -> anyhow::Result<()> {
     fog.size = Vec3::new(env("FSX", 0.6), env("FSY", 0.42), env("FSZ", 0.6));
     fog.sim_time = env("FT", fog.sim_time);
     fog.emission_rate = env("FR", fog.emission_rate);
-    fog.density = env("FD", fog.density);
+    fog.density = env("FD", 110.0);
+    // Dettaglio più fine del preset: da vicino si vedono i filamenti.
+    fog.scale = env("FSC", 0.012);
     fog.rise = env("RISE", fog.rise);
     s.fogs.push(fog);
 

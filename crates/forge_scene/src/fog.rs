@@ -80,7 +80,7 @@ impl FogVolume {
         (min, max)
     }
 
-    /// Zona simulata estesa fino al suolo `ground` (il punto più basso della scena) se
+    /// Zona simulata estesa fino al suolo `ground` (la superficie sotto la zona) se
     /// questo è più in basso: il fondo della zona è chiuso e non deve fare da pavimento
     /// invisibile a mezz'aria.
     pub fn bounds_over(&self, ground: Option<f32>) -> (Vec3, Vec3) {

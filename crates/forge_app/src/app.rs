@@ -719,6 +719,11 @@ impl ForgeApp {
         self.orbit = OrbitController::from_camera(&self.scene.camera);
     }
 
+    /// Geometria compilata se è aggiornata (senza costruirla).
+    pub fn compiled_geometry(&self) -> Option<Arc<RenderGeometry>> {
+        self.current_geometry()
+    }
+
     fn current_geometry(&self) -> Option<Arc<RenderGeometry>> {
         self.geometry
             .as_ref()

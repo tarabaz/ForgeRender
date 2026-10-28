@@ -145,8 +145,30 @@ fn zone(f: &FogVolume, ground: Option<f32>) -> (Vec3, Vec3) {
     f.bounds_over(if f.collisions { ground } else { None })
 }
 
+/// Filtro [1 2 1]/4 separabile sui tre assi (bordi replicati).
+fn smooth_field(data: &[f32], spec: &GridSpec) -> Vec<f32> {
+    let mut a = data.to_vec();
+    let mut b = vec![0.0f32; a.len()];
+    for axis in 0..3 {
+        let n = spec.res[axis];
+        b.par_iter_mut().enumerate().for_each(|(i, out)| {
+            let (x, y, z) = spec.coords(i);
+            let c = [x, y, z];
+            let at = |k: usize| {
+                let mut q = c;
+                q[axis] = k;
+                a[spec.index(q[0], q[1], q[2])]
+            };
+            let k = c[axis];
+            *out = 0.25 * at(k.saturating_sub(1)) + 0.5 * at(k) + 0.25 * at((k + 1).min(n - 1));
+        });
+        std::mem::swap(&mut a, &mut b);
+    }
+    a
+}
+
 /// Simula la nebbia. `solid` restituisce le celle occupate dagli oggetti
-/// (ignorato se le collisioni sono spente); `ground` è il punto più basso della scena:
+/// (ignorato se le collisioni sono spente); `ground` è la superficie sotto la zona (vedi `ground_under` nel renderer):
 /// la zona si estende fino a lì (vedi [`FogVolume::bounds_over`]).
 pub fn simulate_fog(fog: &FogVolume, solid: Option<SolidFn>, ground: Option<f32>) -> SimState {
     let f = fog.sanitized();
@@ -194,7 +216,17 @@ pub fn bake_detail(fog: &FogVolume, sim_state: &SimState, solid: Option<SolidFn>
     let (min, max) = zone(&f, ground);
     let sim_spec = sim_state.spec;
     let sim_ms = sim_state.ms;
-    let sim = sim_state;
+    // Campo della simulazione ammorbidito: l'interpolazione trilineare dei bordi netti
+    // (nebbia piena accanto al vuoto) lascia gradini allineati alle celle, visibili da
+    // vicino e messi in evidenza dal denoiser.
+    let conc = smooth_field(&sim_state.conc, &sim_spec);
+    let sim = SimState {
+        conc,
+        spec: sim_spec,
+        steps: sim_state.steps,
+        ms: sim_state.ms,
+    };
+    let sim = &sim;
     let solid_for = |spec: &GridSpec| match (f.collisions, solid) {
         (true, Some(s)) => s(spec),
         _ => vec![false; spec.len()],
