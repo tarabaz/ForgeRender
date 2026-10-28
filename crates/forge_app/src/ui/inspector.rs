@@ -990,50 +990,15 @@ fn effects(app: &mut ForgeApp, ui: &mut egui::Ui) {
                         }
                     }
                     changed |= vec3_edit(ui, "Zona simulata (m)", &mut f.size, 0.01);
-                    ui.horizontal(|ui| {
-                        ui.label("Scala della scena:");
-                        // Preset: stessa fisica, dimensioni e portate adatte alla scala.
-                        let mut preset =
-                            |ui: &mut egui::Ui, name: &str, tip: &str, zone: Vec3, src: f32, rate: f32, dens: f32, scale: f32| {
-                                if ui.small_button(name).on_hover_text(tip).clicked() {
-                                    f.size = zone;
-                                    f.source_radius = src;
-                                    f.emission_rate = rate;
-                                    f.density = dens;
-                                    f.scale = scale;
-                                    changed = true;
-                                }
-                            };
-                        preset(
-                            ui,
-                            "Bicchiere / tazza",
-                            "Zona 0.6 m: colate dal bordo, riccioli, tappeto sul tavolo",
-                            Vec3::new(0.6, 0.4, 0.6),
-                            0.03,
-                            0.08,
-                            250.0,
-                            0.03,
-                        );
-                        preset(
-                            ui,
-                            "Tavolo",
-                            "Zona 2 m: ciotola sul tavolo che cola a terra",
-                            Vec3::new(2.0, 1.0, 2.0),
-                            0.12,
-                            0.6,
-                            80.0,
-                            0.12,
-                        );
-                        preset(
-                            ui,
-                            "Palco",
-                            "Zona 6 m: macchina del ghiaccio secco, tappeto basso",
-                            Vec3::new(6.0, 1.2, 6.0),
-                            0.25,
-                            4.0,
-                            40.0,
-                            0.4,
-                        );
+                    // Preset scenografici: impostano tutto il look; l'emettitore resta dov'è.
+                    ui.label("Preset (passa sopra per vedere dove mettere l'emettitore):");
+                    ui.horizontal_wrapped(|ui| {
+                        for p in forge_scene::FOG_PRESETS.iter() {
+                            if ui.small_button(p.name).on_hover_text(p.hint).clicked() {
+                                p.apply(f);
+                                changed = true;
+                            }
+                        }
                     });
                     egui::Grid::new("fog-grid").num_columns(2).spacing([10.0, 6.0]).show(ui, |ui| {
                         ui.label("Seed");

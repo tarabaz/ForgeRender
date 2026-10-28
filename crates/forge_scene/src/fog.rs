@@ -115,3 +115,59 @@ impl FogVolume {
         f
     }
 }
+
+/// Preset scenografici: impostano tutti i parametri del look insieme (non posizione,
+/// seed, nome, accensione e collisioni). `hint` dice dove mettere l'emettitore.
+pub struct FogPreset {
+    pub name: &'static str,
+    pub hint: &'static str,
+    /// Zona, sorgente, quantità, tempo, densità, scala, turbolenza, risalita,
+    /// dissolvenza, anisotropia, risoluzione.
+    pub values: [f32; 13],
+}
+
+impl FogPreset {
+    pub fn apply(&self, f: &mut FogVolume) {
+        let v = self.values;
+        f.size = Vec3::new(v[0], v[1], v[2]);
+        f.source_radius = v[3];
+        f.emission_rate = v[4];
+        f.sim_time = v[5];
+        f.density = v[6];
+        f.scale = v[7];
+        f.turbulence = v[8];
+        f.rise = v[9];
+        f.dissipation = v[10];
+        f.anisotropy = v[11];
+        f.resolution = v[12] as u32;
+        f.albedo = [0.95; 3];
+    }
+}
+
+pub const FOG_PRESETS: [FogPreset; 5] = [
+    FogPreset {
+        name: "Misurino che trabocca",
+        hint: "Emettitore dentro il contenitore, 1 cm sotto il bordo: cupola a cavolfiore, colata lungo la parete, tappeto sul tavolo.",
+        values: [0.6, 0.4, 0.6, 0.03, 0.08, 6.0, 250.0, 0.03, 0.6, 0.25, 1.0, 0.3, 160.0],
+    },
+    FogPreset {
+        name: "Beuta: nuvola che sale",
+        hint: "Emettitore all'imboccatura di un collo stretto: la nebbia esce a sbuffi e sale in una nuvola, qualche ricciolo ricade.",
+        values: [0.7, 0.5, 0.7, 0.015, 0.06, 6.0, 250.0, 0.03, 0.7, 0.7, 1.0, 0.4, 160.0],
+    },
+    FogPreset {
+        name: "Cocktail: colata e riccioli",
+        hint: "Emettitore nel bicchiere poco sotto il bordo: poca nebbia che trabocca a filo, scende lungo lo stelo e si arriccia.",
+        values: [0.45, 0.4, 0.45, 0.025, 0.05, 6.0, 300.0, 0.02, 0.9, 0.15, 0.8, 0.4, 200.0],
+    },
+    FogPreset {
+        name: "Calderone / pozione",
+        hint: "Emettitore nel calderone o in una ciotola grande: nebbia densa che ribolle sopra il bordo e scivola a terra.",
+        values: [1.6, 1.0, 1.6, 0.12, 1.8, 10.0, 120.0, 0.08, 0.7, 0.3, 1.0, 0.5, 160.0],
+    },
+    FogPreset {
+        name: "Tappeto basso da palco",
+        hint: "Emettitore a 20–40 cm da terra (la bocca della macchina): tappeto basso e compatto che copre il pavimento.",
+        values: [6.0, 1.2, 6.0, 0.35, 25.0, 12.0, 40.0, 0.4, 0.5, 0.05, 0.5, 0.3, 160.0],
+    },
+];
