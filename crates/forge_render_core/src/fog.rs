@@ -7,7 +7,7 @@
 use crate::RenderGeometry;
 use forge_math::Vec3;
 use forge_scene::{FogVolume, Scene};
-use forge_volume::{BakedFog, GridSpec};
+use forge_volume::{BakedFog, GridSpec, SimState};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -53,16 +53,33 @@ pub fn voxelize(geo: &RenderGeometry, spec: &GridSpec) -> Vec<bool> {
     solid
 }
 
-type Cache = Mutex<HashMap<(String, u64), Arc<BakedFog>>>;
+type Cache<T> = Mutex<HashMap<(String, u64), Arc<T>>>;
 
-fn cache() -> &'static Cache {
-    static C: OnceLock<Cache> = OnceLock::new();
+/// Nebbie pronte (simulazione + dettaglio), per tutti i parametri.
+fn cache() -> &'static Cache<BakedFog> {
+    static C: OnceLock<Cache<BakedFog>> = OnceLock::new();
     C.get_or_init(Default::default)
+}
+
+/// Simulazioni, per i soli parametri che cambiano il moto: cambiare densità, colore,
+/// anisotropia o scala del dettaglio rifà solo il dettaglio (frazioni di secondo).
+fn sim_cache() -> &'static Cache<SimState> {
+    static C: OnceLock<Cache<SimState>> = OnceLock::new();
+    C.get_or_init(Default::default)
+}
+
+fn geo_key(f: &FogVolume, geo: &RenderGeometry) -> u64 {
+    // La geometria conta solo con le collisioni.
+    if f.collisions {
+        geo.id
+    } else {
+        0
+    }
 }
 
 fn key(f: &FogVolume, geo: &RenderGeometry) -> (String, u64) {
     let f = f.sanitized();
-    // Il nome non cambia la nebbia; la geometria conta solo con le collisioni.
+    // Il nome non cambia la nebbia.
     let k = format!(
         "{:?}",
         FogVolume {
@@ -70,7 +87,7 @@ fn key(f: &FogVolume, geo: &RenderGeometry) -> (String, u64) {
             ..f.clone()
         }
     );
-    (k, if f.collisions { geo.id } else { 0 })
+    (k, geo_key(&f, geo))
 }
 
 /// Nebbie attive della scena già calcolate (senza calcolarne di nuove)?
@@ -90,7 +107,21 @@ pub fn bake_fogs(scene: &Scene, geo: &RenderGeometry) -> Vec<Arc<BakedFog>> {
         }
         let solid = |spec: &GridSpec| voxelize(geo, spec);
         let ground = (!geo.accel.is_empty()).then_some(geo.bounds.min.y);
-        let b = Arc::new(forge_volume::bake(f, Some(&solid), ground));
+        let sk = (forge_volume::sim_key(f), geo_key(&f.sanitized(), geo));
+        let cached_sim = sim_cache().lock().unwrap().get(&sk).cloned();
+        let sim = match cached_sim {
+            Some(s) => s,
+            None => {
+                let s = Arc::new(forge_volume::simulate_fog(f, Some(&solid), ground));
+                let mut c = sim_cache().lock().unwrap();
+                if c.len() > 8 {
+                    c.clear();
+                }
+                c.insert(sk, s.clone());
+                s
+            }
+        };
+        let b = Arc::new(forge_volume::bake_detail(f, &sim, Some(&solid), ground));
         let mut c = cache().lock().unwrap();
         if c.len() > 16 {
             c.clear();

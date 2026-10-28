@@ -217,3 +217,39 @@ fn rise_lifts_part_of_the_fog() {
     eprintln!("sopra 12 cm: risalita 0 {low:.4}, risalita 1 {high:.4}");
     assert!(high > 3.0 * low && high > 0.02, "risalita 0: {low:.4}, risalita 1: {high:.4}");
 }
+
+/// Densità, colore, anisotropia e scala del dettaglio non rifanno la simulazione;
+/// i parametri del moto sì. Il dettaglio rifatto da una simulazione in cache è identico
+/// a quello calcolato da zero.
+#[test]
+fn appearance_changes_reuse_the_simulation() {
+    let base = small_fog();
+    let looks = FogVolume {
+        density: 200.0,
+        albedo: [0.3, 0.4, 0.9],
+        anisotropy: -0.4,
+        scale: 0.6,
+        name: "altro".into(),
+        ..base.clone()
+    };
+    assert_eq!(sim_key(&base), sim_key(&looks));
+    for moved in [
+        FogVolume { seed: 9, ..base.clone() },
+        FogVolume {
+            sim_time: 2.0,
+            ..base.clone()
+        },
+        FogVolume { rise: 0.9, ..base.clone() },
+        FogVolume {
+            turbulence: 0.1,
+            ..base.clone()
+        },
+    ] {
+        assert_ne!(sim_key(&base), sim_key(&moved));
+    }
+    let s = simulate_fog(&base, None, None);
+    let a = bake_detail(&looks, &s, None, None);
+    let b = bake(&looks, None, None);
+    assert_eq!(a.data, b.data);
+    assert_eq!(a.albedo, b.albedo);
+}

@@ -111,25 +111,58 @@ impl BakedFog {
 /// Celle solide per una griglia (fornite dal renderer, che ha la geometria).
 pub type SolidFn<'a> = &'a (dyn Fn(&GridSpec) -> Vec<bool> + Sync);
 
-/// Calcola la nebbia. `solid` restituisce le celle occupate dagli oggetti
+/// Risultato della simulazione (riusabile: cambiare solo l'aspetto non la rifà).
+pub struct SimState {
+    pub spec: GridSpec,
+    pub conc: Vec<f32>,
+    pub steps: u32,
+    pub ms: f64,
+}
+
+/// Parametri che cambiano il moto della nebbia (chiave della cache della simulazione):
+/// tutto tranne nome, densità, scala dei dettagli, colore e anisotropia.
+pub fn sim_key(fog: &FogVolume) -> String {
+    let f = fog.sanitized();
+    format!(
+        "{:?} {:?} {} {} {} {} {} {} {} {} {} {}",
+        f.emitter,
+        f.size,
+        f.seed,
+        f.sim_time,
+        f.source_radius,
+        f.emission_rate,
+        f.dissipation,
+        f.turbulence,
+        f.rise,
+        f.collisions,
+        f.resolution,
+        f.enabled
+    )
+}
+
+/// Zona simulata effettiva (estesa fino al suolo se le collisioni sono attive).
+fn zone(f: &FogVolume, ground: Option<f32>) -> (Vec3, Vec3) {
+    f.bounds_over(if f.collisions { ground } else { None })
+}
+
+/// Simula la nebbia. `solid` restituisce le celle occupate dagli oggetti
 /// (ignorato se le collisioni sono spente); `ground` è il punto più basso della scena:
 /// la zona si estende fino a lì (vedi [`FogVolume::bounds_over`]).
-pub fn bake(fog: &FogVolume, solid: Option<SolidFn>, ground: Option<f32>) -> BakedFog {
+pub fn simulate_fog(fog: &FogVolume, solid: Option<SolidFn>, ground: Option<f32>) -> SimState {
     let f = fog.sanitized();
-    let (min, max) = f.bounds_over(if f.collisions { ground } else { None });
-    let empty = |spec: &GridSpec| vec![false; spec.len()];
-    let solid_for = |spec: &GridSpec| match (f.collisions, solid) {
-        (true, Some(s)) => s(spec),
-        _ => empty(spec),
-    };
-
+    let (min, max) = zone(&f, ground);
     let t0 = std::time::Instant::now();
     // Simulazione al 70% della risoluzione del dettaglio (il tappeto e le colate devono
     // avere qualche cella di spessore per scorrere bene).
-    let sim_spec = GridSpec::covering(min, max, ((f.resolution as f32 * 0.7) as usize).clamp(32, SIM_MAX));
-    let sim_solid = solid_for(&sim_spec);
+    let spec = GridSpec::covering(min, max, ((f.resolution as f32 * 0.7) as usize).clamp(32, SIM_MAX));
+    let sim_solid = match (f.collisions, solid) {
+        (true, Some(s)) => s(&spec),
+        _ => vec![false; spec.len()],
+    };
+    // Vortici proporzionati alla zona (indipendenti dalla scala del dettaglio, che è solo aspetto).
+    let swirl_scale = 0.12 * f.size.x.max(f.size.z);
     let sim = sim::simulate(&sim::SimInput {
-        spec: sim_spec,
+        spec,
         solid: &sim_solid,
         emitter: f.emitter,
         sim_time: f.sim_time,
@@ -138,10 +171,34 @@ pub fn bake(fog: &FogVolume, solid: Option<SolidFn>, ground: Option<f32>) -> Bak
         dissipation: f.dissipation,
         turbulence: f.turbulence,
         rise: f.rise,
-        swirl_scale: f.scale * 2.5,
+        swirl_scale,
         seed: f.seed,
     });
-    let sim_ms = t0.elapsed().as_secs_f64() * 1e3;
+    SimState {
+        spec,
+        conc: sim.conc,
+        steps: sim.steps,
+        ms: t0.elapsed().as_secs_f64() * 1e3,
+    }
+}
+
+/// Calcola la nebbia: simulazione e dettaglio.
+pub fn bake(fog: &FogVolume, solid: Option<SolidFn>, ground: Option<f32>) -> BakedFog {
+    let s = simulate_fog(fog, solid, ground);
+    bake_detail(fog, &s, solid, ground)
+}
+
+/// Griglia fine con il dettaglio e l'aspetto, a partire da una simulazione già fatta.
+pub fn bake_detail(fog: &FogVolume, sim_state: &SimState, solid: Option<SolidFn>, ground: Option<f32>) -> BakedFog {
+    let f = fog.sanitized();
+    let (min, max) = zone(&f, ground);
+    let sim_spec = sim_state.spec;
+    let sim_ms = sim_state.ms;
+    let sim = sim_state;
+    let solid_for = |spec: &GridSpec| match (f.collisions, solid) {
+        (true, Some(s)) => s(spec),
+        _ => vec![false; spec.len()],
+    };
 
     let t1 = std::time::Instant::now();
     let spec = GridSpec::covering(min, max, f.resolution as usize);
