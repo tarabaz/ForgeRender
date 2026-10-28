@@ -18,9 +18,38 @@ Solo misure realmente eseguite. Comando: `forgerender-cli bench` (scena di test 
 Mesh STL da 1 000 000 di triangoli (toro generato), `render --mesh --spp 16 --width 640 --height 360`, 3 thread:
 import + normali 1590 ms, costruzione BVH 914 ms (1 080 743 nodi), rendering 0.63 s (39.5 ms/passata).
 
-## Ryzen 9 9900X + RTX 5070
+## Ryzen 9 9900X + RTX 5070 (PC di riferimento), 28/10/2026
 
-Da eseguire sul PC: `forgerender-cli bench --json bench-9900x.json`.
+Windows 11 (build 26100), AMD Ryzen 9 9900X (12 core, 24 thread), 93.6 GB di RAM,
+NVIDIA GeForce RTX 5070 (Vulkan, driver 617.42), build release compilata in locale.
+
+`forgerender-cli bench --json bench-9900x.json` (640×360, 16 campioni/pixel; compilazione
+scena + BVH 4.6 ms)
+
+| Dispositivo | Tempo (s) | ms/passata | Mcampioni/s | Speedup |
+|---|---:|---:|---:|---:|
+| CPU, 1 thread | 1.814 | 113.36 | 2.03 | 1.00× |
+| CPU, 2 thread | 0.944 | 58.98 | 3.91 | 1.92× |
+| CPU, 4 thread | 0.498 | 31.10 | 7.41 | 3.65× |
+| CPU, 8 thread | 0.244 | 15.23 | 15.13 | 7.44× |
+| CPU, 16 thread | 0.151 | 9.42 | 24.47 | 12.04× |
+| CPU, 24 thread | 0.121 | 7.55 | 30.50 | 15.01× |
+| **GPU RTX 5070** | **0.026** | **1.65** | **139.36** | **68.57×** |
+
+Denoiser Open Image Denoise 2.3.3, 640×360, qualità alta:
+
+| Dispositivo | ms per immagine |
+|---|---:|
+| CPU | 50.8 |
+| CUDA (RTX 5070) | 18.1 |
+
+- La CPU scala quasi linearmente fino ai 12 core fisici (7.4× con 8 thread); i thread SMT
+  aggiungono un altro 25% circa (12× → 15× da 16 a 24 thread).
+- La GPU è 4.6 volte più veloce della CPU a pieno carico e 68 volte più veloce di un singolo core.
+  Questa scena è piccola: sulle scene pesanti (texture, displacement, nebbia) il divario va misurato
+  con `render --project … --backend gpu|cpu`.
+- Con CUDA il denoiser è 2.8 volte più veloce che sulla CPU: per l'anteprima progressiva è
+  conveniente attivarlo.
 
 ## Nebbia volumetrica (ghiaccio secco), container di sviluppo, 28/10/2026
 

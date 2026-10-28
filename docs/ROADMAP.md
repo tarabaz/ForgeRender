@@ -130,7 +130,8 @@ correct accumulation, PNG export.
 - ✅ GPU tests (lavapipe in CI): white furnace, area light and emissives against analytic
   formulas, HDRI, textures, displacement, depth of field, statistical convergence to the CPU image
 - ✅ CPU/GPU selector in the UI and CLI, automatic fallback to CPU
-- ⏳ Measurements on the RTX 5070, NVML, hardware ray tracing, hybrid CPU+GPU
+- ✅ Measurements on the RTX 5070 ([BENCHMARK.md](BENCHMARK.md)): 139 Msamples/s, 4.6× the 24-thread 9900X
+- ⏳ NVML, hardware ray tracing, hybrid CPU+GPU
 
 ## Phase 5 — CAD 🟡
 - ✅ glTF/GLB (recommended export from SolidWorks), OBJ, STL, Blender `.blend`
@@ -162,7 +163,7 @@ Hierarchy, meshes, Principled materials and textures, cameras, `KHR_lights_punct
 
 | Step | What | Requirements | Status |
 |---|---|---|---|
-| 1 | OIDN denoiser on CUDA | NVIDIA driver, Volta or newer GPU | done, to be tested on the RTX 5070 |
+| 1 | OIDN denoiser on CUDA | NVIDIA driver, Volta or newer GPU | done, tested on the RTX 5070: 18 ms vs 51 ms on the CPU (640×360) |
 | 2 | DLSS Ray Reconstruction as fast preview of the Render view | NVIDIA Streamline/NGX on Vulkan, interop with wgpu resources, RTX only | to do |
 | 3 | DLSS menu: model version (one DLL folder per version, menu built from a manifest), internal resolution, sharpness, blend with the accumulated image | step 2 | to do |
 | 4 | Hardware ray tracing (RT cores) | OptiX or Vulkan ray query | to evaluate |
