@@ -45,7 +45,19 @@ pub fn import_named(
     opts: &ImportOptions,
     area_lights: Vec<AreaLightRecord>,
 ) -> Result<ImportReport, ImportError> {
-    let (doc, buffers, images) = gltf::import(path).map_err(|e| ImportError::Parse(format!("glTF: {e}")))?;
+    let (doc, buffers, images) = gltf::import(path).map_err(|e| {
+        let msg = e.to_string();
+        if msg.contains("received 0 bytes") {
+            ImportError::Parse(format!(
+                "il file è incompleto: contiene la descrizione del modello ma non i dati (geometria e texture).\n\
+                 Riesportalo dal programma di origine e controlla che non pesi solo pochi KB; da SolidWorks, se il .glb\n\
+                 esce vuoto, prova \"Extended Reality (*.gltf)\" e copia tutta la cartella (file .gltf, .bin e immagini).\n\
+                 (dettaglio: {msg})"
+            ))
+        } else {
+            ImportError::Parse(format!("glTF: {msg}"))
+        }
+    })?;
     let mut warnings = Vec::new();
     let stem = Path::new(file_name)
         .file_stem()
@@ -279,17 +291,33 @@ fn visit(scene: &mut Scene, ctx: &mut Ctx, node: &gltf::Node, parent: usize, par
 
     if let Some(cam) = node.camera() {
         if ctx.camera.is_none() {
-            if let gltf::camera::Projection::Perspective(p) = cam.projection() {
-                // La camera glTF guarda lungo −Z locale con +Y in alto.
-                let position = world.transform_point3(Vec3::ZERO);
-                let fwd = world.transform_vector3(-Vec3::Z).normalize_or(-Vec3::Z);
-                let up = world.transform_vector3(Vec3::Y).normalize_or(Vec3::Y);
-                ctx.camera = Some(Camera {
-                    position,
-                    target: position + fwd,
-                    up,
-                    vfov_deg: p.yfov().to_degrees(),
-                });
+            // La camera glTF guarda lungo −Z locale con +Y in alto.
+            let position = world.transform_point3(Vec3::ZERO);
+            let fwd = world.transform_vector3(-Vec3::Z).normalize_or(-Vec3::Z);
+            let up = world.transform_vector3(Vec3::Y).normalize_or(Vec3::Y);
+            match cam.projection() {
+                gltf::camera::Projection::Perspective(p) => {
+                    ctx.camera = Some(Camera {
+                        position,
+                        target: position + fwd,
+                        up,
+                        vfov_deg: p.yfov().to_degrees(),
+                    });
+                }
+                gltf::camera::Projection::Orthographic(o) => {
+                    // Il renderer è prospettico: stessa direzione di vista, campo visivo
+                    // moderato e distanza tale da inquadrare la stessa altezza (2·ymag)
+                    // al centro del volume visibile (es. la "current camera" di SolidWorks).
+                    const VFOV: f32 = 30.0;
+                    let center = position + fwd * 0.5 * (o.znear() + o.zfar());
+                    let dist = o.ymag().abs().max(1e-6) / (VFOV.to_radians() * 0.5).tan();
+                    ctx.camera = Some(Camera {
+                        position: center - fwd * dist,
+                        target: center,
+                        up,
+                        vfov_deg: VFOV,
+                    });
+                }
             }
         }
     }
@@ -357,6 +385,69 @@ mod tests {
 
     /// glTF minimo scritto a mano: un triangolo con materiale emissivo e trasparente,
     /// una camera e una luce puntiforme.
+    #[test]
+    fn orthographic_camera_becomes_perspective_with_same_view() {
+        let dir = std::env::temp_dir().join(format!("forge_gltf_ortho_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let p = dir.join("o.gltf");
+        // Triangolo + camera ortografica 2 m davanti, che guarda verso −Z.
+        let tri: Vec<u8> = [0.0f32, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+            .iter()
+            .flat_map(|v| v.to_le_bytes())
+            .collect();
+        std::fs::write(dir.join("o.bin"), &tri).unwrap();
+        std::fs::write(
+            &p,
+            r#"{"asset":{"version":"2.0"},"scene":0,"scenes":[{"nodes":[0,1]}],
+              "nodes":[{"mesh":0},{"camera":0,"translation":[0.0,0.0,2.0]}],
+              "cameras":[{"type":"orthographic","orthographic":{"xmag":0.5,"ymag":0.4,"znear":1.0,"zfar":3.0}}],
+              "meshes":[{"primitives":[{"attributes":{"POSITION":0}}]}],
+              "accessors":[{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3","min":[0,0,0],"max":[1,1,0]}],
+              "bufferViews":[{"buffer":0,"byteLength":36}],"buffers":[{"uri":"o.bin","byteLength":36}]}"#,
+        )
+        .unwrap();
+        let mut scene = Scene::default();
+        let opts = ImportOptions {
+            unit: forge_scene::LengthUnit::Meter,
+            ..Default::default()
+        };
+        let r = import(&mut scene, &p, &opts).unwrap();
+        let cam = r.camera.unwrap();
+        // Stessa direzione (−Z) e centro del volume visibile (z = 0) come bersaglio.
+        assert!((cam.forward() - Vec3::new(0.0, 0.0, -1.0)).length() < 1e-4, "{:?}", cam.forward());
+        assert!(cam.target.length() < 1e-4, "{:?}", cam.target);
+        assert!(cam.position.z > 1.0);
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn truncated_glb_gives_clear_error() {
+        let dir = std::env::temp_dir().join(format!("forge_glb_trunc_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let p = dir.join("vuoto.glb");
+        // Struttura di un GLB esportato con il blocco binario vuoto.
+        let mut json = br#"{"asset":{"version":"2.0"},"buffers":[{"byteLength":64}]}"#.to_vec();
+        while json.len() % 4 != 0 {
+            json.push(b' ');
+        }
+        let total = 12 + 8 + json.len() + 8;
+        let mut glb = Vec::new();
+        glb.extend(b"glTF");
+        glb.extend(2u32.to_le_bytes());
+        glb.extend((total as u32).to_le_bytes());
+        glb.extend((json.len() as u32).to_le_bytes());
+        glb.extend(b"JSON");
+        glb.extend(&json);
+        glb.extend(0u32.to_le_bytes());
+        glb.extend(b"BIN\0");
+        std::fs::write(&p, glb).unwrap();
+        let e = import(&mut Scene::default(), &p, &ImportOptions::default())
+            .unwrap_err()
+            .to_string();
+        assert!(e.contains("incompleto"), "{e}");
+        std::fs::remove_dir_all(dir).ok();
+    }
+
     #[test]
     fn imports_mesh_material_camera_light() {
         let dir = std::env::temp_dir().join(format!("forge_gltf_{}", std::process::id()));
