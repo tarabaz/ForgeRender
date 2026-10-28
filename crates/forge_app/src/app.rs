@@ -535,7 +535,12 @@ impl ForgeApp {
                 },
                 at(c.x, back - 0.3 * e),
             ),
-            AddKind::Box => (K::Box { size: Vec3::splat(2.0 * r) }, at(side, c.z)),
+            AddKind::Box => (
+                K::Box {
+                    size: Vec3::splat(2.0 * r),
+                },
+                at(side, c.z),
+            ),
             AddKind::Sphere => (K::Sphere { radius: r }, at(side, c.z)),
             AddKind::Cylinder => (
                 K::Cylinder {

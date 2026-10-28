@@ -301,7 +301,8 @@ pub fn backdrop(width: f32, depth: f32, height: f32, radius: f32, segments: u32)
     for (k, &(z, y)) in profile.iter().enumerate() {
         for x in [-w, w] {
             m.positions.push(Vec3::new(x, y, z));
-            m.uvs.push(Vec2::new((x + w) / width.max(1e-6), len[k] / len[len.len() - 1].max(1e-6)));
+            m.uvs
+                .push(Vec2::new((x + w) / width.max(1e-6), len[k] / len[len.len() - 1].max(1e-6)));
         }
     }
     for k in 0..profile.len() as u32 - 1 {

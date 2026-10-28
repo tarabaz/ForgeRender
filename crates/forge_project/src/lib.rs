@@ -377,7 +377,10 @@ mod tests {
         scene.nodes[vi].visible = false;
         scene.nodes[vi].contact_snap = true;
         scene.lights.push(Light::point("P", Vec3::new(1.0, 2.0, 3.0), 5.0));
-        let floor = scene.add_object(forge_scene::AddedKind::Floor { size: 5.0 }, Mat4::from_translation(Vec3::new(0.0, -0.1, 0.0)));
+        let floor = scene.add_object(
+            forge_scene::AddedKind::Floor { size: 5.0 },
+            Mat4::from_translation(Vec3::new(0.0, -0.1, 0.0)),
+        );
         scene.nodes[floor].user.translation = Vec3::new(0.3, 0.0, 0.0);
         scene.fogs.push(forge_scene::FogVolume {
             seed: 77,
@@ -450,7 +453,11 @@ mod tests {
         std::fs::rename(&dir, &moved).unwrap();
         let loaded = load(&moved.join("progetto.frproject")).unwrap();
         assert!(loaded.report.missing_sources.is_empty());
-        assert_eq!(loaded.scene.triangle_count(), 5, "2 triangoli dal file + 1 della copia + 2 del pavimento aggiunto");
+        assert_eq!(
+            loaded.scene.triangle_count(),
+            5,
+            "2 triangoli dal file + 1 della copia + 2 del pavimento aggiunto"
+        );
         std::fs::remove_dir_all(moved).ok();
     }
 

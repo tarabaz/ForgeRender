@@ -10,16 +10,36 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum AddedKind {
     /// Pavimento quadrato di lato `size`.
-    Floor { size: f32 },
+    Floor {
+        size: f32,
+    },
     /// Fondale da studio curvo.
-    Backdrop { width: f32, depth: f32, height: f32, radius: f32 },
+    Backdrop {
+        width: f32,
+        depth: f32,
+        height: f32,
+        radius: f32,
+    },
     /// Parete verticale (normale verso +Z).
-    Wall { width: f32, height: f32 },
-    Box { size: Vec3 },
-    Sphere { radius: f32 },
-    Cylinder { radius: f32, height: f32 },
+    Wall {
+        width: f32,
+        height: f32,
+    },
+    Box {
+        size: Vec3,
+    },
+    Sphere {
+        radius: f32,
+    },
+    Cylinder {
+        radius: f32,
+        height: f32,
+    },
     /// Tazza / contenitore cavo.
-    Cup { radius: f32, height: f32 },
+    Cup {
+        radius: f32,
+        height: f32,
+    },
 }
 
 impl AddedKind {
@@ -101,19 +121,18 @@ impl Scene {
         let base = kind.label();
         let mut n = 1;
         let (id, name) = loop {
-            let id = ComponentId(format!("aggiunti/{}{}", base.to_lowercase().replace(' ', "-"), if n == 1 { String::new() } else { format!("-{n}") }));
+            let id = ComponentId(format!(
+                "aggiunti/{}{}",
+                base.to_lowercase().replace(' ', "-"),
+                if n == 1 { String::new() } else { format!("-{n}") }
+            ));
             if self.find(&id).is_none() {
                 let name = if n == 1 { base.to_string() } else { format!("{base} {n}") };
                 break (id, name);
             }
             n += 1;
         };
-        let r = AddedRecord {
-            id,
-            name,
-            kind,
-            placement,
-        };
+        let r = AddedRecord { id, name, kind, placement };
         let i = self.instantiate_added(&r);
         self.added.push(r);
         i
