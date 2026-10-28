@@ -55,6 +55,7 @@ fn main() -> anyhow::Result<()> {
         }
         "render" => render(&args),
         "bench" => bench(&args),
+        "libreria" => library(&args),
         "-h" | "--help" | "help" => {
             print_help();
             Ok(())
@@ -75,7 +76,9 @@ fn print_help() {
              --hdri F.hdr|F.exr  --hdri-strength S  --hdri-rotation GRADI\n    \
              --denoise off|finale  --denoise-quality veloce|bilanciata|alta  --cuda  --denoise-strength 0..1\n  \
          bench [opzioni]            benchmark della scena di test con diversi numeri di thread\n    \
-             --spp N (default 16)  --width W  --height H  --threads 1,2,4  --json F",
+             --spp N (default 16)  --width W  --height H  --threads 1,2,4  --json F\n  \
+         libreria elenco            materiali e HDRI della libreria\n  \
+         libreria importa P [P…]    importa cartelle di mappe o zip come materiali  [--dimensione METRI]",
         env!("CARGO_PKG_VERSION")
     );
 }
@@ -357,4 +360,46 @@ fn parse_quality(q: &str) -> anyhow::Result<forge_render_core::DenoiseQuality> {
         "alta" | "high" => forge_render_core::DenoiseQuality::High,
         _ => bail!("qualità del denoiser non valida: {q} (veloce|bilanciata|alta)"),
     })
+}
+
+fn library(args: &Args) -> anyhow::Result<()> {
+    let root = forge_library::paths::ensure()?;
+    match args.0.first().map(String::as_str) {
+        Some("elenco") | None => {
+            println!("Libreria: {}", root.display());
+            let mats = forge_library::store::list();
+            println!("\nMateriali ({}):", mats.len());
+            for m in &mats {
+                let maps = m.material.texture_slots().iter().filter(|s| s.is_some()).count();
+                println!("  {:<40} {maps} mappe  [{}]", m.material.name, m.source);
+            }
+            let hdri = forge_library::paths::list_hdri();
+            println!("\nHDRI ({}):", hdri.len());
+            for h in &hdri {
+                println!("  {}", h.display());
+            }
+            Ok(())
+        }
+        Some("importa") => {
+            let size: Option<f32> = args.parse("--dimensione")?;
+            let paths: Vec<&String> = args.0[1..].iter().take_while(|a| !a.starts_with("--")).collect();
+            if paths.is_empty() {
+                bail!("indica almeno una cartella o uno zip da importare");
+            }
+            for p in paths {
+                let p = PathBuf::from(p);
+                let r = if p.extension().is_some_and(|e| e.eq_ignore_ascii_case("zip")) {
+                    forge_library::store::import_zip(&p, None, size, "importato da riga di comando")
+                } else {
+                    forge_library::store::import_folder(&p, None, size, "importato da riga di comando")
+                };
+                match r {
+                    Ok(m) => println!("importato «{}» in {}", m.material.name, m.dir.display()),
+                    Err(e) => eprintln!("{}: {e:#}", p.display()),
+                }
+            }
+            Ok(())
+        }
+        Some(other) => bail!("comando libreria sconosciuto: {other} (elenco | importa)"),
+    }
 }

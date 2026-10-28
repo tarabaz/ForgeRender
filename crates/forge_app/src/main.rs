@@ -33,6 +33,11 @@ fn parse_args() -> StartupOptions {
                 i += 1;
                 o.screenshot_after_samples = args.get(i).and_then(|s| s.parse().ok()).unwrap_or(0);
             }
+            "--library" => o.library = true,
+            "--tab" => {
+                i += 1;
+                o.tab = args.get(i).cloned();
+            }
             "--select" => {
                 i += 1;
                 o.select = args.get(i).cloned();

@@ -10,6 +10,7 @@ default-members = [
     "crates/forge_render_cpu",
     "crates/forge_render_gpu",
     "crates/forge_denoise",
+    "crates/forge_library",
     "crates/forge_import",
     "crates/forge_project",
     "crates/forge_image_io",
@@ -33,6 +34,7 @@ forge_render_core = { path = "crates/forge_render_core" }
 forge_render_cpu = { path = "crates/forge_render_cpu" }
 forge_render_gpu = { path = "crates/forge_render_gpu" }
 forge_denoise = { path = "crates/forge_denoise" }
+forge_library = { path = "crates/forge_library" }
 forge_import = { path = "crates/forge_import" }
 forge_project = { path = "crates/forge_project" }
 forge_image_io = { path = "crates/forge_image_io" }
@@ -44,7 +46,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
-image = { version = "0.25", default-features = false, features = ["png", "jpeg", "hdr", "exr"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "hdr", "exr", "tiff", "tga", "bmp"] }
 tobj = "4.0"
 gltf = { version = "1.4", default-features = false, features = ["import", "utils", "names", "KHR_lights_punctual", "KHR_materials_transmission", "KHR_materials_ior", "KHR_materials_emissive_strength"] }
 stl_io = "0.11"
@@ -55,6 +57,8 @@ rfd = "0.17"
 wgpu = { version = "30", features = ["static-dxc"] }
 pollster = "1"
 libloading = "0.8"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+ureq = { version = "3", default-features = false, features = ["rustls", "json"] }
 bytemuck = { version = "1", features = ["derive"] }
 anyhow = "1"
 thiserror = "2"

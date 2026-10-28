@@ -1,0 +1,16 @@
+[package]
+name = "forge_library"
+description = "Libreria di materiali e HDRI: cartelle, riconoscimento delle mappe PBR, import da cartella/zip, download da ambientCG e Poly Haven."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+forge_scene.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+image.workspace = true
+zip.workspace = true
+ureq.workspace = true

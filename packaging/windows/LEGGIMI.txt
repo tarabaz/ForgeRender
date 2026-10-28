@@ -13,6 +13,15 @@ Riga di comando (render e benchmark senza interfaccia)
   forgerender-cli.exe render --test-scene --spp 64 --denoise finale --cuda --out pulita.png
   forgerender-cli.exe bench --json benchmark.json
 
+Libreria (pulsante "Libreria" nella barra)
+  Materiali PBR veri con tutte le mappe (colore, rugosità/gloss, metallicità, normal GL/DX,
+  rilievo, occlusione, opacità con ritaglio). Scarica da ambientCG e Poly Haven (CC0, gratuiti
+  anche per uso commerciale) in 1K/2K/4K/8K, oppure importa una cartella o uno zip: le mappe
+  vengono riconosciute dai nomi dei file. Le HDRI della cartella Libreria\HDRI compaiono con
+  l'anteprima nella scheda Ambiente.
+  Portable: cartella Libreria accanto a forgerender.exe. Installato: Documenti\ForgeRender\Libreria.
+  Da riga di comando: forgerender-cli libreria importa <cartella|zip> [--dimensione METRI]
+
 Riduzione del rumore (denoiser, pannello Render)
   Intel Open Image Denoise: con 64-256 campioni l'immagine è già pulita.
   "Usa CUDA (GPU NVIDIA)": esegue il denoiser sulla GPU con i core tensor

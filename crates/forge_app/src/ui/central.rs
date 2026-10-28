@@ -467,7 +467,7 @@ pub fn material_preview(app: &mut ForgeApp, ui: &mut egui::Ui) {
     });
 }
 
-fn render_preview(mat: &Material) -> Vec<u8> {
+pub(crate) fn render_preview(mat: &Material) -> Vec<u8> {
     let mut s = Scene::default();
     let mut m = mat.clone();
     m.id = forge_scene::MaterialId::new("__preview");

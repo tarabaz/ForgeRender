@@ -132,6 +132,14 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
         }
     });
 
+    if ui
+        .button("Libreria con texture (ambientCG, Poly Haven)…")
+        .on_hover_text("Materiali PBR veri con tutte le mappe: la tua libreria, import da cartella/zip e download")
+        .clicked()
+    {
+        app.library.open = true;
+    }
+
     // Assegnazione.
     ui.add_space(4.0);
     ui.horizontal_wrapped(|ui| {
@@ -297,8 +305,57 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
             changed = true;
         }
         ui.end_row();
+        if m.roughness_texture.is_some() {
+            ui.label("");
+            changed |= ui
+                .checkbox(&mut m.roughness_is_gloss, "È una mappa di lucidità (gloss)")
+                .on_hover_text("Quixel e alcuni flussi Substance usano «gloss»: chiaro = lucido. Viene invertita.")
+                .changed();
+            ui.end_row();
+        }
+        ui.label("Metallicità");
+        if texture_slot(ui, &mut m.metallic_texture, "metal") {
+            if m.metallic_texture.is_some() {
+                m.metallic = 1.0; // la texture viene moltiplicata per la metallicità
+            }
+            changed = true;
+        }
+        ui.end_row();
         ui.label("Normal map");
         changed |= texture_slot(ui, &mut m.normal_texture, "normal");
+        ui.end_row();
+        if m.normal_texture.is_some() {
+            ui.label("");
+            changed |= ui
+                .checkbox(&mut m.normal_directx, "Formato DirectX")
+                .on_hover_text("Le normal map «DX» (Unreal, Quixel, *_NormalDX) hanno il verde invertito rispetto a OpenGL")
+                .changed();
+            ui.end_row();
+        }
+        ui.label("Rilievo (height)");
+        changed |= texture_slot(ui, &mut m.height_texture, "height");
+        ui.end_row();
+        if m.height_texture.is_some() {
+            ui.label("Profondità rilievo (mm)");
+            changed |= ui
+                .add(egui::DragValue::new(&mut m.bump_mm).speed(0.05).range(0.0..=100.0))
+                .on_hover_text("Bump mapping: 0 = spento. Con una normal map il rilievo è di solito già incluso.")
+                .changed();
+            ui.end_row();
+        }
+        ui.label("Occlusione (AO)");
+        changed |= texture_slot(ui, &mut m.ao_texture, "ao");
+        ui.end_row();
+        if m.ao_texture.is_some() {
+            ui.label("Intensità AO");
+            changed |= ui
+                .add(egui::Slider::new(&mut m.ao_strength, 0.0..=1.0))
+                .on_hover_text("Scurisce le cavità. Il path tracer calcola già l'occlusione reale: valori bassi sono più fedeli.")
+                .changed();
+            ui.end_row();
+        }
+        ui.label("Opacità (ritaglio)");
+        changed |= texture_slot(ui, &mut m.opacity_texture, "opacity");
         ui.end_row();
         if m.has_textures() {
             ui.label("Proiezione");
@@ -343,7 +400,6 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
             ui.end_row();
         }
     });
-    unavailable(ui, "Displacement, opacità e trasmissione ruvida", "fasi successive");
     if changed {
         app.appearance_changed();
     }
@@ -650,6 +706,7 @@ fn environment(app: &mut ForgeApp, ui: &mut egui::Ui) {
     if repick {
         changed |= pick_hdri(app);
     }
+    changed |= hdri_library(app, ui);
     if changed {
         app.shading_changed();
     }
@@ -664,7 +721,7 @@ fn environment(app: &mut ForgeApp, ui: &mut egui::Ui) {
         ui.label(
             egui::RichText::new(
                 "La HDRI illumina la scena con importance sampling (sole e finestre campionati direttamente). \
-                 Mappe gratuite CC0: polyhaven.com.",
+                 Mappe gratuite CC0: polyhaven.com (anche dal pulsante «Scarica HDRI…»).",
             )
             .weak()
             .small(),
@@ -672,11 +729,104 @@ fn environment(app: &mut ForgeApp, ui: &mut egui::Ui) {
     }
 }
 
-/// Sceglie una HDRI e la carica in background (così il primo render non blocca l'interfaccia).
+/// Elenco delle HDRI della cartella `Libreria/HDRI`: un clic e diventano l'ambiente.
+fn hdri_library(app: &mut ForgeApp, ui: &mut egui::Ui) -> bool {
+    let mut changed = false;
+    ui.separator();
+    ui.horizontal(|ui| {
+        ui.strong("HDRI della libreria");
+        if ui
+            .small_button("Apri cartella")
+            .on_hover_text(forge_library::paths::hdri_dir().display().to_string())
+            .clicked()
+        {
+            crate::ui::library::open_folder(&forge_library::paths::hdri_dir());
+        }
+        if ui
+            .small_button("Scarica HDRI…")
+            .on_hover_text("HDRI gratuite (CC0) da Poly Haven")
+            .clicked()
+        {
+            app.library.open_hdri_tab();
+        }
+    });
+    let list = app.library.hdri_list();
+    if list.is_empty() {
+        ui.label(
+            egui::RichText::new("Nessuna HDRI: copia i file .hdr/.exr nella cartella HDRI della libreria, oppure scaricane una.")
+                .weak()
+                .small(),
+        );
+    }
+    let current = match &app.scene.environment {
+        Environment::Hdri { path, .. } => Some(path.clone()),
+        _ => None,
+    };
+    let ctx = ui.ctx().clone();
+    egui::ScrollArea::vertical().id_salt("hdri-list").max_height(320.0).show(ui, |ui| {
+        ui.horizontal_wrapped(|ui| {
+            for p in list {
+                let name = p.file_stem().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                let tex = app.library.hdri_thumb(&ctx, &p);
+                let size = egui::vec2(150.0, 75.0);
+                let r = ui
+                    .vertical(|ui| {
+                        let (rect, r) = ui.allocate_exact_size(size, egui::Sense::click());
+                        match tex {
+                            Some(t) => {
+                                ui.painter().image(
+                                    t.id(),
+                                    rect,
+                                    egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                                    egui::Color32::WHITE,
+                                );
+                            }
+                            None => {
+                                ui.painter().rect_filled(rect, 3.0, egui::Color32::from_gray(40));
+                                ui.painter().text(
+                                    rect.center(),
+                                    egui::Align2::CENTER_CENTER,
+                                    "anteprima…",
+                                    egui::FontId::proportional(11.0),
+                                    egui::Color32::GRAY,
+                                );
+                            }
+                        }
+                        let selected = current.as_ref() == Some(&p);
+                        if selected || r.hovered() {
+                            let c = if selected { style::ACCENT } else { egui::Color32::from_gray(200) };
+                            ui.painter()
+                                .rect_stroke(rect, 3.0, egui::Stroke::new(2.0, c), egui::StrokeKind::Inside);
+                        }
+                        ui.add(egui::Label::new(egui::RichText::new(&name).small()).truncate());
+                        r
+                    })
+                    .inner;
+                if r.on_hover_text(p.display().to_string()).clicked() {
+                    set_hdri(app, p);
+                    changed = true;
+                }
+            }
+        });
+    });
+    changed
+}
+
+/// Sceglie una HDRI da file.
 fn pick_hdri(app: &mut ForgeApp) -> bool {
-    let Some(path) = rfd::FileDialog::new().add_filter("HDRI (.hdr, .exr)", &["hdr", "exr"]).pick_file() else {
+    let Some(path) = rfd::FileDialog::new()
+        .add_filter("HDRI (.hdr, .exr)", &["hdr", "exr"])
+        .set_directory(forge_library::paths::hdri_dir())
+        .pick_file()
+    else {
         return false;
     };
+    set_hdri(app, path);
+    true
+}
+
+/// Imposta la HDRI come ambiente e la carica in background (così il primo render non blocca l'interfaccia).
+pub(crate) fn set_hdri(app: &mut ForgeApp, path: std::path::PathBuf) {
     let p2 = path.clone();
     std::thread::spawn(move || {
         if let Err(e) = forge_render_core::env_map::load_cached(&p2) {
@@ -694,7 +844,6 @@ fn pick_hdri(app: &mut ForgeApp) -> bool {
         strength,
         rotation_deg,
     };
-    true
 }
 
 // ----------------------------------------------------------------------

@@ -130,6 +130,15 @@ pub fn import_named(
             // glTF: roughness nel canale G, metallic nel B. ForgeRender legge la roughness da R.
             mat.roughness_texture = save_image(info.texture().source().index(), "roughness", &mut warnings);
             uses_texture |= mat.roughness_texture.is_some();
+            if mat.metallic > 0.0 {
+                mat.metallic_texture = save_image(info.texture().source().index(), "metallic", &mut warnings);
+            }
+        }
+        if let Some(o) = m.occlusion_texture() {
+            // glTF: occlusione nel canale R.
+            mat.ao_texture = save_image(o.texture().source().index(), "occlusione", &mut warnings);
+            mat.ao_strength = o.strength().clamp(0.0, 1.0) * 0.5;
+            uses_texture |= mat.ao_texture.is_some();
         }
         if let Some(n) = m.normal_texture() {
             mat.normal_texture = save_image(n.texture().source().index(), "normal", &mut warnings);
@@ -374,7 +383,12 @@ fn to_rgb8(data: &gltf::image::Data, kind: &str) -> Option<image::RgbImage> {
     let mut img = image::RgbImage::new(w, h);
     for (i, p) in img.pixels_mut().enumerate().take(n) {
         let c = get(i);
-        *p = image::Rgb(if kind == "roughness" { [c[1]; 3] } else { c });
+        *p = image::Rgb(match kind {
+            "roughness" => [c[1]; 3],
+            "metallic" => [c[2]; 3],
+            "occlusione" => [c[0]; 3],
+            _ => c,
+        });
     }
     Some(img)
 }

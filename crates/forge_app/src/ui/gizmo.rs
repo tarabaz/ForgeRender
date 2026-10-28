@@ -607,10 +607,15 @@ fn draw(app: &ForgeApp, rect: egui::Rect, painter: &egui::Painter, f: &Frame, ac
 
 /// Barra degli strumenti nella viewport: modalità, assi globali/locali, passi di snap.
 pub fn toolbar(app: &mut ForgeApp, ui: &mut egui::Ui, rect: egui::Rect) {
-    let area = egui::Area::new(egui::Id::NULL.with("gizmo-toolbar"))
-        .fixed_pos(rect.left_top() + egui::vec2(8.0, 8.0))
-        .order(egui::Order::Foreground);
-    area.show(ui.ctx(), |ui| {
+    // Dentro la viewport (stesso livello del pannello): le finestre restano sopra.
+    let bar = egui::Rect::from_min_size(rect.left_top() + egui::vec2(8.0, 8.0), egui::vec2(rect.width() - 16.0, 40.0));
+    let mut child = ui.new_child(
+        egui::UiBuilder::new()
+            .max_rect(bar)
+            .layout(egui::Layout::left_to_right(egui::Align::Min)),
+    );
+    {
+        let ui = &mut child;
         egui::Frame::popup(ui.style()).inner_margin(4.0).show(ui, |ui| {
             ui.horizontal(|ui| {
                 for m in [GizmoMode::Select, GizmoMode::Move, GizmoMode::Rotate, GizmoMode::Scale] {
@@ -660,7 +665,7 @@ pub fn toolbar(app: &mut ForgeApp, ui: &mut egui::Ui, rect: egui::Rect) {
                 }
             });
         });
-    });
+    }
 }
 
 #[cfg(test)]

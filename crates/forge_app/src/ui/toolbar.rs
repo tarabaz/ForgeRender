@@ -59,6 +59,13 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
         if ui.button("Salva").on_hover_text("Salva progetto (Ctrl+S)").clicked() {
             app.save_project(false);
         }
+        if ui
+            .selectable_label(app.library.open, "Libreria")
+            .on_hover_text("Materiali con texture e HDRI: la tua libreria e i download da ambientCG / Poly Haven")
+            .clicked()
+        {
+            app.library.open = !app.library.open;
+        }
         ui.separator();
 
         let state = app.render_state();

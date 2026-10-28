@@ -18,6 +18,7 @@ forge_render_core.workspace = true
 forge_render_cpu.workspace = true
 forge_render_gpu.workspace = true
 forge_denoise.workspace = true
+forge_library.workspace = true
 forge_image_io.workspace = true
 forge_telemetry.workspace = true
 anyhow.workspace = true

@@ -63,6 +63,14 @@ foreach ($dll in $oidnDlls) { Copy-Item (Join-Path $OidnDir "bin\$dll") $staging
 $oidnLic = Join-Path $staging "licenze\OpenImageDenoise"
 New-Item -ItemType Directory -Force -Path $oidnLic | Out-Null
 Copy-Item (Join-Path $OidnDir "doc\LICENSE.txt"), (Join-Path $OidnDir "doc\third-party-programs*.txt") $oidnLic
+# Cartelle della libreria (HDRI, materiali, texture): nella portable stanno accanto al programma.
+foreach ($sub in @("HDRI", "Materiali", "Texture")) {
+    $d = Join-Path $staging "Libreria\$sub"
+    New-Item -ItemType Directory -Force -Path $d | Out-Null
+}
+Set-Content -Path (Join-Path $staging "Libreria\HDRI\LEGGIMI.txt") -Value "Metti qui le mappe HDRI (.hdr, .exr): compaiono con l'anteprima nella scheda Ambiente."
+Set-Content -Path (Join-Path $staging "Libreria\Materiali\LEGGIMI.txt") -Value "Materiali della libreria (una cartella per materiale). Usa Libreria -> Importa cartella/zip oppure scarica da ambientCG / Poly Haven."
+Set-Content -Path (Join-Path $staging "Libreria\Texture\LEGGIMI.txt") -Value "Texture sciolte da usare negli slot dei materiali."
 # Marcatore della modalità portable: i log restano nella cartella del programma.
 Set-Content -Path (Join-Path $staging "portable.txt") -Value "Versione portable di ForgeRender: i log vengono scritti nella sottocartella logs."
 $zip = Join-Path $dist "$portableName.zip"

@@ -73,6 +73,10 @@ pub struct StartupOptions {
     pub auto_render: bool,
     pub screenshot: Option<PathBuf>,
     pub screenshot_after_samples: u32,
+    /// Apre la finestra della libreria.
+    pub library: bool,
+    /// Scheda dell'inspector: oggetto | materiali | luci | ambiente | camera | render.
+    pub tab: Option<String>,
     /// Seleziona il componente con questo nome.
     pub select: Option<String>,
     /// Modalità del gizmo: move | rotate | scale.
@@ -156,6 +160,7 @@ pub struct ForgeApp {
     pub denoiser_info: Result<String, String>,
     denoise_sent: Option<forge_render_core::DenoiseSettings>,
     pub gizmo: crate::ui::gizmo::Gizmo,
+    pub library: crate::ui::library::LibraryUi,
     /// "Pilota": la camera di rendering attiva segue la vista della viewport.
     pub camera_follow: bool,
     /// Annulla/ripeti delle trasformazioni: stato precedente dei componenti toccati
@@ -224,6 +229,7 @@ impl ForgeApp {
             denoiser_info: Err(String::new()),
             denoise_sent: None,
             gizmo: Default::default(),
+            library: Default::default(),
             camera_follow: false,
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
@@ -247,6 +253,11 @@ impl ForgeApp {
                 })
                 .ok();
             app.gpu_warmup = Some(rx);
+        }
+        // Cartelle della libreria (HDRI, materiali, texture).
+        match forge_library::paths::ensure() {
+            Ok(root) => tracing::info!("libreria: {}", root.display()),
+            Err(e) => tracing::warn!("cartelle della libreria non create: {e}"),
         }
         // Denoiser: la libreria OIDN è opzionale (accanto all'eseguibile).
         match forge_denoise::OidnDenoiser::load() {
@@ -281,6 +292,17 @@ impl ForgeApp {
                 app.camera_changed();
             }
             app.tab = InspectorTab::Camera;
+        }
+        app.library.open = startup.library;
+        if let Some(t) = &startup.tab {
+            app.tab = match t.as_str() {
+                "oggetto" => InspectorTab::Object,
+                "luci" => InspectorTab::Lights,
+                "ambiente" => InspectorTab::Environment,
+                "camera" => InspectorTab::Camera,
+                "render" => InspectorTab::Render,
+                _ => InspectorTab::Materials,
+            };
         }
         if startup.auto_render {
             app.tab = InspectorTab::Render;
