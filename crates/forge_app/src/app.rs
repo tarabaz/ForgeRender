@@ -14,6 +14,10 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::Receiver;
 use std::sync::Arc;
 
+/// Nome, versione e commit della build, per il titolo della finestra
+/// (es. "ForgeRender v0.1.0 (a1b2c3d)"; "dev" se compilato senza Git).
+pub const APP_TITLE: &str = concat!("ForgeRender v", env!("CARGO_PKG_VERSION"), " (", env!("FORGE_GIT_SHA"), ")");
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum View {
     Viewport,
@@ -1572,7 +1576,7 @@ impl ForgeApp {
         }
         self.handle_screenshot(ctx);
         let title = format!(
-            "ForgeRender — {}{}",
+            "{APP_TITLE} — {}{}",
             self.meta
                 .path
                 .as_ref()

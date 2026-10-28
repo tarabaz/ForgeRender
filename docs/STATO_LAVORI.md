@@ -66,6 +66,39 @@
   pesante che si mescola e risale ("Risalita"); preset bicchiere/tavolo/palco; la zona si estende
   fino al pavimento della scena; test su tazza che trabocca e risalita; ottimizzazioni (8×).
 
+## Fatto nella nona parte
+- Scheda Effetti, preset scenografici e cache a due livelli della nebbia; qualità della griglia
+  (simulazione fino a 256 celle) e zona spostabile; nebbia ricalcolata solo se cambiano gli
+  oggetti dentro la sua zona; niente gradini (zona appoggiata alla superficie sotto, campo
+  ammorbidito).
+- Menu Aggiungi (pavimento, fondale, parete, forme); render interattivo che non ricarica la scena
+  sulla GPU quando si muove solo la camera; camera "Punta su oggetto".
+- Portali di luce per gli interni (CPU e GPU); liquidi nei bicchieri: colore in volume e volumi
+  annidati con priorità (CPU e GPU).
+- BVH costruita su tutti i core; libreria online con catalogo completo in cache e
+  `forgerender-cli libreria scarica-tutto`.
+- Scena demo `samples/scene/cocktail-ghiaccio-secco`; benchmark sul PC di riferimento
+  (Ryzen 9 9900X + RTX 5070) in docs/BENCHMARK.md.
+
+## Piano di sviluppo incrementale
+
+### Fase 1 — Versione nella barra del titolo: fatta, in attesa di conferma
+- Titolo della finestra: `ForgeRender v<versione> (<commit>)`, es. `ForgeRender v0.1.0 (a6d8a99)`,
+  seguito da ` — <progetto>[ *]` come prima.
+- Versione da `CARGO_PKG_VERSION` (si cambia solo nel Cargo.toml del workspace a una release).
+- Commit: `crates/forge_app/build.rs` lo calcola in compilazione (mai durante l'esecuzione):
+  variabile `FORGE_GIT_SHA` se impostata, altrimenti `git rev-parse --short=7 HEAD`, altrimenti
+  `dev`. Cargo lo ricalcola solo quando cambia il commit (HEAD, ref corrente, packed-refs).
+- Stessa costante `APP_TITLE` in `ViewportBuilder::with_title`, `eframe::run_native` e nel titolo
+  aggiornato a ogni frame (`app.rs`, che prima riscriveva "ForgeRender — …").
+- `with_app_id("ForgeRender")`: l'archivio delle impostazioni di eframe resta lo stesso anche se
+  il titolo cambia a ogni build.
+- Verifiche: `cargo fmt --all --check` ok; `cargo build --release -p forge_app -p forge_cli` ok;
+  titolo letto nel log di avvio e nell'eseguibile nei tre casi (commit reale, `FORGE_GIT_SHA`
+  impostata, Git assente → `dev`).
+
+### Fase 2 — Compilazione locale rapida (Build-ForgeRender.ps1): da fare dopo conferma
+### Fase 3 — Baseline visiva e profiling: da fare dopo la fase 2
+
 ## Prossimi passi
-Vedi la tabella di sintesi in docs/ROADMAP.it.md (gizmo luci, snap a contatto, lingue,
-campionamento adattivo, nebbia volumetrica…).
+Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

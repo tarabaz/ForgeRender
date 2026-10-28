@@ -75,14 +75,17 @@ fn main() -> std::process::ExitCode {
     let logs = forge_telemetry::init_logging_to(log_dir.as_deref());
     let startup = parse_args();
     let system = forge_telemetry::SystemInfo::detect();
-    tracing::info!("ForgeRender {} — {}", env!("CARGO_PKG_VERSION"), system.summary());
+    tracing::info!("{} — {}", app::APP_TITLE, system.summary());
     if let Some(d) = &log_dir {
         tracing::info!("file di log: {}", d.join("forgerender.log").display());
     }
 
     let native = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_title("ForgeRender")
+            .with_title(app::APP_TITLE)
+            // Identificativo stabile (archivio delle impostazioni, app id su Wayland):
+            // il titolo cambia a ogni build, le impostazioni salvate restano.
+            .with_app_id("ForgeRender")
             .with_inner_size([1600.0, 960.0])
             .with_min_inner_size([960.0, 600.0])
             .with_drag_and_drop(true),
@@ -95,7 +98,7 @@ fn main() -> std::process::ExitCode {
     };
     let st = startup.clone();
     let result = eframe::run_native(
-        "ForgeRender",
+        app::APP_TITLE,
         native,
         Box::new(move |cc| Ok(Box::new(ForgeApp::new(cc, logs, system, st)))),
     );
