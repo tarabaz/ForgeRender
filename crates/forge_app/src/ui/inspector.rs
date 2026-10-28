@@ -763,52 +763,33 @@ fn hdri_library(app: &mut ForgeApp, ui: &mut egui::Ui) -> bool {
         _ => None,
     };
     let ctx = ui.ctx().clone();
-    egui::ScrollArea::vertical().id_salt("hdri-list").max_height(320.0).show(ui, |ui| {
-        ui.horizontal_wrapped(|ui| {
-            for p in list {
-                let name = p.file_stem().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-                let tex = app.library.hdri_thumb(&ctx, &p);
-                let size = egui::vec2(150.0, 75.0);
-                let r = ui
-                    .vertical(|ui| {
-                        let (rect, r) = ui.allocate_exact_size(size, egui::Sense::click());
-                        match tex {
-                            Some(t) => {
-                                ui.painter().image(
-                                    t.id(),
-                                    rect,
-                                    egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-                                    egui::Color32::WHITE,
-                                );
-                            }
-                            None => {
-                                ui.painter().rect_filled(rect, 3.0, egui::Color32::from_gray(40));
-                                ui.painter().text(
-                                    rect.center(),
-                                    egui::Align2::CENTER_CENTER,
-                                    "anteprima…",
-                                    egui::FontId::proportional(11.0),
-                                    egui::Color32::GRAY,
-                                );
-                            }
-                        }
-                        let selected = current.as_ref() == Some(&p);
-                        if selected || r.hovered() {
-                            let c = if selected { style::ACCENT } else { egui::Color32::from_gray(200) };
-                            ui.painter()
-                                .rect_stroke(rect, 3.0, egui::Stroke::new(2.0, c), egui::StrokeKind::Inside);
-                        }
-                        ui.add(egui::Label::new(egui::RichText::new(&name).small()).truncate());
-                        r
-                    })
-                    .inner;
-                if r.on_hover_text(p.display().to_string()).clicked() {
-                    set_hdri(app, p);
-                    changed = true;
+    // Colonne a larghezza fissa calcolate sullo spazio disponibile: il pannello non si
+    // allarga mai per far stare le miniature (con molte HDRI usciva dallo schermo).
+    // Al massimo 2 per riga, larghe quanto metà pannello; le altre vanno sotto (scorrimento).
+    let gap = ui.spacing().item_spacing.x;
+    let avail = ui.available_width() - 12.0; // spazio per la barra di scorrimento
+    let cols = if avail >= 260.0 { 2 } else { 1 };
+    let cell = ((avail - gap * (cols as f32 - 1.0)) / cols as f32).clamp(100.0, 400.0);
+    let mut clicked = None;
+    egui::ScrollArea::vertical().id_salt("hdri-list").max_height(520.0).show(ui, |ui| {
+        for row in list.chunks(cols) {
+            ui.horizontal(|ui| {
+                for p in row {
+                    let name = p.file_stem().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                    let tex = app.library.hdri_thumb(&ctx, p);
+                    let selected = current.as_ref() == Some(p);
+                    let r = crate::ui::library::thumb_card(ui, tex, egui::vec2(cell, cell * 0.5), &name, "", selected);
+                    if r.on_hover_text(p.display().to_string()).clicked() {
+                        clicked = Some(p.clone());
+                    }
                 }
-            }
-        });
+            });
+        }
     });
+    if let Some(p) = clicked {
+        set_hdri(app, p);
+        changed = true;
+    }
     changed
 }
 

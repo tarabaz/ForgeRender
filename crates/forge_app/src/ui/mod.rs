@@ -29,15 +29,21 @@ impl eframe::App for ForgeApp {
             .default_size(170.0)
             .min_size(70.0)
             .show(ui, |ui| status::show(self, ui));
+        // Limiti di larghezza: un contenuto largo (es. molte miniature) non può più far
+        // crescere un pannello fino a coprire la viewport; vale anche per le larghezze
+        // salvate dalle sessioni precedenti.
+        let total = ui.available_width();
         egui::Panel::left("tree")
             .resizable(true)
             .default_size(270.0)
             .min_size(180.0)
+            .max_size((total * 0.3).max(200.0))
             .show(ui, |ui| tree::show(self, ui));
         egui::Panel::right("inspector")
             .resizable(true)
-            .default_size(340.0)
+            .default_size(360.0)
             .min_size(260.0)
+            .max_size((total * 0.45).max(280.0))
             .show(ui, |ui| inspector::show(self, ui));
         egui::CentralPanel::default().show(ui, |ui| central::show(self, ui, frame));
 

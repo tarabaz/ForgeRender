@@ -322,43 +322,57 @@ pub fn apply_material(app: &mut ForgeApp, m: &LibraryMaterial) {
 
 const CARD: f32 = 112.0;
 
-fn card(ui: &mut egui::Ui, tex: Option<egui::TextureHandle>, size: egui::Vec2, title: &str, subtitle: &str) -> egui::Response {
-    ui.allocate_ui(egui::vec2(size.x, size.y + 34.0), |ui| {
-        ui.vertical(|ui| {
-            let (rect, resp) = ui.allocate_exact_size(size, egui::Sense::click());
-            match tex {
-                Some(t) => {
-                    ui.painter().image(
-                        t.id(),
-                        rect,
-                        egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-                        egui::Color32::WHITE,
-                    );
-                }
-                None => {
-                    ui.painter().rect_filled(rect, 4.0, egui::Color32::from_gray(40));
-                    ui.painter().text(
-                        rect.center(),
-                        egui::Align2::CENTER_CENTER,
-                        "…",
-                        egui::FontId::proportional(18.0),
-                        egui::Color32::GRAY,
-                    );
-                }
+/// Miniatura con titolo, a larghezza fissa (il testo lungo viene troncato).
+pub fn thumb_card(
+    ui: &mut egui::Ui,
+    tex: Option<egui::TextureHandle>,
+    size: egui::Vec2,
+    title: &str,
+    subtitle: &str,
+    selected: bool,
+) -> egui::Response {
+    let h = size.y + if subtitle.is_empty() { 18.0 } else { 34.0 };
+    ui.allocate_ui_with_layout(egui::vec2(size.x, h), egui::Layout::top_down(egui::Align::Min), |ui| {
+        ui.set_width(size.x);
+        let (rect, resp) = ui.allocate_exact_size(size, egui::Sense::click());
+        match tex {
+            Some(t) => {
+                ui.painter().image(
+                    t.id(),
+                    rect,
+                    egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                    egui::Color32::WHITE,
+                );
             }
-            if resp.hovered() {
-                ui.painter()
-                    .rect_stroke(rect, 4.0, egui::Stroke::new(2.0, style::ACCENT), egui::StrokeKind::Inside);
+            None => {
+                ui.painter().rect_filled(rect, 4.0, egui::Color32::from_gray(40));
+                ui.painter().text(
+                    rect.center(),
+                    egui::Align2::CENTER_CENTER,
+                    "anteprima…",
+                    egui::FontId::proportional(11.0),
+                    egui::Color32::GRAY,
+                );
             }
-            ui.add(egui::Label::new(egui::RichText::new(title).small()).truncate());
-            if !subtitle.is_empty() {
-                ui.add(egui::Label::new(egui::RichText::new(subtitle).small().weak()).truncate());
-            }
-            resp
-        })
-        .inner
+        }
+        if selected || resp.hovered() {
+            let c = if selected { style::ACCENT } else { egui::Color32::from_gray(200) };
+            ui.painter()
+                .rect_stroke(rect, 4.0, egui::Stroke::new(2.0, c), egui::StrokeKind::Inside);
+        }
+        ui.add(egui::Label::new(egui::RichText::new(title).small()).truncate());
+        if !subtitle.is_empty() {
+            ui.add(egui::Label::new(egui::RichText::new(subtitle).small().weak()).truncate());
+        }
+        resp
     })
     .inner
+}
+
+/// Griglia di miniature a colonne fisse (non allarga mai il contenitore).
+fn grid_cols(ui: &egui::Ui, cell: f32) -> usize {
+    let gap = ui.spacing().item_spacing.x;
+    (((ui.available_width() + gap) / (cell + gap)).floor() as usize).max(1)
 }
 
 /// Finestra della libreria.
@@ -484,28 +498,31 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
     }
     let mut apply = None;
     let mut delete = None;
+    let cols = grid_cols(ui, CARD);
     egui::ScrollArea::vertical().id_salt("lib-mine").show(ui, |ui| {
-        ui.horizontal_wrapped(|ui| {
-            for m in &items {
-                let tex = app.library.material_thumb(&ctx, m);
-                let maps = m.material.texture_slots().iter().filter(|s| s.is_some()).count();
-                let r = card(ui, tex, egui::vec2(CARD, CARD), &m.material.name, &format!("{maps} mappe"));
-                let r = r.on_hover_text(format!("{}\n{}", m.source, m.dir.display()));
-                if r.clicked() {
-                    apply = Some(m.clone());
+        for row in items.chunks(cols) {
+            ui.horizontal(|ui| {
+                for m in row {
+                    let tex = app.library.material_thumb(&ctx, m);
+                    let maps = m.material.texture_slots().iter().filter(|s| s.is_some()).count();
+                    let r = thumb_card(ui, tex, egui::vec2(CARD, CARD), &m.material.name, &format!("{maps} mappe"), false);
+                    let r = r.on_hover_text(format!("{}\n{}", m.source, m.dir.display()));
+                    if r.clicked() {
+                        apply = Some(m.clone());
+                    }
+                    r.context_menu(|ui| {
+                        if ui.button("Apri cartella").clicked() {
+                            open_folder(&m.dir);
+                            ui.close();
+                        }
+                        if ui.button("Elimina dalla libreria").clicked() {
+                            delete = Some(m.clone());
+                            ui.close();
+                        }
+                    });
                 }
-                r.context_menu(|ui| {
-                    if ui.button("Apri cartella").clicked() {
-                        open_folder(&m.dir);
-                        ui.close();
-                    }
-                    if ui.button("Elimina dalla libreria").clicked() {
-                        delete = Some(m.clone());
-                        ui.close();
-                    }
-                });
-            }
-        });
+            });
+        }
     });
     if let Some(m) = apply {
         apply_material(app, &m);
@@ -577,20 +594,24 @@ fn online_tab(app: &mut ForgeApp, ui: &mut egui::Ui) {
     } else {
         egui::vec2(CARD, CARD)
     };
+    let cols = grid_cols(ui, size.x);
     egui::ScrollArea::vertical().id_salt("lib-online").show(ui, |ui| {
-        ui.horizontal_wrapped(|ui| {
-            for a in &results {
-                let tex = app.library.online_thumb(&ctx, a);
-                let sub = match a.size_m {
-                    Some(s) => format!("{} · {:.2} m", a.category, s),
-                    None => a.category.clone(),
-                };
-                let r = card(ui, tex, size, &a.name, &sub).on_hover_text(format!("{}\nClic: scarica a {res}", a.tags.join(", ")));
-                if r.clicked() && app.library.busy.is_none() {
-                    download = Some(a.clone());
+        for row in results.chunks(cols) {
+            ui.horizontal(|ui| {
+                for a in row {
+                    let tex = app.library.online_thumb(&ctx, a);
+                    let sub = match a.size_m {
+                        Some(s) => format!("{} · {:.2} m", a.category, s),
+                        None => a.category.clone(),
+                    };
+                    let r = thumb_card(ui, tex, size, &a.name, &sub, false)
+                        .on_hover_text(format!("{}\nClic: scarica a {res}", a.tags.join(", ")));
+                    if r.clicked() && app.library.busy.is_none() {
+                        download = Some(a.clone());
+                    }
                 }
-            }
-        });
+            });
+        }
     });
     if let Some(a) = download {
         let label = format!("Download di «{}» ({res})", a.name);

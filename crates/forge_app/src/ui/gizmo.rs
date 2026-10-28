@@ -473,7 +473,8 @@ fn apply_drag(app: &mut ForgeApp, rect: egui::Rect, drag: &Drag, pos: egui::Pos2
             if drag.axes[k].dot(app.scene.camera.forward()) < 0.0 {
                 ang = -ang;
             }
-            let mut deg = -ang.to_degrees();
+            // Verso della rotazione rispetto al trascinamento lungo l'anello.
+            let mut deg = ang.to_degrees();
             if snapping {
                 deg = snap(deg, g.snap_rot_deg);
             }
