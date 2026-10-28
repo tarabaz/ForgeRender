@@ -106,7 +106,12 @@ pub struct Scene {
     pub default_material: MaterialId,
     pub lights: Vec<Light>,
     pub environment: Environment,
+    /// Camera della viewport (vista libera dell'utente).
     pub camera: Camera,
+    /// Camere di rendering salvate nel progetto.
+    pub render_cameras: Vec<crate::camera::RenderCamera>,
+    /// Camera di rendering attiva; `None` = il render usa la vista della viewport.
+    pub active_camera: Option<usize>,
 }
 
 impl Default for Scene {
@@ -121,11 +126,21 @@ impl Default for Scene {
             lights: Vec::new(),
             environment: Environment::default(),
             camera: Camera::default(),
+            render_cameras: Vec::new(),
+            active_camera: None,
         }
     }
 }
 
 impl Scene {
+    /// Camera usata dal renderer: quella di rendering attiva, altrimenti la vista.
+    pub fn render_camera(&self) -> &Camera {
+        self.active_camera
+            .and_then(|i| self.render_cameras.get(i))
+            .map(|c| &c.camera)
+            .unwrap_or(&self.camera)
+    }
+
     pub fn add_mesh(&mut self, mesh: Mesh) -> usize {
         self.meshes.push(Arc::new(mesh));
         self.meshes.len() - 1

@@ -13,7 +13,7 @@ pub mod primitives;
 pub mod scene;
 pub mod units;
 
-pub use camera::{Camera, OrbitController};
+pub use camera::{Camera, OrbitController, RenderCamera};
 pub use environment::Environment;
 pub use light::{Light, LightKind};
 pub use material::{Material, MaterialId, MaterialLibrary, Projection, TextureMapping};

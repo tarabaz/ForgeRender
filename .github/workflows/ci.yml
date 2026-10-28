@@ -34,19 +34,9 @@ jobs:
       - run: cargo clippy --workspace --exclude forge_step --all-targets --release -- -D warnings
       - run: cargo test --workspace --exclude forge_step --release
 
-  step-linux:
-    name: Convertitore STEP (Linux, Open CASCADE)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: occt
-      - run: cargo clippy -p forge_step --all-targets --release -- -D warnings
-      - run: cargo test -p forge_step --release
+  # Il convertitore STEP (Open CASCADE, ~1 ora di compilazione) è momentaneamente escluso
+  # dalla CI: i modelli SolidWorks si importano in GLB. Per riattivarlo: job con
+  # `cargo test -p forge_step --release` e `cargo build --release -p forge_step` su Windows.
 
   windows:
     name: Build e pacchetti (Windows)
@@ -71,8 +61,6 @@ jobs:
         run: cargo test --workspace --exclude forge_step --release
       - name: Compilazione
         run: cargo build --release -p forge_app -p forge_cli
-      - name: Convertitore STEP (Open CASCADE, la prima volta richiede a lungo)
-        run: cargo test -p forge_step --release
       - name: Benchmark (runner GitHub, solo indicativo)
         run: target\release\forgerender-cli.exe bench --spp 8 --json bench-windows-runner.json
       - name: Inno Setup

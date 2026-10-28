@@ -77,7 +77,8 @@ pub fn convert(path: &Path, opts: &ImportOptions, mut progress: impl FnMut(Strin
 fn run_converter(step: &Path, opts: &ImportOptions, progress: &mut impl FnMut(String)) -> Result<FrMesh, ImportError> {
     let conv = converter_path().ok_or_else(|| {
         ImportError::Converter(format!(
-            "convertitore STEP non trovato ({CONVERTER} deve trovarsi accanto a ForgeRender)"
+            "convertitore STEP non incluso in questa versione ({CONVERTER} deve trovarsi accanto a ForgeRender).\n\
+             Da SolidWorks esporta in \"Extended Reality (*.glb)\": porta anche materiali e struttura dell'assieme"
         ))
     })?;
     let out = temp_path("step", "frmesh");
@@ -113,66 +114,8 @@ fn run_converter(step: &Path, opts: &ImportOptions, progress: &mut impl FnMut(St
     model
 }
 
-/// Script PowerShell che usa le API COM ufficiali di SolidWorks: apre il documento
-/// in sola lettura e senza finestre di dialogo, lo esporta in STEP e lo chiude.
-/// Se SolidWorks era già aperto viene riutilizzato, altrimenti viene avviato e poi chiuso.
-const SOLIDWORKS_SCRIPT: &str = r#"
-param([string]$In, [string]$Out)
-$ErrorActionPreference = "Stop"
-$started = $false
-try { $sw = [Runtime.InteropServices.Marshal]::GetActiveObject("SldWorks.Application") }
-catch {
-  try { $sw = New-Object -ComObject "SldWorks.Application"; $started = $true }
-  catch { [Console]::Error.WriteLine("SolidWorks non è installato o non è registrato per l'automazione COM"); exit 3 }
-}
-try {
-  $ext = [IO.Path]::GetExtension($In).ToLower()
-  $type = if ($ext -eq ".sldasm") { 2 } else { 1 }   # swDocASSEMBLY = 2, swDocPART = 1
-  $err = 0; $warn = 0
-  # swOpenDocOptions_Silent (1) | swOpenDocOptions_ReadOnly (2)
-  try { $doc = $sw.OpenDoc6($In, $type, 3, "", [ref]$err, [ref]$warn) } catch { $doc = $sw.OpenDoc($In, $type) }
-  if ($null -eq $doc) { [Console]::Error.WriteLine("SolidWorks non ha aperto il documento (codice $err)"); exit 4 }
-  if ($type -eq 2) { try { [void]$doc.ResolveAllLightWeightComponents($false) } catch {} }
-  # swSaveAsCurrentVersion (0), swSaveAsOptions_Silent (1) | swSaveAsOptions_Copy (2): il documento originale non viene modificato
-  $res = $doc.SaveAs3($Out, 0, 3)
-  $title = $doc.GetTitle()
-  try { $sw.CloseDoc($title) } catch {}
-  if (-not (Test-Path $Out)) { [Console]::Error.WriteLine("esportazione STEP da SolidWorks fallita (codice $res)"); exit 5 }
-} finally {
-  if ($started) { try { $sw.ExitApp() } catch {} }
-}
-exit 0
-"#;
-
 fn solidworks_to_step(input: &Path, out: &Path) -> Result<(), ImportError> {
-    if !cfg!(windows) {
-        return Err(ImportError::Converter(
-            "i file SolidWorks richiedono Windows con SolidWorks installato".into(),
-        ));
-    }
-    let script = temp_path("solidworks", "ps1");
-    std::fs::write(&script, SOLIDWORKS_SCRIPT)?;
-    let mut cmd = Command::new("powershell.exe");
-    cmd.args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File"])
-        .arg(&script)
-        .arg("-In")
-        .arg(input)
-        .arg("-Out")
-        .arg(out)
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped());
-    let result = hide_console(&mut cmd).output();
-    let _ = std::fs::remove_file(&script);
-    let output = result.map_err(|e| ImportError::Converter(format!("avvio di PowerShell fallito: {e}")))?;
-    if !output.status.success() || !out.is_file() {
-        let msg = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        return Err(ImportError::Converter(if msg.is_empty() {
-            "esportazione da SolidWorks fallita".into()
-        } else {
-            msg
-        }));
-    }
-    Ok(())
+    crate::solidworks::export(input, out)
 }
 
 fn hex(c: [f32; 3]) -> String {

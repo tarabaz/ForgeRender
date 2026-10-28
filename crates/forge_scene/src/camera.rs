@@ -22,6 +22,13 @@ impl Default for Camera {
     }
 }
 
+/// Camera di rendering con nome, salvata nel progetto.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RenderCamera {
+    pub name: String,
+    pub camera: Camera,
+}
+
 impl Camera {
     pub fn forward(&self) -> Vec3 {
         (self.target - self.position).normalize_or(-Vec3::Z)

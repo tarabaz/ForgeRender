@@ -107,14 +107,12 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
         }
     }
     if let Some(i) = toggle_vis {
+        app.push_undo(&[i]);
         app.scene.nodes[i].visible = !app.scene.nodes[i].visible;
         app.geometry_changed();
     }
     if show_all {
-        for n in &mut app.scene.nodes {
-            n.visible = true;
-        }
-        app.geometry_changed();
+        app.show_all();
     }
     if let Some((i, multi)) = click {
         select(&mut app.selection, i, multi);

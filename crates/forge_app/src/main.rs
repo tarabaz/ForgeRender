@@ -33,6 +33,18 @@ fn parse_args() -> StartupOptions {
                 i += 1;
                 o.screenshot_after_samples = args.get(i).and_then(|s| s.parse().ok()).unwrap_or(0);
             }
+            "--select" => {
+                i += 1;
+                o.select = args.get(i).cloned();
+            }
+            "--gizmo" => {
+                i += 1;
+                o.gizmo = args.get(i).cloned();
+            }
+            "--camera-test" => {
+                i += 1;
+                o.camera_test = args.get(i).cloned();
+            }
             other if !other.starts_with("--") => o.open = Some(PathBuf::from(other)),
             other => eprintln!("opzione sconosciuta ignorata: {other}"),
         }

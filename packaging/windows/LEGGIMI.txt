@@ -24,19 +24,24 @@ Comandi della viewport
   trascina = orbita, Shift+trascina / tasto destro / centrale = pan, rotella = zoom
   clic = seleziona, Ctrl+clic = selezione multipla, doppio clic / F = inquadra selezione
   Home = inquadra tutto, F5 = avvia render, Ctrl+S salva, Ctrl+O apri, Ctrl+I importa
+  Gizmo: W sposta, E ruota, R scala, Q solo selezione; Ctrl durante il trascinamento = snap
+  H nasconde la selezione, Shift+H isola, Alt+H mostra tutto; Ctrl+Z / Ctrl+Y annulla e ripeti
+  Camere di rendering (scheda Camera): il render usa la camera attiva, la vista resta libera
 
 Versione portable: nessuna installazione, non scrive nulla nel registro né fuori
 dalla cartella (i progetti vengono salvati dove scegli tu). I log sono in .\logs.
 Versione installata: i log sono in %LOCALAPPDATA%\ForgeRender\logs.
 In caso di problemi allega forgerender.log alla segnalazione.
 
-Formati supportati: STEP/STP (assiemi con nomi, colori e trasformazioni, tramite
-forgerender-step.exe che deve restare nella stessa cartella), OBJ (con .mtl), STL.
+Formati supportati: glTF/GLB (consigliato), OBJ (con .mtl), STL.
+Da SolidWorks: "Salva con nome" → "Extended Reality (*.glb)": porta apparenze/materiali,
+texture, nomi e struttura dell'assieme (luci e viste non vengono esportate).
+STEP/STP: solo se forgerender-step.exe è presente (convertitore Open CASCADE, opzionale).
 glTF/GLB (anche esportati da Blender) con camera, luci, materiali e texture.
 Blender .blend: richiede Blender installato (viene avviato in background per esportare glTF;
 le texture incorporate vengono salvate accanto al file .blend).
 SolidWorks SLDPRT/SLDASM: sperimentale, richiede SolidWorks installato su questo PC
-(il file viene esportato in STEP da SolidWorks tramite le sue API COM, in sola lettura).
+(il file viene esportato in GLB da SolidWorks tramite le sue API COM, in sola lettura).
 
 Componenti di terze parti e licenze: cartella licenze\ (Open CASCADE Technology, LGPL 2.1;
 Intel Open Image Denoise, Apache 2.0).

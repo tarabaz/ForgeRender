@@ -198,7 +198,9 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
 fn tips(ui: &mut egui::Ui) {
     ui.label(
         egui::RichText::new(
-            "Nella viewport: Alt + trascina sposta la selezione sul piano orizzontale, Alt + Shift + trascina la sposta in verticale.\n\
+            "Gizmo nella viewport: W sposta · E ruota · R scala · Q solo selezione · Ctrl durante il trascinamento = snap · Esc annulla.\n\
+             H nasconde la selezione · Shift+H nasconde tutto il resto · Alt+H mostra tutto · Ctrl+Z / Ctrl+Y annulla e ripeti.\n\
+             Alt + trascina sposta la selezione sul piano orizzontale, Alt + Shift + trascina in verticale.\n\
              Le trasformazioni non modificano il file CAD: vengono salvate nel progetto.",
         )
         .weak()

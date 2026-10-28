@@ -59,6 +59,10 @@ pub struct ProjectFile {
     pub environment: Environment,
     pub camera: Camera,
     #[serde(default)]
+    pub render_cameras: Vec<forge_scene::RenderCamera>,
+    #[serde(default)]
+    pub active_camera: Option<usize>,
+    #[serde(default)]
     pub render: RenderSettings,
 }
 
@@ -148,6 +152,8 @@ pub fn to_project_file(scene: &Scene, meta: &ProjectMeta, settings: &RenderSetti
         lights: scene.lights.clone(),
         environment: scene.environment.clone(),
         camera: scene.camera.clone(),
+        render_cameras: scene.render_cameras.clone(),
+        active_camera: scene.active_camera,
         render: settings.clone(),
     }
 }
@@ -273,6 +279,8 @@ pub fn load(path: &Path) -> anyhow::Result<LoadedProject> {
         }
     }
     scene.camera = pf.camera;
+    scene.active_camera = pf.active_camera.filter(|&i| i < pf.render_cameras.len());
+    scene.render_cameras = pf.render_cameras;
 
     if !report.missing_components.is_empty() {
         tracing::warn!(
@@ -341,6 +349,15 @@ mod tests {
         scene.nodes[vi].visible = false;
         scene.lights.push(Light::point("P", Vec3::new(1.0, 2.0, 3.0), 5.0));
         scene.camera.vfov_deg = 27.0;
+        scene.render_cameras.push(forge_scene::RenderCamera {
+            name: "Frontale".into(),
+            camera: forge_scene::Camera {
+                position: Vec3::new(0.0, 0.5, 2.0),
+                vfov_deg: 35.0,
+                ..Default::default()
+            },
+        });
+        scene.active_camera = Some(0);
         let si = scene.find(&staffa).unwrap();
         scene.nodes[si].user = forge_scene::UserTransform {
             translation: Vec3::new(0.1, 0.2, 0.3),
@@ -372,6 +389,9 @@ mod tests {
         assert!((s2.bounds_of(s2.find(&staffa).unwrap()).center() - scene.bounds_of(si).center()).length() < 1e-6);
         assert_eq!(s2.lights, scene.lights);
         assert_eq!(s2.camera, scene.camera);
+        assert_eq!(s2.render_cameras, scene.render_cameras);
+        assert_eq!(s2.active_camera, Some(0));
+        assert_eq!(s2.render_camera().vfov_deg, 35.0);
         assert_eq!(loaded.settings, settings);
 
         // Il progetto funziona anche dopo aver spostato l'intera cartella (percorso relativo).

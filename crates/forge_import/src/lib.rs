@@ -10,6 +10,7 @@ pub mod blender;
 pub mod frmesh;
 pub mod gltf_import;
 mod obj;
+pub mod solidworks;
 pub mod step;
 mod stl;
 
@@ -141,7 +142,7 @@ pub(crate) struct ImportedObject {
 pub const SUPPORTED_EXTENSIONS: [&str; 6] = ["obj", "stl", "step", "stp", "gltf", "glb"];
 /// File di Blender: richiedono Blender installato (esportazione glTF in background).
 pub const BLENDER_EXTENSIONS: [&str; 1] = ["blend"];
-/// Formati SolidWorks: richiedono SolidWorks installato (esportazione STEP via COM).
+/// Formati SolidWorks: richiedono SolidWorks installato (esportazione GLB via COM).
 pub const SOLIDWORKS_EXTENSIONS: [&str; 2] = ["sldprt", "sldasm"];
 
 pub fn import_file(scene: &mut Scene, path: &Path, opts: &ImportOptions) -> Result<ImportReport, ImportError> {
@@ -152,7 +153,17 @@ pub fn import_file(scene: &mut Scene, path: &Path, opts: &ImportOptions) -> Resu
     let objects = match ext.as_str() {
         "obj" => obj::read(path, &mut warnings)?,
         "stl" => stl::read(path)?,
-        "step" | "stp" | "sldprt" | "sldasm" => {
+        "sldprt" | "sldasm" => {
+            let glb = solidworks::export_glb(path)?;
+            let dir = path.parent().unwrap_or(Path::new(".")).to_path_buf();
+            let r = gltf_import::import_named(scene, &glb.glb, &file_name, &dir, opts, Vec::new());
+            let _ = std::fs::remove_file(&glb.glb);
+            return Ok(ImportReport {
+                duration: t0.elapsed(),
+                ..r?
+            });
+        }
+        "step" | "stp" => {
             let model = step::convert(path, opts, |m| tracing::info!("{m}"))?;
             let report = step::insert(scene, &file_name, model, opts)?;
             return Ok(ImportReport {

@@ -702,8 +702,17 @@ fn pick_hdri(app: &mut ForgeApp) -> bool {
 // ----------------------------------------------------------------------
 
 fn camera(app: &mut ForgeApp, ui: &mut egui::Ui) {
+    render_cameras(app, ui);
+    ui.separator();
+
+    // Parametri della camera di rendering attiva, oppure della vista se non ce n'è una.
+    let active = app.scene.active_camera;
+    ui.strong(match active {
+        Some(i) => format!("Parametri: {}", app.scene.render_cameras[i].name),
+        None => "Parametri della vista".to_string(),
+    });
     let mut changed = false;
-    let mut cam = app.scene.camera.clone();
+    let mut cam = app.scene.render_camera().clone();
     ui.horizontal(|ui| {
         ui.label("Campo visivo verticale (°)");
         changed |= ui.add(egui::Slider::new(&mut cam.vfov_deg, 5.0..=120.0)).changed();
@@ -714,8 +723,20 @@ fn camera(app: &mut ForgeApp, ui: &mut egui::Ui) {
     changed |= vec3_edit(ui, "Posizione", &mut cam.position, r * 0.005);
     changed |= vec3_edit(ui, "Bersaglio", &mut cam.target, r * 0.005);
     if changed {
-        app.scene.camera = cam;
-        app.sync_orbit_from_camera();
+        let through = app.viewing_through_active();
+        match active {
+            Some(i) => {
+                app.scene.render_cameras[i].camera = cam.clone();
+                if through {
+                    app.scene.camera = cam;
+                    app.sync_orbit_from_camera();
+                }
+            }
+            None => {
+                app.scene.camera = cam;
+                app.sync_orbit_from_camera();
+            }
+        }
         app.shading_changed();
     }
     ui.separator();
@@ -1009,4 +1030,97 @@ fn denoiser(app: &mut ForgeApp, ui: &mut egui::Ui) -> bool {
         ui.label(egui::RichText::new(status).weak().small());
     }
     changed
+}
+
+/// Elenco delle camere di rendering salvate nel progetto.
+fn render_cameras(app: &mut ForgeApp, ui: &mut egui::Ui) {
+    ui.strong("Camere di rendering");
+    ui.label(
+        egui::RichText::new("Il render usa la camera attiva: nella viewport ti muovi liberamente senza perdere l'inquadratura.")
+            .weak()
+            .small(),
+    );
+    let active = app.scene.active_camera;
+    if ui
+        .radio(active.is_none(), "Nessuna: il render usa la vista della viewport")
+        .clicked()
+        && active.is_some()
+    {
+        app.set_active_camera(None);
+    }
+    let mut action: Option<(usize, &str)> = None;
+    for i in 0..app.scene.render_cameras.len() {
+        ui.horizontal(|ui| {
+            if ui
+                .radio(active == Some(i), "")
+                .on_hover_text("Usa questa camera per il render")
+                .clicked()
+                && active != Some(i)
+            {
+                action = Some((i, "attiva"));
+            }
+            let name = &mut app.scene.render_cameras[i].name;
+            if ui.add(egui::TextEdit::singleline(name).desired_width(110.0)).changed() {
+                app.unsaved = true;
+            }
+            if ui
+                .small_button("Guarda")
+                .on_hover_text("Guarda attraverso: porta la vista su questa inquadratura")
+                .clicked()
+            {
+                action = Some((i, "guarda"));
+            }
+            if ui
+                .small_button("Da vista")
+                .on_hover_text("Imposta dalla vista: questa camera prende l'inquadratura attuale della viewport")
+                .clicked()
+            {
+                action = Some((i, "imposta"));
+            }
+            if ui.small_button("Elimina").on_hover_text("Elimina la camera").clicked() {
+                action = Some((i, "elimina"));
+            }
+        });
+    }
+    match action {
+        Some((i, "attiva")) => {
+            app.set_active_camera(Some(i));
+            app.look_through(i);
+        }
+        Some((i, "guarda")) => app.look_through(i),
+        Some((i, "imposta")) => {
+            app.scene.render_cameras[i].camera = app.scene.camera.clone();
+            app.shading_changed();
+        }
+        Some((i, "elimina")) => {
+            app.scene.render_cameras.remove(i);
+            let new_active = match app.scene.active_camera {
+                Some(a) if a == i => None,
+                Some(a) if a > i => Some(a - 1),
+                other => other,
+            };
+            app.set_active_camera(new_active);
+        }
+        _ => {}
+    }
+    ui.horizontal(|ui| {
+        if ui
+            .button("+ Nuova camera dalla vista")
+            .on_hover_text("Crea una camera di rendering con l'inquadratura attuale")
+            .clicked()
+        {
+            app.add_render_camera(None);
+        }
+        if app.scene.active_camera.is_some() {
+            ui.checkbox(&mut app.camera_follow, "Pilota")
+                .on_hover_text("La camera attiva segue i movimenti della viewport (per regolare l'inquadratura muovendoti nella scena)");
+        }
+    });
+    if app.scene.active_camera.is_some() && !app.viewing_through_active() && !app.camera_follow {
+        ui.label(
+            egui::RichText::new("Vista libera: il render resta sull'inquadratura della camera attiva («Guarda» per tornarci).")
+                .weak()
+                .small(),
+        );
+    }
 }

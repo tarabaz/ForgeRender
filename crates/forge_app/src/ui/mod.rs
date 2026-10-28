@@ -4,6 +4,7 @@
 //! log), area centrale (viewport o render).
 
 pub mod central;
+pub mod gizmo;
 mod inspector;
 mod status;
 pub mod style;
@@ -149,6 +150,46 @@ impl ForgeApp {
                 i.consume_key(egui::Modifiers::NONE, egui::Key::F5),
             )
         });
+        // Gizmo e annulla/ripeti (Ctrl+Maiusc+Z = ripeti, come Ctrl+Y).
+        let (redo, undo) = ctx.input_mut(|i| {
+            let redo = i.consume_key(egui::Modifiers::COMMAND | egui::Modifiers::SHIFT, egui::Key::Z)
+                || i.consume_key(egui::Modifiers::COMMAND, egui::Key::Y);
+            (redo, i.consume_key(egui::Modifiers::COMMAND, egui::Key::Z))
+        });
+        let (hide, isolate, unhide) = ctx.input_mut(|i| {
+            (
+                i.consume_key(egui::Modifiers::NONE, egui::Key::H),
+                i.consume_key(egui::Modifiers::SHIFT, egui::Key::H),
+                i.consume_key(egui::Modifiers::ALT, egui::Key::H),
+            )
+        });
+        if hide || isolate {
+            self.hide_selection(isolate);
+        }
+        if unhide {
+            self.show_all();
+        }
+        if undo {
+            self.undo();
+        }
+        if redo {
+            self.redo();
+        }
+        if !self.gizmo.is_dragging() {
+            use crate::ui::gizmo::GizmoMode;
+            ctx.input_mut(|i| {
+                for (k, m) in [
+                    (egui::Key::Q, GizmoMode::Select),
+                    (egui::Key::W, GizmoMode::Move),
+                    (egui::Key::E, GizmoMode::Rotate),
+                    (egui::Key::R, GizmoMode::Scale),
+                ] {
+                    if i.consume_key(egui::Modifiers::NONE, k) {
+                        self.gizmo.mode = m;
+                    }
+                }
+            });
+        }
         if save {
             self.save_project(false);
         }

@@ -7,6 +7,8 @@
 param(
     [switch]$SkipBuild,
     [switch]$SkipInstaller,
+    # Include il convertitore STEP (compila Open CASCADE: decine di minuti la prima volta).
+    [switch]$WithStep,
     # Cartella di Open Image Denoise (scaricato automaticamente se manca).
     [string]$OidnDir = ""
 )
@@ -20,9 +22,11 @@ Write-Host "ForgeRender $version"
 if (-not $SkipBuild) {
     cargo build --release -p forge_app -p forge_cli
     if ($LASTEXITCODE -ne 0) { throw "compilazione fallita" }
-    # Convertitore STEP (Open CASCADE): la prima compilazione richiede decine di minuti.
-    cargo build --release -p forge_step
-    if ($LASTEXITCODE -ne 0) { throw "compilazione del convertitore STEP fallita" }
+    if ($WithStep) {
+        # Convertitore STEP (Open CASCADE): la prima compilazione richiede decine di minuti.
+        cargo build --release -p forge_step
+        if ($LASTEXITCODE -ne 0) { throw "compilazione del convertitore STEP fallita" }
+    }
 }
 
 $bin = Join-Path $root "target\release"
@@ -51,7 +55,7 @@ New-Item -ItemType Directory -Path $staging | Out-Null
 Copy-Item (Join-Path $bin "forgerender.exe") $staging
 Copy-Item (Join-Path $bin "forgerender-cli.exe") $staging
 $stepExe = Join-Path $bin "forgerender-step.exe"
-if (Test-Path $stepExe) { Copy-Item $stepExe $staging } else { Write-Warning "forgerender-step.exe non trovato: pacchetto senza import STEP" }
+if (Test-Path $stepExe) { Copy-Item $stepExe $staging } else { Write-Host "Pacchetto senza convertitore STEP (usa -WithStep per includerlo)" }
 Copy-Item (Join-Path $PSScriptRoot "LEGGIMI.txt") $staging
 New-Item -ItemType Directory -Force -Path (Join-Path $staging "licenze") | Out-Null
 Copy-Item (Join-Path $root "packaging\licenses\*") (Join-Path $staging "licenze")

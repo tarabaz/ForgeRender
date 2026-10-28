@@ -73,6 +73,19 @@ pub struct StartupOptions {
     pub auto_render: bool,
     pub screenshot: Option<PathBuf>,
     pub screenshot_after_samples: u32,
+    /// Seleziona il componente con questo nome.
+    pub select: Option<String>,
+    /// Modalità del gizmo: move | rotate | scale.
+    pub gizmo: Option<String>,
+    /// Crea una camera di rendering: "lato" sposta la vista per mostrarla, "attraverso" la guarda.
+    pub camera_test: Option<String>,
+}
+
+/// Stato di un componente salvato per annulla/ripeti (trasformazione e visibilità).
+#[derive(Clone, Copy, Debug)]
+pub struct NodeState {
+    user: forge_scene::UserTransform,
+    visible: bool,
 }
 
 /// Contenuto della vista Render.
@@ -142,6 +155,13 @@ pub struct ForgeApp {
     /// Open Image Denoise caricato (versione) o motivo dell'assenza.
     pub denoiser_info: Result<String, String>,
     denoise_sent: Option<forge_render_core::DenoiseSettings>,
+    pub gizmo: crate::ui::gizmo::Gizmo,
+    /// "Pilota": la camera di rendering attiva segue la vista della viewport.
+    pub camera_follow: bool,
+    /// Annulla/ripeti delle trasformazioni: stato precedente dei componenti toccati
+    /// (con il numero di nodi della scena, per scartare voci non più valide).
+    undo_stack: Vec<(usize, Vec<(usize, NodeState)>)>,
+    redo_stack: Vec<(usize, Vec<(usize, NodeState)>)>,
 
     pub logs: LogBuffer,
     pub system: SystemInfo,
@@ -203,6 +223,10 @@ impl ForgeApp {
             render_view: RenderView::Final,
             denoiser_info: Err(String::new()),
             denoise_sent: None,
+            gizmo: Default::default(),
+            camera_follow: false,
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
             logs,
             system,
             monitor: ResourceMonitor::new(),
@@ -238,6 +262,26 @@ impl ForgeApp {
         if let Some(p) = &startup.open {
             app.open_any(p);
         }
+        if let Some(name) = &startup.select {
+            if let Some(i) = app.scene.nodes.iter().position(|n| &n.name == name) {
+                app.selection.insert(i);
+            }
+        }
+        app.gizmo.mode = match startup.gizmo.as_deref() {
+            Some("rotate") => crate::ui::gizmo::GizmoMode::Rotate,
+            Some("scale") => crate::ui::gizmo::GizmoMode::Scale,
+            _ => crate::ui::gizmo::GizmoMode::Move,
+        };
+        if let Some(mode) = &startup.camera_test {
+            app.add_render_camera(Some("Frontale".into()));
+            if mode != "attraverso" {
+                app.orbit.yaw += 1.2;
+                app.orbit.pitch += 0.35;
+                app.orbit.distance *= 2.6;
+                app.camera_changed();
+            }
+            app.tab = InspectorTab::Camera;
+        }
         if startup.auto_render {
             app.tab = InspectorTab::Render;
             app.start_render();
@@ -269,10 +313,172 @@ impl ForgeApp {
         self.unsaved = true;
     }
 
+    fn node_state(&self, i: usize) -> NodeState {
+        let n = &self.scene.nodes[i];
+        NodeState {
+            user: n.user,
+            visible: n.visible,
+        }
+    }
+
+    /// Registra lo stato dei componenti indicati prima di una modifica (annulla).
+    pub fn push_undo(&mut self, nodes: &[usize]) {
+        let before = nodes.iter().map(|&i| (i, self.node_state(i))).collect();
+        self.undo_stack.push((self.scene.nodes.len(), before));
+        if self.undo_stack.len() > 200 {
+            self.undo_stack.remove(0);
+        }
+        self.redo_stack.clear();
+    }
+
+    /// Scarta l'ultima voce (modifica annullata con Esc prima di essere applicata).
+    pub fn discard_last_undo(&mut self) {
+        self.undo_stack.pop();
+    }
+
+    /// H: nasconde la selezione. Shift+H: nasconde tutto il resto. Alt+H: mostra tutto.
+    pub fn hide_selection(&mut self, others: bool) {
+        if self.selection.is_empty() {
+            return;
+        }
+        let targets: Vec<usize> = if others {
+            // Restano visibili i selezionati, i loro antenati e i loro discendenti.
+            let mut keep = vec![false; self.scene.nodes.len()];
+            for &s in &self.selection {
+                let mut p = Some(s);
+                while let Some(k) = p {
+                    keep[k] = true;
+                    p = self.scene.nodes[k].parent;
+                }
+                let mut stack = vec![s];
+                while let Some(k) = stack.pop() {
+                    keep[k] = true;
+                    stack.extend(self.scene.nodes[k].children.iter().copied());
+                }
+            }
+            (0..self.scene.nodes.len())
+                .filter(|&i| !keep[i] && self.scene.nodes[i].visible)
+                .collect()
+        } else {
+            self.selection.iter().copied().collect()
+        };
+        if targets.is_empty() {
+            return;
+        }
+        self.push_undo(&targets);
+        for &i in &targets {
+            self.scene.nodes[i].visible = false;
+        }
+        if !others {
+            self.selection.clear();
+        }
+        self.geometry_changed();
+    }
+
+    pub fn show_all(&mut self) {
+        let hidden: Vec<usize> = (0..self.scene.nodes.len()).filter(|&i| !self.scene.nodes[i].visible).collect();
+        if hidden.is_empty() {
+            return;
+        }
+        self.push_undo(&hidden);
+        for &i in &hidden {
+            self.scene.nodes[i].visible = true;
+        }
+        self.geometry_changed();
+    }
+
+    pub fn can_undo_redo(&self) -> (bool, bool) {
+        (!self.undo_stack.is_empty(), !self.redo_stack.is_empty())
+    }
+
+    fn swap_transforms(&mut self, from_undo: bool) {
+        let n = self.scene.nodes.len();
+        let (src, dst) = if from_undo {
+            (&mut self.undo_stack, &mut self.redo_stack)
+        } else {
+            (&mut self.redo_stack, &mut self.undo_stack)
+        };
+        while let Some((count, entry)) = src.pop() {
+            if count != n {
+                continue; // la struttura della scena è cambiata: voce non più applicabile
+            }
+            let current = entry
+                .iter()
+                .map(|(i, _)| {
+                    let n = &self.scene.nodes[*i];
+                    (
+                        *i,
+                        NodeState {
+                            user: n.user,
+                            visible: n.visible,
+                        },
+                    )
+                })
+                .collect();
+            for (i, st) in entry {
+                self.scene.nodes[i].user = st.user;
+                self.scene.nodes[i].visible = st.visible;
+            }
+            dst.push((n, current));
+            self.geometry_changed();
+            return;
+        }
+    }
+
+    pub fn undo(&mut self) {
+        self.swap_transforms(true);
+    }
+
+    pub fn redo(&mut self) {
+        self.swap_transforms(false);
+    }
+
     /// Camera spostata dall'utente (orbita/pan/zoom).
     pub fn camera_changed(&mut self) {
         self.scene.camera = self.orbit.camera();
-        self.shading_rev += 1;
+        match self.scene.active_camera {
+            // La vista si muove liberamente: l'inquadratura del render non cambia.
+            Some(_) if !self.camera_follow => {}
+            Some(i) => {
+                if let Some(c) = self.scene.render_cameras.get_mut(i) {
+                    c.camera = self.scene.camera.clone();
+                }
+                self.shading_rev += 1;
+                self.unsaved = true;
+            }
+            None => self.shading_rev += 1,
+        }
+    }
+
+    /// Aggiunge una camera di rendering dalla vista attuale e la rende attiva.
+    pub fn add_render_camera(&mut self, name: Option<String>) {
+        let n = self.scene.render_cameras.len() + 1;
+        self.scene.render_cameras.push(forge_scene::RenderCamera {
+            name: name.unwrap_or_else(|| format!("Camera {n}")),
+            camera: self.scene.camera.clone(),
+        });
+        self.set_active_camera(Some(self.scene.render_cameras.len() - 1));
+    }
+
+    pub fn set_active_camera(&mut self, idx: Option<usize>) {
+        self.scene.active_camera = idx.filter(|&i| i < self.scene.render_cameras.len());
+        if self.scene.active_camera.is_none() {
+            self.camera_follow = false;
+        }
+        self.shading_changed();
+    }
+
+    /// Porta la vista della viewport sull'inquadratura della camera di rendering.
+    pub fn look_through(&mut self, idx: usize) {
+        if let Some(c) = self.scene.render_cameras.get(idx) {
+            self.scene.camera = c.camera.clone();
+            self.sync_orbit_from_camera();
+        }
+    }
+
+    /// Vero se la viewport mostra esattamente l'inquadratura della camera attiva.
+    pub fn viewing_through_active(&self) -> bool {
+        self.scene.active_camera.is_some() && self.scene.render_camera() == &self.scene.camera
     }
 
     pub fn sync_orbit_from_camera(&mut self) {
@@ -591,7 +797,12 @@ impl ForgeApp {
 
     fn is_cad_format(path: &Path) -> bool {
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
-        matches!(ext.as_str(), "step" | "stp" | "sldprt" | "sldasm")
+        matches!(ext.as_str(), "step" | "stp")
+    }
+
+    fn is_solidworks(path: &Path) -> bool {
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+        matches!(ext.as_str(), "sldprt" | "sldasm")
     }
 
     fn is_blend(path: &Path) -> bool {
@@ -601,24 +812,41 @@ impl ForgeApp {
     }
 
     pub fn import_path(&mut self, path: &Path) {
-        if Self::is_blend(path) {
-            // Esportazione glTF da Blender in background.
+        let solidworks = Self::is_solidworks(path);
+        if Self::is_blend(path) || solidworks {
+            // Esportazione glTF da Blender o da SolidWorks (via COM) in background.
             let (tx, rx) = std::sync::mpsc::channel();
             let p = path.to_path_buf();
-            let _ = tx.send(TaskMsg::Progress("esportazione glTF da Blender…".into()));
+            let _ = tx.send(TaskMsg::Progress(
+                if solidworks {
+                    "esportazione GLB da SolidWorks…"
+                } else {
+                    "esportazione glTF da Blender…"
+                }
+                .into(),
+            ));
             std::thread::Builder::new()
-                .name("forge-blender".into())
+                .name("forge-export".into())
                 .spawn(move || {
-                    let r = forge_import::blender::blend_to_glb(&p).map_err(|e| e.to_string());
-                    let _ = tx.send(TaskMsg::Blend(r));
+                    let r = if solidworks {
+                        forge_import::solidworks::export_glb(&p)
+                    } else {
+                        forge_import::blender::blend_to_glb(&p)
+                    };
+                    let _ = tx.send(TaskMsg::Blend(r.map_err(|e| e.to_string())));
                 })
-                .expect("thread Blender");
+                .expect("thread di esportazione");
             self.pending = Some(Pending {
                 label: format!(
                     "Importazione di {}",
                     path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default()
                 ),
-                message: "avvio di Blender…".into(),
+                message: if solidworks {
+                    "avvio di SolidWorks…"
+                } else {
+                    "avvio di Blender…"
+                }
+                .into(),
                 path: path.to_path_buf(),
                 opts: self.import_opts.clone(),
                 rx,
@@ -716,9 +944,11 @@ impl ForgeApp {
                     self.scene.lights = forge_scene::light::preset("studio", b.center(), b.radius()).unwrap_or_default();
                 }
                 if let Some(cam) = &r.camera {
+                    // La camera del file diventa una camera di rendering (attiva) e la vista la segue.
                     self.scene.camera = cam.clone();
                     self.sync_orbit_from_camera();
-                    self.shading_changed();
+                    let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+                    self.add_render_camera(Some(format!("Camera ({stem})")));
                 } else {
                     self.orbit.frame(&b);
                     self.camera_changed();

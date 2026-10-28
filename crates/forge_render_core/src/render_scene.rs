@@ -376,7 +376,7 @@ impl RenderScene {
             lights,
             environment,
             env_map,
-            camera: scene.camera.clone(),
+            camera: scene.render_camera().clone(),
         }
     }
 

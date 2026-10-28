@@ -17,6 +17,11 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
 /// Gestione mouse comune: orbita, pan, zoom. Restituisce la risposta per il picking.
 fn camera_controls(app: &mut ForgeApp, ui: &mut egui::Ui, rect: egui::Rect) -> egui::Response {
     let resp = ui.allocate_rect(rect, egui::Sense::click_and_drag());
+    camera_input(app, ui, rect, &resp);
+    resp
+}
+
+fn camera_input(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::Response) {
     let shift = ui.input(|i| i.modifiers.shift);
     let alt = ui.input(|i| i.modifiers.alt);
     let delta = resp.drag_delta();
@@ -25,7 +30,7 @@ fn camera_controls(app: &mut ForgeApp, ui: &mut egui::Ui, rect: egui::Rect) -> e
         if let Some(pos) = resp.interact_pointer_pos() {
             move_selection(app, rect, pos - delta, pos, shift);
         }
-        return resp;
+        return;
     }
     let mut moved = false;
     if delta != egui::Vec2::ZERO {
@@ -49,7 +54,6 @@ fn camera_controls(app: &mut ForgeApp, ui: &mut egui::Ui, rect: egui::Rect) -> e
     if moved {
         app.camera_changed();
     }
-    resp
 }
 
 /// Sposta i componenti selezionati seguendo il mouse: sul piano orizzontale
@@ -115,7 +119,7 @@ fn move_selection(app: &mut ForgeApp, rect: egui::Rect, from: egui::Pos2, to: eg
 
 fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
     let rect = ui.available_rect_before_wrap();
-    let resp = camera_controls(app, ui, rect);
+    let resp = ui.allocate_rect(rect, egui::Sense::click_and_drag());
     let ppp = ui.ctx().pixels_per_point();
     let size = [
         (rect.width() * ppp).round().max(1.0) as u32,
@@ -143,9 +147,16 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
         }
     }
     draw_lights(app, &painter, rect);
+    draw_cameras(app, &painter, rect);
+    // Il gizmo ha la precedenza: se usa il mouse la camera non si muove e il clic non seleziona.
+    let gizmo_used = crate::ui::gizmo::update(app, ui, rect, &resp, &painter);
+    if !gizmo_used {
+        camera_input(app, ui, rect, &resp);
+    }
+    crate::ui::gizmo::toolbar(app, ui, rect);
 
     // Picking con un clic (senza trascinamento).
-    if resp.clicked() {
+    if resp.clicked() && !gizmo_used {
         if let Some(pos) = resp.interact_pointer_pos() {
             let ndc_x = (pos.x - rect.left()) / rect.width() * 2.0 - 1.0;
             let ndc_y = 1.0 - (pos.y - rect.top()) / rect.height() * 2.0;
@@ -186,6 +197,98 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
         egui::FontId::proportional(12.0),
         egui::Color32::from_gray(150),
     );
+}
+
+/// Camere di rendering come piramidi; guardando attraverso la camera attiva, la
+/// cornice con le proporzioni esatte dell'immagine renderizzata.
+fn draw_cameras(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
+    let cam = &app.scene.camera;
+    let aspect = app.settings.aspect();
+    if app.viewing_through_active() {
+        let h = rect.height();
+        let w = h * aspect;
+        let frame = egui::Rect::from_center_size(rect.center(), egui::vec2(w, h));
+        let shade = egui::Color32::from_black_alpha(110);
+        if frame.left() > rect.left() {
+            painter.rect_filled(
+                egui::Rect::from_min_max(rect.left_top(), egui::pos2(frame.left(), rect.bottom())),
+                0.0,
+                shade,
+            );
+            painter.rect_filled(
+                egui::Rect::from_min_max(egui::pos2(frame.right(), rect.top()), rect.right_bottom()),
+                0.0,
+                shade,
+            );
+        }
+        painter.rect_stroke(frame, 0.0, egui::Stroke::new(1.5, style::ACCENT), egui::StrokeKind::Inside);
+        // Terzi: aiuto alla composizione.
+        let thirds = egui::Stroke::new(0.5, style::ACCENT.gamma_multiply(0.4));
+        for k in 1..3 {
+            let x = frame.left() + frame.width() * k as f32 / 3.0;
+            let y = frame.top() + frame.height() * k as f32 / 3.0;
+            painter.line_segment([egui::pos2(x, frame.top()), egui::pos2(x, frame.bottom())], thirds);
+            painter.line_segment([egui::pos2(frame.left(), y), egui::pos2(frame.right(), y)], thirds);
+        }
+        if let Some(i) = app.scene.active_camera {
+            painter.text(
+                frame.left_top().max(rect.left_top()) + egui::vec2(8.0, 40.0),
+                egui::Align2::LEFT_TOP,
+                format!(
+                    "Camera {} · {}×{}",
+                    app.scene.render_cameras[i].name, app.settings.width, app.settings.height
+                ),
+                egui::FontId::proportional(12.0),
+                style::ACCENT,
+            );
+        }
+    }
+    let size = (app.scene.bounds().radius() * 0.12).max(0.05);
+    for (i, rc) in app.scene.render_cameras.iter().enumerate() {
+        if app.viewing_through_active() && app.scene.active_camera == Some(i) {
+            continue;
+        }
+        let c = &rc.camera;
+        let (r, u, f) = c.basis();
+        let th = (c.vfov_deg.to_radians() * 0.5).tan() * size;
+        let tw = th * aspect;
+        let base = c.position + f * size;
+        let corners = [
+            base - r * tw - u * th,
+            base + r * tw - u * th,
+            base + r * tw + u * th,
+            base - r * tw + u * th,
+        ];
+        let color = if app.scene.active_camera == Some(i) {
+            style::ACCENT
+        } else {
+            egui::Color32::from_gray(170)
+        };
+        let stroke = egui::Stroke::new(if app.scene.active_camera == Some(i) { 2.0 } else { 1.2 }, color);
+        let Some(apex) = project(cam, rect, c.position) else { continue };
+        let pts: Vec<_> = corners.iter().filter_map(|p| project(cam, rect, *p)).collect();
+        if pts.len() == 4 {
+            for p in &pts {
+                painter.line_segment([apex, *p], stroke);
+            }
+            painter.add(egui::Shape::closed_line(pts.clone(), stroke));
+            // Triangolo sul lato superiore: indica il verso "alto" dell'inquadratura.
+            if let Some(tip) = project(cam, rect, base + u * th * 1.5) {
+                painter.add(egui::Shape::convex_polygon(
+                    vec![pts[3], pts[2], tip],
+                    color.gamma_multiply(0.5),
+                    stroke,
+                ));
+            }
+        }
+        painter.text(
+            apex + egui::vec2(8.0, 8.0),
+            egui::Align2::LEFT_TOP,
+            &rc.name,
+            egui::FontId::proportional(11.0),
+            color,
+        );
+    }
 }
 
 fn draw_lights(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
