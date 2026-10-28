@@ -93,6 +93,17 @@ pub struct Node {
     pub pivot: Vec3,
 }
 
+/// Copia di un componente (con il suo sotto-albero) creata dall'utente. Le copie
+/// non esistono nei file sorgente: il progetto le salva così e le ricrea all'apertura.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CopyRecord {
+    /// Componente copiato.
+    pub of: ComponentId,
+    /// Id della copia (i figli hanno id `<id>/<nome>`).
+    pub id: ComponentId,
+    pub name: String,
+}
+
 #[derive(Clone, Debug)]
 pub struct Scene {
     pub nodes: Vec<Node>,
@@ -112,6 +123,8 @@ pub struct Scene {
     pub render_cameras: Vec<crate::camera::RenderCamera>,
     /// Camera di rendering attiva; `None` = il render usa la vista della viewport.
     pub active_camera: Option<usize>,
+    /// Copie create dall'utente, nell'ordine di creazione.
+    pub copies: Vec<CopyRecord>,
 }
 
 impl Default for Scene {
@@ -128,6 +141,7 @@ impl Default for Scene {
             camera: Camera::default(),
             render_cameras: Vec::new(),
             active_camera: None,
+            copies: Vec::new(),
         }
     }
 }
@@ -238,20 +252,162 @@ impl Scene {
 
     /// Sposta il componente in modo che il suo punto più basso stia a quota `y`.
     pub fn drop_to_floor(&mut self, idx: NodeIndex, y: f32) {
-        let b = self.bounds_of(idx);
+        let b = self.exact_bounds_of(idx);
         if !b.is_empty() {
-            self.nodes[idx].user.translation.y += y - b.min.y;
+            self.translate_world(idx, Vec3::new(0.0, y - b.min.y, 0.0));
         }
     }
 
     /// Porta il centro del componente sull'asse verticale dell'origine (X = Z = 0).
     pub fn center_on_origin(&mut self, idx: NodeIndex) {
-        let b = self.bounds_of(idx);
+        let b = self.exact_bounds_of(idx);
         if !b.is_empty() {
             let c = b.center();
-            self.nodes[idx].user.translation.x -= c.x;
-            self.nodes[idx].user.translation.z -= c.z;
+            self.translate_world(idx, Vec3::new(-c.x, 0.0, -c.z));
         }
+    }
+
+    /// Duplica un componente con tutto il sotto-albero (le mesh sono condivise, non
+    /// copiate) e registra la copia. Restituisce l'indice della nuova radice.
+    pub fn duplicate(&mut self, idx: NodeIndex) -> NodeIndex {
+        let base = self.nodes[idx].id.0.clone();
+        let mut n = 1;
+        let id = loop {
+            let candidate = ComponentId(if n == 1 {
+                format!("{base}#copia")
+            } else {
+                format!("{base}#copia{n}")
+            });
+            if self.find(&candidate).is_none() {
+                break candidate;
+            }
+            n += 1;
+        };
+        let name = if n == 1 {
+            format!("{} (duplicato)", self.nodes[idx].name)
+        } else {
+            format!("{} (duplicato {n})", self.nodes[idx].name)
+        };
+        let new = self.duplicate_as(idx, id.clone(), name.clone());
+        self.copies.push(CopyRecord {
+            of: self.nodes[idx].id.clone(),
+            id,
+            name,
+        });
+        new
+    }
+
+    /// Crea la copia con id e nome dati (usata anche per ricreare le copie di un progetto).
+    pub fn duplicate_as(&mut self, idx: NodeIndex, id: ComponentId, name: String) -> NodeIndex {
+        let parent = self.nodes[idx].parent;
+        let new = self.copy_node(idx, parent, id, name);
+        match parent {
+            Some(p) => self.nodes[p].children.push(new),
+            None => self.roots.push(new),
+        }
+        new
+    }
+
+    fn copy_node(&mut self, idx: NodeIndex, parent: Option<NodeIndex>, id: ComponentId, name: String) -> NodeIndex {
+        let src = self.nodes[idx].clone();
+        if let Some(m) = self.assignments.get(&src.id).cloned() {
+            self.assignments.insert(id.clone(), m);
+        }
+        let new = self.nodes.len();
+        self.nodes.push(Node {
+            id: id.clone(),
+            name,
+            parent,
+            children: Vec::new(),
+            ..src.clone()
+        });
+        for c in src.children {
+            let child_id = match self.nodes[c].id.0.strip_prefix(&src.id.0) {
+                Some(rest) => ComponentId(format!("{}{rest}", id.0)),
+                None => ComponentId(format!("{}/{}", id.0, self.nodes[c].name)),
+            };
+            let child_name = self.nodes[c].name.clone();
+            let nc = self.copy_node(c, Some(new), child_id, child_name);
+            self.nodes[new].children.push(nc);
+        }
+        new
+    }
+
+    /// Vero se il componente è una copia creata dall'utente (o sta dentro una copia).
+    pub fn is_copy(&self, mut idx: NodeIndex) -> bool {
+        loop {
+            if self.copies.iter().any(|c| c.id == self.nodes[idx].id) {
+                return true;
+            }
+            match self.nodes[idx].parent {
+                Some(p) => idx = p,
+                None => return false,
+            }
+        }
+    }
+
+    /// Elimina una copia (e le copie fatte da lei). Restituisce falso se non è una copia.
+    pub fn delete_copy(&mut self, idx: NodeIndex) -> bool {
+        let id = self.nodes[idx].id.clone();
+        if !self.copies.iter().any(|c| c.id == id) {
+            return false;
+        }
+        // Copie che dipendono da questa (copiate dalla copia o da un suo figlio).
+        let mut doomed = vec![id.clone()];
+        let mut changed = true;
+        while changed {
+            changed = false;
+            for c in &self.copies {
+                let depends = doomed.iter().any(|d| c.of == *d || c.of.0.starts_with(&format!("{}/", d.0)));
+                if depends && !doomed.contains(&c.id) {
+                    doomed.push(c.id.clone());
+                    changed = true;
+                }
+            }
+        }
+        for d in &doomed {
+            if let Some(i) = self.find(d) {
+                self.remove_subtree(i);
+            }
+        }
+        self.assignments
+            .retain(|k, _| !doomed.iter().any(|d| *k == *d || k.0.starts_with(&format!("{}/", d.0))));
+        self.copies.retain(|c| !doomed.contains(&c.id));
+        true
+    }
+
+    /// Ingombro esatto: i vertici trasformati uno per uno. [`bounds_of`](Self::bounds_of)
+    /// trasforma invece la scatola della mesh, che per un pezzo ruotato è più larga del
+    /// pezzo (gli angoli della scatola sporgono): va bene per inquadrare, non per appoggiare.
+    pub fn exact_bounds_of(&self, idx: NodeIndex) -> Aabb {
+        let mut b = Aabb::EMPTY;
+        let mut stack = vec![idx];
+        while let Some(i) = stack.pop() {
+            if let Some(m) = self.nodes[i].mesh {
+                let w = self.world_transform(i);
+                for p in &self.meshes[m].positions {
+                    b.grow_point(w.transform_point3(*p));
+                }
+            }
+            stack.extend(&self.nodes[i].children);
+        }
+        b
+    }
+
+    /// Sposta il componente di `delta` in spazio mondo, anche dentro assiemi a loro
+    /// volta ruotati o scalati (lo spostamento passa per l'inversa degli antenati).
+    pub fn translate_world(&mut self, idx: NodeIndex, delta: Vec3) {
+        let mut ancestors = Mat4::IDENTITY;
+        let mut k = self.nodes[idx].parent;
+        while let Some(i) = k {
+            let n = &self.nodes[i];
+            if !n.user.is_identity() {
+                ancestors = n.user.matrix(n.pivot) * ancestors;
+            }
+            k = n.parent;
+        }
+        let local = ancestors.inverse().transform_vector3(delta);
+        self.nodes[idx].user.translation += local;
     }
 
     /// Visibile se il nodo e tutti i suoi antenati sono visibili.
@@ -502,6 +658,68 @@ mod tests {
         assert_eq!(s.triangle_count(), 12);
         assert!(tris > 12);
         let _ = r2;
+    }
+
+    #[test]
+    fn duplicate_and_delete_copies() {
+        let mut s = Scene::default();
+        let m = s.add_mesh(crate::primitives::cuboid(Vec3::ONE));
+        let asm = s.add_node(None, ComponentId("f/A".into()), "A", Mat4::IDENTITY, None);
+        let p = s.add_node(Some(asm), ComponentId("f/A/P".into()), "P", Mat4::IDENTITY, Some(m));
+        s.assignments.insert(ComponentId("f/A/P".into()), crate::MaterialId::new("rosso"));
+        s.refresh_pivots();
+        s.nodes[asm].user.translation = Vec3::new(1.0, 0.0, 0.0);
+        let c = s.duplicate(asm);
+        assert_eq!(s.nodes[c].id.0, "f/A#copia");
+        assert_eq!(s.nodes[c].name, "A (duplicato)");
+        assert_eq!(s.nodes[c].user.translation, Vec3::new(1.0, 0.0, 0.0));
+        let cp = s.nodes[c].children[0];
+        assert_eq!(s.nodes[cp].id.0, "f/A#copia/P");
+        assert_eq!(s.nodes[cp].mesh, s.nodes[p].mesh, "la mesh è condivisa");
+        assert_eq!(
+            s.assignments.get(&ComponentId("f/A#copia/P".into())),
+            Some(&crate::MaterialId::new("rosso"))
+        );
+        assert!(s.is_copy(cp) && !s.is_copy(p));
+        // Copia della copia, poi eliminazione della prima: sparisce anche la seconda.
+        let c2 = s.duplicate(c);
+        assert_eq!(s.nodes[c2].id.0, "f/A#copia#copia");
+        assert_eq!(s.copies.len(), 2);
+        assert!(!s.delete_copy(p), "un pezzo del file non si elimina");
+        let c = s.find(&ComponentId("f/A#copia".into())).unwrap();
+        assert!(s.delete_copy(c));
+        assert!(s.copies.is_empty());
+        assert_eq!(s.nodes.len(), 2);
+        assert!(s.assignments.keys().all(|k| !k.0.contains("#copia")));
+        assert_eq!(s.roots.len(), 1);
+    }
+
+    #[test]
+    fn drop_to_floor_touches_with_real_vertices() {
+        // Toroide ruotato di 40° dentro un assieme a sua volta ruotato: la scatola ruotata
+        // sporge sotto il pezzo, ma l'appoggio deve usare i vertici veri.
+        let mut s = Scene::default();
+        let m = s.add_mesh(crate::primitives::torus(0.5, 0.15, 64, 32));
+        let asm = s.add_node(None, ComponentId("a".into()), "A", Mat4::IDENTITY, None);
+        let t = s.add_node(
+            Some(asm),
+            ComponentId("a/t".into()),
+            "T",
+            Mat4::from_translation(Vec3::new(0.0, 2.0, 0.0)),
+            Some(m),
+        );
+        s.refresh_pivots();
+        s.nodes[asm].user.rotation_deg = Vec3::new(0.0, 30.0, 0.0);
+        s.nodes[t].user.rotation_deg = Vec3::new(0.0, 0.0, 40.0);
+        let loose = s.bounds_of(t).min.y;
+        let exact = s.exact_bounds_of(t).min.y;
+        assert!(loose < exact - 0.05, "la scatola ruotata sporge: {loose} vs {exact}");
+        s.drop_to_floor(t, 0.0);
+        assert!(s.exact_bounds_of(t).min.y.abs() < 1e-5, "{}", s.exact_bounds_of(t).min.y);
+        let c0 = s.exact_bounds_of(t).center();
+        s.center_on_origin(t);
+        let c = s.exact_bounds_of(t).center();
+        assert!(c.x.abs() < 1e-5 && c.z.abs() < 1e-5 && (c.y - c0.y).abs() < 1e-5, "{c}");
     }
 
     #[test]

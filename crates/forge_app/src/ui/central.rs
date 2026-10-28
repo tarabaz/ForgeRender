@@ -120,6 +120,7 @@ fn move_selection(app: &mut ForgeApp, rect: egui::Rect, from: egui::Pos2, to: eg
 fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
     let rect = ui.available_rect_before_wrap();
     let resp = ui.allocate_rect(rect, egui::Sense::click_and_drag());
+    crate::ui::navigator::tick(app, ui.ctx());
     let ppp = ui.ctx().pixels_per_point();
     let size = [
         (rect.width() * ppp).round().max(1.0) as u32,
@@ -150,6 +151,8 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
     draw_cameras(app, &painter, rect);
     // Il gizmo ha la precedenza: se usa il mouse la camera non si muove e il clic non seleziona.
     let gizmo_used = crate::ui::gizmo::update(app, ui, rect, &resp, &painter);
+    let nav_used = crate::ui::navigator::show(app, ui, rect, &painter);
+    let gizmo_used = gizmo_used || nav_used;
     if !gizmo_used {
         camera_input(app, ui, rect, &resp);
     }
@@ -347,6 +350,19 @@ fn render_view(app: &mut ForgeApp, ui: &mut egui::Ui) {
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, 0.0, egui::Color32::from_gray(14));
     let ctx = ui.ctx().clone();
+    // Scelta della camera di rendering (se ce n'è più d'una), in alto a destra.
+    if !app.scene.render_cameras.is_empty() {
+        let bar = egui::Rect::from_min_max(
+            egui::pos2(rect.right() - 230.0, rect.top() + 8.0),
+            egui::pos2(rect.right() - 8.0, rect.top() + 40.0),
+        );
+        let mut child = ui.new_child(
+            egui::UiBuilder::new()
+                .max_rect(bar)
+                .layout(egui::Layout::right_to_left(egui::Align::Min)),
+        );
+        crate::ui::inspector::camera_picker(app, &mut child, "render-view-camera");
+    }
     let stale = app.render_is_stale();
     let preparing = app.is_preparing();
     let progress = app.session.progress();

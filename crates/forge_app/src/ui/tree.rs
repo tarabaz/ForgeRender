@@ -41,6 +41,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
     let mut toggle_collapse: Option<usize> = None;
     let mut frame_node: Option<usize> = None;
     let mut show_all = false;
+    let mut duplicate: Option<usize> = None;
 
     egui::ScrollArea::vertical()
         .id_salt("tree-scroll")
@@ -96,6 +97,10 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
                             show_all = true;
                             ui.close();
                         }
+                        if ui.button("Duplica (Ctrl+D)").clicked() {
+                            duplicate = Some(idx);
+                            ui.close();
+                        }
                     });
                 });
             }
@@ -110,6 +115,11 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
         app.push_undo(&[i]);
         app.scene.nodes[i].visible = !app.scene.nodes[i].visible;
         app.geometry_changed();
+    }
+    if let Some(i) = duplicate {
+        app.selection.clear();
+        app.selection.insert(i);
+        app.duplicate_selection();
     }
     if show_all {
         app.show_all();

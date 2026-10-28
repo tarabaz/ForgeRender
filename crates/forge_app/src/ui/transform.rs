@@ -43,7 +43,26 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
 
     // Azioni rapide: valgono per tutti i componenti selezionati.
     let mut changed = false;
+    // Duplica/elimina cambiano gli indici dei nodi: il resto del pannello si ridisegna al frame dopo.
+    let mut structural = false;
     ui.horizontal_wrapped(|ui| {
+        if ui
+            .button("Duplica")
+            .on_hover_text("Ctrl+D: copia identica nello stesso punto, già selezionata: trascinala col gizmo")
+            .clicked()
+        {
+            app.duplicate_selection();
+            structural = true;
+        }
+        if sel.iter().any(|&i| app.scene.is_copy(i))
+            && ui
+                .button("Elimina copia")
+                .on_hover_text("Canc: elimina le copie selezionate")
+                .clicked()
+        {
+            app.delete_selected_copies();
+            structural = true;
+        }
         if ui
             .button("Appoggia sul pavimento")
             .on_hover_text("Porta il punto più basso a quota 0")
@@ -75,6 +94,9 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             changed = true;
         }
     });
+    if structural {
+        return;
+    }
     ui.horizontal_wrapped(|ui| {
         ui.label("Ruota 90°:");
         for (name, axis) in [("X", Vec3::X), ("Y", Vec3::Y), ("Z", Vec3::Z)] {
@@ -200,6 +222,7 @@ fn tips(ui: &mut egui::Ui) {
         egui::RichText::new(
             "Gizmo nella viewport: W sposta · E ruota · R scala · Q solo selezione · Ctrl durante il trascinamento = snap · Esc annulla.\n\
              H nasconde la selezione · Shift+H nasconde tutto il resto · Alt+H mostra tutto · Ctrl+Z / Ctrl+Y annulla e ripeti.\n\
+             Ctrl+D duplica · Canc elimina una copia.\n\
              Alt + trascina sposta la selezione sul piano orizzontale, Alt + Shift + trascina in verticale.\n\
              Le trasformazioni non modificano il file CAD: vengono salvate nel progetto.",
         )

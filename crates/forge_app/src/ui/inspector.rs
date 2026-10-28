@@ -906,6 +906,10 @@ fn camera(app: &mut ForgeApp, ui: &mut egui::Ui) {
 // ----------------------------------------------------------------------
 
 fn render(app: &mut ForgeApp, ui: &mut egui::Ui) {
+    if !app.scene.render_cameras.is_empty() {
+        camera_picker(app, ui, "render-tab-camera");
+        ui.separator();
+    }
     let mut changed = false;
     let prev_backend = app.settings.backend;
     egui::ComboBox::from_label("Dispositivo")
@@ -1252,5 +1256,37 @@ fn render_cameras(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 .weak()
                 .small(),
         );
+    }
+}
+
+/// Tendina per scegliere la camera usata dal render (vista o camere di rendering).
+pub(crate) fn camera_picker(app: &mut ForgeApp, ui: &mut egui::Ui, id: &str) {
+    let current = match app.scene.active_camera {
+        Some(i) => app.scene.render_cameras[i].name.clone(),
+        None => "Vista della viewport".to_string(),
+    };
+    let mut choice: Option<Option<usize>> = None;
+    egui::ComboBox::from_id_salt(id)
+        .selected_text(format!("Camera: {current}"))
+        .width(200.0)
+        .show_ui(ui, |ui| {
+            if ui
+                .selectable_label(app.scene.active_camera.is_none(), "Vista della viewport")
+                .clicked()
+            {
+                choice = Some(None);
+            }
+            for (i, c) in app.scene.render_cameras.iter().enumerate() {
+                if ui.selectable_label(app.scene.active_camera == Some(i), &c.name).clicked() {
+                    choice = Some(Some(i));
+                }
+            }
+        })
+        .response
+        .on_hover_text("Camera usata dal render (le camere si creano nella scheda Camera)");
+    if let Some(c) = choice {
+        if c != app.scene.active_camera {
+            app.set_active_camera(c);
+        }
     }
 }

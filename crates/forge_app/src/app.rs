@@ -163,6 +163,8 @@ pub struct ForgeApp {
     pub library: crate::ui::library::LibraryUi,
     /// "Pilota": la camera di rendering attiva segue la vista della viewport.
     pub camera_follow: bool,
+    /// Animazione della vista avviata dal navigatore degli assi.
+    pub nav_anim: Option<crate::ui::navigator::NavAnim>,
     /// Annulla/ripeti delle trasformazioni: stato precedente dei componenti toccati
     /// (con il numero di nodi della scena, per scartare voci non più valide).
     undo_stack: Vec<(usize, Vec<(usize, NodeState)>)>,
@@ -231,6 +233,7 @@ impl ForgeApp {
             gizmo: Default::default(),
             library: Default::default(),
             camera_follow: false,
+            nav_anim: None,
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             logs,
@@ -395,6 +398,48 @@ impl ForgeApp {
             self.selection.clear();
         }
         self.geometry_changed();
+    }
+
+    /// Ctrl+D: duplica i componenti selezionati (identici: materiale, posizione e impostazioni)
+    /// e seleziona le copie con il gizmo di spostamento pronto, come in Blender.
+    pub fn duplicate_selection(&mut self) {
+        let sel = crate::ui::gizmo::top_selected(self);
+        if sel.is_empty() {
+            return;
+        }
+        let copies: Vec<usize> = sel.into_iter().map(|i| self.scene.duplicate(i)).collect();
+        self.selection = copies.into_iter().collect();
+        self.gizmo.mode = crate::ui::gizmo::GizmoMode::Move;
+        self.geometry_changed();
+        self.show_selection_tab();
+    }
+
+    /// Canc: elimina le copie selezionate (i componenti dei file importati si nascondono, non si eliminano).
+    pub fn delete_selected_copies(&mut self) {
+        let ids: Vec<forge_scene::ComponentId> = crate::ui::gizmo::top_selected(self)
+            .into_iter()
+            .map(|i| self.scene.nodes[i].id.clone())
+            .collect();
+        let mut deleted = 0;
+        let mut originals = 0;
+        for id in ids {
+            match self.scene.find(&id) {
+                Some(i) if self.scene.delete_copy(i) => deleted += 1,
+                Some(_) => originals += 1,
+                None => {}
+            }
+        }
+        if deleted > 0 {
+            self.selection.clear();
+            self.geometry_changed();
+        }
+        if originals > 0 {
+            self.info = Some(
+                "I componenti dei file importati non si eliminano (il file sorgente resta com'è): \
+                 nascondili con H. Si eliminano solo le copie create con Duplica."
+                    .into(),
+            );
+        }
     }
 
     pub fn show_all(&mut self) {

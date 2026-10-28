@@ -58,6 +58,9 @@ pub struct ProjectFile {
     pub lights: Vec<Light>,
     pub environment: Environment,
     pub camera: Camera,
+    /// Copie create dall'utente (ricreate all'apertura, prima di stati e assegnazioni).
+    #[serde(default)]
+    pub copies: Vec<forge_scene::CopyRecord>,
     #[serde(default)]
     pub render_cameras: Vec<forge_scene::RenderCamera>,
     #[serde(default)]
@@ -152,6 +155,7 @@ pub fn to_project_file(scene: &Scene, meta: &ProjectMeta, settings: &RenderSetti
         lights: scene.lights.clone(),
         environment: scene.environment.clone(),
         camera: scene.camera.clone(),
+        copies: scene.copies.clone(),
         render_cameras: scene.render_cameras.clone(),
         active_camera: scene.active_camera,
         render: settings.clone(),
@@ -242,6 +246,15 @@ pub fn load(path: &Path) -> anyhow::Result<LoadedProject> {
         }
     }
 
+    for c in pf.copies {
+        match scene.find(&c.of) {
+            Some(i) => {
+                scene.duplicate_as(i, c.id.clone(), c.name.clone());
+                scene.copies.push(c);
+            }
+            None => report.missing_components.push(c.of.clone()),
+        }
+    }
     for m in pf.materials {
         scene.materials.upsert(m);
     }
@@ -355,6 +368,12 @@ mod tests {
             },
         });
         scene.active_camera = Some(0);
+        // Una copia spostata con un materiale suo: va salvata e ricreata.
+        let si0 = scene.find(&staffa).unwrap();
+        let copy = scene.duplicate(si0);
+        scene.nodes[copy].user.translation = Vec3::new(0.5, 0.0, 0.0);
+        let copy_id = scene.nodes[copy].id.clone();
+        scene.assignments.insert(copy_id.clone(), MaterialId::new("mio"));
         let si = scene.find(&staffa).unwrap();
         scene.nodes[si].user = forge_scene::UserTransform {
             translation: Vec3::new(0.1, 0.2, 0.3),
@@ -387,6 +406,10 @@ mod tests {
         assert_eq!(s2.lights, scene.lights);
         assert_eq!(s2.camera, scene.camera);
         assert_eq!(s2.render_cameras, scene.render_cameras);
+        let c2 = s2.find(&copy_id).expect("la copia è ricreata");
+        assert_eq!(s2.nodes[c2].user.translation, Vec3::new(0.5, 0.0, 0.0));
+        assert_eq!(s2.resolve_material(c2), &MaterialId::new("mio"));
+        assert_eq!(s2.copies, scene.copies);
         assert_eq!(s2.active_camera, Some(0));
         assert_eq!(s2.render_camera().vfov_deg, 35.0);
         assert_eq!(loaded.settings, settings);
@@ -396,7 +419,7 @@ mod tests {
         std::fs::rename(&dir, &moved).unwrap();
         let loaded = load(&moved.join("progetto.frproject")).unwrap();
         assert!(loaded.report.missing_sources.is_empty());
-        assert_eq!(loaded.scene.triangle_count(), 2);
+        assert_eq!(loaded.scene.triangle_count(), 3, "2 triangoli dal file + 1 della copia");
         std::fs::remove_dir_all(moved).ok();
     }
 

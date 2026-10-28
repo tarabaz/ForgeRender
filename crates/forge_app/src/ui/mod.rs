@@ -7,6 +7,7 @@ pub mod central;
 pub mod gizmo;
 pub(crate) mod inspector;
 pub mod library;
+pub mod navigator;
 mod status;
 pub mod style;
 mod toolbar;
@@ -163,6 +164,18 @@ impl ForgeApp {
                 || i.consume_key(egui::Modifiers::COMMAND, egui::Key::Y);
             (redo, i.consume_key(egui::Modifiers::COMMAND, egui::Key::Z))
         });
+        let (dup, del) = ctx.input_mut(|i| {
+            (
+                i.consume_key(egui::Modifiers::COMMAND, egui::Key::D),
+                i.consume_key(egui::Modifiers::NONE, egui::Key::Delete),
+            )
+        });
+        if dup {
+            self.duplicate_selection();
+        }
+        if del {
+            self.delete_selected_copies();
+        }
         let (hide, isolate, unhide) = ctx.input_mut(|i| {
             (
                 i.consume_key(egui::Modifiers::NONE, egui::Key::H),
