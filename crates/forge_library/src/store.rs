@@ -4,7 +4,7 @@
 //! ```text
 //! Legno noce 049/
 //!   materiale.json        parametri ForgeRender (texture con percorsi relativi)
-//!   anteprima.png         miniatura renderizzata
+//!   anteprima-v2.png      miniatura renderizzata (sfera grande quanto una tessera)
 //!   Wood049_Color.jpg …   mappe PBR
 //! ```
 //! La cartella si può copiare su un altro PC o condividere: è autosufficiente.
@@ -16,7 +16,10 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 pub const MATERIAL_FILE: &str = "materiale.json";
-pub const THUMBNAIL_FILE: &str = "anteprima.png";
+/// Anteprima renderizzata (v2: scena alla scala del materiale; le vecchie si rifanno).
+pub const THUMBNAIL_FILE: &str = "anteprima-v2.png";
+/// Anteprima della versione precedente (sfera di 2 m, rilievo poco visibile): si elimina.
+const LEGACY_THUMBNAIL_FILE: &str = "anteprima.png";
 
 #[derive(Serialize, Deserialize)]
 struct MaterialFile {
@@ -92,9 +95,10 @@ pub fn material_from_maps(name: &str, id: &str, set: &MapSet, size_m: Option<f32
     }
 }
 
-/// Escursione di displacement proposta: 1% del lato della texture (2–20 mm).
+/// Escursione di displacement proposta: 3% del lato della texture (3–60 mm), simile al
+/// rilievo delle miniature dei fornitori; si regola nel pannello del materiale.
 pub fn default_displacement_mm(size_m: Option<f32>) -> f32 {
-    (size_m.filter(|s| s.is_finite() && *s > 0.0).unwrap_or(1.0) * 10.0).clamp(2.0, 20.0)
+    (size_m.filter(|s| s.is_finite() && *s > 0.0).unwrap_or(1.0) * 30.0).clamp(3.0, 60.0)
 }
 
 /// Elenco dei materiali della libreria, in ordine alfabetico.
@@ -161,6 +165,7 @@ pub fn save(dir: &Path, material: &Material, source: &str) -> anyhow::Result<()>
 
 /// Salva la miniatura (RGBA8) del materiale.
 pub fn save_thumbnail(dir: &Path, width: u32, height: u32, rgba: &[u8]) -> anyhow::Result<PathBuf> {
+    let _ = std::fs::remove_file(dir.join(LEGACY_THUMBNAIL_FILE));
     let p = dir.join(THUMBNAIL_FILE);
     image::save_buffer(&p, rgba, width, height, image::ColorType::Rgba8)?;
     Ok(p)

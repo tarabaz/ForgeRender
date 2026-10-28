@@ -729,17 +729,40 @@ pub(crate) fn render_preview(mat: &Material) -> Vec<u8> {
     let mut s = Scene::default();
     let mut m = mat.clone();
     m.id = forge_scene::MaterialId::new("__preview");
+    // Scena alla scala del materiale: con la proiezione box la sfera è grande quanto una
+    // tessera della texture (come le miniature di ambientCG/Poly Haven), così rilievo e
+    // displacement, che sono in millimetri reali, si vedono nella proporzione giusta.
+    let k = if m.has_textures() && m.mapping.projection == forge_scene::Projection::Box {
+        (m.mapping.scale * 0.5).clamp(0.01, 10.0)
+    } else {
+        1.0
+    };
     s.materials.upsert(m);
-    let sphere = s.add_mesh(primitives::uv_sphere(1.0, 48, 24));
-    let floor = s.add_mesh(primitives::plane(20.0, 20.0));
+    let sphere = s.add_mesh(primitives::uv_sphere(k, 64, 32));
+    let floor = s.add_mesh(primitives::plane(20.0 * k, 20.0 * k));
     let id = ComponentId("sfera".into());
-    s.add_node(None, id.clone(), "sfera", forge_math::Mat4::from_translation(Vec3::Y), Some(sphere));
+    s.add_node(
+        None,
+        id.clone(),
+        "sfera",
+        forge_math::Mat4::from_translation(Vec3::Y * k),
+        Some(sphere),
+    );
     s.add_node(None, ComponentId("piano".into()), "piano", forge_math::Mat4::IDENTITY, Some(floor));
     s.assignments.insert(id, forge_scene::MaterialId::new("__preview"));
-    s.lights = vec![Light::area("key", Vec3::new(-2.5, 4.0, 3.0), Vec3::Y, 3.0, 3.0, 4.0)];
+    // Luce ad area scalata con la scena: stessa radianza e stesso angolo solido, quindi
+    // stessa illuminazione a qualsiasi scala.
+    s.lights = vec![Light::area(
+        "key",
+        Vec3::new(-2.5, 4.0, 3.0) * k,
+        Vec3::Y * k,
+        3.0 * k,
+        3.0 * k,
+        4.0,
+    )];
     s.camera = Camera {
-        position: Vec3::new(0.0, 1.6, 4.2),
-        target: Vec3::new(0.0, 0.9, 0.0),
+        position: Vec3::new(0.0, 1.6, 4.2) * k,
+        target: Vec3::new(0.0, 0.9, 0.0) * k,
         up: Vec3::Y,
         vfov_deg: 32.0,
         ..Default::default()
