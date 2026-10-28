@@ -206,7 +206,7 @@ impl GpuBackend {
     }
 
     fn upload_scene(&mut self, scene: &RenderScene) -> anyhow::Result<()> {
-        if self.scene.as_ref().is_some_and(|s| s.scene_id == scene.id) {
+        if self.scene.as_ref().is_some_and(|s| s.scene_id == scene.content_id) {
             return Ok(());
         }
         let t0 = Instant::now();
@@ -232,7 +232,7 @@ impl GpuBackend {
             t0.elapsed().as_secs_f64() * 1e3
         );
         self.scene = Some(SceneGpu {
-            scene_id: scene.id,
+            scene_id: scene.content_id,
             buffer,
             params: sb.params,
             bytes,
@@ -298,7 +298,13 @@ impl RenderBackend for GpuBackend {
         }
         self.upload_scene(scene)?;
         self.ensure_target(w, h);
-        let n = self.samples_per_pass.clamp(1, max_samples.max(1));
+        // La prima passata di un render è di un solo campione: muovendo la vista l'immagine
+        // nuova compare subito, poi le passate crescono fino a ~TARGET_PASS_MS.
+        let n = if first_sample == 0 {
+            1
+        } else {
+            self.samples_per_pass.clamp(1, max_samples.max(1))
+        };
 
         let sg = self.scene.as_ref().expect("scena");
         let mut p = sg.params;
@@ -396,9 +402,8 @@ impl RenderBackend for GpuBackend {
         let per_sample = ms / n as f64;
         let ideal = (TARGET_PASS_MS / per_sample.max(1e-3)).floor() as u32;
         self.samples_per_pass = ideal.clamp(1, MAX_SAMPLES_PER_PASS).min(self.samples_per_pass * 2).max(1);
-        if cancel.load(Ordering::Relaxed) {
-            return Ok(0);
-        }
+        // Una passata finita è valida anche se nel frattempo è arrivato un comando: si tiene,
+        // così trascinando la vista si vede sempre l'ultima immagine calcolata invece di nulla.
         Ok(n)
     }
 }

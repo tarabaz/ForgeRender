@@ -1247,7 +1247,7 @@ fn camera(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 app.sync_orbit_from_camera();
             }
         }
-        app.shading_changed();
+        app.render_camera_changed();
     }
     ui.separator();
     ui.horizontal_wrapped(|ui| {

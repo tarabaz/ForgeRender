@@ -370,6 +370,9 @@ pub struct RenderScene {
     /// Identificativo univoco (per processo): i backend GPU lo usano per sapere
     /// quando ricaricare i dati della scena in memoria video.
     pub id: u64,
+    /// Identifica tutto tranne la camera: due scene con lo stesso `content_id` hanno gli
+    /// stessi dati in memoria video, quindi spostando la vista non si ricarica nulla.
+    pub content_id: u64,
     pub geometry: Arc<RenderGeometry>,
     /// Materiale effettivo di ogni nodo della scena (indice in `materials`).
     pub node_material: Vec<u32>,
@@ -381,7 +384,7 @@ pub struct RenderScene {
     /// Mappa HDRI caricata (se l'ambiente è una HDRI), con intensità e rotazione in radianti.
     pub env_map: Option<(Arc<EnvironmentMap>, f32, f32)>,
     /// Superfici emissive campionabili come luci.
-    pub emissive: Option<EmissiveSet>,
+    pub emissive: Option<Arc<EmissiveSet>>,
     pub camera: Camera,
     /// Qualche materiale ha una mappa di opacità (ritaglio): le intersezioni vanno filtrate.
     pub has_cutout: bool,
@@ -478,15 +481,16 @@ impl RenderScene {
             _ => None,
         };
 
-        let emissive = build_emissive(&geometry, &node_material, &materials);
+        let emissive = build_emissive(&geometry, &node_material, &materials).map(Arc::new);
 
         let has_cutout = material_textures.iter().flatten().any(|t| t.opacity.is_some());
         let fogs = crate::fog::bake_fogs(scene, &geometry);
-        static NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        let id = next_scene_id();
         RenderScene {
             has_cutout,
             fogs,
-            id: NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            id,
+            content_id: id,
             emissive,
             geometry,
             node_material,
@@ -496,6 +500,26 @@ impl RenderScene {
             environment,
             env_map,
             camera: scene.render_camera().clone(),
+        }
+    }
+
+    /// Stessa scena vista da un'altra camera: nessuna ricompilazione, e il backend GPU
+    /// riusa i dati già caricati (serve per muovere la vista col render attivo).
+    pub fn with_camera(&self, camera: Camera) -> RenderScene {
+        RenderScene {
+            id: next_scene_id(),
+            content_id: self.content_id,
+            geometry: self.geometry.clone(),
+            node_material: self.node_material.clone(),
+            materials: self.materials.clone(),
+            material_textures: self.material_textures.clone(),
+            lights: self.lights.clone(),
+            environment: self.environment.clone(),
+            env_map: self.env_map.clone(),
+            emissive: self.emissive.clone(),
+            camera,
+            has_cutout: self.has_cutout,
+            fogs: self.fogs.clone(),
         }
     }
 
@@ -542,6 +566,11 @@ pub fn pick(geometry: &RenderGeometry, origin: Vec3, dir: Vec3) -> Option<(usize
         .accel
         .intersect(origin, dir, 0.0, f32::INFINITY)
         .map(|h| (geometry.tri_node[h.prim as usize] as usize, h.t))
+}
+
+fn next_scene_id() -> u64 {
+    static NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 
 fn build_emissive(geo: &RenderGeometry, node_material: &[u32], materials: &[RenderMaterial]) -> Option<EmissiveSet> {
