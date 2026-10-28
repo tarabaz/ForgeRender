@@ -9,6 +9,11 @@ dall'applicazione principale; il codice sorgente completo di ForgeRender e dello
 shim di integrazione è disponibile nel repository del progetto, e i sorgenti di
 Open CASCADE sono quelli del pacchetto occt-sys 7.8.1 (crates.io).
 
+Il denoiser utilizza Intel Open Image Denoise 2.3.3 (https://www.openimagedenoise.org),
+licenza Apache 2.0, con oneTBB e oneDNN (vedi la cartella OpenImageDenoise). Le
+librerie OpenImageDenoise*.dll e tbb12.dll sono caricate a runtime: se mancano,
+l'applicazione funziona senza riduzione del rumore.
+
 L'applicazione utilizza inoltre librerie Rust con licenze permissive (MIT,
 Apache-2.0, BSD, Zlib), tra cui egui/eframe, wgpu, glam, rayon, serde, image,
 tobj, stl_io, sysinfo, rfd.

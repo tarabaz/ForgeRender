@@ -841,6 +841,7 @@ dependencies = [
  "anyhow",
  "bytemuck",
  "eframe",
+ "forge_denoise",
  "forge_image_io",
  "forge_import",
  "forge_math",
@@ -859,6 +860,7 @@ name = "forge_cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "forge_denoise",
  "forge_image_io",
  "forge_import",
  "forge_math",
@@ -869,6 +871,19 @@ dependencies = [
  "forge_scene",
  "forge_telemetry",
  "serde_json",
+ "tracing",
+]
+
+[[package]]
+name = "forge_denoise"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "forge_math",
+ "forge_render_core",
+ "forge_render_cpu",
+ "forge_scene",
+ "libloading",
  "tracing",
 ]
 

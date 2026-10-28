@@ -1,0 +1,17 @@
+[package]
+name = "forge_denoise"
+description = "Riduzione del rumore con Intel Open Image Denoise (caricato a runtime, CPU o CUDA)."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+forge_render_core.workspace = true
+forge_render_cpu.workspace = true
+libloading.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+forge_scene.workspace = true
+forge_math.workspace = true

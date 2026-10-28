@@ -10,7 +10,15 @@ Riga di comando (render e benchmark senza interfaccia)
   forgerender-cli.exe info
   forgerender-cli.exe render --test-scene --spp 256 --width 1920 --height 1080 --out render.png
   forgerender-cli.exe render --mesh pezzo.stl --unit mm --spp 128 --out pezzo.png
+  forgerender-cli.exe render --test-scene --spp 64 --denoise finale --cuda --out pulita.png
   forgerender-cli.exe bench --json benchmark.json
+
+Riduzione del rumore (denoiser, pannello Render)
+  Intel Open Image Denoise: con 64-256 campioni l'immagine è già pulita.
+  "Usa CUDA (GPU NVIDIA)": esegue il denoiser sulla GPU con i core tensor
+  (RTX 20/30/40/50 e Quadro RTX; basta il driver NVIDIA, nessun CUDA Toolkit).
+  Sulle GPU più vecchie (es. Quadro P-series) si usa automaticamente la CPU.
+  Le DLL OpenImageDenoise*.dll e tbb12.dll devono restare accanto a forgerender.exe.
 
 Comandi della viewport
   trascina = orbita, Shift+trascina / tasto destro / centrale = pan, rotella = zoom
@@ -30,4 +38,5 @@ le texture incorporate vengono salvate accanto al file .blend).
 SolidWorks SLDPRT/SLDASM: sperimentale, richiede SolidWorks installato su questo PC
 (il file viene esportato in STEP da SolidWorks tramite le sue API COM, in sola lettura).
 
-Componenti di terze parti e licenze: cartella licenze\ (Open CASCADE Technology, LGPL 2.1).
+Componenti di terze parti e licenze: cartella licenze\ (Open CASCADE Technology, LGPL 2.1;
+Intel Open Image Denoise, Apache 2.0).

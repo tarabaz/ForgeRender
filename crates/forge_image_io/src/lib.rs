@@ -28,9 +28,10 @@ pub fn save_png(path: &Path, width: u32, height: u32, rgba: &[u8]) -> anyhow::Re
     })
 }
 
-/// Applica tone mapping al frame e lo salva come PNG.
-pub fn save_frame_png(path: &Path, frame: &Frame, tone: ToneMapping, exposure_ev: f32) -> anyhow::Result<()> {
-    let rgba = tonemap_to_rgba8(&frame.linear, tone, exposure_ev);
+/// Applica tone mapping al frame e lo salva come PNG. `denoise_strength` miscela
+/// l'immagine grezza con quella ripulita, se presente (0 = grezza, 1 = ripulita).
+pub fn save_frame_png(path: &Path, frame: &Frame, tone: ToneMapping, exposure_ev: f32, denoise_strength: f32) -> anyhow::Result<()> {
+    let rgba = tonemap_to_rgba8(&frame.display(denoise_strength), tone, exposure_ev);
     save_png(path, frame.width, frame.height, &rgba)
 }
 

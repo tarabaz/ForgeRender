@@ -6,7 +6,7 @@
 //! interrotta (pausa, annullamento, nuova scena) viene scartata per intero,
 //! così l'accumulo non contiene mai campioni parziali.
 
-use crate::{Accumulator, RenderBackend, RenderScene, RenderSettings};
+use crate::{Accumulator, DenoiseMode, DenoiseSettings, Denoiser, Guides, RenderBackend, RenderScene, RenderSettings};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
@@ -54,6 +54,8 @@ pub struct Progress {
     pub last_pass: Duration,
     pub backend: String,
     pub device: String,
+    /// Stato della riduzione del rumore (filtro, dispositivo, tempo o errore); vuoto se inattiva.
+    pub denoiser: String,
 }
 
 impl Progress {
@@ -92,6 +94,22 @@ pub struct Frame {
     pub width: u32,
     pub height: u32,
     pub linear: Arc<Vec<[f32; 3]>>,
+    /// Immagine ripulita dal denoiser, calcolata a `denoised_samples` campioni.
+    pub denoised: Option<Arc<Vec<[f32; 3]>>>,
+    pub denoised_samples: u32,
+    /// Buffer guida usati dal denoiser (per la visualizzazione di controllo).
+    pub guides: Option<Arc<Guides>>,
+}
+
+impl Frame {
+    /// Immagine da mostrare/esportare: grezza o miscelata con quella ripulita.
+    pub fn display(&self, strength: f32) -> std::borrow::Cow<'_, [[f32; 3]]> {
+        match &self.denoised {
+            Some(d) if strength >= 1.0 => std::borrow::Cow::Borrowed(d.as_slice()),
+            Some(d) if strength > 0.0 => std::borrow::Cow::Owned(crate::mix_denoised(&self.linear, d, strength)),
+            _ => std::borrow::Cow::Borrowed(self.linear.as_slice()),
+        }
+    }
 }
 
 enum Cmd {
@@ -100,6 +118,8 @@ enum Cmd {
     Resume,
     Cancel,
     SetTarget(u32),
+    SetDenoise(DenoiseSettings),
+    SetDenoiser(Option<Box<dyn Denoiser>>),
     Shutdown,
 }
 
@@ -146,6 +166,7 @@ impl RenderSession {
                 last_pass: Duration::ZERO,
                 backend: String::new(),
                 device: String::new(),
+                denoiser: String::new(),
             }),
             frame: Mutex::new(None),
             frame_version: AtomicU64::new(0),
@@ -212,6 +233,16 @@ impl RenderSession {
         let _ = self.tx.send(Cmd::SetTarget(target));
     }
 
+    /// Aggiorna le impostazioni del denoiser senza ripartire.
+    pub fn set_denoise(&self, settings: DenoiseSettings) {
+        let _ = self.tx.send(Cmd::SetDenoise(settings));
+    }
+
+    /// Installa (o rimuove) il denoiser usato dalla sessione.
+    pub fn set_denoiser(&self, denoiser: Option<Box<dyn Denoiser>>) {
+        let _ = self.tx.send(Cmd::SetDenoiser(denoiser));
+    }
+
     pub fn progress(&self) -> Progress {
         self.shared.progress.lock().unwrap().clone()
     }
@@ -256,24 +287,129 @@ struct Active {
     running_since: Option<Instant>,
     elapsed: Duration,
     last_publish: Instant,
+    denoised: Option<Arc<Vec<[f32; 3]>>>,
+    /// Campioni e "chiave" (qualità, CUDA, guide) dell'ultima immagine ripulita.
+    denoised_at: Option<(u32, DenoiseKey)>,
+    /// Soglia della prossima anteprima ripulita.
+    next_preview: u32,
+}
+
+type DenoiseKey = (crate::DenoiseQuality, bool, bool);
+
+/// Denoiser installato, impostazioni correnti e cache dei buffer guida.
+struct DenoiseState {
+    denoiser: Option<Box<dyn Denoiser>>,
+    settings: DenoiseSettings,
+    /// (id della scena, larghezza, altezza) → guide.
+    guides: Option<((u64, u32, u32), Arc<Guides>)>,
+    status: String,
+}
+
+impl DenoiseState {
+    fn enabled(&self) -> bool {
+        self.denoiser.is_some() && self.settings.mode != DenoiseMode::Off
+    }
+
+    fn key(&self, final_image: bool) -> DenoiseKey {
+        let q = if final_image {
+            self.settings.quality
+        } else {
+            self.settings.preview_quality
+        };
+        (q, self.settings.use_cuda, self.settings.use_guides)
+    }
+
+    /// Ripulisce l'immagine corrente. Restituisce falso se interrotto da un comando.
+    fn run(&mut self, a: &mut Active, final_image: bool, interrupt: &AtomicBool) -> bool {
+        if !self.enabled() {
+            return true;
+        }
+        let key = self.key(final_image);
+        let Some(denoiser) = self.denoiser.as_mut() else { return true };
+        if a.accum.samples == 0 {
+            return true;
+        }
+        let (w, h) = (a.accum.width, a.accum.height);
+        let guides = if self.settings.use_guides {
+            let gk = (a.job.scene.id, w, h);
+            match &self.guides {
+                Some((k, g)) if *k == gk => Some(g.clone()),
+                _ => {
+                    let t0 = Instant::now();
+                    let Some(g) = denoiser.guides(&a.job.scene, &a.job.settings, interrupt) else {
+                        return false;
+                    };
+                    tracing::info!(
+                        "buffer guida (albedo, normali) calcolati in {:.0} ms",
+                        t0.elapsed().as_secs_f64() * 1e3
+                    );
+                    let g = Arc::new(g);
+                    self.guides = Some((gk, g.clone()));
+                    Some(g)
+                }
+            }
+        } else {
+            None
+        };
+        let color = a.accum.resolve();
+        let t0 = Instant::now();
+        match denoiser.denoise(&color, guides.as_deref(), w, h, key.0, key.1) {
+            Ok(img) => {
+                let ms = t0.elapsed().as_secs_f64() * 1e3;
+                self.status = format!(
+                    "{} · {} · {:.0} ms a {} campioni",
+                    denoiser.name(),
+                    key.0.label(),
+                    ms,
+                    a.accum.samples
+                );
+                tracing::debug!("denoise: {}", self.status);
+                a.denoised = Some(Arc::new(img));
+            }
+            Err(e) => {
+                tracing::warn!("riduzione del rumore fallita: {e:#}");
+                self.status = format!("errore del denoiser: {e:#}");
+                a.denoised = None;
+            }
+        }
+        a.denoised_at = Some((a.accum.samples, key));
+        true
+    }
+
+    /// Vero se l'immagine finale ripulita manca o non è aggiornata.
+    fn final_pending(&self, a: &Active) -> bool {
+        self.enabled() && a.accum.samples > 0 && a.denoised_at != Some((a.accum.samples, self.key(true)))
+    }
 }
 
 fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
     let mut active: Option<Active> = None;
     let mut state = SessionState::Idle;
+    let mut dn = DenoiseState {
+        denoiser: None,
+        settings: DenoiseSettings::default(),
+        guides: None,
+        status: String::new(),
+    };
 
-    let publish = |a: &Active, shared: &Shared| {
+    let publish = |a: &Active, dn: &DenoiseState, shared: &Shared| {
+        // In modalità "solo finale" l'immagine ripulita si mostra solo se è aggiornata.
+        let fresh = a.denoised_at.map(|d| d.0) == Some(a.accum.samples);
+        let on = dn.enabled() && a.denoised.is_some() && (fresh || dn.settings.mode == DenoiseMode::Progressive);
         let frame = Frame {
             job_id: a.job.id,
             samples: a.accum.samples,
             width: a.accum.width,
             height: a.accum.height,
             linear: Arc::new(a.accum.resolve()),
+            denoised: if on { a.denoised.clone() } else { None },
+            denoised_samples: if on { a.denoised_at.map(|d| d.0).unwrap_or(0) } else { 0 },
+            guides: if on { dn.guides.as_ref().map(|g| g.1.clone()) } else { None },
         };
         *shared.frame.lock().unwrap() = Some(frame);
         shared.frame_version.fetch_add(1, Ordering::Release);
     };
-    let update_progress = |a: &Active, state: &SessionState, last_pass: Duration, shared: &Shared| {
+    let update_progress = |a: &Active, dn: &DenoiseState, state: &SessionState, last_pass: Duration, shared: &Shared| {
         let mut p = shared.progress.lock().unwrap();
         p.job_id = a.job.id;
         p.state = state.clone();
@@ -285,11 +421,22 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
         p.last_pass = last_pass;
         p.backend = a.job.backend.name();
         p.device = a.job.backend.device_info();
+        p.denoiser = if dn.enabled() { dn.status.clone() } else { String::new() };
     };
 
     loop {
         let wants_render = state == SessionState::Rendering;
         shared.interrupt.store(false, Ordering::SeqCst);
+        // Fermi (completato, in pausa, interrotto): si completa l'immagine finale ripulita.
+        if !wants_render {
+            if let Some(a) = active.as_mut() {
+                if dn.final_pending(a) && dn.run(a, true, &shared.interrupt) {
+                    publish(a, &dn, &shared);
+                    update_progress(a, &dn, &state, Duration::ZERO, &shared);
+                }
+            }
+            shared.interrupt.store(false, Ordering::SeqCst);
+        }
         let cmd = if wants_render {
             rx.try_recv().ok()
         } else {
@@ -309,6 +456,7 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
                 Cmd::Shutdown => return,
                 Cmd::Start(job) => {
                     let job = *job;
+                    dn.settings = job.settings.denoise.clone();
                     let (w, h) = (job.settings.width, job.settings.height);
                     let accum = match job.resume {
                         Some(ref a) if a.width == w && a.height == h => a.clone(),
@@ -321,6 +469,9 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
                         running_since: Some(Instant::now()),
                         elapsed: Duration::ZERO,
                         last_publish: Instant::now() - Duration::from_secs(1),
+                        denoised: None,
+                        denoised_at: None,
+                        next_preview: dn.settings.first_preview_samples,
                     };
                     tracing::info!(
                         "render avviato: {}x{}, {} campioni, backend {}",
@@ -338,15 +489,15 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
                     } else {
                         SessionState::Rendering
                     };
-                    update_progress(&a, &state, Duration::ZERO, &shared);
+                    update_progress(&a, &dn, &state, Duration::ZERO, &shared);
                     active = Some(a);
                 }
                 Cmd::Pause => {
                     if let (Some(a), SessionState::Rendering) = (active.as_mut(), &state) {
                         stop_clock(a);
                         state = SessionState::Paused;
-                        publish(a, &shared);
-                        update_progress(a, &state, Duration::ZERO, &shared);
+                        publish(a, &dn, &shared);
+                        update_progress(a, &dn, &state, Duration::ZERO, &shared);
                     }
                 }
                 Cmd::Resume => {
@@ -354,7 +505,7 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
                         if matches!(state, SessionState::Paused | SessionState::Cancelled) && !a.done() {
                             a.running_since = Some(Instant::now());
                             state = SessionState::Rendering;
-                            update_progress(a, &state, Duration::ZERO, &shared);
+                            update_progress(a, &dn, &state, Duration::ZERO, &shared);
                         }
                     }
                 }
@@ -363,10 +514,30 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
                         if state.is_active() {
                             stop_clock(a);
                             state = SessionState::Cancelled;
-                            publish(a, &shared);
-                            update_progress(a, &state, Duration::ZERO, &shared);
+                            publish(a, &dn, &shared);
+                            update_progress(a, &dn, &state, Duration::ZERO, &shared);
                             tracing::info!("render interrotto a {} campioni", a.accum.samples);
                         }
+                    }
+                }
+                Cmd::SetDenoise(d) => {
+                    dn.settings = d;
+                    if let Some(a) = active.as_mut() {
+                        if dn.settings.mode == DenoiseMode::Progressive && a.next_preview <= a.accum.samples {
+                            a.next_preview = a.accum.samples.max(dn.settings.first_preview_samples);
+                        }
+                        publish(a, &dn, &shared);
+                        update_progress(a, &dn, &state, Duration::ZERO, &shared);
+                    }
+                }
+                Cmd::SetDenoiser(d) => {
+                    dn.denoiser = d;
+                    dn.guides = None;
+                    dn.status.clear();
+                    if let Some(a) = active.as_mut() {
+                        a.denoised = None;
+                        a.denoised_at = None;
+                        publish(a, &dn, &shared);
                     }
                 }
                 Cmd::SetTarget(t) => {
@@ -378,9 +549,9 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
                         } else if state == SessionState::Rendering && a.done() {
                             stop_clock(a);
                             state = SessionState::Completed;
-                            publish(a, &shared);
+                            publish(a, &dn, &shared);
                         }
-                        update_progress(a, &state, Duration::ZERO, &shared);
+                        update_progress(a, &dn, &state, Duration::ZERO, &shared);
                     }
                 }
             }
@@ -424,6 +595,17 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
                         a.elapsed.as_secs_f64()
                     );
                 }
+                if done {
+                    // Se un comando interrompe il calcolo, si riprova appena la sessione è ferma.
+                    dn.run(a, true, &shared.interrupt);
+                } else if dn.enabled()
+                    && dn.settings.mode == DenoiseMode::Progressive
+                    && a.accum.samples >= a.next_preview
+                    && dn.run(a, false, &shared.interrupt)
+                {
+                    a.next_preview = a.accum.samples.saturating_mul(2);
+                    a.last_publish = Instant::now() - Duration::from_secs(1);
+                }
                 // Le prime passate si mostrano subito, poi al massimo ~4 volte al secondo.
                 let interval = if a.accum.samples < 8 {
                     Duration::ZERO
@@ -431,10 +613,10 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
                     Duration::from_millis(250)
                 };
                 if done || a.last_publish.elapsed() >= interval {
-                    publish(a, &shared);
+                    publish(a, &dn, &shared);
                     a.last_publish = Instant::now();
                 }
-                update_progress(a, &state, dt, &shared);
+                update_progress(a, &dn, &state, dt, &shared);
             }
             Ok(_) => {} // interrotta: si torna a leggere i comandi
             Err(e) => {
@@ -443,8 +625,8 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
                     a.elapsed += t.elapsed();
                 }
                 state = SessionState::Failed(format!("{e:#}"));
-                publish(a, &shared);
-                update_progress(a, &state, Duration::ZERO, &shared);
+                publish(a, &dn, &shared);
+                update_progress(a, &dn, &state, Duration::ZERO, &shared);
             }
         }
     }
@@ -490,6 +672,81 @@ mod tests {
             out.fill([1.0; 3]);
             Ok(1)
         }
+    }
+
+    /// Denoiser di prova: dimezza l'immagine e registra a quanti campioni è stato chiamato.
+    struct HalfDenoiser(Arc<Mutex<Vec<u32>>>);
+    impl Denoiser for HalfDenoiser {
+        fn name(&self) -> String {
+            "metà".into()
+        }
+        fn guides(&mut self, _: &RenderScene, s: &RenderSettings, _: &AtomicBool) -> Option<Guides> {
+            let n = (s.width * s.height) as usize;
+            Some(Guides {
+                width: s.width,
+                height: s.height,
+                albedo: vec![[1.0; 3]; n],
+                normal: vec![[0.0, 0.0, 1.0]; n],
+            })
+        }
+        fn denoise(
+            &mut self,
+            color: &[[f32; 3]],
+            guides: Option<&Guides>,
+            _: u32,
+            _: u32,
+            _: crate::DenoiseQuality,
+            _: bool,
+        ) -> anyhow::Result<Vec<[f32; 3]>> {
+            assert!(guides.is_some());
+            self.0.lock().unwrap().push(0);
+            Ok(color.iter().map(|p| p.map(|v| v * 0.5)).collect())
+        }
+    }
+
+    #[test]
+    fn denoise_final_and_progressive() {
+        let s = RenderSession::new();
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        s.set_denoiser(Some(Box::new(HalfDenoiser(calls.clone()))));
+        let scene = Arc::new(RenderScene::compile(&Scene::default()));
+        // Solo finale: una chiamata, immagine ripulita aggiornata al numero finale di campioni.
+        let id = s.start(scene.clone(), settings(10), Box::new(ConstBackend(Duration::ZERO)));
+        s.wait(id, Duration::from_secs(10));
+        std::thread::sleep(Duration::from_millis(20));
+        let f = s.latest_frame().unwrap();
+        assert_eq!((f.samples, f.denoised_samples), (10, 10));
+        assert!(f.denoised.as_ref().unwrap().iter().all(|p| *p == [0.5; 3]));
+        assert_eq!(f.display(0.5)[0], [0.75; 3], "miscela 50 %");
+        assert_eq!(calls.lock().unwrap().len(), 1);
+        assert!(s.progress().denoiser.contains("metà"));
+
+        // Anteprima: ripulita a 8, 16, 32 e alla fine (40).
+        calls.lock().unwrap().clear();
+        let mut st = settings(40);
+        st.denoise.mode = DenoiseMode::Progressive;
+        let id = s.start(scene.clone(), st, Box::new(ConstBackend(Duration::ZERO)));
+        s.wait(id, Duration::from_secs(10));
+        std::thread::sleep(Duration::from_millis(20));
+        assert_eq!(calls.lock().unwrap().len(), 4);
+        assert_eq!(s.latest_frame().unwrap().denoised_samples, 40);
+
+        // Disattivato: nessuna immagine ripulita.
+        calls.lock().unwrap().clear();
+        let mut st = settings(5);
+        st.denoise.mode = DenoiseMode::Off;
+        let id = s.start(scene.clone(), st, Box::new(ConstBackend(Duration::ZERO)));
+        s.wait(id, Duration::from_secs(10));
+        std::thread::sleep(Duration::from_millis(20));
+        assert!(s.latest_frame().unwrap().denoised.is_none());
+        assert!(calls.lock().unwrap().is_empty());
+
+        // Attivato a render finito (cambio d'impostazione dal pannello): si ripulisce subito.
+        s.set_denoise(DenoiseSettings::default());
+        std::thread::sleep(Duration::from_millis(50));
+        let f = s.latest_frame().unwrap();
+        assert_eq!(f.denoised_samples, 5);
+        assert_eq!(calls.lock().unwrap().len(), 1);
     }
 
     fn settings(target: u32) -> RenderSettings {

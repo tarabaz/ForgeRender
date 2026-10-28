@@ -6,7 +6,9 @@
 #   powershell -ExecutionPolicy Bypass -File packaging\windows\package.ps1
 param(
     [switch]$SkipBuild,
-    [switch]$SkipInstaller
+    [switch]$SkipInstaller,
+    # Cartella di Open Image Denoise (scaricato automaticamente se manca).
+    [string]$OidnDir = ""
 )
 $ErrorActionPreference = "Stop"
 $root = Resolve-Path (Join-Path $PSScriptRoot "..\..")
@@ -24,6 +26,20 @@ if (-not $SkipBuild) {
 }
 
 $bin = Join-Path $root "target\release"
+
+# --- Open Image Denoise (denoiser, Apache 2.0): solo le librerie per CPU e GPU NVIDIA (CUDA) ---
+$oidnVersion = "2.3.3"
+if (-not $OidnDir) { $OidnDir = Join-Path $root "target\oidn-$oidnVersion.x64.windows" }
+if (-not (Test-Path (Join-Path $OidnDir "bin\OpenImageDenoise.dll"))) {
+    $oidnZip = Join-Path $env:TEMP "oidn-$oidnVersion.x64.windows.zip"
+    Write-Host "Download di Open Image Denoise $oidnVersion..."
+    Invoke-WebRequest -Uri "https://github.com/RenderKit/oidn/releases/download/v$oidnVersion/oidn-$oidnVersion.x64.windows.zip" -OutFile $oidnZip
+    $oidnParent = Split-Path $OidnDir -Parent
+    Expand-Archive -Path $oidnZip -DestinationPath $oidnParent -Force
+    $extracted = Join-Path $oidnParent "oidn-$oidnVersion.x64.windows"
+    if ($extracted -ne $OidnDir) { Move-Item $extracted $OidnDir -Force }
+}
+$oidnDlls = @("OpenImageDenoise.dll", "OpenImageDenoise_core.dll", "OpenImageDenoise_device_cpu.dll", "OpenImageDenoise_device_cuda.dll", "tbb12.dll")
 $dist = Join-Path $root "dist"
 New-Item -ItemType Directory -Force -Path $dist | Out-Null
 
@@ -39,6 +55,10 @@ if (Test-Path $stepExe) { Copy-Item $stepExe $staging } else { Write-Warning "fo
 Copy-Item (Join-Path $PSScriptRoot "LEGGIMI.txt") $staging
 New-Item -ItemType Directory -Force -Path (Join-Path $staging "licenze") | Out-Null
 Copy-Item (Join-Path $root "packaging\licenses\*") (Join-Path $staging "licenze")
+foreach ($dll in $oidnDlls) { Copy-Item (Join-Path $OidnDir "bin\$dll") $staging }
+$oidnLic = Join-Path $staging "licenze\OpenImageDenoise"
+New-Item -ItemType Directory -Force -Path $oidnLic | Out-Null
+Copy-Item (Join-Path $OidnDir "doc\LICENSE.txt"), (Join-Path $OidnDir "doc\third-party-programs*.txt") $oidnLic
 # Marcatore della modalità portable: i log restano nella cartella del programma.
 Set-Content -Path (Join-Path $staging "portable.txt") -Value "Versione portable di ForgeRender: i log vengono scritti nella sottocartella logs."
 $zip = Join-Path $dist "$portableName.zip"
@@ -56,7 +76,7 @@ if (-not $SkipInstaller) {
     if (-not $iscc) {
         Write-Warning "Inno Setup 6 non trovato: installer non creato (scaricalo da https://jrsoftware.org/isdl.php)"
     } else {
-        & $iscc "/DAppVersion=$version" "/DBinDir=$bin" (Join-Path $PSScriptRoot "forgerender.iss")
+        & $iscc "/DAppVersion=$version" "/DBinDir=$bin" "/DOidnDir=$OidnDir" (Join-Path $PSScriptRoot "forgerender.iss")
         if ($LASTEXITCODE -ne 0) { throw "creazione dell'installer fallita" }
         Write-Host "Installer: $dist\ForgeRender-$version-setup-x64.exe"
     }

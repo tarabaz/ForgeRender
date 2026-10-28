@@ -63,7 +63,11 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
         ));
         ui.label("GPU: utilizzo non rilevato")
             .on_hover_text("La lettura di utilizzo GPU e VRAM (NVML) non è ancora integrata");
-        ui.label("Denoising: non disponibile (Fase 6)");
+        match (&app.denoiser_info, p.denoiser.is_empty()) {
+            (Err(_), _) => ui.label("Denoiser: OIDN non trovato"),
+            (Ok(_), true) => ui.label("Denoiser: inattivo"),
+            (Ok(_), false) => ui.label(format!("Denoiser: {}", p.denoiser)),
+        };
         ui.label(egui::RichText::new(format!("{} ({} thread)", app.system.cpu_brand, app.system.logical_threads)).weak());
         ui.end_row();
     });

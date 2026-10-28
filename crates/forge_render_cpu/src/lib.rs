@@ -7,10 +7,12 @@
 //! risultato è identico qualunque sia il numero di thread.
 
 pub mod bsdf;
+mod guides;
 mod integrator;
 pub mod lights;
 mod textures;
 
+pub use guides::{render_guides, GUIDE_SAMPLES};
 pub use integrator::radiance;
 
 use forge_math::Pcg32;

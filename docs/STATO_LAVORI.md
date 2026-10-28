@@ -31,9 +31,16 @@
 - Fase 3 completata: compensazione multi-scattering, emissivi come luci, vetro satinato.
 - Fase 4: backend GPU WGSL via wgpu con test fisici e confronto statistico con la CPU.
 
+## Fatto nella quinta parte
+- Build Windows completa in CI (Open CASCADE statico con MSVC: OCCT_STATIC_BUILD, uscita con _exit).
+- Collaudo su hardware reale: Xeon E-2176G + Quadro P5000 (Vulkan), GPU ≈ 6× la CPU.
+- Fase 6 (denoiser): Intel Open Image Denoise 2.3.3 caricato a runtime (crate forge_denoise),
+  dispositivo CPU o CUDA (spunta "Usa CUDA", ripiego automatico sulla CPU), buffer guida
+  albedo/normali calcolati sulla CPU (anche attraverso il vetro), modalità "solo finale" e
+  "anteprima veloce" (8, 16, 32… campioni), qualità, intensità, viste di controllo. Errore
+  ridotto ~10× a 8 campioni nei test (MSE contro riferimento a 512 campioni).
+
 ## Prossimi passi
-1. Confermare in CI la build Windows di Open CASCADE (correzione CMake 4 applicata).
-2. Prova sul PC reale: avvio, viewport e render GPU sulla RTX 5070, benchmark CPU vs GPU,
-   import dei file STEP/SLDASM reali, bridge SolidWorks.
-3. Fase 6: denoiser (Intel Open Image Denoise), arresto a soglia di rumore.
-4. GPU: NVML per utilizzo/VRAM, eventuale ray tracing hardware; anteprima RTX (DLSS RR) opzionale.
+1. Prova sul PC con RTX 5070: denoiser CUDA, render GPU, benchmark, file STEP/SLDASM reali.
+2. DLSS Ray Reconstruction come anteprima interattiva su RTX (vedi docs/ROADMAP.md, "NVIDIA").
+3. Arresto a soglia di rumore; NVML per utilizzo/VRAM della GPU.

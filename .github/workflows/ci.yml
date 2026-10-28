@@ -25,6 +25,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Vulkan software (lavapipe) per i test del backend GPU
         run: sudo apt-get update && sudo apt-get install -y mesa-vulkan-drivers
+      - name: Open Image Denoise (per i test del denoiser)
+        run: |
+          curl -sSL https://github.com/RenderKit/oidn/releases/download/v2.3.3/oidn-2.3.3.x86_64.linux.tar.gz | tar xz -C "$RUNNER_TEMP"
+          echo "FORGE_OIDN_DIR=$RUNNER_TEMP/oidn-2.3.3.x86_64.linux" >> "$GITHUB_ENV"
+          echo "FORGE_REQUIRE_OIDN=1" >> "$GITHUB_ENV"
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --exclude forge_step --all-targets --release -- -D warnings
       - run: cargo test --workspace --exclude forge_step --release
@@ -53,6 +58,15 @@ jobs:
         with:
           # Conserva la compilazione di Open CASCADE (~1 ora) anche se un passo fallisce.
           cache-on-failure: true
+      - name: Open Image Denoise (test e pacchetti)
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP "oidn.zip"
+          Invoke-WebRequest -Uri "https://github.com/RenderKit/oidn/releases/download/v2.3.3/oidn-2.3.3.x64.windows.zip" -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $env:RUNNER_TEMP -Force
+          "FORGE_OIDN_DIR=$env:RUNNER_TEMP\oidn-2.3.3.x64.windows\bin" >> $env:GITHUB_ENV
+          "OIDN_ROOT=$env:RUNNER_TEMP\oidn-2.3.3.x64.windows" >> $env:GITHUB_ENV
+          "FORGE_REQUIRE_OIDN=1" >> $env:GITHUB_ENV
       - name: Test
         run: cargo test --workspace --exclude forge_step --release
       - name: Compilazione
@@ -67,7 +81,7 @@ jobs:
           if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
       - name: Pacchetti portable e installer
         shell: pwsh
-        run: packaging\windows\package.ps1 -SkipBuild
+        run: packaging\windows\package.ps1 -SkipBuild -OidnDir $env:OIDN_ROOT
       - uses: actions/upload-artifact@v4
         with:
           name: ForgeRender-portable-x64

@@ -1,4 +1,4 @@
-use crate::app::{ForgeApp, InspectorTab};
+use crate::app::{ForgeApp, InspectorTab, RenderView};
 use crate::ui::style;
 use eframe::egui;
 use forge_math::Vec3;
@@ -898,11 +898,115 @@ fn render(app: &mut ForgeApp, ui: &mut egui::Ui) {
         .changed();
 
     ui.separator();
-    unavailable(ui, "Denoiser (Intel Open Image Denoise)", "Fase 6");
+    changed |= denoiser(app, ui);
     if changed {
         app.unsaved = true;
     }
     if app.render_is_stale() && !app.auto_restart {
         ui.colored_label(style::WARN, "Le impostazioni sono cambiate: premi Riavvia per applicarle.");
     }
+}
+
+/// Regolazioni della riduzione del rumore (Open Image Denoise). Nessuna di
+/// queste riavvia il render: la sessione ripulisce di nuovo l'immagine corrente.
+fn denoiser(app: &mut ForgeApp, ui: &mut egui::Ui) -> bool {
+    use forge_render_core::{DenoiseMode, DenoiseQuality};
+    let mut changed = false;
+    ui.strong("Riduzione del rumore (denoiser)");
+    let info = app.denoiser_info.clone();
+    match &info {
+        Ok(v) => {
+            ui.label(egui::RichText::new(v).weak().small());
+        }
+        Err(e) => {
+            ui.colored_label(
+                style::WARN,
+                "Open Image Denoise non trovato: il render resta senza riduzione del rumore.",
+            )
+            .on_hover_text(e);
+            return false;
+        }
+    }
+    let status = app.session.progress().denoiser;
+    let d = &mut app.settings.denoise;
+    egui::ComboBox::from_label("Modalità")
+        .selected_text(d.mode.label())
+        .show_ui(ui, |ui| {
+            for m in [DenoiseMode::Final, DenoiseMode::Progressive, DenoiseMode::Off] {
+                changed |= ui.selectable_value(&mut d.mode, m, m.label()).changed();
+            }
+        })
+        .response
+        .on_hover_text(
+            "Solo immagine finale: ripulisce a fine render, in pausa o quando lo fermi.\n\
+             Anteprima veloce: ripulisce anche durante il render a 8, 16, 32… campioni, così vedi subito il risultato.",
+        );
+    if d.mode == DenoiseMode::Off {
+        return changed;
+    }
+    changed |= ui
+        .checkbox(&mut d.use_cuda, "Usa CUDA (GPU NVIDIA)")
+        .on_hover_text(
+            "Esegue il denoiser sulla GPU NVIDIA con i core tensor: molto più veloce, ideale per l'anteprima.\n\
+             Richiede una GPU Volta o successiva (RTX 20/30/40/50, Quadro RTX) e il driver NVIDIA; nessun CUDA Toolkit da installare.\n\
+             Se non è disponibile si usa automaticamente la CPU.",
+        )
+        .changed();
+    if d.use_cuda && status.contains("· CPU") {
+        ui.colored_label(style::WARN, "CUDA non disponibile su questa GPU: il denoiser usa la CPU.");
+    }
+    egui::Grid::new("dn-grid").num_columns(2).spacing([10.0, 6.0]).show(ui, |ui| {
+        let quality = |ui: &mut egui::Ui, id: &str, q: &mut DenoiseQuality| {
+            let mut c = false;
+            egui::ComboBox::from_id_salt(id).selected_text(q.label()).show_ui(ui, |ui| {
+                for v in [DenoiseQuality::High, DenoiseQuality::Balanced, DenoiseQuality::Fast] {
+                    c |= ui.selectable_value(q, v, v.label()).changed();
+                }
+            });
+            c
+        };
+        ui.label("Qualità finale");
+        changed |= quality(ui, "dn-q-final", &mut d.quality);
+        ui.end_row();
+        if d.mode == DenoiseMode::Progressive {
+            ui.label("Qualità anteprima");
+            changed |= quality(ui, "dn-q-preview", &mut d.preview_quality);
+            ui.end_row();
+            ui.label("Prima anteprima a");
+            changed |= ui
+                .add(
+                    egui::DragValue::new(&mut d.first_preview_samples)
+                        .range(1..=1024)
+                        .suffix(" campioni"),
+                )
+                .on_hover_text("Poi a ogni raddoppio dei campioni (es. 8, 16, 32, 64…)")
+                .changed();
+            ui.end_row();
+        }
+        ui.label("Intensità");
+        let mut pct = d.strength * 100.0;
+        if ui
+            .add(egui::Slider::new(&mut pct, 0.0..=100.0).suffix(" %"))
+            .on_hover_text("Miscela tra l'immagine grezza (0 %) e quella ripulita (100 %): utile se il filtro appiattisce dettagli fini")
+            .changed()
+        {
+            d.strength = pct / 100.0;
+            changed = true;
+        }
+        ui.end_row();
+    });
+    changed |= ui
+        .checkbox(&mut d.use_guides, "Preserva i dettagli (albedo e normali)")
+        .on_hover_text("Guida il filtro con colore e orientamento delle superfici: spigoli, testi e texture restano nitidi")
+        .changed();
+    ui.horizontal(|ui| {
+        ui.label("Vista:");
+        for v in [RenderView::Final, RenderView::Raw, RenderView::Albedo, RenderView::Normals] {
+            ui.selectable_value(&mut app.render_view, v, v.label());
+        }
+    });
+    if !status.is_empty() {
+        ui.label(egui::RichText::new(status).weak().small());
+    }
+    changed
 }

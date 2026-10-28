@@ -75,6 +75,27 @@ pub struct StartupOptions {
     pub screenshot_after_samples: u32,
 }
 
+/// Contenuto della vista Render.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RenderView {
+    /// Immagine finale (ripulita secondo l'intensità impostata, se il denoiser è attivo).
+    Final,
+    Raw,
+    Albedo,
+    Normals,
+}
+
+impl RenderView {
+    pub fn label(self) -> &'static str {
+        match self {
+            RenderView::Final => "Finale",
+            RenderView::Raw => "Grezza",
+            RenderView::Albedo => "Albedo",
+            RenderView::Normals => "Normali",
+        }
+    }
+}
+
 pub struct ForgeApp {
     pub scene: Scene,
     pub meta: ProjectMeta,
@@ -115,7 +136,12 @@ pub struct ForgeApp {
     pub viewport: Option<ViewportRenderer>,
     viewport_uploaded: Option<(u64, u64, BTreeSet<usize>)>,
     pub render_texture: Option<egui::TextureHandle>,
-    render_texture_key: Option<(u64, ToneMapping, u32)>,
+    render_texture_key: Option<(u64, ToneMapping, u32, u32, RenderView)>,
+    /// Cosa mostrare del render: finale, grezzo o i buffer guida del denoiser.
+    pub render_view: RenderView,
+    /// Open Image Denoise caricato (versione) o motivo dell'assenza.
+    pub denoiser_info: Result<String, String>,
+    denoise_sent: Option<forge_render_core::DenoiseSettings>,
 
     pub logs: LogBuffer,
     pub system: SystemInfo,
@@ -174,6 +200,9 @@ impl ForgeApp {
             viewport_uploaded: None,
             render_texture: None,
             render_texture_key: None,
+            render_view: RenderView::Final,
+            denoiser_info: Err(String::new()),
+            denoise_sent: None,
             logs,
             system,
             monitor: ResourceMonitor::new(),
@@ -195,10 +224,22 @@ impl ForgeApp {
                 .ok();
             app.gpu_warmup = Some(rx);
         }
+        // Denoiser: la libreria OIDN è opzionale (accanto all'eseguibile).
+        match forge_denoise::OidnDenoiser::load() {
+            Ok(d) => {
+                app.denoiser_info = Ok(format!("Open Image Denoise {}", d.version()));
+                app.session.set_denoiser(Some(Box::new(d)));
+            }
+            Err(e) => {
+                tracing::warn!("riduzione del rumore non disponibile: {e:#}");
+                app.denoiser_info = Err(format!("{e:#}"));
+            }
+        }
         if let Some(p) = &startup.open {
             app.open_any(p);
         }
         if startup.auto_render {
+            app.tab = InspectorTab::Render;
             app.start_render();
         }
         app
@@ -374,6 +415,11 @@ impl ForgeApp {
     }
 
     fn update_render_job(&mut self) {
+        // Le impostazioni del denoiser non invalidano l'accumulo: si inviano alla sessione.
+        if self.denoise_sent.as_ref() != Some(&self.settings.denoise) {
+            self.session.set_denoise(self.settings.denoise.clone());
+            self.denoise_sent = Some(self.settings.denoise.clone());
+        }
         let Some(job) = &mut self.job else { return };
         if job.target != self.settings.target_samples {
             job.target = self.settings.target_samples;
@@ -400,10 +446,30 @@ impl ForgeApp {
     /// Aggiorna la texture del render se è arrivato un nuovo frame o se è cambiato il tone mapping.
     pub fn render_texture(&mut self, ctx: &egui::Context) -> Option<&egui::TextureHandle> {
         let version = self.session.frame_version();
-        let key = (version, self.settings.tone_mapping, self.settings.exposure_ev.to_bits());
+        let strength = self.settings.denoise.strength;
+        let key = (
+            version,
+            self.settings.tone_mapping,
+            self.settings.exposure_ev.to_bits(),
+            strength.to_bits(),
+            self.render_view,
+        );
         if self.render_texture_key != Some(key) {
             if let Some(frame) = self.session.latest_frame() {
-                let rgba = forge_render_core::tonemap_to_rgba8(&frame.linear, self.settings.tone_mapping, self.settings.exposure_ev);
+                let rgba = match (self.render_view, &frame.guides) {
+                    (RenderView::Raw, _) => {
+                        forge_render_core::tonemap_to_rgba8(&frame.linear, self.settings.tone_mapping, self.settings.exposure_ev)
+                    }
+                    // Buffer guida: valori già in [0, 1] (le normali rimappate da [-1, 1]).
+                    (RenderView::Albedo, Some(g)) => forge_render_core::tonemap_to_rgba8(&g.albedo, ToneMapping::Standard, 0.0),
+                    (RenderView::Normals, Some(g)) => {
+                        let n: Vec<[f32; 3]> = g.normal.iter().map(|v| v.map(|c| c * 0.5 + 0.5)).collect();
+                        forge_render_core::tonemap_to_rgba8(&n, ToneMapping::Standard, 0.0)
+                    }
+                    _ => {
+                        forge_render_core::tonemap_to_rgba8(&frame.display(strength), self.settings.tone_mapping, self.settings.exposure_ev)
+                    }
+                };
                 let img = egui::ColorImage::from_rgba_unmultiplied([frame.width as usize, frame.height as usize], &rgba);
                 match &mut self.render_texture {
                     Some(t) => t.set(img, egui::TextureOptions::LINEAR),
@@ -429,7 +495,13 @@ impl ForgeApp {
             return;
         };
         let path = with_extension(path, "png");
-        match forge_image_io::save_frame_png(&path, &frame, self.settings.tone_mapping, self.settings.exposure_ev) {
+        match forge_image_io::save_frame_png(
+            &path,
+            &frame,
+            self.settings.tone_mapping,
+            self.settings.exposure_ev,
+            self.settings.denoise.strength,
+        ) {
             Ok(()) => {
                 tracing::info!("immagine esportata: {} ({} campioni)", path.display(), frame.samples);
                 self.info = Some(format!("Immagine esportata ({} campioni):\n{}", frame.samples, path.display()));

@@ -72,7 +72,8 @@ fn print_help() {
              --project F.frproject | --mesh F.obj/.stl/.step/.glb/.blend | --test-scene (default)\n    \
              --out F.png  --spp N  --width W  --height H  --threads T  --bounces B  --backend cpu|gpu\n    \
              --unit mm|cm|m|in  (per --mesh, default mm)  --quiet\n    \
-             --hdri F.hdr|F.exr  --hdri-strength S  --hdri-rotation GRADI\n  \
+             --hdri F.hdr|F.exr  --hdri-strength S  --hdri-rotation GRADI\n    \
+             --denoise off|finale  --denoise-quality veloce|bilanciata|alta  --cuda  --denoise-strength 0..1\n  \
          bench [opzioni]            benchmark della scena di test con diversi numeri di thread\n    \
              --spp N (default 16)  --width W  --height H  --threads 1,2,4  --json F",
         env!("CARGO_PKG_VERSION")
@@ -148,6 +149,21 @@ fn render(args: &Args) -> anyhow::Result<()> {
     if settings.target_samples == 0 {
         bail!("--spp deve essere > 0 per il rendering da riga di comando");
     }
+    if let Some(m) = args.value("--denoise") {
+        settings.denoise.mode = match m {
+            "off" | "no" => forge_render_core::DenoiseMode::Off,
+            "finale" | "final" => forge_render_core::DenoiseMode::Final,
+            _ => bail!("--denoise: valori ammessi off|finale"),
+        };
+    }
+    if let Some(q) = args.value("--denoise-quality") {
+        settings.denoise.quality = parse_quality(q)?;
+    }
+    // Sulla CLI CUDA si attiva solo se richiesto esplicitamente (la creazione del dispositivo richiede tempo).
+    settings.denoise.use_cuda = args.flag("--cuda");
+    if let Some(v) = args.parse("--denoise-strength")? {
+        settings.denoise.strength = v;
+    }
     let out = PathBuf::from(args.value("--out").unwrap_or("render.png"));
     let t_compile = Instant::now();
     let rs = Arc::new(RenderScene::compile(&scene));
@@ -164,6 +180,12 @@ fn render(args: &Args) -> anyhow::Result<()> {
         forge_render_core::BackendKind::Cpu => Box::new(CpuBackend::from_settings(&settings)?),
     };
     let session = RenderSession::new();
+    if settings.denoise.mode != forge_render_core::DenoiseMode::Off {
+        match forge_denoise::OidnDenoiser::load() {
+            Ok(d) => session.set_denoiser(Some(Box::new(d))),
+            Err(e) => eprintln!("riduzione del rumore non disponibile: {e:#}"),
+        }
+    }
     let job = session.start(rs.clone(), settings.clone(), backend);
     let mut last_print = Instant::now();
     let p = loop {
@@ -181,7 +203,10 @@ fn render(args: &Args) -> anyhow::Result<()> {
         bail!("rendering fallito: {e}");
     }
     let frame = session.latest_frame().context("nessun frame prodotto")?;
-    forge_image_io::save_frame_png(&out, &frame, settings.tone_mapping, settings.exposure_ev)?;
+    forge_image_io::save_frame_png(&out, &frame, settings.tone_mapping, settings.exposure_ev, settings.denoise.strength)?;
+    if !p.denoiser.is_empty() {
+        println!("riduzione del rumore: {}", p.denoiser);
+    }
     println!(
         "{}x{} | {} campioni | {} triangoli | compilazione scena {:.0} ms | rendering {:.2} s | {:.1} ms/passata | {:.2} Mcampioni/s | {} | -> {}",
         p.width,
@@ -286,6 +311,30 @@ fn bench(args: &Args) -> anyhow::Result<()> {
         }
         Err(e) => println!("GPU: non disponibile ({e})"),
     }
+    // Riduzione del rumore: tempo del filtro alla risoluzione del benchmark.
+    match forge_denoise::OidnDenoiser::load() {
+        Ok(mut d) => {
+            let img = vec![[0.5f32; 3]; (width * height) as usize];
+            let guides = forge_render_cpu::render_guides(&rs, &settings, forge_render_cpu::GUIDE_SAMPLES, &cancel);
+            for cuda in [false, true] {
+                if cuda && !d.cuda_available() {
+                    println!("Denoiser CUDA: non disponibile ({})", d.cuda_error().unwrap_or("?"));
+                    continue;
+                }
+                let q = forge_render_core::DenoiseQuality::High;
+                d.run(&img, guides.as_ref(), width, height, q, cuda)?; // riscaldamento
+                let t0 = Instant::now();
+                d.run(&img, guides.as_ref(), width, height, q, cuda)?;
+                let ms = t0.elapsed().as_secs_f64() * 1e3;
+                println!(
+                    "Denoiser {}: {ms:.1} ms per immagine ({width}x{height}, qualità alta)",
+                    forge_denoise::Denoiser::name(&d)
+                );
+                results.push(serde_json::json!({"denoiser": forge_denoise::Denoiser::name(&d), "ms": ms}));
+            }
+        }
+        Err(e) => println!("Denoiser: non disponibile ({e})"),
+    }
     if let Some(p) = args.value("--json") {
         let doc = serde_json::json!({
             "system": sys.summary(),
@@ -299,4 +348,13 @@ fn bench(args: &Args) -> anyhow::Result<()> {
         println!("\nRisultati salvati in {p}");
     }
     Ok(())
+}
+
+fn parse_quality(q: &str) -> anyhow::Result<forge_render_core::DenoiseQuality> {
+    Ok(match q {
+        "veloce" | "fast" => forge_render_core::DenoiseQuality::Fast,
+        "bilanciata" | "balanced" => forge_render_core::DenoiseQuality::Balanced,
+        "alta" | "high" => forge_render_core::DenoiseQuality::High,
+        _ => bail!("qualità del denoiser non valida: {q} (veloce|bilanciata|alta)"),
+    })
 }

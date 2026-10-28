@@ -35,6 +35,80 @@ impl BackendKind {
     }
 }
 
+/// Quando applicare la riduzione del rumore.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum DenoiseMode {
+    Off,
+    /// Solo sull'immagine finale (a fine render, in pausa o all'interruzione).
+    #[default]
+    Final,
+    /// Anche durante il render: anteprima veloce ripulita a 8, 16, 32… campioni.
+    Progressive,
+}
+
+impl DenoiseMode {
+    pub fn label(self) -> &'static str {
+        match self {
+            DenoiseMode::Off => "Disattivata",
+            DenoiseMode::Final => "Solo immagine finale",
+            DenoiseMode::Progressive => "Anteprima veloce + finale",
+        }
+    }
+}
+
+/// Qualità del filtro (corrisponde alle modalità di Open Image Denoise).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum DenoiseQuality {
+    Fast,
+    Balanced,
+    #[default]
+    High,
+}
+
+impl DenoiseQuality {
+    pub fn label(self) -> &'static str {
+        match self {
+            DenoiseQuality::Fast => "Veloce",
+            DenoiseQuality::Balanced => "Bilanciata",
+            DenoiseQuality::High => "Alta",
+        }
+    }
+}
+
+/// Impostazioni della riduzione del rumore. Non invalidano l'accumulo: si
+/// possono cambiare durante il render.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct DenoiseSettings {
+    pub mode: DenoiseMode,
+    /// Esegue il filtro sulla GPU NVIDIA tramite CUDA (se supportata), altrimenti sulla CPU.
+    pub use_cuda: bool,
+    /// Qualità per l'immagine finale.
+    pub quality: DenoiseQuality,
+    /// Qualità per le anteprime durante il render.
+    pub preview_quality: DenoiseQuality,
+    /// Miscela tra immagine grezza (0) e ripulita (1): applicata in visualizzazione ed esportazione.
+    pub strength: f32,
+    /// Usa albedo e normali come guida: preserva spigoli, testi e texture.
+    pub use_guides: bool,
+    /// Campioni per pixel della prima anteprima ripulita (poi a ogni raddoppio).
+    pub first_preview_samples: u32,
+}
+
+impl Default for DenoiseSettings {
+    fn default() -> Self {
+        Self {
+            mode: DenoiseMode::Final,
+            use_cuda: true,
+            quality: DenoiseQuality::High,
+            preview_quality: DenoiseQuality::Fast,
+            strength: 1.0,
+            use_guides: true,
+            first_preview_samples: 8,
+        }
+    }
+}
+
 /// Preset del numero di campioni per pixel.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SamplesPreset {
@@ -70,6 +144,7 @@ pub struct RenderSettings {
     /// Se falso lo sfondo è nero ma l'ambiente continua a illuminare.
     pub environment_visible: bool,
     pub backend: BackendKind,
+    pub denoise: DenoiseSettings,
 }
 
 impl Default for RenderSettings {
@@ -87,6 +162,7 @@ impl Default for RenderSettings {
             exposure_ev: 0.0,
             environment_visible: true,
             backend: BackendKind::Cpu,
+            denoise: DenoiseSettings::default(),
         }
     }
 }
@@ -118,6 +194,12 @@ impl RenderSettings {
         if !s.exposure_ev.is_finite() {
             s.exposure_ev = 0.0;
         }
+        s.denoise.strength = if s.denoise.strength.is_finite() {
+            s.denoise.strength.clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
+        s.denoise.first_preview_samples = s.denoise.first_preview_samples.clamp(1, 4096);
         s
     }
 

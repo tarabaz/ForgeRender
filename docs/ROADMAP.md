@@ -82,3 +82,23 @@ Open Image Denoise con buffer albedo/normali, arresto a soglia di rumore, benchm
   appoggia sul pavimento, centra, rotazioni di 90°, Alt+trascina nella viewport)
 - ⏳ regole di assegnazione avanzate, rimappatura componenti rinominati, profondità di campo,
   ripresa del render dopo la chiusura, file di log su disco, lingue aggiuntive, annulla/ripeti
+
+
+## NVIDIA: CUDA, OptiX e DLSS (piano)
+
+Stato: **fatto** il primo passo (denoiser OIDN con dispositivo CUDA, core tensor sulle RTX).
+
+| Passo | Cosa | Requisiti | Stato |
+|---|---|---|---|
+| 1 | Denoiser OIDN su CUDA | driver NVIDIA, GPU Volta o successiva (RTX 20–50) | fatto, da collaudare sulla RTX 5070 |
+| 2 | DLSS Ray Reconstruction come anteprima veloce della vista Render | NVIDIA Streamline/NGX su Vulkan, interop con le risorse wgpu (immagini colore, albedo diffuso/speculare, normali+roughness, profondità, vettori di movimento), solo RTX | da fare, collaudo solo su RTX |
+| 3 | Menu DLSS: preset del modello, risoluzione interna (DLAA/Quality/Balanced/Performance), nitidezza, miscela con l'immagine accumulata, passaggio automatico a OIDN a camera ferma | passo 2 | da fare |
+| 4 | Ray tracing hardware (RT core) | OptiX 8/9 (CUDA) oppure ray query Vulkan quando wgpu le espone in modo stabile | da valutare |
+
+Note:
+- I "CUDA core" sono le unità di calcolo della GPU: il path tracer GPU (compute shader Vulkan/DX12)
+  li usa già. CUDA come API serve per librerie NVIDIA specifiche (OIDN-CUDA, OptiX).
+- DLSS Ray Reconstruction è progettato per il tempo reale (pochi campioni per pixel + storia
+  temporale): ha senso per l'anteprima interattiva; per l'immagine finale ferma si usa OIDN.
+- "DLSS 5": non esiste documentazione pubblica verificabile al momento di questa stesura; si
+  integrerà l'ultima versione del modello Ray Reconstruction disponibile nell'SDK.

@@ -287,6 +287,14 @@ fn render_view(app: &mut ForgeApp, ui: &mut egui::Ui) {
         format!("{} · {} campioni", progress.state.label(), progress.samples),
         egui::Color32::from_gray(200),
     ));
+    if let Some(f) = app.session.latest_frame().filter(|f| f.denoised.is_some()) {
+        if app.render_view == crate::app::RenderView::Final {
+            overlay.push((
+                format!("Ripulita a {} campioni (denoiser)", f.denoised_samples),
+                egui::Color32::from_rgb(140, 200, 140),
+            ));
+        }
+    }
     for (k, (t, c)) in overlay.iter().enumerate() {
         painter.text(
             rect.left_top() + egui::vec2(10.0, 10.0 + k as f32 * 18.0),
