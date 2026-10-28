@@ -49,6 +49,8 @@ pub struct LibraryUi {
     items: Option<Vec<LibraryMaterial>>,
     hdris: Option<Vec<PathBuf>>,
     results: Vec<OnlineAsset>,
+    /// Il prossimo caricamento riscarica il catalogo dal sito invece di usare la cache.
+    refresh_catalog: bool,
     searching: Option<u64>,
     search_id: u64,
     busy: Option<String>,
@@ -72,6 +74,7 @@ impl Default for LibraryUi {
             items: None,
             hdris: None,
             results: Vec::new(),
+            refresh_catalog: false,
             searching: None,
             search_id: 0,
             busy: None,
@@ -239,10 +242,14 @@ impl LibraryUi {
         self.searching = Some(id);
         self.results.clear();
         let (p, k, q) = (self.provider, self.kind, self.query.clone());
+        let refresh = std::mem::take(&mut self.refresh_catalog);
         let tx = self.tx.clone();
         let ctx = ctx.clone();
         std::thread::spawn(move || {
-            let r = online::search(p, k, &q, 0, 60).map_err(|e| format!("{e:#}"));
+            // Catalogo completo (in cache su disco), filtrato localmente.
+            let r = online::catalog(p, k, refresh)
+                .map(|all| online::filter(&all, &q))
+                .map_err(|e| format!("{e:#}"));
             let _ = tx.send(Msg::Search(id, r));
             ctx.request_repaint();
         });
@@ -558,6 +565,14 @@ fn online_tab(app: &mut ForgeApp, ui: &mut egui::Ui) {
         );
         do_search |= r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
         do_search |= ui.button("Cerca").clicked();
+        if ui
+            .button("Aggiorna catalogo")
+            .on_hover_text("Riscarica l'elenco completo dal sito (si aggiorna da solo una volta a settimana)")
+            .clicked()
+        {
+            lib.refresh_catalog = true;
+            do_search = true;
+        }
         egui::ComboBox::from_id_salt("lib-res")
             .selected_text(online::RESOLUTIONS[lib.resolution])
             .width(60.0)
@@ -588,31 +603,63 @@ fn online_tab(app: &mut ForgeApp, ui: &mut egui::Ui) {
     }
     let results = lib.results.clone();
     let res = online::RESOLUTIONS[lib.resolution].to_string();
+    // Già scaricati (a qualsiasi risoluzione): segnati con ✓.
+    let local: std::collections::HashSet<String> = lib
+        .materials()
+        .iter()
+        .filter_map(|m| m.source.rsplit_once(" (").map(|(k, _)| k.to_string()))
+        .collect();
+    let hdris = lib.hdri_list();
     let mut download = None;
     let size = if lib.kind == AssetKind::Hdri {
         egui::vec2(CARD * 2.0, CARD)
     } else {
         egui::vec2(CARD, CARD)
     };
+    ui.label(
+        egui::RichText::new(format!(
+            "{} {} nel catalogo{}",
+            results.len(),
+            if lib.kind == AssetKind::Hdri { "HDRI" } else { "materiali" },
+            if lib.query.trim().is_empty() {
+                String::new()
+            } else {
+                format!(" per «{}»", lib.query.trim())
+            }
+        ))
+        .small(),
+    );
     let cols = grid_cols(ui, size.x);
-    egui::ScrollArea::vertical().id_salt("lib-online").show(ui, |ui| {
-        for row in results.chunks(cols) {
-            ui.horizontal(|ui| {
-                for a in row {
-                    let tex = app.library.online_thumb(&ctx, a);
-                    let sub = match a.size_m {
-                        Some(s) => format!("{} · {:.2} m", a.category, s),
-                        None => a.category.clone(),
-                    };
-                    let r = thumb_card(ui, tex, size, &a.name, &sub, false)
-                        .on_hover_text(format!("{}\nClic: scarica a {res}", a.tags.join(", ")));
-                    if r.clicked() && app.library.busy.is_none() {
-                        download = Some(a.clone());
+    // Si disegnano (e si scaricano le miniature) solo delle righe visibili.
+    let row_h = size.y + 34.0 + ui.spacing().item_spacing.y;
+    let rows = results.len().div_ceil(cols);
+    egui::ScrollArea::vertical()
+        .id_salt("lib-online")
+        .show_rows(ui, row_h, rows, |ui, range| {
+            for row in range {
+                ui.horizontal(|ui| {
+                    for a in &results[row * cols..((row + 1) * cols).min(results.len())] {
+                        let tex = app.library.online_thumb(&ctx, a);
+                        let have = match a.kind {
+                            AssetKind::Material => online::already_downloaded(a, &local),
+                            AssetKind::Hdri => online::hdri_downloaded(a, &hdris),
+                        };
+                        let mut sub = match a.size_m {
+                            Some(s) => format!("{} · {:.2} m", a.category, s),
+                            None => a.category.clone(),
+                        };
+                        if have {
+                            sub = format!("✓ in libreria · {sub}");
+                        }
+                        let r = thumb_card(ui, tex, size, &a.name, &sub, have)
+                            .on_hover_text(format!("{}\nClic: scarica a {res}", a.tags.join(", ")));
+                        if r.clicked() && app.library.busy.is_none() {
+                            download = Some(a.clone());
+                        }
                     }
-                }
-            });
-        }
-    });
+                });
+            }
+        });
     if let Some(a) = download {
         let label = format!("Download di «{}» ({res})", a.name);
         app.library.spawn(&ctx, label, move |tx| {

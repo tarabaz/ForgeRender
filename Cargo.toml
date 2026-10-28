@@ -48,7 +48,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
-image = { version = "0.25", default-features = false, features = ["png", "jpeg", "hdr", "exr", "tiff", "tga", "bmp"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "hdr", "exr", "tiff", "tga", "bmp"] }
 tobj = "4.0"
 gltf = { version = "1.4", default-features = false, features = ["import", "utils", "names", "KHR_lights_punctual", "KHR_materials_transmission", "KHR_materials_ior", "KHR_materials_emissive_strength"] }
 stl_io = "0.11"

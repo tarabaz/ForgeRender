@@ -78,7 +78,11 @@ fn print_help() {
          bench [opzioni]            benchmark della scena di test con diversi numeri di thread\n    \
              --spp N (default 16)  --width W  --height H  --threads 1,2,4  --json F\n  \
          libreria elenco            materiali e HDRI della libreria\n  \
-         libreria importa P [P…]    importa cartelle di mappe o zip come materiali  [--dimensione METRI]",
+         libreria importa P [P…]    importa cartelle di mappe o zip come materiali  [--dimensione METRI]\n  \
+         libreria scarica-tutto     scarica i cataloghi completi di ambientCG e Poly Haven nella libreria\n    \
+             --fonte ambientcg|polyhaven|tutte (default tutte)  --tipo materiali|hdri|tutto (default materiali)\n    \
+             --risoluzione 1K|2K|4K|8K (default 1K)  --filtro TESTO  --max N  --aggiorna-catalogo\n    \
+             --solo-elenco (conta e stima lo spazio senza scaricare). Già scaricati: saltati; si può interrompere e riprendere",
         env!("CARGO_PKG_VERSION")
     );
 }
@@ -362,6 +366,96 @@ fn parse_quality(q: &str) -> anyhow::Result<forge_render_core::DenoiseQuality> {
     })
 }
 
+/// Scarica tutto il catalogo dei siti nella libreria, saltando ciò che c'è già.
+fn download_all(args: &Args) -> anyhow::Result<()> {
+    use forge_library::online::{self, AssetKind, Provider};
+    let providers = match args.value("--fonte").unwrap_or("tutte") {
+        "ambientcg" => vec![Provider::AmbientCg],
+        "polyhaven" => vec![Provider::PolyHaven],
+        "tutte" => vec![Provider::AmbientCg, Provider::PolyHaven],
+        f => bail!("fonte non valida: {f} (ambientcg|polyhaven|tutte)"),
+    };
+    let kinds = match args.value("--tipo").unwrap_or("materiali") {
+        "materiali" => vec![AssetKind::Material],
+        "hdri" => vec![AssetKind::Hdri],
+        "tutto" => vec![AssetKind::Material, AssetKind::Hdri],
+        t => bail!("tipo non valido: {t} (materiali|hdri|tutto)"),
+    };
+    let res = args.value("--risoluzione").unwrap_or("1K").to_uppercase();
+    if !online::RESOLUTIONS.contains(&res.as_str()) {
+        bail!("risoluzione non valida: {res} (1K|2K|4K|8K)");
+    }
+    let filter = args.value("--filtro").unwrap_or("");
+    let max: Option<usize> = args.parse("--max")?;
+    let dry = args.flag("--solo-elenco");
+    // Stima indicativa dello spazio per elemento (MB), per risoluzione.
+    let ri = online::RESOLUTIONS.iter().position(|r| *r == res).unwrap_or(0);
+    let mb = |k: AssetKind| match k {
+        AssetKind::Material => [8.0, 25.0, 90.0, 320.0][ri],
+        AssetKind::Hdri => [1.5, 6.0, 24.0, 100.0][ri],
+    };
+
+    let mut local = online::local_source_keys();
+    let hdris = forge_library::paths::list_hdri();
+    let (mut done, mut skipped, mut failed) = (0usize, 0usize, 0usize);
+    for &k in &kinds {
+        for &p in &providers {
+            let label = format!("{} · {}", p.label(), if k == AssetKind::Material { "materiali" } else { "HDRI" });
+            println!("\n{label}: scarico il catalogo…");
+            let all = online::filter(&online::catalog(p, k, args.flag("--aggiorna-catalogo"))?, filter);
+            let todo: Vec<_> = all
+                .iter()
+                .filter(|a| match k {
+                    AssetKind::Material => !online::already_downloaded(a, &local),
+                    AssetKind::Hdri => !online::hdri_downloaded(a, &hdris),
+                })
+                .take(max.unwrap_or(usize::MAX))
+                .cloned()
+                .collect();
+            skipped += all.len().min(max.unwrap_or(usize::MAX)) - todo.len();
+            println!(
+                "{label}: {} nel catalogo, {} già in libreria, {} da scaricare a {res} (circa {:.1} GB, stima indicativa)",
+                all.len(),
+                all.len() - todo.len(),
+                todo.len(),
+                todo.len() as f64 * mb(k) / 1024.0
+            );
+            if dry {
+                continue;
+            }
+            for (i, a) in todo.iter().enumerate() {
+                print!("[{}/{}] {} ({})… ", i + 1, todo.len(), a.name, a.id);
+                use std::io::Write;
+                let _ = std::io::stdout().flush();
+                let r = match k {
+                    AssetKind::Material => online::download_material(a, &res, &|_| {}).map(|m| {
+                        local.insert(online::source_key(p, &a.id));
+                        m.dir
+                    }),
+                    AssetKind::Hdri => online::download_hdri(a, &res, &|_| {}),
+                };
+                match r {
+                    Ok(_) => {
+                        done += 1;
+                        println!("ok");
+                    }
+                    Err(e) => {
+                        failed += 1;
+                        println!("ERRORE: {e:#}");
+                    }
+                }
+            }
+        }
+    }
+    if !dry {
+        println!("\nFatto: {done} scaricati, {skipped} già presenti, {failed} non riusciti.");
+        if failed > 0 {
+            println!("Rilancia lo stesso comando per riprovare quelli non riusciti.");
+        }
+    }
+    Ok(())
+}
+
 fn library(args: &Args) -> anyhow::Result<()> {
     let root = forge_library::paths::ensure()?;
     match args.0.first().map(String::as_str) {
@@ -400,6 +494,7 @@ fn library(args: &Args) -> anyhow::Result<()> {
             }
             Ok(())
         }
-        Some(other) => bail!("comando libreria sconosciuto: {other} (elenco | importa)"),
+        Some("scarica-tutto") => download_all(args),
+        Some(other) => bail!("comando libreria sconosciuto: {other} (elenco | importa | scarica-tutto)"),
     }
 }

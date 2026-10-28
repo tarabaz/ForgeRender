@@ -8,13 +8,18 @@
 //!   `https://api.polyhaven.com/files/<id>`; le mappe si scaricano una per una.
 //!
 //! Il parsing è tollerante: se un campo manca si usano gli indirizzi standard.
+//!
+//! Il catalogo completo di ogni sito si scarica una volta e resta in cache su disco
+//! (aggiornato dopo una settimana o a richiesta): la ricerca è locale e istantanea su
+//! tutti i materiali, non solo sui primi risultati.
 
 use crate::store::{self, LibraryMaterial};
 use anyhow::{bail, Context};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Provider {
     AmbientCg,
     PolyHaven,
@@ -29,14 +34,14 @@ impl Provider {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AssetKind {
     Material,
     Hdri,
 }
 
 /// Risultato di una ricerca online.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct OnlineAsset {
     pub provider: Provider,
     pub kind: AssetKind,
@@ -260,20 +265,153 @@ pub fn polyhaven_hdri_file(v: &Value, resolution: &str) -> Option<String> {
     v.get("hdri")?.get(&res)?.get("hdr")?.get("url")?.as_str().map(str::to_string)
 }
 
-// ------------------------------------------------------------------ Operazioni
+// ------------------------------------------------------------------ Catalogo
 
-/// Cerca materiali o HDRI sul sito indicato.
-pub fn search(provider: Provider, kind: AssetKind, query: &str, offset: usize, limit: usize) -> anyhow::Result<Vec<OnlineAsset>> {
+/// Dopo quanto tempo il catalogo in cache si riscarica da solo.
+const CATALOG_MAX_AGE: std::time::Duration = std::time::Duration::from_secs(7 * 24 * 3600);
+/// Risultati per pagina chiesti ad ambientCG mentre si scarica il catalogo.
+const ACG_PAGE: usize = 250;
+
+fn catalog_path(provider: Provider, kind: AssetKind) -> PathBuf {
+    let k = match kind {
+        AssetKind::Material => "materiali",
+        AssetKind::Hdri => "hdri",
+    };
+    crate::paths::cache_dir()
+        .join("catalogo")
+        .join(format!("{}_{k}.json", provider.label().replace(' ', "").to_lowercase()))
+}
+
+fn fetch_catalog(provider: Provider, kind: AssetKind) -> anyhow::Result<Vec<OnlineAsset>> {
     match provider {
         Provider::AmbientCg => {
-            let v = get_json(&ambientcg_search_url(query, kind, offset, limit))?;
-            Ok(parse_ambientcg(&v, kind))
+            let mut all: Vec<OnlineAsset> = Vec::new();
+            let mut seen = std::collections::HashSet::new();
+            let mut offset = 0;
+            // Pagina dopo pagina finché il sito ne restituisce di nuove (il sito può dare pagine
+            // più corte di quelle chieste); al massimo 400 pagine come protezione.
+            for _ in 0..400 {
+                let v = get_json(&ambientcg_search_url("", kind, offset, ACG_PAGE))?;
+                let got = parse_ambientcg(&v, kind);
+                let before = all.len();
+                offset += got.len();
+                all.extend(got.into_iter().filter(|a| seen.insert(a.id.clone())));
+                if all.len() == before {
+                    break;
+                }
+            }
+            Ok(all)
         }
-        Provider::PolyHaven => {
-            let v = get_json(polyhaven_list_url(kind))?;
-            Ok(parse_polyhaven(&v, kind, query).into_iter().skip(offset).take(limit).collect())
+        Provider::PolyHaven => Ok(parse_polyhaven(&get_json(polyhaven_list_url(kind))?, kind, "")),
+    }
+}
+
+/// Catalogo completo del sito (dalla cache su disco se recente). Con `refresh` si
+/// riscarica comunque; se il sito non risponde si usa la cache, anche vecchia.
+pub fn catalog(provider: Provider, kind: AssetKind, refresh: bool) -> anyhow::Result<Vec<OnlineAsset>> {
+    let path = catalog_path(provider, kind);
+    let cached = || -> Option<Vec<OnlineAsset>> { serde_json::from_slice(&std::fs::read(&path).ok()?).ok() };
+    let fresh = std::fs::metadata(&path)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.elapsed().ok())
+        .is_some_and(|age| age < CATALOG_MAX_AGE);
+    if fresh && !refresh {
+        if let Some(c) = cached() {
+            return Ok(c);
         }
     }
+    match fetch_catalog(provider, kind) {
+        Ok(list) if !list.is_empty() => {
+            if let Some(d) = path.parent() {
+                let _ = std::fs::create_dir_all(d);
+            }
+            let _ = std::fs::write(&path, serde_json::to_vec(&list)?);
+            tracing::info!("catalogo {} scaricato: {} elementi", provider.label(), list.len());
+            Ok(list)
+        }
+        other => match cached() {
+            Some(c) => {
+                tracing::warn!("catalogo {} non aggiornato, uso la copia in cache", provider.label());
+                Ok(c)
+            }
+            None => other.and_then(|_| bail!("il catalogo di {} è vuoto", provider.label())),
+        },
+    }
+}
+
+/// Filtra il catalogo: tutte le parole devono comparire in id, nome, categoria o tag.
+pub fn filter(assets: &[OnlineAsset], query: &str) -> Vec<OnlineAsset> {
+    let q = query.trim().to_lowercase();
+    if q.is_empty() {
+        return assets.to_vec();
+    }
+    assets
+        .iter()
+        .filter(|a| {
+            let hay = format!("{} {} {} {}", a.id, a.name, a.category, a.tags.join(" ")).to_lowercase();
+            q.split_whitespace().all(|w| hay.contains(w))
+        })
+        .cloned()
+        .collect()
+}
+
+// ------------------------------------------------------------------ Operazioni
+
+/// Cerca materiali o HDRI sul sito indicato, nel catalogo completo.
+pub fn search(provider: Provider, kind: AssetKind, query: &str, offset: usize, limit: usize) -> anyhow::Result<Vec<OnlineAsset>> {
+    let all = catalog(provider, kind, false)?;
+    Ok(filter(&all, query).into_iter().skip(offset).take(limit).collect())
+}
+
+/// Al massimo questo numero di miniature si scarica in contemporanea: con decine di
+/// richieste insieme i siti rallentano o le rifiutano.
+const MAX_THUMB_DOWNLOADS: usize = 6;
+
+fn thumb_slot() -> impl Drop {
+    use std::sync::{Condvar, Mutex};
+    static STATE: (Mutex<usize>, Condvar) = (Mutex::new(0), Condvar::new());
+    struct Slot;
+    impl Drop for Slot {
+        fn drop(&mut self) {
+            *STATE.0.lock().unwrap() -= 1;
+            STATE.1.notify_one();
+        }
+    }
+    let mut n = STATE.0.lock().unwrap();
+    while *n >= MAX_THUMB_DOWNLOADS {
+        n = STATE.1.wait(n).unwrap();
+    }
+    *n += 1;
+    Slot
+}
+
+/// Il materiale è già nella libreria locale (scaricato prima, a qualsiasi risoluzione)?
+pub fn already_downloaded(asset: &OnlineAsset, local_sources: &std::collections::HashSet<String>) -> bool {
+    local_sources.contains(&source_key(asset.provider, &asset.id))
+}
+
+/// Chiave "sito id" ricavata dall'origine salvata con i materiali scaricati.
+pub fn source_key(provider: Provider, id: &str) -> String {
+    format!("{} {}", provider.label(), id)
+}
+
+/// La HDRI è già nella cartella HDRI della libreria (a qualsiasi risoluzione)?
+pub fn hdri_downloaded(asset: &OnlineAsset, local_hdris: &[PathBuf]) -> bool {
+    let id = asset.id.to_lowercase();
+    local_hdris.iter().any(|p| {
+        p.file_stem()
+            .map(|s| s.to_string_lossy().to_lowercase())
+            .is_some_and(|s| s == id || s.starts_with(&format!("{id}_")))
+    })
+}
+
+/// Chiavi "sito id" dei materiali della libreria (per riconoscere quelli già scaricati).
+pub fn local_source_keys() -> std::collections::HashSet<String> {
+    store::list()
+        .into_iter()
+        .filter_map(|m| m.source.rsplit_once(" (").map(|(k, _)| k.to_string()))
+        .collect()
 }
 
 /// Miniatura (PNG/JPG), con cache su disco.
@@ -286,6 +424,7 @@ pub fn thumbnail(asset: &OnlineAsset) -> anyhow::Result<Vec<u8>> {
     if let Ok(b) = std::fs::read(&cache) {
         return Ok(b);
     }
+    let _slot = thumb_slot();
     let b = get_bytes(&asset.thumbnail_url)?;
     if let Some(d) = cache.parent() {
         let _ = std::fs::create_dir_all(d);
@@ -400,6 +539,43 @@ mod tests {
             "https://ambientcg.com/get?file=Wood049_2K-JPG.zip"
         );
         assert!(ambientcg_search_url("legno chiaro", AssetKind::Material, 0, 30).contains("q=legno+chiaro"));
+    }
+
+    #[test]
+    fn catalog_filter_matches_all_words() {
+        let a = |id: &str, name: &str, cat: &str, tags: &[&str]| OnlineAsset {
+            provider: Provider::AmbientCg,
+            kind: AssetKind::Material,
+            id: id.into(),
+            name: name.into(),
+            category: cat.into(),
+            tags: tags.iter().map(|t| t.to_string()).collect(),
+            thumbnail_url: String::new(),
+            size_m: None,
+        };
+        let all = vec![
+            a("Wood049", "Wood 049", "Wood", &["oak", "planks"]),
+            a("Metal012", "Metal 012", "Metal", &["brushed", "steel"]),
+            a("Planks021", "Planks 021", "Wood", &["floor", "dark"]),
+        ];
+        assert_eq!(filter(&all, "").len(), 3);
+        assert_eq!(filter(&all, "WOOD").len(), 2);
+        let r = filter(&all, "wood dark");
+        assert_eq!(r.len(), 1);
+        assert_eq!(r[0].id, "Planks021");
+        assert!(filter(&all, "glass").is_empty());
+        // Chiave dei già scaricati: "sito id" dall'origine salvata "sito id (risoluzione)".
+        let mut local = std::collections::HashSet::new();
+        local.insert(source_key(Provider::AmbientCg, "Metal012"));
+        assert!(already_downloaded(&all[1], &local));
+        assert!(!already_downloaded(&all[0], &local));
+        let hdris = vec![PathBuf::from("/lib/HDRI/studio_small_2k.hdr")];
+        let h = OnlineAsset {
+            provider: Provider::PolyHaven,
+            kind: AssetKind::Hdri,
+            ..a("studio_small", "Studio Small", "", &[])
+        };
+        assert!(hdri_downloaded(&h, &hdris));
     }
 
     #[test]
