@@ -28,6 +28,7 @@ La complessità è una stima di lavoro e rischio per questo codice:
 | 13 | Ray tracing hardware (RT core) | Molto alta | OptiX o ray query Vulkan | — |
 | 14 | Generatore di edera: rampicanti fotorealistici che crescono sugli oggetti | Alta | — | **Da fare più avanti**, non pianificato ora |
 | 15 | Utilizzo GPU / VRAM tramite NVML | Bassa | — | — |
+| 16 | Import di volumi OpenVDB (fumo/fuoco simulati in Blender Mantaflow, EmberGen, Houdini) | Media | renderer della nebbia ✅ | Lettore VDB in Rust puro; il renderer gestisce già griglie di densità |
 
 Ordine consigliato per ciò che resta: 4 → 3 → 5, poi il resto secondo necessità.
 
@@ -69,6 +70,16 @@ o piani con texture, senza toccare la qualità di ciò che già funziona.
    salvataggio nel progetto.
 6. Più avanti: timeline e calcolo per fotogramma (il generatore riceve già un parametro di tempo),
    poi un vero solutore fluidodinamico che scrive lo stesso formato di griglia.
+
+**Simulazione (seconda versione):** vero solutore euleriano per il fumo (Fedkiw et al. 2001)
+su griglia sfalsata: trasporto semi-lagrangiano della velocità, proiezione della pressione
+(SOR rosso/nero) con gli oggetti della scena come pareti, confinamento della vorticità per i
+riccioli, trasporto MacCormack per filamenti netti, attrito col suolo (strato limite), sorgente
+di volume nell'emettitore (il gas nuovo spinge fuori il vecchio: i contenitori si riempiono e
+traboccano), CO₂ pesante che si mescola prima del vapore visibile (la nebbia vecchia diventa
+leggera e risale a sbuffi, cursore "Risalita"). Verificata su una tazza (si riempie, trabocca,
+cola lungo la parete, tappeto sul tavolo) e su un collo stretto (sbuffo sopra l'imboccatura,
+colate lungo i lati); preset di scala per bicchiere, tavolo e palco.
 
 **Stato:** le fasi 1–5 sono implementate e testate (crate `forge_volume`, `medium.rs` sulla CPU,
 lo stesso codice in WGSL sulla GPU, pannello nebbia nella scheda Ambiente, emettitore e zona

@@ -60,6 +60,12 @@
 - Snap a contatto per oggetto (salvato nel progetto): lo spostamento si ferma al primo contatto,
   si può scivolare lungo le superfici.
 
+## Fatto nell'ottava parte
+- Nebbia: simulazione fluida vera (Fedkiw 2001) al posto del modello a diffusione: pressione con
+  gli oggetti come pareti, vorticità, MacCormack, attrito col suolo, sorgente di volume, gas
+  pesante che si mescola e risale ("Risalita"); preset bicchiere/tavolo/palco; la zona si estende
+  fino al pavimento della scena; test su tazza che trabocca e risalita; ottimizzazioni (8×).
+
 ## Prossimi passi
 Vedi la tabella di sintesi in docs/ROADMAP.it.md (gizmo luci, snap a contatto, lingue,
 campionamento adattivo, nebbia volumetrica…).

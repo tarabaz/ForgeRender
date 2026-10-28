@@ -445,9 +445,14 @@ fn draw_depth_of_field(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect
 fn draw_fogs(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
     let cam = &app.scene.camera;
     let color = egui::Color32::from_rgb(140, 210, 255);
+    let ground = {
+        let b = app.scene.bounds();
+        (!b.is_empty()).then_some(b.min.y)
+    };
     for f in &app.scene.fogs {
         let c = if f.enabled { color } else { egui::Color32::from_gray(90) };
-        let (lo, hi) = f.sanitized().bounds();
+        let f = &f.sanitized();
+        let (lo, hi) = f.bounds_over(if f.collisions { ground } else { None });
         let corner = |i: usize| Vec3::new([lo.x, hi.x][i & 1], [lo.y, hi.y][(i >> 1) & 1], [lo.z, hi.z][(i >> 2) & 1]);
         for (a, b) in [
             (0, 1),

@@ -599,10 +599,11 @@ fn gpu_dry_ice_fog_matches_cpu() {
     let mut s = Scene::test_scene();
     dark(&mut s);
     s.fogs.push(forge_scene::FogVolume {
-        emitter: Vec3::new(0.2, 0.75, -0.6),
+        // Davanti agli oggetti, in vista della camera: cade e si stende sul pavimento.
+        emitter: Vec3::new(0.0, 0.5, 1.4),
         size: Vec3::new(2.4, 0.9, 2.4),
-        resolution: 64,
-        sim_time: 3.0,
+        resolution: 96,
+        sim_time: 4.0,
         ..Default::default()
     });
     let rs = RenderScene::compile(&s);

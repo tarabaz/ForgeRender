@@ -1,10 +1,12 @@
 //! Nebbia volumetrica procedurale per il path tracer.
 //!
 //! Pipeline (deterministica dal seed):
-//! 1. [`sim::simulate`] su una griglia grossolana: caduta, deposito, espansione
-//!    laterale attorno agli ostacoli, turbolenza, dissolvenza per il tempo simulato;
-//! 2. [`bake`] su una griglia fine: concentrazione interpolata × dettaglio
-//!    procedurale (fBm deformato dalla turbolenza, bordi erosi in filamenti);
+//! 1. [`sim::simulate`]: simulazione fluida (velocità, pressione, vorticità) su una
+//!    griglia grossolana: il gas pesante esce dalla sorgente, riempie i contenitori,
+//!    trabocca, cola lungo le pareti e forma il tappeto; la parte che si scalda risale
+//!    a sbuffi; ostacoli dalla geometria della scena;
+//! 2. [`bake`] su una griglia fine: concentrazione interpolata con deformazione e
+//!    tessitura procedurale (grumi "a cavolfiore", bordi erosi in filamenti);
 //! 3. il risultato [`BakedFog`] è la densità σt(p) (1/m) quantizzata a 16 bit,
 //!    con un majorant per strato orizzontale per il delta tracking.
 //!
@@ -21,7 +23,7 @@ pub use grid::GridSpec;
 use rayon::prelude::*;
 
 /// Lato massimo (in celle) della griglia di simulazione.
-const SIM_MAX: usize = 64;
+const SIM_MAX: usize = 128;
 
 /// Nebbia pronta per il rendering.
 #[derive(Clone, Debug)]
@@ -110,10 +112,11 @@ impl BakedFog {
 pub type SolidFn<'a> = &'a (dyn Fn(&GridSpec) -> Vec<bool> + Sync);
 
 /// Calcola la nebbia. `solid` restituisce le celle occupate dagli oggetti
-/// (ignorato se le collisioni sono spente).
-pub fn bake(fog: &FogVolume, solid: Option<SolidFn>) -> BakedFog {
+/// (ignorato se le collisioni sono spente); `ground` è il punto più basso della scena:
+/// la zona si estende fino a lì (vedi [`FogVolume::bounds_over`]).
+pub fn bake(fog: &FogVolume, solid: Option<SolidFn>, ground: Option<f32>) -> BakedFog {
     let f = fog.sanitized();
-    let (min, max) = f.bounds();
+    let (min, max) = f.bounds_over(if f.collisions { ground } else { None });
     let empty = |spec: &GridSpec| vec![false; spec.len()];
     let solid_for = |spec: &GridSpec| match (f.collisions, solid) {
         (true, Some(s)) => s(spec),
@@ -121,7 +124,9 @@ pub fn bake(fog: &FogVolume, solid: Option<SolidFn>) -> BakedFog {
     };
 
     let t0 = std::time::Instant::now();
-    let sim_spec = GridSpec::covering(min, max, (f.resolution as usize).min(SIM_MAX));
+    // Simulazione al 70% della risoluzione del dettaglio (il tappeto e le colate devono
+    // avere qualche cella di spessore per scorrere bene).
+    let sim_spec = GridSpec::covering(min, max, ((f.resolution as f32 * 0.7) as usize).clamp(32, SIM_MAX));
     let sim_solid = solid_for(&sim_spec);
     let sim = sim::simulate(&sim::SimInput {
         spec: sim_spec,
@@ -132,6 +137,7 @@ pub fn bake(fog: &FogVolume, solid: Option<SolidFn>) -> BakedFog {
         source_radius: f.source_radius,
         dissipation: f.dissipation,
         turbulence: f.turbulence,
+        rise: f.rise,
         swirl_scale: f.scale * 2.5,
         seed: f.seed,
     });
@@ -140,12 +146,13 @@ pub fn bake(fog: &FogVolume, solid: Option<SolidFn>) -> BakedFog {
     let t1 = std::time::Instant::now();
     let spec = GridSpec::covering(min, max, f.resolution as usize);
     let fine_solid = solid_for(&spec);
-    // Deformazione del dettaglio lungo la turbolenza (la velocità vale già ~turbolenza·TURB_SPEED):
-    // spostamento fino a ~0.6 dettagli a turbolenza piena.
-    let vel_scale = 0.6 / sim::TURB_SPEED;
-    let contrast = 0.4 + 0.6 * f.turbulence;
+    // Dettaglio sotto la risoluzione della simulazione:
+    // - deformazione del campo (warp) di circa una cella: bordi a grumi e riccioli;
+    // - "billow" (1 − |rumore|) a due scale: la tessitura a cavolfiore della nebbia densa;
+    // - erosione dove la nebbia è sottile: filamenti e bordi sfrangiati.
+    let warp_amp = sim_spec.cell * (0.6 + 1.4 * f.turbulence);
+    let erosion = 0.12 + 0.35 * f.turbulence;
     let seed = f.seed;
-    let erosion = 0.08 + 0.3 * f.turbulence;
     let values: Vec<f32> = (0..spec.len())
         .into_par_iter()
         .map(|i| {
@@ -154,23 +161,33 @@ pub fn bake(fog: &FogVolume, solid: Option<SolidFn>) -> BakedFog {
             }
             let (x, y, z) = spec.coords(i);
             let p = spec.center(x, y, z);
-            let c = sim_spec.sample(&sim.conc, p);
+            // Controllo rapido: niente nebbia nei dintorni → zero (la deformazione è < 2 celle).
+            if sim_spec.sample(&sim.conc, p) < 1e-5 && sim_spec.sample(&sim.conc, p + Vec3::Y * warp_amp) < 1e-5 {
+                let far = [Vec3::X, -Vec3::X, Vec3::Z, -Vec3::Z, -Vec3::Y]
+                    .iter()
+                    .all(|d| sim_spec.sample(&sim.conc, p + *d * warp_amp) < 1e-5);
+                if far {
+                    return 0.0;
+                }
+            }
+            let q = p / f.scale;
+            let w = Vec3::new(
+                noise::fbm(q, seed.wrapping_add(1), 3),
+                noise::fbm(q + Vec3::new(17.1, 3.3, 8.9), seed.wrapping_add(2), 3),
+                noise::fbm(q + Vec3::new(-4.2, 11.7, 2.5), seed.wrapping_add(3), 3),
+            );
+            let c = sim_spec.sample(&sim.conc, p + w * warp_amp);
             if c < 1e-4 {
                 return 0.0;
             }
-            // Dettagli più schiacciati in verticale: la nebbia pesante si stratifica.
-            let mut q = p / f.scale;
-            q.y *= 1.8;
-            q += sample_vec(&sim_spec, &sim.velocity, p) * vel_scale;
-            let n = (noise::fbm(q, seed.wrapping_add(17), 5) * 0.5 + 0.5).clamp(0.0, 1.0);
-            let n2 = (noise::fbm(q * 2.7 + Vec3::splat(5.3), seed.wrapping_add(91), 3) * 0.5 + 0.5).clamp(0.0, 1.0);
-            let cc = (c / sim::FULL).min(1.5);
-            // Dove la nebbia è sottile il rumore la "erode" in filamenti.
+            let cc = (c / sim::FULL).min(2.0);
+            let b1 = 1.0 - noise::gradient(q * 1.7 + Vec3::splat(2.3), seed.wrapping_add(4)).abs();
+            let b2 = 1.0 - noise::gradient(q * 4.1 + Vec3::splat(7.7), seed.wrapping_add(5)).abs();
+            let billow = 0.6 * b1 + 0.4 * b2;
+            let n = (noise::fbm(q * 0.8, seed.wrapping_add(6), 4) * 0.5 + 0.5).clamp(0.0, 1.0);
             let th = erosion * (1.0 - n);
-            let shaped = ((cc - th) / (1.0 - th).max(1e-3)).clamp(0.0, 1.5);
-            // Variazione interna (media ~1): sbuffi più densi e più radi.
-            let variation = 1.0 + contrast * (0.55 + 0.9 * n2 - 1.0);
-            f.density * shaped * variation
+            let shaped = ((cc - th) / (1.0 - th).max(1e-3)).clamp(0.0, 2.0);
+            f.density * shaped * (0.35 + 0.9 * billow * billow)
         })
         .collect();
     let max_density = values.iter().cloned().fold(0.0f32, f32::max);
@@ -209,14 +226,6 @@ pub fn bake(fog: &FogVolume, solid: Option<SolidFn>) -> BakedFog {
         sim_steps: sim.steps,
         sim_ms,
         bake_ms,
-    }
-}
-
-fn sample_vec(spec: &GridSpec, v: &[Vec3], p: Vec3) -> Vec3 {
-    // Il campo di turbolenza è liscio: il valore della cella più vicina basta.
-    match spec.cell_of(p) {
-        Some((x, y, z)) => v[spec.index(x, y, z)],
-        None => Vec3::ZERO,
     }
 }
 

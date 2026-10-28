@@ -38,3 +38,18 @@ predefinita sopra il box (zona 3.2 × 0.95 × 3.2 m, 5 s simulati, collisioni at
 - Il costo del rendering dipende dalla densità e dai rimbalzi nella nebbia (scattering multiplo).
   Ottimizzazione prevista: majorant su una griglia 3D grossolana con attraversamento DDA (oggi è
   per strato orizzontale).
+
+### Simulazione fluida della nebbia (seconda versione), 28/10/2026
+
+Stessa macchina (4 vCPU Xeon). Solutore euleriano a griglia sfalsata, 6 s simulati,
+risoluzione 160 (simulazione 112 celle sul lato lungo), zona 0.7 × 0.4–0.5 × 0.7 m:
+
+| Scena | Calcolo nebbia | Note |
+|---|---:|---|
+| Tazza (misurino) che trabocca | 10 s | colate lungo la parete, tappeto sul tavolo |
+| Collo stretto (beuta), risalita alta | 39 s | 674 passi; prima delle ottimizzazioni 309 s |
+
+Ottimizzazioni misurate sulla scena "beuta": riquadro di lavoro attorno alla nebbia (309 → 200 s),
+passo fino a 2 celle con controllo delle pareti (200 → 110 s), pressione rosso/nero sul posto
+(pressione 40 → 10 s), trasporto di vapore e gas pesante insieme e solo vicino alla nebbia
+(110 → 40 s). Il calcolo si fa una volta, in background, e resta in cache.

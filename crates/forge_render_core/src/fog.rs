@@ -89,7 +89,8 @@ pub fn bake_fogs(scene: &Scene, geo: &RenderGeometry) -> Vec<Arc<BakedFog>> {
             continue;
         }
         let solid = |spec: &GridSpec| voxelize(geo, spec);
-        let b = Arc::new(forge_volume::bake(f, Some(&solid)));
+        let ground = (!geo.accel.is_empty()).then_some(geo.bounds.min.y);
+        let b = Arc::new(forge_volume::bake(f, Some(&solid), ground));
         let mut c = cache().lock().unwrap();
         if c.len() > 16 {
             c.clear();

@@ -38,6 +38,8 @@ pub struct FogVolume {
     pub emission_rate: f32,
     /// Velocità con cui la nebbia si dissolve (1 = normale, 0 = non si dissolve).
     pub dissipation: f32,
+    /// Tendenza della nebbia "vecchia" a scaldarsi e risalire a sbuffi (0 = resta a terra).
+    pub rise: f32,
     /// La nebbia non attraversa gli oggetti della scena.
     pub collisions: bool,
     /// Risoluzione della griglia (celle sul lato più lungo).
@@ -61,6 +63,7 @@ impl Default for FogVolume {
             source_radius: 0.12,
             emission_rate: 1.0,
             dissipation: 1.0,
+            rise: 0.4,
             collisions: true,
             resolution: 160,
         }
@@ -68,12 +71,23 @@ impl Default for FogVolume {
 }
 
 impl FogVolume {
-    /// Zona simulata: in pianta centrata sull'emettitore; in altezza dall'emettitore
-    /// meno `size.y` fino a un quarto di `size.y` sopra (la nebbia sale poco).
+    /// Zona simulata: in pianta centrata sull'emettitore; in altezza il 55% sotto
+    /// l'emettitore (dove la nebbia cade) e il 45% sopra (sbuffi che risalgono).
     pub fn bounds(&self) -> (Vec3, Vec3) {
         let s = self.size.max(Vec3::splat(0.01));
-        let min = Vec3::new(self.emitter.x - s.x * 0.5, self.emitter.y - s.y, self.emitter.z - s.z * 0.5);
-        let max = Vec3::new(self.emitter.x + s.x * 0.5, self.emitter.y + s.y * 0.25, self.emitter.z + s.z * 0.5);
+        let min = Vec3::new(self.emitter.x - s.x * 0.5, self.emitter.y - s.y * 0.55, self.emitter.z - s.z * 0.5);
+        let max = Vec3::new(self.emitter.x + s.x * 0.5, self.emitter.y + s.y * 0.45, self.emitter.z + s.z * 0.5);
+        (min, max)
+    }
+
+    /// Zona simulata estesa fino al suolo `ground` (il punto più basso della scena) se
+    /// questo è più in basso: il fondo della zona è chiuso e non deve fare da pavimento
+    /// invisibile a mezz'aria.
+    pub fn bounds_over(&self, ground: Option<f32>) -> (Vec3, Vec3) {
+        let (mut min, max) = self.bounds();
+        if let Some(g) = ground.filter(|g| g.is_finite() && *g < min.y) {
+            min.y = g - 0.01 * self.size.y.max(0.01);
+        }
         (min, max)
     }
 
@@ -96,6 +110,7 @@ impl FogVolume {
         f.source_radius = fin(f.source_radius, 0.12).clamp(0.005, 10.0);
         f.emission_rate = fin(f.emission_rate, 1.0).clamp(0.0, 100.0);
         f.dissipation = fin(f.dissipation, 1.0).clamp(0.0, 10.0);
+        f.rise = fin(f.rise, 0.4).clamp(0.0, 1.0);
         f.resolution = f.resolution.clamp(16, 400);
         f
     }

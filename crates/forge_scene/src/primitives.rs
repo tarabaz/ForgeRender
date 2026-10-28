@@ -186,3 +186,89 @@ mod tests {
         assert_outward(&torus(1.0, 0.3, 24, 12));
     }
 }
+
+/// Tazza (cilindro cavo aperto in alto) appoggiata su y = 0: raggio esterno, altezza,
+/// spessore della parete e del fondo. Normali calcolate con spigoli netti a 40°.
+pub fn cup(radius: f32, height: f32, wall: f32, segments: u32) -> Mesh {
+    let mut m = Mesh {
+        name: "Tazza".into(),
+        ..Default::default()
+    };
+    let s = segments.max(8);
+    let ri = (radius - wall).max(radius * 0.05);
+    let ring = |r: f32, y: f32| -> Vec<Vec3> {
+        (0..s)
+            .map(|k| {
+                let a = k as f32 / s as f32 * TAU;
+                Vec3::new(r * a.cos(), y, r * a.sin())
+            })
+            .collect()
+    };
+    let quad_strip = |m: &mut Mesh, a: &[Vec3], b: &[Vec3]| {
+        // Quadrilateri tra due anelli; il verso è quello dato dall'ordine (a, b).
+        for k in 0..s as usize {
+            let k1 = (k + 1) % s as usize;
+            let base = m.positions.len() as u32;
+            m.positions.extend([a[k], a[k1], b[k1], b[k]]);
+            m.indices.push([base, base + 2, base + 1]);
+            m.indices.push([base, base + 3, base + 2]);
+        }
+    };
+    let floor = wall.min(height * 0.5);
+    let (o0, o1) = (ring(radius, 0.0), ring(radius, height));
+    let (i0, i1) = (ring(ri, floor), ring(ri, height));
+    quad_strip(&mut m, &o0, &o1); // parete esterna
+    quad_strip(&mut m, &i1, &i0); // parete interna
+    quad_strip(&mut m, &o1, &i1); // bordo
+                                  // Fondo: esterno (verso il basso) e interno (verso l'alto), a ventaglio.
+    let fan = |m: &mut Mesh, r: &[Vec3], center: Vec3, up: bool| {
+        let c = m.positions.len() as u32;
+        m.positions.push(center);
+        let first = m.positions.len() as u32;
+        m.positions.extend_from_slice(r);
+        for k in 0..s {
+            let (a, b) = (first + k, first + (k + 1) % s);
+            m.indices.push(if up { [c, b, a] } else { [c, a, b] });
+        }
+    };
+    fan(&mut m, &o0, Vec3::ZERO, false);
+    fan(&mut m, &i0, Vec3::new(0.0, floor, 0.0), true);
+    m.compute_normals(40.0);
+    m
+}
+
+#[cfg(test)]
+mod cup_tests {
+    use super::*;
+
+    #[test]
+    fn cup_is_closed_and_faces_outward() {
+        let m = cup(0.05, 0.08, 0.004, 32);
+        let b = m.bounds();
+        assert!((b.max.y - 0.08).abs() < 1e-6 && b.min.y.abs() < 1e-6);
+        // Le normali delle facce della parete esterna puntano in fuori.
+        let mut out = 0;
+        for t in &m.indices {
+            let [a, b, c] = t.map(|i| m.positions[i as usize]);
+            let n = (b - a).cross(c - a);
+            let ctr = (a + b + c) / 3.0;
+            let r = Vec3::new(ctr.x, 0.0, ctr.z).length();
+            if (r - 0.05).abs() < 1e-3 && ctr.y > 0.001 && ctr.y < 0.079 && n.dot(Vec3::new(ctr.x, 0.0, ctr.z)) > 0.0 {
+                out += 1;
+            }
+        }
+        assert_eq!(out, 64);
+        // Fondo interno verso l'alto, fondo esterno verso il basso.
+        for t in &m.indices {
+            let [a, b, c] = t.map(|i| m.positions[i as usize]);
+            let n = (b - a).cross(c - a).normalize_or_zero();
+            if a.y == b.y && b.y == c.y && n.y.abs() > 0.9 {
+                if a.y.abs() < 1e-6 {
+                    assert!(n.y < 0.0, "fondo esterno");
+                } else if (a.y - 0.004).abs() < 1e-6 {
+                    assert!(n.y > 0.0, "fondo interno");
+                }
+            }
+        }
+    }
+}

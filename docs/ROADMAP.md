@@ -28,6 +28,7 @@ Complexity is a rough estimate of the effort and risk for this codebase:
 | 13 | Hardware ray tracing (RT cores) | Very high | OptiX or Vulkan ray query | — |
 | 14 | Ivy generator: photorealistic climbing plants growing on objects | High | — | **To do later**, not scheduled now |
 | 15 | GPU usage / VRAM readout via NVML | Low | — | — |
+| 16 | Import OpenVDB volumes (smoke/fire simulated in Blender Mantaflow, EmberGen, Houdini) | Medium | fog renderer ✅ | Pure-Rust VDB reader; the renderer already handles density grids |
 
 Suggested order for what is left: 4 → 3 → 5, then the rest by need.
 
@@ -66,6 +67,15 @@ not sprites or textured planes, without changing the quality of what already wor
    time, collision on/off), bounding box and emitter drawn in the viewport, project save.
 6. Later: timeline and per-frame bake (the generator already takes a time parameter), then a
    real fluid solver writing the same grid format.
+
+**Simulation (second version):** a real Eulerian smoke solver (Fedkiw et al. 2001) on a
+staggered grid: semi-Lagrangian velocity advection, pressure projection (red/black SOR) with
+the scene objects as solid boundaries, vorticity confinement for curls, MacCormack advection
+for sharp filaments, ground friction (boundary layer), a volume source at the emitter (new gas
+pushes the old one out, so containers fill and overflow), heavy CO₂ that mixes faster than the
+visible vapour (old fog becomes light and rises in puffs, "Rise" slider). Verified on a cup
+(fills, overflows, cascades down the wall, carpet on the table) and a narrow neck (puff above
+the opening, streams down the sides); scale presets for glass, table and stage.
 
 **Status:** phases 1–5 are implemented and tested (`forge_volume` crate, `medium.rs` on the CPU,
 the same code in WGSL on the GPU, fog panel in the Environment tab, emitter and simulated
