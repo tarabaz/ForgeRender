@@ -163,6 +163,77 @@ pub fn save(dir: &Path, material: &Material, source: &str) -> anyhow::Result<()>
     Ok(())
 }
 
+/// Cartella della libreria del materiale con id `lib:<cartella>`, se esiste.
+pub fn dir_of(id: &MaterialId) -> Option<PathBuf> {
+    let name = id.0.strip_prefix("lib:")?;
+    let dir = crate::paths::materials_dir().join(name);
+    (!name.is_empty() && dir.join(MATERIAL_FILE).is_file()).then_some(dir)
+}
+
+/// Copia nella cartella le texture che stanno fuori (la cartella resta autosufficiente).
+/// Le texture già dentro restano dove sono; file con lo stesso nome non si sovrascrivono.
+fn copy_textures_into(dir: &Path, m: &mut Material) -> anyhow::Result<()> {
+    let mut copied: Vec<(PathBuf, PathBuf)> = Vec::new();
+    for slot in m.texture_slots_mut().into_iter() {
+        let Some(src) = slot.clone() else { continue };
+        if src.starts_with(dir) {
+            continue;
+        }
+        if let Some((_, to)) = copied.iter().find(|(from, _)| *from == src) {
+            *slot = Some(to.clone());
+            continue;
+        }
+        let file = src.file_name().context("nome di file della texture non valido")?;
+        let mut to = dir.join(file);
+        let mut k = 2;
+        while to.exists() {
+            let stem = Path::new(file).file_stem().and_then(|s| s.to_str()).unwrap_or("texture");
+            let ext = Path::new(file).extension().and_then(|s| s.to_str()).unwrap_or("png");
+            to = dir.join(format!("{stem} {k}.{ext}"));
+            k += 1;
+        }
+        std::fs::copy(&src, &to).with_context(|| format!("copia della texture {}", src.display()))?;
+        copied.push((src, to.clone()));
+        *slot = Some(to);
+    }
+    Ok(())
+}
+
+/// Sovrascrive il materiale della libreria nella sua cartella con le impostazioni di
+/// `material` (es. modificate nel progetto). La miniatura si rifà.
+pub fn update(dir: &Path, material: &Material) -> anyhow::Result<LibraryMaterial> {
+    let root = crate::paths::materials_dir();
+    anyhow::ensure!(dir.starts_with(&root), "cartella fuori dalla libreria");
+    let source = load(dir).map(|m| m.source).unwrap_or_default();
+    let mut m = material.clone();
+    copy_textures_into(dir, &mut m)?;
+    save(dir, &m, &source)?;
+    let _ = std::fs::remove_file(dir.join(THUMBNAIL_FILE));
+    load(dir)
+}
+
+/// Salva `material` nella libreria come nuovo materiale `name` (cartella nuova con la
+/// copia di tutte le texture). L'originale non cambia.
+pub fn save_as(material: &Material, name: &str, source: &str) -> anyhow::Result<LibraryMaterial> {
+    let name = name.trim();
+    anyhow::ensure!(!name.is_empty(), "nome vuoto");
+    std::fs::create_dir_all(crate::paths::materials_dir())?;
+    let dest = unique_dir(&crate::paths::materials_dir(), name);
+    std::fs::create_dir_all(&dest)?;
+    let result = (|| {
+        let mut m = material.clone();
+        m.name = name.to_string();
+        m.category = "Libreria".into();
+        copy_textures_into(&dest, &mut m)?;
+        save(&dest, &m, source)?;
+        load(&dest)
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_dir_all(&dest);
+    }
+    result
+}
+
 /// Salva la miniatura (RGBA8) del materiale.
 pub fn save_thumbnail(dir: &Path, width: u32, height: u32, rgba: &[u8]) -> anyhow::Result<PathBuf> {
     let _ = std::fs::remove_file(dir.join(LEGACY_THUMBNAIL_FILE));
@@ -400,6 +471,37 @@ mod tests {
             ["Mattoni", "Metal012"]
         );
         assert!(all[0].material.id.0.starts_with("lib:"));
+
+        // Salva: le modifiche restano nella cartella, provenienza e texture conservate.
+        let mut edited = all[0].material.clone();
+        edited.roughness = 0.25;
+        edited.mapping.scale = 3.5;
+        assert_eq!(dir_of(&edited.id).as_deref(), Some(all[0].dir.as_path()));
+        let upd = update(&all[0].dir, &edited).unwrap();
+        assert_eq!(upd.material, edited, "ricaricato uguale a quello salvato");
+        assert_eq!(upd.source, "test");
+        assert_eq!(load(&all[0].dir).unwrap().material.roughness, 0.25);
+        // Una texture esterna viene copiata dentro la cartella.
+        let ext_tex = src.join("esterna.png");
+        gray(&ext_tex, 77);
+        edited.ao_texture = Some(ext_tex.clone());
+        let upd = update(&all[0].dir, &edited).unwrap();
+        let ao = upd.material.ao_texture.clone().unwrap();
+        assert!(ao.starts_with(&all[0].dir) && ao.is_file(), "{}", ao.display());
+
+        // Salva con nome: cartella nuova con le sue texture, originale invariato.
+        let copy = save_as(&upd.material, "Mattoni chiari", "copia di Mattoni").unwrap();
+        assert_eq!(copy.material.name, "Mattoni chiari");
+        assert_ne!(copy.dir, all[0].dir);
+        assert_eq!(copy.material.roughness, 0.25);
+        for t in copy.material.texture_slots().into_iter().flatten() {
+            assert!(t.starts_with(&copy.dir) && t.is_file(), "{}", t.display());
+        }
+        assert_eq!(load(&all[0].dir).unwrap().material.name, "Mattoni");
+        assert!(save_as(&upd.material, "  ", "").is_err());
+        delete(&copy).unwrap();
+        assert_eq!(dir_of(&MaterialId::new("lib:non-esiste")), None);
+        assert_eq!(dir_of(&MaterialId::new("acciaio")), None);
         delete(&all[1]).unwrap();
         assert_eq!(list().len(), 1);
 

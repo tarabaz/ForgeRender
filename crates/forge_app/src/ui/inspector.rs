@@ -49,6 +49,142 @@ fn vec3_edit(ui: &mut egui::Ui, label: &str, v: &mut Vec3, speed: f64) -> bool {
 // Materiali
 // ----------------------------------------------------------------------
 
+/// Salva / Salva con nome / Ripristina del materiale selezionato nella libreria con texture.
+fn library_save_controls(app: &mut ForgeApp, ui: &mut egui::Ui) {
+    let id = app.selected_material.clone();
+    let Some(current) = app.scene.materials.get(&id).cloned() else {
+        return;
+    };
+    let lib_dir = forge_library::store::dir_of(&id);
+    let saved = lib_dir
+        .as_ref()
+        .and_then(|_| app.library.saved_version(&id).map(|m| m.material.clone()));
+    let dirty = saved.as_ref().is_some_and(|s| *s != current);
+    let name_key = egui::Id::NULL.with("mat-save-as-name");
+    let mut save_as_name: Option<String> = ui.ctx().data(|d| d.get_temp(name_key));
+    let mut status: Option<(String, bool)> = None;
+
+    ui.horizontal_wrapped(|ui| {
+        if let Some(dir) = &lib_dir {
+            if ui
+                .add_enabled(dirty || saved.is_none(), egui::Button::new("Salva"))
+                .on_hover_text(format!("Salva le modifiche nella libreria ({})", dir.display()))
+                .clicked()
+            {
+                match forge_library::store::update(dir, &current) {
+                    Ok(m) => {
+                        app.scene.materials.upsert(m.material.clone());
+                        app.library.material_saved(&m);
+                        app.appearance_changed();
+                        status = Some((format!("«{}» salvato nella libreria.", m.material.name), false));
+                    }
+                    Err(e) => status = Some((format!("Salvataggio non riuscito: {e:#}"), true)),
+                }
+            }
+        }
+        let label = if lib_dir.is_some() {
+            "Salva con nome…"
+        } else {
+            "Salva nella libreria…"
+        };
+        if ui
+            .button(label)
+            .on_hover_text("Salva una copia nella libreria con un nome nuovo (con tutte le texture); l'originale non cambia")
+            .clicked()
+        {
+            save_as_name = Some(if lib_dir.is_some() {
+                format!("{} (copia)", current.name)
+            } else {
+                current.name.clone()
+            });
+        }
+        if let (Some(_), Some(saved)) = (&lib_dir, &saved) {
+            if ui
+                .add_enabled(dirty, egui::Button::new("Ripristina"))
+                .on_hover_text("Torna alle impostazioni salvate nella libreria")
+                .clicked()
+            {
+                app.scene.materials.upsert(saved.clone());
+                app.appearance_changed();
+            }
+        }
+        if dirty {
+            ui.colored_label(crate::ui::style::WARN, "● modifiche non salvate nella libreria");
+        }
+    });
+
+    if let Some(name) = &mut save_as_name {
+        let mut close = false;
+        ui.horizontal(|ui| {
+            ui.label("Nome:");
+            let r = ui.add(egui::TextEdit::singleline(name).desired_width(180.0));
+            let enter = r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+            if ui.add_enabled(!name.trim().is_empty(), egui::Button::new("Salva")).clicked() || (enter && !name.trim().is_empty()) {
+                let source = if lib_dir.is_some() {
+                    format!("copia di «{}»", saved.as_ref().map(|m| m.name.as_str()).unwrap_or(&current.name))
+                } else {
+                    "salvato dal progetto".to_string()
+                };
+                match forge_library::store::save_as(&current, name, &source) {
+                    Ok(m) => {
+                        // Il progetto usa la copia al posto dell'originale (come "Salva con nome").
+                        let new_id = m.material.id.clone();
+                        app.scene.materials.upsert(m.material.clone());
+                        for v in app.scene.assignments.values_mut() {
+                            if *v == id {
+                                *v = new_id.clone();
+                            }
+                        }
+                        if app.scene.default_material == id {
+                            app.scene.default_material = new_id.clone();
+                        }
+                        // L'originale della libreria torna come salvato (si riapplica dalla libreria).
+                        if lib_dir.is_some() {
+                            app.scene.materials.materials.retain(|x| x.id != id);
+                        }
+                        app.selected_material = new_id;
+                        app.library.material_saved(&m);
+                        app.appearance_changed();
+                        status = Some((format!("Copia «{}» salvata nella libreria.", m.material.name), false));
+                        close = true;
+                    }
+                    Err(e) => status = Some((format!("Salvataggio non riuscito: {e:#}"), true)),
+                }
+            }
+            if ui.button("Annulla").clicked() {
+                close = true;
+            }
+        });
+        if close {
+            save_as_name = None;
+        }
+    }
+    ui.ctx().data_mut(|d| match &save_as_name {
+        Some(n) => {
+            d.insert_temp(name_key, n.clone());
+        }
+        None => d.remove::<String>(name_key),
+    });
+    // Messaggio dell'ultimo salvataggio, finché resta selezionato lo stesso materiale.
+    let status_key = egui::Id::NULL.with("mat-save-status");
+    if let Some((msg, err)) = status {
+        let sel = app.selected_material.0.clone();
+        ui.ctx().data_mut(|d| d.insert_temp(status_key, (sel, msg, err)));
+    }
+    if let Some((_, msg, err)) = ui
+        .ctx()
+        .data(|d| d.get_temp::<(String, String, bool)>(status_key))
+        .filter(|(sel, _, _)| *sel == app.selected_material.0)
+    {
+        let col = if err {
+            crate::ui::style::WARN
+        } else {
+            egui::Color32::from_rgb(140, 200, 140)
+        };
+        ui.colored_label(col, egui::RichText::new(msg).small());
+    }
+}
+
 fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
     let n_sel = app.selection.len();
     if n_sel == 0 {
@@ -237,6 +373,7 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
             app.appearance_changed();
         }
     });
+    library_save_controls(app, ui);
 
     ui.separator();
     // Lato più lungo dei componenti selezionati (per contare le ripetizioni della texture).

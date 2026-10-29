@@ -152,5 +152,17 @@
 - README (italiano e inglese): sezione "Benchmark: comandi da lanciare" con tutte le misure
   possibili e a cosa servono.
 
+### Materiali della libreria: Salva, Salva con nome, Ripristina
+- Problema: cliccando di nuovo un materiale scaricato, le modifiche fatte nel progetto si
+  perdevano (il materiale veniva ricopiato dalla libreria).
+- Ora il clic tiene le impostazioni già presenti nel progetto. Nell'editor del materiale:
+  **Salva** (scrive le modifiche nella cartella del materiale e rifà la miniatura),
+  **Salva con nome…** (copia nuova nella libreria con tutte le texture; il progetto passa a
+  usare la copia, l'originale resta com'era), **Ripristina** (torna alla versione salvata) e
+  l'avviso "modifiche non salvate nella libreria". Per i materiali del progetto (non della
+  libreria) c'è "Salva nella libreria…".
+- Le texture esterne alla cartella vengono copiate dentro, così il materiale resta
+  autosufficiente. Test in `forge_library` (salva, texture esterna, salva con nome, nome vuoto).
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

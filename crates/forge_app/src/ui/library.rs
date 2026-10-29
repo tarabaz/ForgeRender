@@ -166,6 +166,17 @@ impl LibraryUi {
         self.items.get_or_insert_with(store::list)
     }
 
+    /// Versione salvata nella libreria del materiale `id` (`lib:…`), se c'è.
+    pub fn saved_version(&mut self, id: &forge_scene::MaterialId) -> Option<&LibraryMaterial> {
+        self.materials().iter().find(|m| &m.material.id == id)
+    }
+
+    /// Dopo un salvataggio: elenco e miniatura del materiale si ricaricano.
+    pub fn material_saved(&mut self, m: &LibraryMaterial) {
+        self.items = None;
+        self.thumbs.remove(&format!("mat:{}", m.dir.display()));
+    }
+
     /// Texture della miniatura `key`; avvia il caricamento in background se serve.
     fn thumb(
         &mut self,
@@ -316,10 +327,14 @@ fn poll(app: &mut ForgeApp, ctx: &egui::Context) {
     }
 }
 
-/// Aggiunge il materiale della libreria al progetto e lo assegna alla selezione.
+/// Aggiunge il materiale della libreria al progetto e lo assegna alla selezione. Se il
+/// progetto lo contiene già, si tengono le sue impostazioni (anche quelle non salvate
+/// nella libreria): si ripristinano con "Ripristina dalla libreria".
 pub fn apply_material(app: &mut ForgeApp, m: &LibraryMaterial) {
     let id = m.material.id.clone();
-    app.scene.materials.upsert(m.material.clone());
+    if app.scene.materials.get(&id).is_none() {
+        app.scene.materials.upsert(m.material.clone());
+    }
     for &i in &app.selection {
         app.scene.assignments.insert(app.scene.nodes[i].id.clone(), id.clone());
     }
@@ -532,8 +547,19 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
         }
     });
     if let Some(m) = apply {
+        let kept = app.scene.materials.get(&m.material.id).is_some_and(|p| *p != m.material);
         apply_material(app, &m);
-        app.library.status = Some((format!("«{}» applicato.", m.material.name), false));
+        app.library.status = Some((
+            if kept {
+                format!(
+                    "«{}» applicato con le impostazioni del progetto (non ancora salvate nella libreria).",
+                    m.material.name
+                )
+            } else {
+                format!("«{}» applicato.", m.material.name)
+            },
+            false,
+        ));
     }
     if let Some(m) = delete {
         match store::delete(&m) {
