@@ -416,3 +416,71 @@ shader) aspettano la tua risposta.
 
 **Nota**: i progetti hanno `threads: 0`, cioè automatico (thread logici − 1). Il runner ha
 2 vCPU, da qui "1 thread" nel log.
+
+
+### Richiesta di ChatGPT — 2026-10-29: menu Impostazioni e importazione fedele dei materiali PBR
+
+**Richiesta dell'utente:** implementare un menu Impostazioni completo, persistente e ben organizzato, dando priorità alle opzioni della libreria materiali. In particolare, i materiali scaricati da Poly Haven e ambientCG devono essere importati fedelmente: non basta scaricare alcune texture e ricreare valori PBR arbitrari. L'utente non deve essere costretto a costruirsi una libreria manualmente, materiale per materiale.
+
+#### Fatto osservato dalla cartella mostrata dall'utente
+
+Per il materiale `metal_plate_02`, il download diretto dal sito contiene:
+- `metal_plate_02_diff_4k.jpg` — mappa colore/albedo;
+- `metal_plate_02_disp_4k.png` — displacement;
+- `metal_plate_02_metal_4k.exr` — metallicità;
+- `metal_plate_02_nor_gl_4k.exr` — normal map OpenGL;
+- `metal_plate_02_rough_4k.exr` — roughness.
+
+La cartella vista nella libreria ForgeRender conteneva invece una miniatura, `materiale.json` e mappe PNG per AO, normal e roughness; nella schermata non erano visibili colore base, metallicità o displacement. Questo è un confronto visivo delle cartelle, non ancora una verifica del contenuto effettivo del catalogo o del codice di download. Va determinato se si tratti di un pacchetto ridotto scelto dalla libreria, di una variante di download diversa o di un problema nell'importazione.
+
+#### Requisiti di implementazione
+
+1. **Menu Impostazioni vero e proprio**
+   - UI coerente con ForgeRender, organizzata in sezioni (Generali, Libreria e importazione materiali, Rendering/qualità, Prestazioni, Librerie e percorsi, Informazioni).
+   - Configurazione persistente, ripristino al riavvio, gestione robusta di file mancanti o non validi e ripristino delle impostazioni predefinite.
+   - Controlli collegati a funzionalità reali; non aggiungere opzioni decorative o non operative.
+   - Per la sezione materiali, prevedere impostazioni esplicite per rispettare i parametri originali, applicare preset solo quando richiesto, e correggere solo campi mancanti/non validi. I preset non devono sovrascrivere parametri sorgente validi.
+
+2. **Download fedele del pacchetto originale**
+   - Verificare per Poly Haven e ambientCG le API/metadati e il percorso di download effettivamente usato.
+   - Scaricare tutte le mappe previste e disponibili per la variante/risoluzione scelta, senza sostituire silenziosamente il pacchetto completo con una selezione parziale.
+   - Conservare i file originali e i loro nomi; indicare chiaramente se una mappa non esiste nella sorgente.
+   - Non confondere pacchetti o risoluzioni diverse.
+
+3. **Supporto EXR reale**
+   - Verificare e implementare, se necessario, la decodifica EXR nel percorso usato dal renderer, non soltanto per le miniature.
+   - Mantenere la precisione originale; non convertire automaticamente le mappe EXR in PNG a 8 bit.
+   - Gestire correttamente canali, valori HDR e mappe numeriche.
+   - Se una mappa è corrotta o non supportata, mostrare un errore esplicito e non sostituirla silenziosamente con un valore inventato.
+
+4. **Riconoscimento e associazione delle mappe**
+   - Riconoscere almeno i suffissi verificati nel materiale di esempio: `diff`, `disp`, `metal`, `nor_gl`, `rough`, oltre alle mappe AO e alle varianti già supportate.
+   - Gestire mappe ORM/ARM impacchettate nei canali, secondo il formato dichiarato dalla sorgente.
+   - Collegare ogni mappa al canale corretto e distinguere le mappe colore dai dati lineari.
+   - Rispettare la convenzione OpenGL di `nor_gl`; convertire il canale Y solo se necessario e in modo esplicito.
+
+5. **Conservazione dei parametri PBR**
+   - Leggere e conservare i parametri forniti dalla sorgente o dai suoi metadati.
+   - Non inventare o sostituire metallic, roughness, IOR, specular, transmission, emissione o colore quando la sorgente fornisce già valori validi.
+   - Applicare valori predefiniti solo ai campi assenti/non validi e solo secondo una politica configurabile.
+   - Se il renderer non supporta una proprietà sorgente, dichiarare il limite invece di affermare che il materiale è riprodotto fedelmente.
+   - La categoria può guidare un preset soltanto quando richiesto o quando mancano informazioni affidabili; se la categoria è sconosciuta, preservare i dati originali.
+
+6. **Test e verifica end-to-end**
+   - Test automatici per decodifica EXR, riconoscimento dei nomi, assegnazione ai canali, interpretazione lineare/sRGB, convenzione delle normal map e persistenza delle impostazioni.
+   - Test che dimostrino che i parametri validi della sorgente non vengono sovrascritti.
+   - Verifica del pacchetto scaricato per `metal_plate_02`, confrontando le mappe disponibili dal sito con quelle scaricate dalla libreria.
+   - Test di rendering o verifica end-to-end che dimostri che EXR viene realmente usato nel materiale.
+   - Eseguire `cargo fmt --all --check`, i test pertinenti e Clippy secondo le convenzioni del repository; riportare solo risultati realmente ottenuti.
+
+#### Vincoli e consegna
+
+- Prima di modificare, ispezionare il codice attuale della libreria, il download delle sorgenti, il decoder immagini e il percorso di creazione/applicazione dei materiali.
+- Lavorare su un branch separato, senza modificare direttamente il branch principale.
+- Non introdurre dipendenze senza necessità concreta.
+- Aggiungere una nuova sezione di risposta datata senza cancellare le note precedenti, indicando file, branch, commit, comandi eseguiti, risultati, limiti e attività non completate.
+- Non dichiarare completato il supporto EXR se il formato viene soltanto riconosciuto dal nome ma non decodificato e utilizzato durante il rendering.
+
+**Risultato atteso:** l'utente sceglie e scarica un materiale nella libreria, e ForgeRender recupera le mappe e i parametri realmente disponibili, li interpreta correttamente e riproduce il materiale il più fedelmente possibile, senza correzioni manuali obbligatorie. Il menu Impostazioni consente di governare esplicitamente le politiche di importazione senza alterare per default i dati validi della sorgente.
+
+**Stato:** richiesta registrata in questa nota; nessuna implementazione o test è stato eseguito da ChatGPT.
