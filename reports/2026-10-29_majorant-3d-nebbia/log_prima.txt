@@ -1,0 +1,7 @@
+6524bc2 Build-ForgeRender.ps1: aggiornamento da GitHub e compilazione locale con un comando [skip ci]
+intera cpu: nebbia «Ghiaccio secco nel cocktail»: simulazione 128×90×128 celle, 297 passi in 47112 ms; densità 200×140×200 in 894 ms
+intera cpu: 320x400 | 32 campioni | 96966 triangoli | compilazione scena 49394 ms | rendering 20.25 s | 632.7 ms/passata | 0.20 Mcampioni/s | 3 thread | -> prima_intera_cpu.png
+intera gpu: nebbia «Ghiaccio secco nel cocktail»: simulazione 128×90×128 celle, 297 passi in 45204 ms; densità 200×140×200 in 956 ms
+vicina cpu: nebbia «Ghiaccio secco nel cocktail»: simulazione 128×90×128 celle, 297 passi in 45436 ms; densità 200×140×200 in 992 ms
+vicina cpu: 320x400 | 32 campioni | 96966 triangoli | compilazione scena 47030 ms | rendering 26.55 s | 829.7 ms/passata | 0.15 Mcampioni/s | 3 thread | -> prima_vicina_cpu.png
+vicina gpu: nebbia «Ghiaccio secco nel cocktail»: simulazione 128×90×128 celle, 297 passi in 43170 ms; densità 200×140×200 in 935 ms

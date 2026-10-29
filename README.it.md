@@ -73,8 +73,165 @@ cargo run --release -p forge_cli -- bench   # benchmark
 Pacchetti Windows in locale: `powershell -ExecutionPolicy Bypass -File packaging\windows\package.ps1`
 (per l'installer serve [Inno Setup 6](https://jrsoftware.org/isdl.php)).
 
+## Benchmark: comandi da lanciare
+
+Elenco di tutte le misure che si possono fare, con a cosa serve ciascuna. I risultati veri (e i
+dati grezzi) vanno in [`reports/`](reports/README.md), una cartella per esperimento; quelli già
+fatti sono in [docs/BENCHMARK.md](docs/BENCHMARK.md). Regola: si riportano solo numeri misurati.
+
+### Preparazione (una volta)
+
+I comandi sono per PowerShell, da lanciare **nella cartella del repository** (servono le scene in
+`samples/` e gli script in `reports/strumenti/`, che non sono nello zip). Il programma da usare è
+`forgerender-cli.exe`: quello compilato con `Build-ForgeRender.ps1` oppure quello estratto dallo
+zip `ForgeRender-portable-x64`.
+
+```powershell
+cd C:\percorso\RenderingEngine
+$cli = ".\target\release\forgerender-cli.exe"     # oppure il percorso dello zip estratto
+py -m pip install numpy pillow                    # solo per crea_progetti_bench e confronta_immagini
+py reports\strumenti\crea_progetti_bench.py       # crea bench_intera / bench_vicina / bench_ad
+```
+
+`crea_progetti_bench.py` crea tre progetti accanto alla demo del cocktail, tutti senza
+profondità di campo e con la camera fissa. Non vanno committati.
+
+| Progetto | Cosa inquadra | Seed |
+|---|---|---|
+| `bench_intera` | l'intera demo | 12345 |
+| `bench_vicina` | ravvicinata sulla nebbia | 12345 |
+| `bench_ad` | l'intera demo | dato da `--seed` |
+
+Le righe da leggere nell'output del render sono:
+- `rendering N s | M ms/passata | X Mcampioni/s`
+- `geometria compilata … in N ms`
+- `nebbia «…»: simulazione … in N ms`
+
+### 1. Hardware rilevato
+
+```powershell
+& $cli info
+```
+**A cosa serve**: verificare CPU, thread e RAM viste dal programma. Il nome va scritto in ogni
+report.
+
+### 2. Benchmark standard (CPU, GPU, denoiser)
+
+```powershell
+& $cli bench --json bench.json
+& $cli bench --spp 64 --width 1920 --height 1080 --threads 1,4,8,12,24 --json bench-1080p.json
+```
+**A cosa serve**:
+- **CPU**: scalabilità al variare dei thread.
+- **GPU**: la riga `GPU` riporta Mcampioni/s e quante volte va più veloce di 1 thread.
+- **Denoiser**: OIDN su CPU e CUDA, in ms per immagine.
+
+La scena di test è piccola (11 022 triangoli): misura la velocità pura del path tracer.
+**Confronto**: la tabella del 9900X in `docs/BENCHMARK.md`. Se cambia di molto senza modifiche
+al codice, cambiano driver o impostazioni di energia.
+
+### 3. Scena reale pesante, CPU contro GPU (nebbia, vetro, texture)
+
+```powershell
+$p = "samples\scene\cocktail-ghiaccio-secco"
+& $cli render --project $p\bench_intera.frproject --backend cpu --width 320 --height 400 --spp 32 --quiet --out intera_cpu.png
+& $cli render --project $p\bench_intera.frproject --backend gpu --width 320 --height 400 --spp 32 --quiet --out intera_gpu.png
+& $cli render --project $p\bench_vicina.frproject --backend cpu --width 320 --height 400 --spp 32 --quiet --out vicina_cpu.png
+& $cli render --project $p\bench_vicina.frproject --backend gpu --width 320 --height 400 --spp 32 --quiet --out vicina_gpu.png
+```
+**A cosa serve**:
+- Quanto rende la GPU su una scena vera, non sulla scena di test.
+- Misura il **majorant 3D della nebbia** sulla RTX 5070, che nel container non si è potuto
+  misurare.
+
+**Cosa guardare**: la riga `ms/passata`. Prima del render c'è la simulazione della nebbia, che
+dura qualche decina di secondi e non conta nel tempo di rendering.
+
+**Confronto**: [report majorant](reports/2026-10-29_majorant-3d-nebbia/REPORT.md). Per
+confrontarti con i numeri del container aggiungi `--threads 3` alla riga CPU. Per tempi più
+stabili alza la risoluzione (es. `--width 960 --height 1200 --spp 64`).
+
+### 4. Campionamento adattivo (conviene sulla mia scena?)
+
+```powershell
+$b = "samples\scene\cocktail-ghiaccio-secco\bench_ad.frproject"
+& $cli render --project $b --backend gpu --width 320 --height 400 --spp 1024 --seed 99  --quiet --out ref.png
+& $cli render --project $b --backend gpu --width 320 --height 400 --spp 1024 --seed 100 --quiet --out ref2.png
+& $cli render --project $b --backend gpu --width 320 --height 400 --spp 32  --quiet --out uni32.png
+& $cli render --project $b --backend gpu --width 320 --height 400 --spp 128 --quiet --out uni128.png
+& $cli render --project $b --backend gpu --width 320 --height 400 --spp 1024 --noise-threshold 0.08 --quiet --out ad08.png
+& $cli render --project $b --backend gpu --width 320 --height 400 --spp 1024 --noise-threshold 0.04 --quiet --out ad04.png
+py reports\strumenti\confronta_immagini.py ref.png ref2.png -- uni32.png uni128.png ad08.png ad04.png
+```
+**A cosa serve**: capire se fermare i pixel già puliti fa risparmiare tempo a parità di
+qualità.
+
+**Cosa guardare**:
+- Annota il tempo di ogni render.
+- Calcola **tempo × MSE**: più è basso, meglio è. Si confronta adattivo contro uniforme.
+- Con il threshold attivo il CLI stampa anche i campioni medi per pixel.
+
+Ripeti con `--backend cpu` per confrontare i due backend.
+
+**Confronto**: [report campionamento adattivo](reports/2026-10-29_campionamento-adattivo/REPORT.md).
+Nel container, su questa scena, l'adattivo era meno efficiente.
+
+### 5. Import e BVH di una mesh grande
+
+```powershell
+& $cli render --mesh C:\percorso\modello_grande.stl --unit mm --spp 16 --width 640 --height 360 --quiet --out mesh.png
+```
+**A cosa serve**: il tempo di caricamento delle scene CAD pesanti. Funziona anche con
+`.step`, `.glb` e `.obj`.
+
+**Cosa guardare**: la riga `geometria compilata: N triangoli, BVH M nodi, in T ms` e il tempo
+totale prima che parta il render.
+
+**Confronto**: toro da 1 milione di triangoli in `docs/BENCHMARK.md`.
+
+### 6. Profilo della simulazione della nebbia
+
+```powershell
+$env:FORGE_FOG_PROFILE = "1"
+& $cli render --project samples\scene\cocktail-ghiaccio-secco\bench_intera.frproject --spp 1 --width 160 --height 200 --quiet --out nebbia.png
+Remove-Item Env:FORGE_FOG_PROFILE
+```
+**A cosa serve**: capire quanto costa ogni fase della simulazione fluida (forze, trasporto,
+pressione…), per decidere dove ottimizzare.
+
+**Cosa guardare**: le righe `nebbia «…»: simulazione … passi in N ms` e `profilo nebbia: …`.
+
+### 7. Risoluzione e campioni della scena finale
+
+```powershell
+& $cli render --project samples\scene\cocktail-ghiaccio-secco\cocktail-ghiaccio-secco.frproject --backend gpu --quiet --out finale_gpu.png
+& $cli render --project samples\scene\cocktail-ghiaccio-secco\cocktail-ghiaccio-secco.frproject --backend gpu --denoise finale --cuda --quiet --out finale_gpu_dn.png
+```
+**A cosa serve**: il tempo reale di un'immagine finita, con le impostazioni del progetto
+(risoluzione, campioni, profondità di campo), con e senza denoiser.
+
+### 8. Test di correttezza (prima di fidarsi dei tempi)
+
+```powershell
+cargo test --release --workspace --exclude forge_step
+cargo test --release -p forge_render_gpu -- --nocapture
+cargo test --release -p forge_render_cpu --test portal -- --nocapture
+cargo test --release -p forge_render_cpu --test adaptive -- --nocapture
+```
+**A cosa serve**:
+- **Tutti i test**: confermano che le immagini sono giuste. Tra questi ci sono white furnace,
+  luci contro il risultato analitico, nebbia, vetro, portali e adattivo.
+- **Test della GPU**: sulla RTX 5070 controllano che CPU e GPU diano la stessa immagine.
+- `--nocapture` stampa gli errori misurati (portali, adattivo) da confrontare con i report.
+
+### Dove scrivere i risultati
+
+Crea `reports/AAAA-MM-GG_argomento/` con un `REPORT.md` (macchina, commit, comandi, tabella) e i
+file di output e le immagini. Poi aggiungi una riga all'indice in `reports/README.md`.
+
 ## Documentazione
 
+- [reports/](reports/README.md) — report delle misure con dati grezzi, immagini e comandi per rifarle
 - [docs/ROADMAP.it.md](docs/ROADMAP.it.md) — stato, prossimi passi con la complessità, piani tecnici
   ([English](docs/ROADMAP.md))
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architettura, scelte tecniche, rischi

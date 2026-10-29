@@ -1,0 +1,2 @@
+951501d Nebbia: majorant 3D per blocchi con attraversamento DDA (CPU e GPU)
+480x270 | 64 campioni | 11022 triangoli | compilazione scena 43 ms | rendering 4.07 s | 63.6 ms/passata | 2.04 Mcampioni/s | 3 thread | -> prima_test_64.png

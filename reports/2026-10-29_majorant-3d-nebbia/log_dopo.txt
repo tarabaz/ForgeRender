@@ -1,0 +1,2 @@
+intera cpu: 320x400 | 32 campioni | 96966 triangoli | compilazione scena 45075 ms | rendering 11.91 s | 372.2 ms/passata | 0.34 Mcampioni/s | 3 thread | -> dopo_intera_cpu.png
+vicina cpu: 320x400 | 32 campioni | 96966 triangoli | compilazione scena 44445 ms | rendering 13.44 s | 419.8 ms/passata | 0.30 Mcampioni/s | 3 thread | -> dopo_vicina_cpu.png

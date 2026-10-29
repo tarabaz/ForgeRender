@@ -144,5 +144,13 @@
   Tutti i test del workspace verdi; GPU verificata con i test esistenti (furnace, Beer–Lambert,
   ghiaccio secco GPU contro CPU).
 
+### Report delle misure e comandi di benchmark
+- Nuova cartella `reports/`: un report per esperimento (`AAAA-MM-GG_argomento/REPORT.md` con
+  comandi, tabelle, log originali e immagini), indice in `reports/README.md`, strumenti in
+  `reports/strumenti/` (`crea_progetti_bench.py`, `confronta_immagini.py`).
+- Report: esperimenti precedenti (riepilogo), majorant 3D della nebbia, campionamento adattivo.
+- README (italiano e inglese): sezione "Benchmark: comandi da lanciare" con tutte le misure
+  possibili e a cosa servono.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

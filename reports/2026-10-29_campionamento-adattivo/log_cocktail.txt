@@ -1,0 +1,8 @@
+320x400 | 1024 campioni | 96966 triangoli | compilazione scena 51713 ms | rendering 445.35 s | 434.9 ms/passata | 0.29 Mcampioni/s | 3 thread | -> ref.png
+320x400 | 128 campioni | 96966 triangoli | compilazione scena 47919 ms | rendering 55.00 s | 429.7 ms/passata | 0.30 Mcampioni/s | 3 thread | -> uni128.png
+320x400 | 1024 campioni | 96966 triangoli | compilazione scena 48694 ms | rendering 272.79 s | 266.4 ms/passata | 0.29 Mcampioni/s | 3 thread | -> ad04.png
+campionamento adattivo: soglia 0.04 | campioni per pixel: media 621.2, massimo 1024 | 79517952 campioni in totale
+320x400 | 1024 campioni | 96966 triangoli | compilazione scena 48871 ms | rendering 170.67 s | 166.7 ms/passata | 0.25 Mcampioni/s | 3 thread | -> ad08.png
+campionamento adattivo: soglia 0.08 | campioni per pixel: media 337.9, massimo 1024 | 43249920 campioni in totale
+320x400 | 32 campioni | 96966 triangoli | compilazione scena 45762 ms | rendering 12.90 s | 403.1 ms/passata | 0.32 Mcampioni/s | 3 thread | -> uni32.png
+320x400 | 1024 campioni | 96966 triangoli | compilazione scena 46487 ms | rendering 431.52 s | 421.4 ms/passata | 0.30 Mcampioni/s | 3 thread | -> ref2.png
