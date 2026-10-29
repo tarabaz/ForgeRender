@@ -17,6 +17,9 @@
 //! | impacchettata | arm, orm (R = occlusione, G = rugosità, B = metallicità) |
 //!
 //! Mappe ignorate: anteprime, cavity, specular, translucency, id.
+//!
+//! Decide l'ultima parola riconosciuta del nome: il tipo sta in fondo, mentre il nome del
+//! materiale all'inizio può contenere parole chiave (`metal_plate_02_diff_4k` è il colore).
 
 use std::path::{Path, PathBuf};
 
@@ -100,59 +103,54 @@ pub fn words(stem: &str) -> Vec<String> {
     out
 }
 
+/// Cosa indica una parola del nome di una mappa.
+#[derive(Clone, Copy)]
+enum Word {
+    Map(MapKind),
+    /// Anteprime, cavity, specular…: il file non è una mappa usata.
+    Ignore,
+}
+
+fn word_kind(w: &str) -> Option<Word> {
+    Some(match w {
+        "preview" | "thumb" | "thumbnail" | "sphere" | "render" | "cavity" | "specular" | "spec" | "translucency" | "idmap" | "id"
+        | "swatch" => Word::Ignore,
+        "normal" | "nor" | "nrm" | "norm" | "normalgl" | "normalmap" => Word::Map(MapKind::Normal(false)),
+        "normaldx" => Word::Map(MapKind::Normal(true)),
+        "arm" | "orm" => Word::Map(MapKind::Packed),
+        "roughness" | "rough" | "rgh" => Word::Map(MapKind::Roughness),
+        "gloss" | "glossiness" => Word::Map(MapKind::Gloss),
+        "metalness" | "metallic" | "metal" => Word::Map(MapKind::Metallic),
+        "displacement" | "disp" | "height" | "bump" | "heightmap" => Word::Map(MapKind::Height),
+        "ao" | "ambientocclusion" | "occlusion" => Word::Map(MapKind::Ao),
+        "opacity" | "alpha" | "mask" | "transparency" | "cutout" => Word::Map(MapKind::Opacity),
+        "color" | "colour" | "basecolor" | "albedo" | "diffuse" | "diff" | "col" | "basecol" => Word::Map(MapKind::BaseColor),
+        _ => return None,
+    })
+}
+
 /// Tipo di mappa di un file immagine, dal nome.
+///
+/// Decide l'**ultima** parola riconosciuta: le librerie mettono il tipo in fondo
+/// (`metal_plate_02_diff_4k`, `Wood049_2K-JPG_NormalGL`), mentre il nome del materiale
+/// all'inizio può contenere a sua volta parole come "metal", "rough" o "color".
 pub fn classify(path: &Path) -> Option<MapKind> {
     let ext = path.extension()?.to_str()?.to_ascii_lowercase();
     if !IMAGE_EXTENSIONS.contains(&ext.as_str()) {
         return None;
     }
     let w = words(path.file_stem()?.to_str()?);
-    let has = |list: &[&str]| w.iter().any(|x| list.contains(&x.as_str()));
-    if has(&[
-        "preview",
-        "thumb",
-        "thumbnail",
-        "sphere",
-        "render",
-        "cavity",
-        "specular",
-        "spec",
-        "translucency",
-        "idmap",
-        "id",
-        "swatch",
-    ]) {
-        return None;
+    let (i, kind) = w.iter().enumerate().rev().find_map(|(i, x)| word_kind(x).map(|k| (i, k)))?;
+    match kind {
+        Word::Ignore => None,
+        // Convenzione DirectX se lo dicono le parole che seguono ("nor_dx", "Normal_DirectX").
+        Word::Map(MapKind::Normal(dx)) => {
+            // ("DirectX" viene diviso in "direct" + "x").
+            let after = w[i + 1..].concat();
+            Some(MapKind::Normal(dx || after.contains("dx") || after.contains("directx")))
+        }
+        Word::Map(k) => Some(k),
     }
-    if has(&["normal", "nor", "nrm", "norm", "normalgl", "normaldx", "normalmap"]) {
-        let dx = has(&["dx", "directx", "normaldx"]);
-        return Some(MapKind::Normal(dx));
-    }
-    if has(&["arm", "orm"]) {
-        return Some(MapKind::Packed);
-    }
-    if has(&["roughness", "rough", "rgh"]) {
-        return Some(MapKind::Roughness);
-    }
-    if has(&["gloss", "glossiness"]) {
-        return Some(MapKind::Gloss);
-    }
-    if has(&["metalness", "metallic", "metal"]) {
-        return Some(MapKind::Metallic);
-    }
-    if has(&["displacement", "disp", "height", "bump", "heightmap"]) {
-        return Some(MapKind::Height);
-    }
-    if has(&["ao", "ambientocclusion", "occlusion"]) {
-        return Some(MapKind::Ao);
-    }
-    if has(&["opacity", "alpha", "mask", "transparency", "cutout"]) {
-        return Some(MapKind::Opacity);
-    }
-    if has(&["color", "colour", "basecolor", "albedo", "diffuse", "diff", "col", "basecol"]) {
-        return Some(MapKind::BaseColor);
-    }
-    None
 }
 
 /// Parole che indicano il tipo di mappa (da togliere per ricavare il nome del materiale).
@@ -352,6 +350,46 @@ mod tests {
         assert_eq!(k("ugkmbdkn_4K_Cavity.jpg"), None);
         assert_eq!(k("ugkmbdkn_4K_Specular.jpg"), None);
         assert_eq!(k("notes.txt"), None);
+    }
+
+    /// Il nome del materiale contiene parole chiave: decide il suffisso, non il nome
+    /// (prima `metal_plate_02_diff` veniva preso per metallicità e l'AO finiva come metallic).
+    #[test]
+    fn material_name_with_map_words() {
+        // Poly Haven "metal_plate_02", nomi reali del pacchetto.
+        assert_eq!(k("metal_plate_02_diff_4k.jpg"), Some(MapKind::BaseColor));
+        assert_eq!(k("metal_plate_02_disp_4k.png"), Some(MapKind::Height));
+        assert_eq!(k("metal_plate_02_metal_4k.exr"), Some(MapKind::Metallic));
+        assert_eq!(k("metal_plate_02_nor_gl_4k.exr"), Some(MapKind::Normal(false)));
+        assert_eq!(k("metal_plate_02_rough_4k.exr"), Some(MapKind::Roughness));
+        assert_eq!(k("metal_plate_02_ao_4k.png"), Some(MapKind::Ao));
+        assert_eq!(k("metal_plate_02_arm_4k.png"), Some(MapKind::Packed));
+        // Altri nomi con parole chiave all'inizio.
+        assert_eq!(k("rough_rock_02_nor_dx_2k.png"), Some(MapKind::Normal(true)));
+        assert_eq!(k("color_tiles_rough_1k.jpg"), Some(MapKind::Roughness));
+        assert_eq!(k("normal_stone_diff_2k.jpg"), Some(MapKind::BaseColor));
+        assert_eq!(k("specular_tiles_diff_2k.jpg"), Some(MapKind::BaseColor));
+        assert_eq!(k("dx_panel_nor_gl_2k.png"), Some(MapKind::Normal(false)));
+        assert_eq!(k("Metal049B_1K-JPG_Color.jpg"), Some(MapKind::BaseColor));
+        assert_eq!(k("Metal049B_1K-JPG_Metalness.jpg"), Some(MapKind::Metallic));
+        assert_eq!(k("Metal049B_1K-JPG_NormalDX.jpg"), Some(MapKind::Normal(true)));
+        assert_eq!(k("Metal049B_1K-JPG_Displacement.jpg"), Some(MapKind::Height));
+        assert_eq!(k("Fabric_Normal_DirectX.png"), Some(MapKind::Normal(true)));
+        assert_eq!(k("metal_plate_02_preview.png"), None);
+        let f = |n: &str| PathBuf::from(n);
+        let set = detect(&[
+            f("metal_plate_02_diff_4k.jpg"),
+            f("metal_plate_02_disp_4k.png"),
+            f("metal_plate_02_metal_4k.png"),
+            f("metal_plate_02_nor_gl_4k.png"),
+            f("metal_plate_02_rough_4k.png"),
+            f("metal_plate_02_ao_4k.png"),
+        ]);
+        assert_eq!(set.base_color, Some(f("metal_plate_02_diff_4k.jpg")));
+        assert_eq!(set.height, Some(f("metal_plate_02_disp_4k.png")));
+        assert_eq!(set.metallic, Some(f("metal_plate_02_metal_4k.png")));
+        assert_eq!(set.ao, Some(f("metal_plate_02_ao_4k.png")));
+        assert_eq!(set.count(), 6);
     }
 
     #[test]
