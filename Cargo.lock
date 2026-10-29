@@ -929,6 +929,8 @@ dependencies = [
  "image",
  "rayon",
  "rfd",
+ "serde",
+ "serde_json",
  "tracing",
 ]
 
