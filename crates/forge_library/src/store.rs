@@ -4,7 +4,7 @@
 //! ```text
 //! Legno noce 049/
 //!   materiale.json        parametri ForgeRender (texture con percorsi relativi)
-//!   anteprima-v2.png      miniatura renderizzata (sfera grande quanto una tessera)
+//!   anteprima-v3.png      miniatura renderizzata (sfera grande quanto una tessera)
 //!   Wood049_Color.jpg …   mappe PBR
 //! ```
 //! La cartella si può copiare su un altro PC o condividere: è autosufficiente.
@@ -16,10 +16,13 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 pub const MATERIAL_FILE: &str = "materiale.json";
-/// Anteprima renderizzata (v2: scena alla scala del materiale; le vecchie si rifanno).
-pub const THUMBNAIL_FILE: &str = "anteprima-v2.png";
-/// Anteprima della versione precedente (sfera di 2 m, rilievo poco visibile): si elimina.
-const LEGACY_THUMBNAIL_FILE: &str = "anteprima.png";
+/// Anteprima renderizzata (v3: displacement spento di default; le vecchie si rifanno).
+pub const THUMBNAIL_FILE: &str = "anteprima-v3.png";
+/// Anteprime delle versioni precedenti: si eliminano quando si salva quella nuova.
+const LEGACY_THUMBNAIL_FILES: [&str; 2] = ["anteprima.png", "anteprima-v2.png"];
+/// Versione di `materiale.json`. Nella 1 il displacement veniva acceso in automatico
+/// all'import (3 % del lato della texture): al caricamento si riporta a 0.
+const FILE_VERSION: u32 = 2;
 
 #[derive(Serialize, Deserialize)]
 struct MaterialFile {
@@ -80,9 +83,11 @@ pub fn material_from_maps(name: &str, id: &str, set: &MapSet, size_m: Option<f32
         normal_directx: set.normal_directx,
         metallic_texture: set.metallic.clone(),
         height_texture: set.height.clone(),
-        // Con la normal map il rilievo fine è già incluso: la height serve al displacement.
+        // Con la normal map il rilievo fine è già incluso. Il displacement resta spento: molte
+        // height map (metalli, vernici, plastiche) contengono solo micro-variazioni normalizzate
+        // su tutta la scala e con un valore automatico diventano bozzi. Si accende dal pannello.
         bump_mm: if has(&set.normal) { 0.0 } else { 1.0 },
-        displacement_mm: if has(&set.height) { default_displacement_mm(size_m) } else { 0.0 },
+        displacement_mm: 0.0,
         ao_texture: set.ao.clone(),
         opacity_texture: set.opacity.clone(),
         mapping: TextureMapping {
@@ -95,8 +100,8 @@ pub fn material_from_maps(name: &str, id: &str, set: &MapSet, size_m: Option<f32
     }
 }
 
-/// Escursione di displacement proposta: 3% del lato della texture (3–60 mm), simile al
-/// rilievo delle miniature dei fornitori; si regola nel pannello del materiale.
+/// Escursione di displacement proposta quando lo si accende dal pannello: 3% del lato della
+/// texture (3–60 mm), adatta a materiali con rilievo vero (pietre, mattoni, cortecce).
 pub fn default_displacement_mm(size_m: Option<f32>) -> f32 {
     (size_m.filter(|s| s.is_finite() && *s > 0.0).unwrap_or(1.0) * 30.0).clamp(3.0, 60.0)
 }
@@ -127,9 +132,9 @@ pub fn load(dir: &Path) -> anyhow::Result<LibraryMaterial> {
     let text = std::fs::read_to_string(dir.join(MATERIAL_FILE))?;
     let f: MaterialFile = serde_json::from_str(&text).context("materiale.json non valido")?;
     let mut material = f.material;
-    // Materiali salvati prima del displacement: si attiva con il valore proposto.
-    if material.height_texture.is_some() && !text.contains("\"displacement_mm\"") {
-        material.displacement_mm = default_displacement_mm(Some(material.mapping.scale));
+    // Versione 1: il displacement era quello automatico dell'import, non una scelta.
+    if f.version < 2 {
+        material.displacement_mm = 0.0;
     }
     for slot in material.texture_slots_mut().into_iter().flatten() {
         if slot.is_relative() {
@@ -155,7 +160,7 @@ pub fn save(dir: &Path, material: &Material, source: &str) -> anyhow::Result<()>
         }
     }
     let f = MaterialFile {
-        version: 1,
+        version: FILE_VERSION,
         source: source.to_string(),
         material: m,
     };
@@ -236,7 +241,9 @@ pub fn save_as(material: &Material, name: &str, source: &str) -> anyhow::Result<
 
 /// Salva la miniatura (RGBA8) del materiale.
 pub fn save_thumbnail(dir: &Path, width: u32, height: u32, rgba: &[u8]) -> anyhow::Result<PathBuf> {
-    let _ = std::fs::remove_file(dir.join(LEGACY_THUMBNAIL_FILE));
+    for old in LEGACY_THUMBNAIL_FILES {
+        let _ = std::fs::remove_file(dir.join(old));
+    }
     let p = dir.join(THUMBNAIL_FILE);
     image::save_buffer(&p, rgba, width, height, image::ColorType::Rgba8)?;
     Ok(p)
@@ -434,6 +441,8 @@ mod tests {
         assert!(mat.ao_texture.is_some());
         assert!(mat.metallic_texture.is_none());
         assert_eq!(mat.bump_mm, 0.0, "con la normal map il rilievo resta spento");
+        assert!(mat.height_texture.is_some());
+        assert_eq!(mat.displacement_mm, 0.0, "displacement spento di default");
         assert_eq!(mat.mapping.scale, 2.0);
         // Il JSON salva percorsi relativi: la cartella è spostabile.
         let json = std::fs::read_to_string(m.dir.join(MATERIAL_FILE)).unwrap();
@@ -471,6 +480,19 @@ mod tests {
             ["Mattoni", "Metal012"]
         );
         assert!(all[0].material.id.0.starts_with("lib:"));
+
+        // File della versione 1 (displacement automatico dell'import): torna a 0.
+        let json_path = all[0].dir.join(MATERIAL_FILE);
+        let mut v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&json_path).unwrap()).unwrap();
+        v["version"] = 1.into();
+        v["material"]["displacement_mm"] = 30.0.into();
+        std::fs::write(&json_path, v.to_string()).unwrap();
+        assert_eq!(load(&all[0].dir).unwrap().material.displacement_mm, 0.0);
+        // Una scelta salvata dalla versione 2 in poi resta.
+        let mut chosen = load(&all[0].dir).unwrap().material;
+        chosen.displacement_mm = 12.0;
+        assert_eq!(update(&all[0].dir, &chosen).unwrap().material.displacement_mm, 12.0);
+        let all = list();
 
         // Salva: le modifiche restano nella cartella, provenienza e texture conservate.
         let mut edited = all[0].material.clone();

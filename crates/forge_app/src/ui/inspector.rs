@@ -661,7 +661,21 @@ fn relief_controls(ui: &mut egui::Ui, m: &mut Material) -> bool {
                 )
                 .changed();
             ui.end_row();
-            if m.displacement_mm > 0.0 {
+            if m.displacement_mm <= 0.0 {
+                ui.label("");
+                if ui
+                    .small_button("Valore proposto")
+                    .on_hover_text(
+                        "Accende il displacement al 3 % del lato della texture: per materiali con rilievo vero \
+                         (pietre, mattoni, cortecce). Per metalli, vernici e plastiche lascialo a 0.",
+                    )
+                    .clicked()
+                {
+                    m.displacement_mm = forge_library::store::default_displacement_mm(Some(m.mapping.scale));
+                    changed = true;
+                }
+                ui.end_row();
+            } else {
                 ui.label("Livello medio");
                 changed |= ui
                     .add(egui::Slider::new(&mut m.displacement_mid, 0.0..=1.0))

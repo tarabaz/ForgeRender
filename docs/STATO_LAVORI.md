@@ -179,5 +179,15 @@
     dell'adattivo) dalla cartella estratta.
 - CLI: avviso "file non trovato: modello …" se manca un modello del progetto.
 
+### Materiali scaricati: displacement spento di default
+- Segnalazione: Metal 049 B (ambientCG) ha una miniatura liscia sul sito, ma applicato diventava
+  una sfera piena di bozzi. Causa: all'import il displacement veniva acceso in automatico al 3 %
+  del lato della texture (30 mm per 1 m). Le height map dei metalli, delle vernici e delle
+  plastiche contengono solo micro-variazioni stirate su tutta la scala di grigi.
+- Ora l'import lascia la height map collegata ma il displacement a 0. I materiali già nella
+  libreria (`materiale.json` versione 1) tornano a 0 al caricamento; da versione 2 il valore
+  salvato con "Salva" resta. Le miniature si rifanno (`anteprima-v3.png`).
+- Pannello Rilievo: pulsante "Valore proposto" (3 % del lato) per i materiali con rilievo vero.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
