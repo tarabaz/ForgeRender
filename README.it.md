@@ -49,8 +49,9 @@ roadmap.
 
 ## Scaricare la versione Windows
 
-Ogni push viene compilato da GitHub Actions (job *Build e pacchetti (Windows)*); nella sezione
-*Artifacts* del run ci sono due pacchetti:
+La build su GitHub Actions **non** parte ai push: si avvia a mano da *Actions → CI → Run workflow*
+(oppure si compila in locale con `Build-ForgeRender.ps1`). Nella sezione *Artifacts* del run ci
+sono due pacchetti:
 
 | Pacchetto | Contenuto |
 |---|---|

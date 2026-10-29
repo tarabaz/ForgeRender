@@ -1,19 +1,8 @@
 name: CI
 
-# Si compila solo quando cambia il codice: i commit che toccano soltanto documenti,
-# report e note tra agenti (reports/, docs/, file .md) non avviano la build.
-# La build si può sempre lanciare a mano da Actions → CI → Run workflow.
+# La build NON parte da sola: si avvia solo a mano (Actions → CI → Run workflow), quando
+# Valerio lo chiede. Di solito compila lui in locale con Build-ForgeRender.ps1.
 on:
-  push:
-    paths-ignore:
-      - 'reports/**'
-      - 'docs/**'
-      - '**.md'
-  pull_request:
-    paths-ignore:
-      - 'reports/**'
-      - 'docs/**'
-      - '**.md'
   workflow_dispatch:
 
 # Un nuovo push sullo stesso branch annulla i run precedenti ancora in corso:

@@ -49,8 +49,9 @@ are on the roadmap.
 
 ## Download the Windows build
 
-Every push is built by GitHub Actions (job *Build e pacchetti (Windows)*); two packages are
-available in the *Artifacts* section of the run:
+The GitHub Actions build does **not** start on push: start it manually from *Actions → CI → Run
+workflow* (or build locally with `Build-ForgeRender.ps1`). The run's *Artifacts* section has two
+packages:
 
 | Package | Contents |
 |---|---|
