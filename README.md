@@ -12,6 +12,20 @@ but also working without a dedicated GPU.
 
 ## What it does today
 
+- **Simple / Advanced interface** (switch at the top, Simple by default): "Product photo in
+  5 steps" with large buttons (import, place on the base, frame, look, materials, 16:9 / 1:1 /
+  4:5 / 9:16 format, Draft / Balanced / High quality, render and save). Advanced has every
+  control; both modes edit the same values.
+- **Photo studio**: start-up scene with a tilted cloth backdrop and four studio lights; light
+  color (warm 3200 K, neutral 5500 K, cool 7500 K or per light). Other looks: Light background,
+  Dark background, Dramatic studio. **Prepare product scene** and **Fit the scene to the
+  product** resize backdrop and lights to the product; **Undo preset** restores the scene.
+  New lights and objects appear next to the product.
+- **Languages**: Italian and English, the whole interface switches immediately (at the top or in
+  Settings → Language). Translations are separate `lang/Lan_*.json` files: copy `Lan_eng.json`
+  to add more.
+- **Welcome screen** at start-up with an image (`assets/splash.png`), version and commit; it
+  closes with "Close" and reopens from File.
 - **Path tracing** on the CPU (all cores) and on the GPU (wgpu compute shaders, Vulkan/DX12)
   with real progressive accumulation (16…1024 samples, custom or unlimited, changeable while
   rendering). Next Event Estimation + Multiple Importance Sampling, Russian roulette, SAH BVH.
@@ -26,13 +40,16 @@ but also working without a dedicated GPU.
   ambientCG and Poly Haven or imported from folders/zip files, kept in a local `Library`
   folder with previews.
 - **Lights and environment**: area, point, spot and directional lights, studio presets;
-  uniform, gradient or HDRI environment (.hdr/.exr) with importance sampling.
+  uniform, gradient or HDRI environment (.hdr/.exr) with importance sampling. Point and spot
+  lights have a **range** with edge falloff, independent of the intensity, drawn as a bubble in
+  the viewport (CPU and GPU).
 - **Volumetric fog**: procedural dry-ice fog (seeded, deterministic) that falls from a point
   emitter, settles, spreads sideways and flows around objects; rendered as a real participating
   medium (delta tracking, Henyey–Greenstein phase, shadows through fog) on CPU and GPU.
 - **Cameras**: orbit viewport camera plus render cameras with a professional lens: focal length
   in mm, f-stop, depth of field (focus plane and near/far limits drawn in the viewport),
-  aperture blades, lens shift.
+  aperture blades, lens shift. **Orthographic and isometric view** in the viewport (icons next
+  to the navigator, numpad 5) and in the render camera.
 - **Import**: glTF/GLB (recommended export from SolidWorks), OBJ (with .mtl), STL, Blender
   `.blend` (through an installed Blender); STEP via Open CASCADE and SolidWorks SLDPRT/SLDASM
   are experimental.
@@ -43,9 +60,6 @@ but also working without a dedicated GPU.
 - Start / pause / resume / stop / automatic restart when the scene changes, PNG export.
 - `.frproject` projects (versioned JSON, atomic save, relative paths).
 - CLI for headless rendering, benchmarks and library import.
-
-The interface is currently in Italian; external language files (Italian and English first)
-are on the roadmap.
 
 ## Download the Windows build
 

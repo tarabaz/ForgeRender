@@ -29,6 +29,8 @@ pub struct Preferences {
     pub ui_mode: UiMode,
     /// Lingua dell'interfaccia (`code` del file `lang/Lan_*.json`: "it", "en"…).
     pub language: String,
+    /// Schermata di benvenuto all'avvio.
+    pub show_splash: bool,
     // --- Libreria e import dei materiali ---
     /// Risoluzione proposta per i download (indice in `online::RESOLUTIONS`: 0 = 1K).
     pub download_resolution: usize,
@@ -57,6 +59,7 @@ impl Default for Preferences {
         Self {
             ui_mode: UiMode::Simple,
             language: crate::i18n::SOURCE_CODE.into(),
+            show_splash: true,
             download_resolution: 0,
             download_provider: "ambientcg".into(),
             import_displacement: ImportDisplacement::Off,
@@ -183,6 +186,7 @@ mod tests {
         let custom = Preferences {
             ui_mode: UiMode::Advanced,
             language: "en".into(),
+            show_splash: false,
             download_resolution: 2,
             download_provider: "polyhaven".into(),
             import_displacement: ImportDisplacement::FromMaterialX,

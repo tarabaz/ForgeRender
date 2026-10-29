@@ -16,7 +16,7 @@ Complexity is a rough estimate of the effort and risk for this codebase:
 | 1 | ✅ Light gizmo: move point/spot lights like objects, visible and editable spot cone (angle + edge softness handles) | Medium | gizmo | Done: move/rotate lights, scale area lights, cone handles |
 | 2 | ✅ Per-object contact snap: while moving, the object stops when it touches another mesh | Medium | BVH picking | Done: per-object setting saved in the project, can slide along surfaces |
 | 3 | ✅ Adaptive sampling: stop when noise is below a threshold | Medium | — | Done: 16×16 tiles, CPU and GPU, noise tests (docs/BENCHMARK.md) |
-| 4 | UI localization with external language files (`Lan_ita`, `Lan_eng`, anyone can add `Lan_spa`) | Medium | — | Mechanical but touches every UI string |
+| 4 | ✅ UI localization with external language files (`Lan_ita`, `Lan_eng`, anyone can add `Lan_spa`) | Medium | — | Done (0.3.0): `lang/Lan_*.json`, immediate switch, translation coverage test |
 | 5 | Decals / stickers (image projected on a surface, planar and cylindrical, with position/scale/rotation) | Medium | textures | — |
 | 6 | ✅ Volumetric dry-ice fog, static and procedural (seeded noise, CPU path tracer with delta tracking) | High | — | Done, see below |
 | 7 | ✅ Fog collision with objects + point emitter with simulated duration (baked, no timeline) | High | 6 | Done |

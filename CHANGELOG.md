@@ -11,6 +11,39 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.3.0 — 29/10/2026
+
+**Foto prodotto**
+- Aspetto **Studio fotografico**, scena di partenza del programma: fondale in tela inclinato
+  (anche in Aggiungi → "Fondale fotografico (tela inclinata)") e quattro luci da studio fuori
+  dall'inquadratura.
+- **Colore delle luci** nel pannello Semplice: calda 3200 K, neutra 5500 K, fredda 7500 K o
+  colore per singola luce; cambiarlo non fa diventare l'aspetto "Personalizzato".
+- **Adatta la scena al prodotto**: dopo aver spostato o scalato il prodotto ridimensiona fondale e
+  luci sulle sue misure (tiene materiale del fondale e colori delle luci) e inquadra; si annulla
+  con "Annulla preset".
+- Luci e oggetti nuovi nascono vicino alla selezione o al prodotto, non al centro della scena.
+
+**Viewport e camera**
+- **Vista ortografica e isometrica**: icona del cubo e pulsante "Iso" sotto il navigatore, tasto 5
+  del tastierino; "Proiezione" Prospettica/Ortografica e "Altezza inquadratura" nella camera di
+  render. Stessa immagine su CPU e GPU (test).
+
+**Luci**
+- Puntiformi e spot: **raggio d'azione** (distanza massima) e **sfumatura del bordo**,
+  indipendenti dall'intensità, disegnati come una bolla nella viewport (piena = dove finisce la
+  luce, tratteggiata = dove comincia la sfumatura). Spento = luce fisica come prima. CPU e GPU
+  (test).
+
+**Interfaccia**
+- **Lingua italiano / inglese** con cambio immediato di tutta l'interfaccia: selettore in alto e
+  Impostazioni → Lingua. Le traduzioni sono file separati `lang/Lan_ita.json` e
+  `lang/Lan_eng.json` (compresi nel programma e copiati nei pacchetti); un file `Lan_*.json` nella
+  cartella `lang` accanto al programma aggiunge una lingua.
+- **Schermata di benvenuto** all'avvio: immagine `assets/splash.png` (render di ForgeRender, da
+  sostituire), versione e commit. Resta davanti finché non si preme "Chiudi"; "Mostra all'avvio"
+  la disattiva; si riapre da File → "Benvenuto e informazioni…".
+
 ## 0.2.0 — 29/10/2026
 
 **Interfaccia**

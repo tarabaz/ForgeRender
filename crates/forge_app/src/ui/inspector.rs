@@ -868,7 +868,7 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
         ui.label(tr("Preset:"));
         for (id, name) in light::PRESETS {
             if ui
-                .button(name)
+                .button(tr(name))
                 .on_hover_text(tr("Sostituisce tutte le luci, adattandole alle dimensioni della scena"))
                 .clicked()
             {
@@ -1427,7 +1427,7 @@ fn effects(app: &mut ForgeApp, ui: &mut egui::Ui) {
                     ui.label(tr("Preset (passa sopra per vedere dove mettere l'emettitore):"));
                     ui.horizontal_wrapped(|ui| {
                         for p in forge_scene::FOG_PRESETS.iter() {
-                            if ui.small_button(p.name).on_hover_text(p.hint).clicked() {
+                            if ui.small_button(tr(p.name)).on_hover_text(tr(p.hint)).clicked() {
                                 p.apply(f);
                                 changed = true;
                             }
@@ -1531,7 +1531,7 @@ fn effects(app: &mut ForgeApp, ui: &mut egui::Ui) {
                                      (Ultra: minuti e qualche centinaio di MB di memoria).",
                                     &[format!("{}", cells), format!("{}", res)],
                                 );
-                                if ui.selectable_label(on, name).on_hover_text(hint).clicked() {
+                                if ui.selectable_label(on, tr(name)).on_hover_text(hint).clicked() {
                                     f.sim_cells = cells;
                                     f.resolution = res;
                                     changed = true;

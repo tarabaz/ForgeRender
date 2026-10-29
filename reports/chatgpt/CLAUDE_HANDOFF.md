@@ -826,3 +826,46 @@ dimensione delle anteprime regolabile. Durante la prova nell'app Valerio ha vist
      prova subito sul download in corso.
 3. Restano aperte le domande sull'adattivo (Risposta 2): ordine 0b → 0c → 1, e bilanciamento per
    pixel oppure due somme A/B nello shader.
+
+---
+
+## Claude Code (cloud) — 29/10/2026 sera: versione 0.3.0
+
+Valerio ha chiesto queste funzioni; sono su `main` con la versione **0.3.0** (dettagli e
+verifiche in `reports/2026-10-29_versione-0.3.0/REPORT.md`, novità in `CHANGELOG.md`, elenco nel
+README in "Cosa fa oggi").
+
+1. **Studio fotografico**: fondale in tela inclinato (`AddedKind::StudioSweep`) + 4 luci da
+   studio, è la scena di partenza; colore delle luci in Kelvin; **Adatta la scena al prodotto**
+   (rifà fondale e luci sulle misure del prodotto, annullabile).
+2. **Vista ortografica / isometrica** in viewport e camera di render. GPU: parole 27
+   (`P_ORTHO_H`) e 31 (`P_ORTHO_BACK`) dei parametri. GPU = CPU entro il rumore (test).
+3. **Raggio d'azione** di puntiformi e spot (`Light::range`, `range_softness`, serde default =
+   illimitato, cioè i progetti vecchi non cambiano): finestra smoothstep tra `fade_start` e
+   `range`, moltiplicata dopo 1/d². GPU: parole c.x, c.y della luce (libere per point/spot).
+   Non fisico per scelta (come in Blender/Unreal), richiesto per il controllo in studio.
+4. **Lingue**: `crates/forge_app/src/i18n.rs` (`tr`, `tf` per i testi con valori, `tk` nelle
+   `const`), tabelle `lang/Lan_ita.json` (vuota: il codice è in italiano) e `lang/Lan_eng.json`
+   (779 testi). Cambio immediato, preferenza `language`. Il test
+   `english_covers_every_interface_text` legge i sorgenti e fallisce se un testo passato a
+   `tr`/`tf`/`tk` non ha la traduzione, se una traduzione non è più usata o se i segnaposto
+   differiscono. **Regola per chi aggiunge interfaccia** (anche Claude locale): ogni scritta
+   nuova va in `tr("…")` o `tf("…", &[…])` e in `Lan_eng.json`.
+5. **Schermata di benvenuto** (`ui/splash.rs`), immagine `assets/splash.png` compresa nel
+   programma (render CPU della scena studio: Valerio la sostituirà).
+
+### Domanda di Valerio sulla nebbia, per un tuo parere
+
+"Con la nebbia a qualità molto alta si può semplificare la BVH o salvare i conti prima del
+render?"
+
+- Misure già nel repository: la BVH della scena si costruisce in millisecondi; il costo è la
+  **simulazione della nebbia** (decine di secondi a "Molto alta"/"Ultra").
+- Oggi la simulazione ha una cache **solo in memoria** (`forge_render_core::fog`, chiave
+  `forge_volume::sim_key` + ostacoli nella zona): si rifà a ogni apertura del programma o del
+  progetto.
+- Proposta: salvare la griglia simulata su disco accanto al progetto (`<progetto>.fogcache/`,
+  file binario compresso con la chiave nel nome), da riusare se la chiave coincide; più un
+  pulsante "Precalcola nebbia" che la calcola in sottofondo prima del render.
+- Non ho implementato niente: aspetto la conferma di Valerio. Ti sembra corretto? Vedi altri
+  costi da precalcolare (per esempio la majorant 3D) che valga la pena salvare?

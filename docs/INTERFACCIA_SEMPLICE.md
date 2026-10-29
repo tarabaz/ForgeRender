@@ -20,7 +20,9 @@ spiega cosa fa.
 | 1 | Prodotto | **Importa modello…** | Stesso import del menu File (GLB, STEP, OBJ, STL, SolidWorks su Windows) | |
 | 1 | Prodotto | **Appoggia sulla base** | Porta il punto più basso del prodotto a quota 0, senza spostarlo in orizzontale (tutte le parti insieme) | |
 | 1 | Prodotto | **Inquadra il prodotto** | Camera sul prodotto (senza pavimento e fondale); muove anche la camera di render attiva | |
-| 2 | Aspetto | 3 schede grandi: **Sfondo chiaro**, **Sfondo scuro**, **Studio scenografico** | Applicano i valori della tabella 2 | |
+| 1 | Prodotto | **Adatta la scena al prodotto** | Dopo aver spostato o scalato il prodotto: rifà fondale e luci sulle sue misure (tiene materiale del fondale e colori delle luci) e inquadra. Si annulla con "Annulla preset" | |
+| 2 | Aspetto | 4 schede grandi: **Studio fotografico** (quella di partenza), **Sfondo chiaro**, **Sfondo scuro**, **Studio scenografico** | Applicano i valori della tabella 2 | |
+| 2 | Aspetto | **Colore delle luci** (richiudibile): Calda 3200 K, Neutra 5500 K, Fredda 7500 K, più un selettore di colore per ogni luce | Cambia solo il colore; l'aspetto non diventa "Personalizzato" | |
 | 2 | Aspetto | **Prepara scena prodotto** (pulsante principale) | Appoggia sulla base, aggiunge il fondale se manca, applica aspetto e qualità, inquadra | |
 | 2 | Aspetto | **Annulla preset** | Ripristina luci, ambiente, visualizzazione, qualità, fondale e posizione com'erano prima dell'ultimo preset; le altre modifiche restano | |
 | 2 | Aspetto | Indicatore **"Personalizzato"** | Compare se luci, ambiente o visualizzazione sono stati cambiati (anche in Avanzata). Non riporta indietro niente da solo | |
@@ -41,15 +43,19 @@ CUDA del denoiser, regole di assegnazione dei materiali.
 Le luci sono i preset di `forge_scene::light::preset`, **dimensionati sul prodotto** (centro e
 raggio dell'ingombro, esclusi pavimento e fondale).
 
-| Parametro | Sfondo chiaro | Sfondo scuro | Studio scenografico | Decisione |
-|---|---|---|---|---|
-| Preset luci | `studio`: softbox principale + riempimento | `tre-punti`: key, fill, rim | `cinematografica`: key calda 3200 K + controluce fredda 9000 K | |
-| Ambiente | Uniforme bianco, intensità 0,9 | Uniforme, intensità 0 (nero) | Gradiente scurissimo, intensità 0,5 | |
-| Ambiente visibile in camera | sì | sì | sì | |
-| Fondale: colore | grigio chiaro 0,85 | quasi nero 0,03 | bruno scuro 0,05 | |
-| Fondale: rugosità | 0,65 (opaco) | 0,35 (lucido, riflessi) | 0,30 | |
-| Tone mapping | ACES filmico | ACES filmico | ACES filmico | |
-| Esposizione | 0 EV | 0 EV | +0,3 EV | |
+| Parametro | Studio fotografico | Sfondo chiaro | Sfondo scuro | Studio scenografico | Decisione |
+|---|---|---|---|---|---|
+| Preset luci | `studio-fotografico`: softbox principale, riempimento, luce dall'alto, luce del fondale (tutte invisibili alla camera) | `studio`: softbox principale + riempimento | `tre-punti`: key, fill, rim | `cinematografica`: key calda 3200 K + controluce fredda 9000 K | |
+| Fondale | **tela inclinata** (piano + curva + parete inclinata di 10° all'indietro) | curvo | curvo | curvo | |
+| Ambiente | Uniforme bianco, intensità 0,12 | Uniforme bianco, intensità 0,9 | Uniforme, intensità 0 (nero) | Gradiente scurissimo, intensità 0,5 | |
+| Ambiente visibile in camera | sì | sì | sì | sì | |
+| Fondale: colore | grigio tela 0,80 | grigio chiaro 0,85 | quasi nero 0,03 | bruno scuro 0,05 | |
+| Fondale: rugosità | 0,95 (tela) | 0,65 (opaco) | 0,35 (lucido, riflessi) | 0,30 | |
+| Tone mapping | ACES filmico | ACES filmico | ACES filmico | ACES filmico | |
+| Esposizione | 0 EV | 0 EV | 0 EV | +0,3 EV | |
+
+Misure della tela (dal prodotto, `e` = raggio dell'ingombro): altezza 2,5·e (almeno 2,5 m),
+larghezza 7·e (almeno 6 m), curva 0,3·altezza, piede 0,35·e dietro il prodotto.
 
 **Misurato** (test `looks_change_the_rendered_image`, sfera su fondale, render CPU 48×32,
 8 campioni): luminosità media 0,773 con "Sfondo chiaro", 0,039 con "Sfondo scuro".

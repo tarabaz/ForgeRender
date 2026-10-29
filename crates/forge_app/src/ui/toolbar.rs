@@ -46,6 +46,10 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 app.prefs_open = true;
                 ui.close();
             }
+            if ui.button(tr("Benvenuto e informazioni…")).clicked() {
+                app.splash_open = true;
+                ui.close();
+            }
         });
         ui.menu_button(tr("Vista"), |ui| {
             if ui.button(tr("Inquadra tutto  (Home)")).clicked() {

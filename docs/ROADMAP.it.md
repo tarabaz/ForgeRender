@@ -16,7 +16,7 @@ La complessità è una stima di lavoro e rischio per questo codice:
 | 1 | ✅ Gizmo per le luci: spostare puntiformi/spot come gli oggetti, cono dello spot visibile e modificabile (maniglie per apertura e sfumatura) | Media | gizmo | Fatto: sposta/ruota le luci, scala le luci ad area, maniglie del cono |
 | 2 | ✅ Snap a contatto per oggetto: durante lo spostamento l'oggetto si ferma quando tocca un'altra mesh | Media | picking BVH | Fatto: impostazione dell'oggetto salvata nel progetto, si può scivolare sulle superfici |
 | 3 | ✅ Campionamento adattivo: arresto quando il rumore scende sotto una soglia | Media | — | Fatto: riquadri 16×16, CPU e GPU, test sul rumore (docs/BENCHMARK.md) |
-| 4 | Lingue dell'interfaccia in file esterni (`Lan_ita`, `Lan_eng`, chiunque può aggiungere `Lan_spa`) | Media | — | Lavoro meccanico ma tocca tutte le scritte |
+| 4 | ✅ Lingue dell'interfaccia in file esterni (`Lan_ita`, `Lan_eng`, chiunque può aggiungere `Lan_spa`) | Media | — | Fatto (0.3.0): `lang/Lan_*.json`, cambio immediato, test di copertura delle traduzioni |
 | 5 | Decal / adesivi (immagine proiettata sulla superficie, piana e cilindrica, con posizione/scala/rotazione) | Media | texture | — |
 | 6 | ✅ Nebbia volumetrica da ghiaccio secco, statica e procedurale (rumore con seed, path tracer CPU con delta tracking) | Alta | — | Fatto, vedi sotto |
 | 7 | ✅ Collisione della nebbia con gli oggetti + emettitore puntiforme con durata simulata (calcolata una volta, senza timeline) | Alta | 6 | Fatto |

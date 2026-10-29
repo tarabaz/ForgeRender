@@ -11,6 +11,20 @@ per Windows 11 (sviluppato per Ryzen 9 9900X + RTX 5070) ma funzionante anche se
 
 ## Cosa fa oggi
 
+- **Interfaccia Semplice / Avanzata** (selettore in alto, predefinita Semplice): "Foto prodotto in
+  5 passi" con pulsanti grandi (importa, appoggia sulla base, inquadra, aspetto, materiali,
+  formato 16:9 / 1:1 / 4:5 / 9:16, qualità Bozza / Bilanciata / Alta, render e salvataggio).
+  La Avanzata ha tutti i controlli; le due modalità modificano gli stessi valori.
+- **Studio fotografico**: scena di partenza con fondale in tela inclinato e quattro luci da
+  studio; colore delle luci (calda 3200 K, neutra 5500 K, fredda 7500 K o per singola luce).
+  Altri aspetti: Sfondo chiaro, Sfondo scuro, Studio scenografico. **Prepara scena prodotto** e
+  **Adatta la scena al prodotto** ridimensionano fondale e luci sulle misure del prodotto;
+  **Annulla preset** riporta la scena com'era. Luci e oggetti nuovi nascono vicino al prodotto.
+- **Lingue**: italiano e inglese, cambio immediato di tutta l'interfaccia (in alto o in
+  Impostazioni → Lingua). Le traduzioni sono file separati `lang/Lan_*.json`: se ne aggiungono
+  altri copiando `Lan_eng.json`.
+- **Schermata di benvenuto** all'avvio con immagine (`assets/splash.png`), versione e commit;
+  si chiude con "Chiudi" e si riapre da File.
 - **Path tracing** su CPU (tutti i core) e su GPU (compute shader wgpu, Vulkan/DX12) con accumulo
   progressivo reale (16…1024 campioni, personalizzato o illimitato, modificabile durante il render).
   Next Event Estimation + Multiple Importance Sampling, Russian roulette, BVH SAH.
@@ -25,14 +39,17 @@ per Windows 11 (sviluppato per Ryzen 9 9900X + RTX 5070) ma funzionante anche se
 - **Libreria**: ~120 materiali pronti, più materiali e HDRI scaricati da ambientCG e Poly Haven
   o importati da cartelle/zip, conservati nella cartella locale `Libreria` con anteprime.
 - **Luci e ambiente**: luci ad area, puntiformi, spot e direzionali, preset da studio; ambiente
-  uniforme, a gradiente o HDRI (.hdr/.exr) con importance sampling.
+  uniforme, a gradiente o HDRI (.hdr/.exr) con importance sampling. Puntiformi e spot hanno un
+  **raggio d'azione** con sfumatura del bordo, indipendente dall'intensità, disegnato come una
+  bolla nella viewport (CPU e GPU).
 - **Nebbia volumetrica**: nebbia da ghiaccio secco procedurale (con seed, riproducibile) che
   esce da un emettitore puntiforme, cade, si deposita, si allarga e scorre attorno agli oggetti;
   resa come vero mezzo partecipante (delta tracking, fase Henyey–Greenstein, ombre nella nebbia)
   su CPU e GPU.
 - **Camere**: camera orbitale della viewport più camere di rendering con obiettivo professionale:
   focale in mm, diaframma f/, profondità di campo (piano di fuoco e limiti vicino/lontano
-  disegnati nella viewport), lamelle, decentramento.
+  disegnati nella viewport), lamelle, decentramento. **Vista ortografica e isometrica** nella
+  viewport (icone accanto al navigatore, tasto 5 del tastierino) e nella camera di render.
 - **Import**: glTF/GLB (esportazione consigliata da SolidWorks), OBJ (con .mtl), STL, Blender
   `.blend` (tramite Blender installato); STEP con Open CASCADE e SolidWorks SLDPRT/SLDASM sono
   sperimentali.
@@ -43,9 +60,6 @@ per Windows 11 (sviluppato per Ryzen 9 9900X + RTX 5070) ma funzionante anche se
 - Avvio / pausa / ripresa / stop / riavvio automatico quando la scena cambia, export PNG.
 - Progetti `.frproject` (JSON versionato, salvataggio atomico, percorsi relativi).
 - CLI per render senza interfaccia, benchmark e import nella libreria.
-
-L'interfaccia oggi è in italiano; i file di lingua esterni (prima italiano e inglese) sono in
-roadmap.
 
 ## Scaricare la versione Windows
 

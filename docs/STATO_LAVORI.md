@@ -80,6 +80,20 @@
 - Scena demo `samples/scene/cocktail-ghiaccio-secco`; benchmark sul PC di riferimento
   (Ryzen 9 9900X + RTX 5070) in docs/BENCHMARK.md.
 
+## Fatto nella decima parte (versioni 0.2.0 e 0.3.0)
+- Interfaccia Semplice/Avanzata, preset di aspetto e qualità con "Annulla preset"
+  (`crates/forge_app/src/presets.rs`, scheda `docs/INTERFACCIA_SEMPLICE.md`).
+- Studio fotografico (tela inclinata + 4 luci) come scena di partenza, colore delle luci,
+  "Adatta la scena al prodotto"; luci e oggetti nuovi vicino al prodotto.
+- Vista ortografica/isometrica (viewport e camera di render, CPU e GPU: parole 27 e 31 dei
+  parametri GPU).
+- Raggio d'azione con sfumatura per puntiformi e spot (CPU e GPU: parole c.x, c.y della luce).
+- Lingue: `crates/forge_app/src/i18n.rs` (`tr`, `tf`, `tk`), file `lang/Lan_*.json`; il test
+  `english_covers_every_interface_text` fallisce se un testo nuovo non ha la traduzione inglese:
+  ogni scritta nuova va passata a `tr("…")` (o `tf("…", &[…])` se ha valori) e aggiunta a
+  `lang/Lan_eng.json`.
+- Schermata di benvenuto (`crates/forge_app/src/ui/splash.rs`, immagine `assets/splash.png`).
+
 ## Piano di sviluppo incrementale
 
 ### Fase 1 — Versione nella barra del titolo: fatta, in attesa di conferma

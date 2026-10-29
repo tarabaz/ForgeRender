@@ -32,6 +32,7 @@ Servono Python 3 con `numpy` e `pillow` (`py -m pip install numpy pillow` su Win
 | 2026-10-29 | [Campionamento adattivo](2026-10-29_campionamento-adattivo/REPORT.md) | 1.8× su scena con cielo, **peggiore** sulla scena del cocktail: spento di default |
 | 2026-10-29 | [Adattivo: diagnostica (passo 0)](2026-10-29_adattivo-diagnostica/REPORT.md) | Campioni nelle zone chiare (non scure); metà B sbilanciata sulla GPU (fino a 0.68, arresto anticipato); PNG non adatto a misurare distorsioni locali |
 | 2026-10-29 | [Interfaccia Semplice / Avanzata](2026-10-29_interfaccia-semplice/REPORT.md) | Pannello in 5 passi, 3 aspetti, 3 qualità, Prepara scena; stessi dati dell'Avanzata; screenshot |
+| 2026-10-29 | [Versione 0.3.0](2026-10-29_versione-0.3.0/REPORT.md) | Studio fotografico, ortografica GPU=CPU, raggio delle luci GPU=CPU, 779 testi in inglese, benvenuto; screenshot |
 
 ## Macchine
 

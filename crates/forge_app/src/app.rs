@@ -210,6 +210,9 @@ pub struct ForgeApp {
     /// Lingue disponibili (comprese e file `lang/Lan_*.json`) e file di lingua non validi.
     pub languages: Vec<std::sync::Arc<crate::i18n::Language>>,
     pub language_errors: Vec<String>,
+    /// Schermata di benvenuto aperta e sua immagine.
+    pub splash_open: bool,
+    pub splash_texture: Option<egui::TextureHandle>,
     /// Modalità Semplice: aspetto e qualità scelti, valori prima dell'ultimo preset.
     pub simple_look: crate::presets::Look,
     pub simple_quality: crate::presets::Quality,
@@ -311,6 +314,8 @@ impl ForgeApp {
             prefs_error: None,
             languages: Vec::new(),
             language_errors: Vec::new(),
+            splash_open: false,
+            splash_texture: None,
             simple_look: crate::presets::Look::Light,
             simple_quality: crate::presets::Quality::Balanced,
             preset_backup: None,
@@ -355,6 +360,7 @@ impl ForgeApp {
             tracing::warn!("file di lingua non valido: {e}");
         }
         app.apply_prefs(prefs, true);
+        app.splash_open = app.prefs.show_splash;
         // Cartelle della libreria (HDRI, materiali, texture).
         match forge_library::paths::ensure() {
             Ok(root) => tracing::info!("libreria: {}", root.display()),
