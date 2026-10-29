@@ -20,13 +20,13 @@ mod settings;
 pub mod texture;
 mod tonemap;
 
-pub use accum::Accumulator;
+pub use accum::{Accumulator, BFraction};
 pub use backend::RenderBackend;
 pub use denoise::{mix_denoised, Denoiser, Guides};
 pub use env_map::EnvironmentMap;
 pub use render_scene::{
     pick, EmissiveSet, MaterialTextures, Portal, Portals, RenderGeometry, RenderLight, RenderLightKind, RenderMaterial, RenderScene,
 };
-pub use session::{Frame, Progress, RenderSession, SessionState};
+pub use session::{AdaptiveDiag, Frame, Progress, RenderSession, SessionState};
 pub use settings::{BackendKind, DenoiseMode, DenoiseQuality, DenoiseSettings, RenderSettings, SamplesPreset, ToneMapping};
 pub use tonemap::{tonemap_pixel, tonemap_to_rgba8};

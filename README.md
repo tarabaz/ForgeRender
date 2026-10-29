@@ -170,6 +170,17 @@ py reports\strumenti\confronta_immagini.py ref.png ref2.png -- uni32.png uni128.
 
 Repeat with `--backend cpu` to compare the two backends.
 
+**Diagnostics (where the samples go)**: add `--adaptive-map map04.png` to an adaptive render. It
+writes a 16-bit PNG with the exact sample count of each pixel and prints the share of samples in
+the "B" half used by the error estimate (should be about 0.5). Then:
+
+```powershell
+py reports\strumenti\analisi_adattivo.py --rif ref.png ref2.png --mappa map04.png --img ad04.png --img uni128.png --csv tiles.csv
+```
+
+It prints, for dark / mid / bright areas of the reference: share of pixels, share of samples,
+error of each image and mean difference with its standard error.
+
 **Compare with**: the [adaptive sampling report](reports/2026-10-29_campionamento-adattivo/REPORT.md).
 
 ### 5. Import and BVH of a large mesh

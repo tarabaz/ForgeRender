@@ -111,6 +111,17 @@ pub struct Frame {
     pub denoised_samples: u32,
     /// Buffer guida usati dal denoiser (per la visualizzazione di controllo).
     pub guides: Option<Arc<Guides>>,
+    /// Diagnostica del campionamento adattivo (solo se è acceso).
+    pub adaptive: Option<Arc<AdaptiveDiag>>,
+}
+
+/// Diagnostica del campionamento adattivo: dove sono finiti i campioni e quanta parte è
+/// nella metà "B" usata per stimare l'errore. Non cambia il rendering.
+#[derive(Clone, Debug)]
+pub struct AdaptiveDiag {
+    /// Campioni di ogni pixel (riga per riga).
+    pub counts: Vec<u32>,
+    pub b_fraction: Option<crate::BFraction>,
 }
 
 impl Frame {
@@ -315,6 +326,8 @@ struct Active {
     next_preview: u32,
     /// Riquadri che ricevono ancora campioni (campionamento adattivo acceso).
     mask: Option<TileMask>,
+    /// La prima valutazione della maschera è già stata registrata nel log.
+    mask_logged: bool,
 }
 
 type DenoiseKey = (crate::DenoiseQuality, bool, bool);
@@ -428,6 +441,12 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
             denoised: if on { a.denoised.clone() } else { None },
             denoised_samples: if on { a.denoised_at.map(|d| d.0).unwrap_or(0) } else { 0 },
             guides: if on { dn.guides.as_ref().map(|g| g.1.clone()) } else { None },
+            adaptive: a.mask.as_ref().map(|_| {
+                Arc::new(AdaptiveDiag {
+                    counts: a.accum.counts().to_vec(),
+                    b_fraction: a.accum.b_fraction(),
+                })
+            }),
         };
         *shared.frame.lock().unwrap() = Some(frame);
         shared.frame_version.fetch_add(1, Ordering::Release);
@@ -498,6 +517,7 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
                         denoised_at: None,
                         next_preview: dn.settings.first_preview_samples,
                         mask: None,
+                        mask_logged: false,
                     };
                     let mut a = a;
                     if a.job.settings.noise_threshold > 0.0 {
@@ -644,6 +664,19 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
                 if let Some(m) = a.mask.as_mut() {
                     if a.accum.samples >= st.adaptive_min_samples {
                         m.update(&a.accum, st.noise_threshold);
+                        if !a.mask_logged {
+                            a.mask_logged = true;
+                            if let Some(f) = a.accum.b_fraction() {
+                                tracing::info!(
+                                    "adattivo: prima valutazione a {} campioni (passata di {n}); metà B n_B/n media {:.3}, min {:.3}, max {:.3}; riquadri attivi {:.1} %",
+                                    a.accum.samples,
+                                    f.mean,
+                                    f.min,
+                                    f.max,
+                                    m.active_fraction() * 100.0
+                                );
+                            }
+                        }
                     }
                 }
                 let dt = t0.elapsed();

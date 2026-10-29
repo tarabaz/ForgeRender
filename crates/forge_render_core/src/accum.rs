@@ -1,5 +1,16 @@
 use rayon::prelude::*;
 
+/// Quota dei campioni nella metà "B" (vedi [`Accumulator::b_fraction`]). Lo stimatore
+/// dell'errore presume circa ½: |A − B| = (1 − n_B/n)·|B − resto|.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BFraction {
+    pub mean: f64,
+    pub min: f64,
+    pub max: f64,
+    /// Pixel con almeno un campione.
+    pub pixels: usize,
+}
+
 /// Buffer di accumulo: somma dei campioni di radianza per pixel, con il numero di
 /// campioni di ogni pixel (col campionamento adattivo i pixel già puliti si fermano).
 /// L'immagine corrente è `sum / count` pixel per pixel.
@@ -62,6 +73,35 @@ impl Accumulator {
     /// Campioni di ogni pixel.
     pub fn counts(&self) -> &[u32] {
         &self.count
+    }
+
+    /// Campioni della metà "B" di ogni pixel.
+    pub fn counts_b(&self) -> &[u32] {
+        &self.count_b
+    }
+
+    /// Diagnostica del campionamento adattivo: quota dei campioni di ogni pixel finiti in B
+    /// (n_B/n), aggregata sui pixel con almeno un campione. La media è quella dei rapporti dei
+    /// singoli pixel (non pesata). I pixel fermi non ricevono più campioni, quindi per loro il
+    /// rapporto è quello del momento in cui si sono fermati. `None` se nessun pixel ha campioni.
+    pub fn b_fraction(&self) -> Option<BFraction> {
+        let (mut sum, mut min, mut max, mut n) = (0.0f64, f64::INFINITY, f64::NEG_INFINITY, 0usize);
+        for (&c, &cb) in self.count.iter().zip(&self.count_b) {
+            if c == 0 {
+                continue;
+            }
+            let f = cb as f64 / c as f64;
+            sum += f;
+            min = min.min(f);
+            max = max.max(f);
+            n += 1;
+        }
+        (n > 0).then(|| BFraction {
+            mean: sum / n as f64,
+            min,
+            max,
+            pixels: n,
+        })
     }
 
     /// Campioni calcolati in totale (somma su tutti i pixel).
@@ -160,5 +200,47 @@ mod tests {
         assert_eq!(r[1], [0.0, 0.0, 0.0]);
         assert_eq!(a.samples, 2);
         assert_eq!(a.counts(), &[2, 2]);
+    }
+
+    #[test]
+    fn b_fraction_with_one_sample_per_pass_is_half() {
+        let mut a = Accumulator::new(2, 1);
+        assert_eq!(a.b_fraction(), None);
+        for _ in 0..32 {
+            a.add_pass(&[[1.0; 3], [0.5; 3]]);
+        }
+        let f = a.b_fraction().unwrap();
+        assert_eq!((f.mean, f.min, f.max, f.pixels), (0.5, 0.5, 0.5, 2));
+        assert_eq!(a.counts_b(), &[16, 16]);
+    }
+
+    /// Passate di dimensione crescente come sulla GPU (1, 2, 4, 8, 16): B riceve le passate
+    /// pari, cioè 1 + 4 + 16 = 21 campioni su 31, non la metà.
+    #[test]
+    fn b_fraction_with_doubling_passes_is_not_half() {
+        let mut a = Accumulator::new(1, 1);
+        for n in [1u32, 2, 4, 8, 16] {
+            a.add_samples(&[[n as f32; 3]], n);
+        }
+        assert_eq!((a.counts()[0], a.counts_b()[0]), (31, 21));
+        assert!((a.b_fraction().unwrap().mean - 21.0 / 31.0).abs() < 1e-12);
+    }
+
+    /// Un pixel fermo dalla maschera conserva il rapporto del momento in cui si è fermato.
+    #[test]
+    fn b_fraction_of_stopped_pixels_is_frozen() {
+        let mut a = Accumulator::new(32, 16);
+        let pass = vec![[1.0f32; 3]; 32 * 16];
+        a.add_pass(&pass); // passata 0 → B
+        let mut m = crate::adaptive::TileMask::all(32, 16);
+        m.active[1] = false; // il riquadro destro si ferma con 1 campione, tutto in B
+        for _ in 0..3 {
+            a.add_samples_masked(&pass, 1, Some(&m));
+        }
+        assert_eq!((a.counts()[0], a.counts_b()[0]), (4, 2));
+        assert_eq!((a.counts()[31], a.counts_b()[31]), (1, 1));
+        let f = a.b_fraction().unwrap();
+        assert_eq!((f.min, f.max, f.pixels), (0.5, 1.0, 512));
+        assert!((f.mean - 0.75).abs() < 1e-12);
     }
 }

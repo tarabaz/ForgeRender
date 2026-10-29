@@ -948,6 +948,7 @@ dependencies = [
  "forge_render_gpu",
  "forge_scene",
  "forge_telemetry",
+ "image",
  "serde_json",
  "tracing",
 ]

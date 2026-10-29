@@ -173,6 +173,17 @@ qualità.
 
 Ripeti con `--backend cpu` per confrontare i due backend.
 
+**Diagnostica (dove vanno i campioni)**: aggiungi `--adaptive-map mappa04.png` a un render
+adattivo. Scrive un PNG a 16 bit con i campioni esatti di ogni pixel e stampa la quota dei
+campioni nella metà "B" usata per stimare l'errore (dovrebbe essere circa 0,5). Poi:
+
+```powershell
+py reports\strumenti\analisi_adattivo.py --rif ref.png ref2.png --mappa mappa04.png --img ad04.png --img uni128.png --csv riquadri.csv
+```
+
+Per le zone scure, medie e chiare del riferimento stampa: quota di pixel, quota di campioni,
+errore di ogni immagine e differenza media con il suo errore standard.
+
 **Confronto**: [report campionamento adattivo](reports/2026-10-29_campionamento-adattivo/REPORT.md).
 Nel container, su questa scena, l'adattivo era meno efficiente.
 

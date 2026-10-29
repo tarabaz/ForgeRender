@@ -74,6 +74,7 @@ fn print_help() {
              --out F.png  --spp N  --width W  --height H  --threads T  --bounces B  --backend cpu|gpu\n    \
              --unit mm|cm|m|in  (per --mesh, default mm)  --quiet  --seed N\n    \
              --noise-threshold T (campionamento adattivo, es. 0.01; --spp resta il massimo)  --adaptive-min N\n    \
+             --adaptive-map F.png (mappa dei campioni per pixel, PNG a 16 bit con i conteggi esatti)\n    \
              --hdri F.hdr|F.exr  --hdri-strength S  --hdri-rotation GRADI\n    \
              --denoise off|finale  --denoise-quality veloce|bilanciata|alta  --cuda  --denoise-strength 0..1\n  \
          bench [opzioni]            benchmark della scena di test con diversi numeri di thread\n    \
@@ -246,6 +247,23 @@ fn render(args: &Args) -> anyhow::Result<()> {
             p.samples,
             p.pixel_samples
         );
+        if let Some(d) = &frame.adaptive {
+            if let Some(f) = d.b_fraction {
+                println!(
+                    "metà B (stima dell'errore): n_B/n media {:.3}, min {:.3}, max {:.3} su {} pixel",
+                    f.mean, f.min, f.max, f.pixels
+                );
+            }
+            if let Some(map) = args.value("--adaptive-map") {
+                let px: Vec<u16> = d.counts.iter().map(|&c| c.min(u16::MAX as u32) as u16).collect();
+                let img = image::ImageBuffer::<image::Luma<u16>, _>::from_raw(frame.width, frame.height, px)
+                    .context("mappa dei campioni di dimensione errata")?;
+                img.save(map).with_context(|| format!("salvataggio di {map}"))?;
+                println!("mappa dei campioni per pixel -> {map}");
+            }
+        }
+    } else if args.value("--adaptive-map").is_some() {
+        eprintln!("--adaptive-map ignorato: serve --noise-threshold > 0");
     }
     Ok(())
 }

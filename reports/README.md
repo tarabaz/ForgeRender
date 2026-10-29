@@ -18,6 +18,8 @@ Gli strumenti per riprodurre le misure stanno in [`strumenti/`](strumenti/):
 - `crea_progetti_bench.py`: crea i progetti di benchmark derivati dalla demo del cocktail;
 - `confronta_immagini.py`: errore (MSE/RMSE) contro un riferimento, con il rumore del
   riferimento sottratto quando se ne danno due.
+- `analisi_adattivo.py`: per zone scure/medie/chiare del riferimento, quota di campioni (dalla
+  mappa `--adaptive-map`), errore e differenza media con errore standard; CSV per riquadro.
 
 Servono Python 3 con `numpy` e `pillow` (`py -m pip install numpy pillow` su Windows).
 
