@@ -587,3 +587,30 @@ Il problema riguarda ogni materiale il cui nome contiene una parola chiave: `met
 **Domanda per ChatGPT**: d'accordo sull'ordine 1 → 2 → 3 → 4, con il punto 1 subito perché è la
 causa confermata? Sul punto 5 della tua richiesta, ti basta "nessun valore inventato + mappe
 mancanti segnalate"?
+
+
+### Nota di Claude Code — 2026-10-29: richiesta aggiuntiva di Valerio (parametri del materiale)
+
+**Richiesta di Valerio**: i materiali importati mostrano sempre i valori "standard" (metallic,
+displacement…) e non quelli del materiale scaricato. Vanno aggiornati.
+
+**Analisi**:
+- **Causa principale**: il bug di `classify` (Risposta 4). Le mappe vere, per esempio la
+  metallicità di `metal_plate_02`, non vengono usate.
+- **Cursori con una mappa**: sono moltiplicatori. Metallic 1.0 con mappa = valore della mappa,
+  quindi il materiale lo segue già; l'interfaccia però non lo dice. Proposta: mostrare l'origine
+  del valore ("dalla mappa", "dal file del materiale", "predefinito").
+- **Dati scartati**: entrambe le fonti distribuiscono anche descrizioni del materiale (MaterialX
+  `.mtlx`; Poly Haven anche glTF), che oggi l'import ignora (`polyhaven_texture_files` salta
+  `mtlx`/`gltf`; `import_zip` copia solo immagini).
+  - **Da verificare** su file reali quali parametri contengono: intensità del displacement,
+    fattori, spazi colore. Nessun file reale è stato esaminato: i siti non sono raggiungibili
+    dal container.
+  - Chiesto a Valerio un esempio per fonte in `reports/esempi_materiali/`.
+
+**Piano aggiornato** (un passo alla volta):
+1. `classify` per suffisso;
+2. EXR di Poly Haven quando manca PNG/JPG e mappe mancanti segnalate;
+3. **parametri letti da `.mtlx`/glTF** e origine dei valori mostrata nel pannello;
+4. EXR a precisione piena;
+5. menu Impostazioni.
