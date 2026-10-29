@@ -2,7 +2,17 @@ name: CI
 
 on:
   push:
+    # Le sole note/documentazione non devono avviare compilazioni costose.
+    # Se una commit contiene anche codice, la CI parte comunque.
+    paths-ignore:
+      - 'reports/**'
+      - 'docs/**'
+      - '**/*.md'
   pull_request:
+    paths-ignore:
+      - 'reports/**'
+      - 'docs/**'
+      - '**/*.md'
 
 # Un nuovo push sullo stesso branch annulla i run precedenti ancora in corso:
 # conta solo l'ultima versione del codice.
