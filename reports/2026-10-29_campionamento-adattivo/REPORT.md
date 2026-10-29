@@ -75,6 +75,12 @@ Log: `log_cocktail.txt`, `log_scena_test_uniforme.txt`. Immagini: `ref.png`, `re
 
 ## Interpretazione
 
+> **Aggiornamento (diagnostica, [report](../2026-10-29_adattivo-diagnostica/REPORT.md))**:
+> l'interpretazione qui sotto sulle zone scure è stata **smentita** dalla mappa dei campioni.
+> I pixel scuri ricevono meno campioni; arrivano al massimo le zone chiare e medie (bicchiere
+> con nebbia, bancone, riflessi). Inoltre "massimo su sottoblocchi 4×4" renderebbe il riquadro
+> *più* sensibile ai pixel isolati, non meno.
+
 - La stima d'errore relativa (divisa per √luminosità) pesa moltissimo le zone scure. Nella scena
   del cocktail lo sfondo è quasi nero con nebbia rada e scintille (lucine sfocate, riflessi):
   lì l'errore relativo resta sopra soglia anche quando nel PNG il rumore non si vede, e quei

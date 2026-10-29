@@ -1,0 +1,24 @@
+== CPU 64x36 seed 7
+2026-10-29T10:15:22.689447Z  INFO adattivo: prima valutazione a 16 campioni (passata di 1); metà B n_B/n media 0.500, min 0.500, max 0.500; riquadri attivi 100.0 %
+campionamento adattivo: soglia 0.04 | campioni per pixel: media 279.8, massimo 287 | 644544 campioni in totale
+metà B (stima dell'errore): n_B/n media 0.501, min 0.500, max 0.502 su 2304 pixel
+== CPU 64x36 seed 8
+2026-10-29T10:15:23.212906Z  INFO adattivo: prima valutazione a 16 campioni (passata di 1); metà B n_B/n media 0.500, min 0.500, max 0.500; riquadri attivi 100.0 %
+campionamento adattivo: soglia 0.04 | campioni per pixel: media 300.0, massimo 303 | 691200 campioni in totale
+metà B (stima dell'errore): n_B/n media 0.502, min 0.502, max 0.502 su 2304 pixel
+== CPU 64x36 seed 9
+2026-10-29T10:15:23.752101Z  INFO adattivo: prima valutazione a 16 campioni (passata di 1); metà B n_B/n media 0.500, min 0.500, max 0.500; riquadri attivi 100.0 %
+campionamento adattivo: soglia 0.04 | campioni per pixel: media 294.2, massimo 302 | 677952 campioni in totale
+metà B (stima dell'errore): n_B/n media 0.500, min 0.500, max 0.502 su 2304 pixel
+== CPU 32x18 seed 7
+2026-10-29T10:15:24.316614Z  INFO adattivo: prima valutazione a 16 campioni (passata di 1); metà B n_B/n media 0.500, min 0.500, max 0.500; riquadri attivi 100.0 %
+campionamento adattivo: soglia 0.04 | campioni per pixel: media 235.0, massimo 235 | 135360 campioni in totale
+metà B (stima dell'errore): n_B/n media 0.502, min 0.502, max 0.502 su 576 pixel
+== CPU 32x18 seed 8
+2026-10-29T10:15:24.519207Z  INFO adattivo: prima valutazione a 16 campioni (passata di 1); metà B n_B/n media 0.500, min 0.500, max 0.500; riquadri attivi 100.0 %
+campionamento adattivo: soglia 0.04 | campioni per pixel: media 209.0, massimo 209 | 120384 campioni in totale
+metà B (stima dell'errore): n_B/n media 0.502, min 0.502, max 0.502 su 576 pixel
+== CPU 32x18 seed 9
+2026-10-29T10:15:24.742814Z  INFO adattivo: prima valutazione a 16 campioni (passata di 1); metà B n_B/n media 0.500, min 0.500, max 0.500; riquadri attivi 100.0 %
+campionamento adattivo: soglia 0.04 | campioni per pixel: media 217.0, massimo 217 | 124992 campioni in totale
+metà B (stima dell'errore): n_B/n media 0.502, min 0.502, max 0.502 su 576 pixel

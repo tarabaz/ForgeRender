@@ -1,0 +1,52 @@
+===== mappa ad04
+riferimento: ../2026-10-29_campionamento-adattivo/ref.png + ../2026-10-29_campionamento-adattivo/ref2.png  (320×400)
+rumore stimato del riferimento (MSE): 0.000227
+campioni per pixel: media 621.2, min 16, max 1024
+
+zona      pixel  campioni  spp medi
+scura     60.9%     43.6%     444.9
+media     23.2%     31.1%     832.5
+chiara    15.8%     25.2%     989.3
+
+../2026-10-29_campionamento-adattivo/ad04.png: MSE corretto 0.000639 (grezzo 0.000866)
+  scura   MSE 0.000418  differenza media +0.00077 ± 0.00008 (z = +9.7)
+  media   MSE 0.001388  differenza media -0.00206 ± 0.00026 (z = -7.9)
+  chiara  MSE 0.000390  differenza media -0.00099 ± 0.00017 (z = -5.7)
+
+../2026-10-29_campionamento-adattivo/uni128.png: MSE corretto 0.002528 (grezzo 0.002755)
+  scura   MSE 0.000871  differenza media +0.00019 ± 0.00011 (z = +1.7)
+  media   MSE 0.006581  differenza media -0.00966 ± 0.00049 (z = -19.6)
+  chiara  MSE 0.002951  differenza media -0.00682 ± 0.00040 (z = -17.2)
+
+../2026-10-29_campionamento-adattivo/uni32.png: MSE corretto 0.007739 (grezzo 0.007966)
+  scura   MSE 0.001487  differenza media -0.00126 ± 0.00014 (z = -8.9)
+  media   MSE 0.019560  differenza media -0.02823 ± 0.00082 (z = -34.3)
+  chiara  MSE 0.014438  differenza media -0.02794 ± 0.00085 (z = -32.8)
+
+riquadri -> riquadri_ad04.csv
+===== mappa ad08
+riferimento: ../2026-10-29_campionamento-adattivo/ref.png + ../2026-10-29_campionamento-adattivo/ref2.png  (320×400)
+rumore stimato del riferimento (MSE): 0.000227
+campioni per pixel: media 337.9, min 16, max 1024
+
+zona      pixel  campioni  spp medi
+scura     60.9%     32.4%     180.0
+media     23.2%     34.3%     499.0
+chiara    15.8%     33.2%     708.8
+
+../2026-10-29_campionamento-adattivo/ad08.png: MSE corretto 0.001627 (grezzo 0.001854)
+  scura   MSE 0.000953  differenza media -0.00003 ± 0.00011 (z = -0.2)
+  media   MSE 0.003450  differenza media -0.00554 ± 0.00037 (z = -14.9)
+  chiara  MSE 0.001544  differenza media -0.00277 ± 0.00030 (z = -9.4)
+
+../2026-10-29_campionamento-adattivo/uni128.png: MSE corretto 0.002528 (grezzo 0.002755)
+  scura   MSE 0.000871  differenza media +0.00019 ± 0.00011 (z = +1.7)
+  media   MSE 0.006581  differenza media -0.00966 ± 0.00049 (z = -19.6)
+  chiara  MSE 0.002951  differenza media -0.00682 ± 0.00040 (z = -17.2)
+
+../2026-10-29_campionamento-adattivo/uni32.png: MSE corretto 0.007739 (grezzo 0.007966)
+  scura   MSE 0.001487  differenza media -0.00126 ± 0.00014 (z = -8.9)
+  media   MSE 0.019560  differenza media -0.02823 ± 0.00082 (z = -34.3)
+  chiara  MSE 0.014438  differenza media -0.02794 ± 0.00085 (z = -32.8)
+
+riquadri -> riquadri_ad08.csv

@@ -30,6 +30,7 @@ Servono Python 3 con `numpy` e `pillow` (`py -m pip install numpy pillow` su Win
 | 2026-10-28 | [Esperimenti precedenti (riepilogo)](2026-10-28_esperimenti-precedenti/REPORT.md) | Portali 6.5× meno rumore; BVH parallela 3.3× su 4 core; bug della griglia della nebbia; benchmark 9900X + RTX 5070 |
 | 2026-10-29 | [Majorant 3D della nebbia](2026-10-29_majorant-3d-nebbia/REPORT.md) | 1.70–1.98× più veloce sulla CPU, immagine invariata |
 | 2026-10-29 | [Campionamento adattivo](2026-10-29_campionamento-adattivo/REPORT.md) | 1.8× su scena con cielo, **peggiore** sulla scena del cocktail: spento di default |
+| 2026-10-29 | [Adattivo: diagnostica (passo 0)](2026-10-29_adattivo-diagnostica/REPORT.md) | Campioni nelle zone chiare (non scure); metà B sbilanciata sulla GPU (fino a 0.68, arresto anticipato); PNG non adatto a misurare distorsioni locali |
 
 ## Macchine
 

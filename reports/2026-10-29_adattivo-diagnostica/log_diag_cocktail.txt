@@ -1,0 +1,16 @@
+2026-10-29T10:05:01.790509Z  INFO simulazione nebbia: 297 passi; ms per fase: passo 160, sorgente/riquadro 9331, forze 8069, trasporto velocità 10692, pressione 17363, trasporto nebbia 1036, dissolvenza 1043
+2026-10-29T10:05:03.005867Z  INFO nebbia «Ghiaccio secco nel cocktail»: simulazione 128×90×128 celle, 297 passi in 49296 ms; densità 200×140×200 in 1106 ms
+2026-10-29T10:05:10.288101Z  INFO adattivo: prima valutazione a 16 campioni (passata di 1); metà B n_B/n media 0.500, min 0.500, max 0.500; riquadri attivi 95.8 %
+320x400 | 1024 campioni | 96966 triangoli | compilazione scena 51006 ms | rendering 291.08 s | 284.3 ms/passata | 0.27 Mcampioni/s | 3 thread | -> ad04.png
+campionamento adattivo: soglia 0.04 | campioni per pixel: media 621.2, massimo 1024 | 79517952 campioni in totale
+metà B (stima dell'errore): n_B/n media 0.502, min 0.500, max 0.529 su 128000 pixel
+mappa dei campioni per pixel -> mappa_ad04.png
+2026-10-29T10:10:44.234683Z  INFO simulazione nebbia: 297 passi; ms per fase: passo 158, sorgente/riquadro 9363, forze 8197, trasporto velocità 10743, pressione 16360, trasporto nebbia 1063, dissolvenza 1115
+2026-10-29T10:10:45.532624Z  INFO nebbia «Ghiaccio secco nel cocktail»: simulazione 128×90×128 celle, 297 passi in 48790 ms; densità 200×140×200 in 1194 ms
+2026-10-29T10:10:53.464491Z  INFO adattivo: prima valutazione a 16 campioni (passata di 1); metà B n_B/n media 0.500, min 0.500, max 0.500; riquadri attivi 60.8 %
+320x400 | 1024 campioni | 96966 triangoli | compilazione scena 50589 ms | rendering 183.21 s | 178.9 ms/passata | 0.24 Mcampioni/s | 3 thread | -> ad08.png
+campionamento adattivo: soglia 0.08 | campioni per pixel: media 337.9, massimo 1024 | 43249920 campioni in totale
+metà B (stima dell'errore): n_B/n media 0.503, min 0.500, max 0.529 su 128000 pixel
+mappa dei campioni per pixel -> mappa_ad08.png
+
+[exited with code 0]
