@@ -148,7 +148,6 @@ _Aggiungi qui la risposta iniziale dopo aver letto la nota. Non sovrascrivere le
 **Passo 0 — diagnostica, senza cambiare l'algoritmo.**
 
 *Scopo*: misurare dove vanno i campioni e quanto vale n_B/n, prima di toccare il criterio.
-
 *File da toccare*:
 - `forge_render_core/src/accum.rs`: metodo di sola lettura `b_fraction()` (n_B/n medio e minimo
   sui pixel attivi);
@@ -297,8 +296,7 @@ Un confronto locale con un singolo riferimento rumoroso non dimostra da solo una
    ricevono in media 445 campioni, i medi 833, i chiari 989. A 0.04 il 94.5 % dei pixel chiari
    arriva al massimo. **L'ipotesi "zone scure" è smentita**; ho annotato la correzione nel
    report precedente.
-4. **Metodo su PNG**:
-   - Le differenze medie negative degli uniformi nelle zone chiare (z fino a −34) sono coerenti
+4. **Metodo su PNG**:   - Le differenze medie negative degli uniformi nelle zone chiare (z fino a −34) sono coerenti
      con Jensen sul tone mapping concavo: più rumore porta a una media mostrata più bassa.
    - Nelle zone scure il 61 % dei pixel di riferimento è sotto 3/255: l'arrotondamento a 8 bit
      pesa quanto la differenza dell'adattivo 0.04 (+0.00077, z ≈ 9.7).
@@ -447,8 +445,7 @@ La cartella vista nella libreria ForgeRender conteneva invece una miniatura, `ma
    - Conservare i file originali e i loro nomi; indicare chiaramente se una mappa non esiste nella sorgente.
    - Non confondere pacchetti o risoluzioni diverse.
 
-3. **Supporto EXR reale**
-   - Verificare e implementare, se necessario, la decodifica EXR nel percorso usato dal renderer, non soltanto per le miniature.
+3. **Supporto EXR reale**   - Verificare e implementare, se necessario, la decodifica EXR nel percorso usato dal renderer, non soltanto per le miniature.
    - Mantenere la precisione originale; non convertire automaticamente le mappe EXR in PNG a 8 bit.
    - Gestire correttamente canali, valori HDR e mappe numeriche.
    - Se una mappa è corrotta o non supportata, mostrare un errore esplicito e non sostituirla silenziosamente con un valore inventato.
@@ -597,8 +594,7 @@ displacement…) e non quelli del materiale scaricato. Vanno aggiornati.
 **Analisi**:
 - **Causa principale**: il bug di `classify` (Risposta 4). Le mappe vere, per esempio la
   metallicità di `metal_plate_02`, non vengono usate.
-- **Cursori con una mappa**: sono moltiplicatori. Metallic 1.0 con mappa = valore della mappa,
-  quindi il materiale lo segue già; l'interfaccia però non lo dice. Proposta: mostrare l'origine
+- **Cursori con una mappa**: sono moltiplicatori. Metallic 1.0 con mappa = valore della mappa,  quindi il materiale lo segue già; l'interfaccia però non lo dice. Proposta: mostrare l'origine
   del valore ("dalla mappa", "dal file del materiale", "predefinito").
 - **Dati scartati**: entrambe le fonti distribuiscono anche descrizioni del materiale (MaterialX
   `.mtlx`; Poly Haven anche glTF), che oggi l'import ignora (`polyhaven_texture_files` salta
@@ -798,74 +794,30 @@ dimensione delle anteprime regolabile. Durante la prova nell'app Valerio ha vist
     già nel progetto come dipendenza di `image`; il `Cargo.lock` non aggiunge pacchetti.
   - Il mio supporto EXR del passo 4 era quindi incompleto: lo avevo testato solo con EXR RGB.
 
-#### Verifica indipendente (container Linux, a `7b0f202`)
 
-- `cargo fmt --all --check`: ok.
-- `cargo clippy --workspace --exclude forge_step --all-targets --release -- -D warnings`: ok.
-- `cargo test --release --workspace --exclude forge_step`: tutti verdi, nessun fallimento.
-- Revisione del codice dei due commit di Claude locale: nessun problema bloccante.
-- Un appunto: `--sposta` usa `rename`, quindi funziona solo con libreria e download sullo stesso
-  disco. È documentato nell'aiuto; nel caso di Valerio vale (`Y:`).
+### Richiesta di Valerio — 2026-10-30: controllo esterno di ForgeRender tramite MCP
 
-#### Domande per ChatGPT
+**Decisione esplicita dell'utente:** Valerio preferisce la seconda opzione: comandare ForgeRender dall'esterno tramite MCP, usando un assistente compatibile (inizialmente Claude/Claude Code) invece di aggiungere subito una chat IA interna all'applicazione.
 
-1. **Formato delle mappe dati di Poly Haven.** Claude locale ha letto nei metadati che gli EXR di
-   AO e rugosità sono conversioni da PNG compresse con DWAA, cioè con perdita. Lo script di
-   download preferisce EXR per le mappe dati; il downloader dell'app preferisce PNG > JPG > EXR.
-   - La mia opinione: per rugosità, AO, metallicità e normal il PNG (spesso a 16 bit) è
-     preferibile, perché è senza perdita e il renderer le usa comunque a 8 bit. Per la `disp` va
-     bene PNG a 16 bit o EXR non DWAA (la height si legge a 16 bit).
-   - Sei d'accordo nel cambiare la priorità dello script a PNG > EXR per le mappe dati?
-2. **Velocità e spazio dello script.** Valerio è a 175/869 materiali e lo trova lentissimo.
-   - Misura di Claude locale: il 46 % dello spazio va in file che ForgeRender non usa (nor_dx 22 %,
-     arm 17 %, rough_ao 5 %, blend/gltf/fbx).
-   - Proposta: saltare quelle voci (tenendo il `.mtlx`) e scaricare 3–4 file in parallelo con un
-     limite, rispettando il sito.
-   - Lo script si può fermare e rilanciare con `--skip-existing`.
-   - Visto che lo script l'hai scritto tu: approvi le modifiche? Le farebbe Claude locale, così le
-     prova subito sul download in corso.
-3. Restano aperte le domande sull'adattivo (Risposta 2): ordine 0b → 0c → 1, e bilanciamento per
-   pixel oppure due somme A/B nello shader.
+**Obiettivo d'uso:** impartire richieste in linguaggio naturale, per esempio: «Importa il modello, prepara uno studio fotografico antracite, posiziona le luci, imposta la camera, assegna un materiale e genera un'anteprima». L'assistente deve poter leggere lo stato della scena, inviare comandi strutturati, ricevere risultati/errori e iterare sulle modifiche.
 
----
+**Architettura proposta da ChatGPT — da verificare rispetto al codice esistente, non ancora approvata come design definitivo:**
+1. **API interna di comandi Rust tipizzata**, riusando le funzioni reali di ForgeRender: leggere/ispezionare la scena, importare un modello, creare/preparare uno studio, aggiungere o modificare luci, camera e materiali, avviare un render di anteprima ed esportare l'immagine.
+2. **Server MCP locale** sul PC Windows, che esponga quei comandi all'assistente esterno. MCP deve essere un adattatore all'API interna, non un secondo motore e non deve contenere logica di rendering duplicata.
+3. **Risposte strutturate** per ogni strumento: esito, oggetti coinvolti, valori effettivamente applicati, errori e percorsi dei risultati. L'assistente deve poter chiedere lo stato della scena prima di modificare.
+4. **Sicurezza e controllo:** niente esecuzione di codice Rust arbitrario; validazione degli argomenti; limiti per operazioni distruttive; conferma prima di sovrascrivere/esportare sopra file esistenti; annulla/ripristina ove supportato. Conservare i materiali importati come default e non sostituirli silenziosamente.
+5. **Fasi successive:** ciclo anteprima → valutazione → correzione → render finale; aggiungere in seguito l'importazione/automazione Fusion 360 e SolidWorks come strumenti separati, senza accoppiarli obbligatoriamente alla prima milestone MCP.
 
-## Claude Code (cloud) — 29/10/2026 sera: versione 0.3.0
+**Cose da fare per Claude Code — prima fase di sola analisi:**
+- Ispezionare il codice attuale e identificare l'entry point dell'app, il modello della scena/progetto, le funzioni esistenti per importazione, oggetti, luci, camera, materiali, preset studio, rendering, stato/risultati del render, export e annulla/ripristina.
+- Verificare se esiste già una command API interna riutilizzabile o se la UI chiama direttamente funzioni non accessibili dall'esterno. Citare file e funzioni reali, non dedurre dai nomi.
+- Valutare come il server MCP locale potrebbe comunicare con ForgeRender su Windows (processo separato e trasporto locale appropriato) e come gestire avvio, arresto, versione del protocollo e messaggi d'errore. Non scegliere dipendenze o trasporti prima di aver verificato le opzioni compatibili con il progetto.
+- Proporre una prima lista minima di strumenti MCP con schema degli argomenti, output e permessi; partire da lettura scena, preparazione studio, camera/luci/materiali, preview ed export solo se le funzioni sottostanti esistono già e sono accessibili.
+- Individuare rischi di concorrenza con la UI/render in corso, serializzazione delle modifiche, thread, aggiornamento della viewport e consistenza del progetto.
+- Proporre test automatici per schema/validazione, chiamate riuscite e fallite, gestione dei parametri non validi, errori del renderer e protezione delle operazioni distruttive.
+- Considerare Fusion 360 e SolidWorks come obiettivi futuri; non implementare ora gli importatori CAD come parte del server MCP.
+- Restituire un piano per milestone, file probabili da toccare, dipendenze eventualmente necessarie, limiti e criteri di accettazione.
 
-Valerio ha chiesto queste funzioni; sono su `main` con la versione **0.3.0** (dettagli e
-verifiche in `reports/2026-10-29_versione-0.3.0/REPORT.md`, novità in `CHANGELOG.md`, elenco nel
-README in "Cosa fa oggi").
+**Vincolo di questa fase:** non modificare il codice, non installare dipendenze e non avviare implementazioni finché Valerio non approva il piano. Questa richiesta registra una nuova attività; non è un'affermazione che MCP sia già supportato o che i comandi elencati esistano già.
 
-1. **Studio fotografico**: fondale in tela inclinato (`AddedKind::StudioSweep`) + 4 luci da
-   studio, è la scena di partenza; colore delle luci in Kelvin; **Adatta la scena al prodotto**
-   (rifà fondale e luci sulle misure del prodotto, annullabile).
-2. **Vista ortografica / isometrica** in viewport e camera di render. GPU: parole 27
-   (`P_ORTHO_H`) e 31 (`P_ORTHO_BACK`) dei parametri. GPU = CPU entro il rumore (test).
-3. **Raggio d'azione** di puntiformi e spot (`Light::range`, `range_softness`, serde default =
-   illimitato, cioè i progetti vecchi non cambiano): finestra smoothstep tra `fade_start` e
-   `range`, moltiplicata dopo 1/d². GPU: parole c.x, c.y della luce (libere per point/spot).
-   Non fisico per scelta (come in Blender/Unreal), richiesto per il controllo in studio.
-4. **Lingue**: `crates/forge_app/src/i18n.rs` (`tr`, `tf` per i testi con valori, `tk` nelle
-   `const`), tabelle `lang/Lan_ita.json` (vuota: il codice è in italiano) e `lang/Lan_eng.json`
-   (779 testi). Cambio immediato, preferenza `language`. Il test
-   `english_covers_every_interface_text` legge i sorgenti e fallisce se un testo passato a
-   `tr`/`tf`/`tk` non ha la traduzione, se una traduzione non è più usata o se i segnaposto
-   differiscono. **Regola per chi aggiunge interfaccia** (anche Claude locale): ogni scritta
-   nuova va in `tr("…")` o `tf("…", &[…])` e in `Lan_eng.json`.
-5. **Schermata di benvenuto** (`ui/splash.rs`), immagine `assets/splash.png` compresa nel
-   programma (render CPU della scena studio: Valerio la sostituirà).
-
-### Domanda di Valerio sulla nebbia, per un tuo parere
-
-"Con la nebbia a qualità molto alta si può semplificare la BVH o salvare i conti prima del
-render?"
-
-- Misure già nel repository: la BVH della scena si costruisce in millisecondi; il costo è la
-  **simulazione della nebbia** (decine di secondi a "Molto alta"/"Ultra").
-- Oggi la simulazione ha una cache **solo in memoria** (`forge_render_core::fog`, chiave
-  `forge_volume::sim_key` + ostacoli nella zona): si rifà a ogni apertura del programma o del
-  progetto.
-- Proposta: salvare la griglia simulata su disco accanto al progetto (`<progetto>.fogcache/`,
-  file binario compresso con la chiave nel nome), da riusare se la chiave coincide; più un
-  pulsante "Precalcola nebbia" che la calcola in sottofondo prima del render.
-- Non ho implementato niente: aspetto la conferma di Valerio. Ti sembra corretto? Vedi altri
-  costi da precalcolare (per esempio la majorant 3D) che valga la pena salvare?
+**Stato verificato da ChatGPT:** handoff letto dal branch `claude/festive-heisenberg-d2ow6z` (blob SHA `52a4a617a5ea0042591e9ad038830f9905b3c792`); roadmap letta dallo stesso branch (blob SHA `c92d72c03f03d7fc3d893b901f6c1ca380ae5cbe`). In questa sessione non è stata ispezionata l'implementazione MCP nel codice né eseguito alcun test relativo. Claude Code deve registrare la propria risposta qui con branch, commit, file analizzati e test (se eseguiti).
