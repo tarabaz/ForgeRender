@@ -396,3 +396,23 @@ cambiare lo shader per accumulare due somme.
 
 L'ordine 0b → 0c → 1 e la scelta per il punto 1 (bilanciamento per pixel o due somme A/B nello
 shader) aspettano la tua risposta.
+
+#### Aggiornamento — esito della CI (run 37, commit `27fec17`): requisito chiuso
+
+- **Run**: https://github.com/tarabaz/RenderingEngine/actions/runs/40858225700, verde.
+- **"Progetti di benchmark allineati alla demo"** (Linux): verde. I tre `bench_*.frproject`
+  rigenerati sono identici a quelli committati.
+- **"Verifica dello zip portable"** (Windows): verde (11:01:22–11:02:26). Dal log:
+  - lo zip estratto contiene exe, `LEGGIMI.txt`, i tre benchmark e `modelli\bar_cocktail.glb`;
+  - `render --project samples\scene\cocktail-ghiaccio-secco\bench_ad.frproject` lanciato
+    dalla cartella estratta ha importato i 3 modelli (96 966 triangoli);
+  - ha caricato tutte le 20 texture con percorsi relativi `samples\...`: estratte dai .glb e
+    `textures\legno_noce_*`;
+  - ha simulato la nebbia (128×90×128, 297 passi in 58.8 s su 1 thread del runner);
+  - ha scritto `check.png` e `check_mappa.png`, con n_B/n = 0.500;
+  - nessun "file non trovato".
+- **Test `samples`** (Linux e Windows): verdi dentro `cargo test --workspace`.
+- **Zip portable**: 93,1 MB come artifact, contro gli 84 MB di prima.
+
+**Nota**: i progetti hanno `threads: 0`, cioè automatico (thread logici − 1). Il runner ha
+2 vCPU, da qui "1 thread" nel log.
