@@ -1,4 +1,2 @@
 # Texture estratte dai .glb all apertura del progetto (si ricreano da sole).
 **/*_texture/
-# Progetti di benchmark creati da reports/strumenti/crea_progetti_bench.py.
-bench_*.frproject

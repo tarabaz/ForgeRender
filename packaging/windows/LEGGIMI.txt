@@ -13,6 +13,17 @@ Riga di comando (render e benchmark senza interfaccia)
   forgerender-cli.exe render --test-scene --spp 64 --denoise finale --cuda --out pulita.png
   forgerender-cli.exe bench --json benchmark.json
 
+Benchmark pronti (dalla cartella estratta, in PowerShell; non serve altro)
+  Scena demo e progetti di benchmark: samples\scene\cocktail-ghiaccio-secco\
+    bench_intera.frproject  demo intera, senza profondità di campo, seed fisso
+    bench_vicina.frproject  ravvicinata sulla nebbia
+    bench_ad.frproject      demo intera per il campionamento adattivo (seed da --seed)
+  La prima apertura calcola la nebbia (circa un minuto) ed estrae le texture dei modelli.
+  $p = "samples\scene\cocktail-ghiaccio-secco"
+  .\forgerender-cli.exe render --project $p\bench_intera.frproject --backend gpu --width 320 --height 400 --spp 32 --quiet --out intera_gpu.png
+  .\forgerender-cli.exe render --project $p\bench_ad.frproject --backend gpu --width 320 --height 400 --spp 1024 --seed 7 --noise-threshold 0.04 --adaptive-map mappa04.png --out ad04.png
+  Elenco completo e significato di ogni misura: README del repository, sezione Benchmark.
+
 Libreria (pulsante "Libreria" nella barra)
   Materiali PBR veri con tutte le mappe (colore, rugosità/gloss, metallicità, normal GL/DX,
   rilievo, occlusione, opacità con ritaglio). Scarica da ambientCG e Poly Haven (CC0, gratuiti

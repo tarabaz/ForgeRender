@@ -164,5 +164,20 @@
 - Le texture esterne alla cartella vengono copiate dentro, così il materiale resta
   autosufficiente. Test in `forge_library` (salva, texture esterna, salva con nome, nome vuoto).
 
+### Benchmark pronti nello zip portable
+- I progetti `bench_intera`, `bench_vicina` e `bench_ad` sono nel repository
+  (`samples/scene/cocktail-ghiaccio-secco/`). Lo zip portable contiene tutta la cartella
+  `samples/`, senza le texture estratte dai .glb, che si ricreano all'apertura.
+- I benchmark si lanciano dalla cartella estratta, senza Python né repository. L'installer non
+  li include: in Program Files il programma non può scrivere le texture estratte.
+- Test `forge_project/tests/samples.rs`: copia `samples/` altrove, rende inesistenti i percorsi
+  assoluti e verifica che ogni progetto si apra senza modelli, componenti o texture mancanti, e
+  con le texture prese dalla copia.
+- CI:
+  - Linux controlla che i benchmark siano allineati alla demo;
+  - Windows estrae lo zip, controlla i file e lancia un render di `bench_ad` (con la mappa
+    dell'adattivo) dalla cartella estratta.
+- CLI: avviso "file non trovato: modello …" se manca un modello del progetto.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

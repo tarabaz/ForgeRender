@@ -81,20 +81,26 @@ fatti sono in [docs/BENCHMARK.md](docs/BENCHMARK.md). Regola: si riportano solo 
 
 ### Preparazione (una volta)
 
-I comandi sono per PowerShell, da lanciare **nella cartella del repository** (servono le scene in
-`samples/` e gli script in `reports/strumenti/`, che non sono nello zip). Il programma da usare è
-`forgerender-cli.exe`: quello compilato con `Build-ForgeRender.ps1` oppure quello estratto dallo
-zip `ForgeRender-portable-x64`.
+I comandi sono per PowerShell. Basta lo zip `ForgeRender-portable-x64`:
+- estrailo e apri PowerShell **nella cartella estratta**;
+- i progetti di benchmark sono già dentro, in `samples\scene\cocktail-ghiaccio-secco\`;
+- non serve né Python né il repository.
+
+In alternativa usa la cartella del repository con `forgerender-cli.exe` compilato da
+`Build-ForgeRender.ps1`.
 
 ```powershell
-cd C:\percorso\RenderingEngine
-$cli = ".\target\release\forgerender-cli.exe"     # oppure il percorso dello zip estratto
-py -m pip install numpy pillow                    # solo per crea_progetti_bench e confronta_immagini
-py reports\strumenti\crea_progetti_bench.py       # crea bench_intera / bench_vicina / bench_ad
+cd C:\percorso\ForgeRender-portable-x64          # cartella dello zip estratto
+$cli = ".\forgerender-cli.exe"                    # nel repository: ".\target\release\forgerender-cli.exe"
 ```
 
-`crea_progetti_bench.py` crea tre progetti accanto alla demo del cocktail, tutti senza
-profondità di campo e con la camera fissa. Non vanno committati.
+I progetti di benchmark sono derivati dalla demo del cocktail, tutti senza profondità di campo
+e con la camera fissa. Se cambia la demo si rigenerano con
+`reports/strumenti/crea_progetti_bench.py`, e la CI controlla che siano allineati.
+
+Python (`py -m pip install numpy pillow`) serve solo per gli script di confronto delle immagini
+in `reports/strumenti/`. Se non puoi usarlo, metti le immagini in `reports/AAAA-MM-GG_.../` e
+l'analisi la fa l'agente.
 
 | Progetto | Cosa inquadra | Seed |
 |---|---|---|

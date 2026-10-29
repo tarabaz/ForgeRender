@@ -92,6 +92,9 @@ fn print_help() {
 fn load_scene(args: &Args) -> anyhow::Result<(Scene, RenderSettings)> {
     if let Some(p) = args.value("--project") {
         let l = forge_project::load(&PathBuf::from(p))?;
+        for m in &l.report.missing_sources {
+            tracing::warn!("file non trovato: modello {}", m.display());
+        }
         for w in &l.report.warnings {
             tracing::warn!("{w}");
         }

@@ -326,3 +326,56 @@ Un confronto locale con un singolo riferimento rumoroso non dimostra da solo una
 D'accordo sull'ordine 0b → 0c → 1? Per il punto 1 preferisci il bilanciamento per pixel
 `count_b·2 < count`, oppure dividere ogni passata GPU in due metà A/B? La seconda richiede di
 cambiare lo shader per accumulare due somme.
+
+
+### Risposta 3 di Claude Code — 2026-10-29 (pacchetto benchmark completo)
+
+- **Branch**: `claude/festive-heisenberg-d2ow6z`; commit indicato nel messaggio a Valerio.
+
+#### Fatto
+
+- **Progetti di benchmark nel repository**: `samples/scene/cocktail-ghiaccio-secco/bench_{ad,intera,vicina}.frproject`.
+  - Generati con `reports/strumenti/crea_progetti_bench.py`.
+  - Tolta l'esclusione da `samples/.gitignore`.
+- **`packaging/windows/package.ps1`**: copia `samples/` nello zip portable senza le cartelle
+  `*_texture` (texture estratte dai .glb, si ricreano all'apertura). Si interrompe se manca uno
+  dei tre benchmark.
+  - **L'installer non li include, di proposito**: in Program Files il programma non può
+    scrivere le texture estratte accanto ai .glb.
+- **`packaging/windows/LEGGIMI.txt`**: sezione "Benchmark pronti" con i comandi dalla cartella
+  estratta.
+- **README (IT/EN)**: la preparazione ora parte dallo zip estratto, senza Python.
+- **`forge_cli`**: avviso `file non trovato: modello …` per i modelli mancanti. Prima la CLI
+  stampava solo le texture mancanti: un modello mancante passava in silenzio.
+- **Test `crates/forge_project/tests/samples.rs`**:
+  - copia `samples/` in una cartella temporanea;
+  - sostituisce i percorsi assoluti con una cartella inesistente;
+  - apre ogni `.frproject`;
+  - verifica che non manchino modelli, componenti o texture e che ogni texture venga dalla copia.
+- **CI**:
+  - Linux rigenera i benchmark e fallisce se differiscono da quelli committati;
+  - Windows, dopo i pacchetti, estrae lo zip, controlla i file e lancia dalla cartella estratta
+    `render --project samples\...\bench_ad.frproject` (CPU, 16×20, 2 campioni, adattivo con
+    `--adaptive-map`). Fallisce se il render non riesce, se mancano le immagini o se il log
+    contiene "file non trovato".
+
+#### Verifiche eseguite (container Linux)
+
+- `cargo test --release -q -p forge_project -p forge_cli`: verdi, compreso il test nuovo
+  (3–4 s).
+- **Controllo negativo**: tolta una texture della demo, il test fallisce; rimessa a posto.
+- **Prova manuale**: `samples/` copiata altrove con i percorsi assoluti rotti, poi
+  `render --project …/bench_ad.frproject` (32×40, 1 campione). Tutte le texture vengono caricate
+  dalla copia: le 3 del legno da `textures/`, le altre estratte di nuovo dai .glb.
+- `cargo clippy … -D warnings` e `cargo fmt`: puliti.
+
+#### Non eseguito qui
+
+- `package.ps1` e il controllo dello zip: nel container non c'è PowerShell. Li esegue la CI su
+  Windows a questo commit; **finché quel passo non è verde il requisito non è chiuso**.
+- Ti aggiorno con l'esito qui o tramite Valerio.
+
+#### Ancora aperto dalla Risposta 2
+
+L'ordine 0b → 0c → 1 e la scelta per il punto 1 (bilanciamento per pixel o due somme A/B nello
+shader) aspettano la tua risposta.

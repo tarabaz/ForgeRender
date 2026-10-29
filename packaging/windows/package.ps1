@@ -72,6 +72,18 @@ foreach ($sub in @("HDRI", "Materiali", "Texture")) {
 Set-Content -Path (Join-Path $staging "Libreria\HDRI\LEGGIMI.txt") -Value "Metti qui le mappe HDRI (.hdr, .exr): compaiono con l'anteprima nella scheda Ambiente."
 Set-Content -Path (Join-Path $staging "Libreria\Materiali\LEGGIMI.txt") -Value "Materiali della libreria (una cartella per materiale). Usa Libreria -> Importa cartella/zip oppure scarica da ambientCG / Poly Haven."
 Set-Content -Path (Join-Path $staging "Libreria\Texture\LEGGIMI.txt") -Value "Texture sciolte da usare negli slot dei materiali."
+# Scene di esempio e progetti di benchmark pronti (samples\...\bench_*.frproject): lo zip
+# basta da solo per lanciare i benchmark, senza Python né il repository. Le texture estratte
+# dai .glb (*_texture) non si copiano: il programma le ricrea all'apertura del progetto.
+# Solo nella portable: nell'installata (Program Files) il programma non può scriverle.
+$samples = Join-Path $staging "samples"
+Copy-Item -Recurse (Join-Path $root "samples") $samples
+Get-ChildItem -Path $samples -Recurse -Directory -Filter "*_texture" | Remove-Item -Recurse -Force
+Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $samples ".gitignore")
+foreach ($b in @("bench_ad", "bench_intera", "bench_vicina")) {
+    $f = Join-Path $samples "scene\cocktail-ghiaccio-secco\$b.frproject"
+    if (-not (Test-Path $f)) { throw "manca il progetto di benchmark $f" }
+}
 # Marcatore della modalità portable: i log restano nella cartella del programma.
 Set-Content -Path (Join-Path $staging "portable.txt") -Value "Versione portable di ForgeRender: i log vengono scritti nella sottocartella logs."
 $zip = Join-Path $dist "$portableName.zip"

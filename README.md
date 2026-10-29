@@ -81,20 +81,26 @@ Every measurement you can run, and what it is for. Results and raw data go in
 
 ### Setup (once)
 
-Run these PowerShell commands **from the repository folder**. They need the scenes in
-`samples/` and the scripts in `reports/strumenti/`, which are not in the zip. Use the
-`forgerender-cli.exe` built by `Build-ForgeRender.ps1` or the one from the
-`ForgeRender-portable-x64` zip.
+These are PowerShell commands. The `ForgeRender-portable-x64` zip is all you need:
+- extract it and open PowerShell **in the extracted folder**;
+- the benchmark projects are already inside, in `samples\scene\cocktail-ghiaccio-secco\`;
+- you need neither Python nor the repository.
+
+Alternatively, use the repository folder with the `forgerender-cli.exe` built by
+`Build-ForgeRender.ps1`.
 
 ```powershell
-cd C:\path\to\RenderingEngine
-$cli = ".\target\release\forgerender-cli.exe"     # or the path of the extracted zip
-py -m pip install numpy pillow                    # only for the two Python tools
-py reports\strumenti\crea_progetti_bench.py       # creates bench_intera / bench_vicina / bench_ad
+cd C:\path\to\ForgeRender-portable-x64          # extracted zip folder
+$cli = ".\forgerender-cli.exe"                    # in the repository: ".\target\release\forgerender-cli.exe"
 ```
 
-`crea_progetti_bench.py` creates three projects next to the cocktail demo. All three use a fixed
-camera with depth of field off. Do not commit them.
+The benchmark projects are derived from the cocktail demo, all with a fixed camera and depth of
+field off. If the demo changes, regenerate them with `reports/strumenti/crea_progetti_bench.py`;
+CI checks that they are in sync.
+
+Python (`py -m pip install numpy pillow`) is only needed for the image comparison scripts in
+`reports/strumenti/`. Without it, put the images in `reports/YYYY-MM-DD_.../` and let the agent
+analyse them.
 
 | Project | View | Seed |
 |---|---|---|

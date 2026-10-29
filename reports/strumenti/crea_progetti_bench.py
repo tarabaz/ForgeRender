@@ -1,6 +1,8 @@
 """Crea i progetti di benchmark derivati dalla demo del cocktail (stessa scena, camera fissa,
 senza profondità di campo, seed fisso). I file nascono accanto alla demo, così i percorsi
-relativi dei modelli funzionano; non vanno committati (sono rigenerabili).
+relativi dei modelli funzionano. I file sono nel repository e nello zip portable (benchmark
+pronti senza Python); lo script serve a rigenerarli quando cambia la demo, e la CI controlla
+che siano allineati.
 
 Uso, dalla radice del repository:
     python reports/strumenti/crea_progetti_bench.py
