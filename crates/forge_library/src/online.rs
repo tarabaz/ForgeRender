@@ -230,12 +230,23 @@ pub fn parse_polyhaven(v: &Value, kind: AssetKind, query: &str) -> Vec<OnlineAss
 /// URL delle mappe di una texture Poly Haven alla risoluzione indicata (`files/<id>`).
 /// Si sceglie PNG se disponibile, poi JPG; si salta la normal DirectX se c'è quella OpenGL
 /// e la mappa ARM se ci sono le mappe separate.
-pub fn polyhaven_texture_files(v: &Value, resolution: &str) -> Vec<String> {
+/// File da scaricare per un materiale Poly Haven.
+#[derive(Debug, Default, PartialEq)]
+pub struct PolyHavenFiles {
+    pub urls: Vec<String>,
+    /// Mappe del materiale senza un file alla risoluzione scelta (nome della mappa sul sito).
+    pub missing: Vec<String>,
+}
+
+/// Mappe di un materiale Poly Haven (`files/<id>`) alla risoluzione scelta. Formato preferito
+/// PNG, poi JPG, poi EXR: una mappa disponibile solo in EXR si scarica comunque (prima veniva
+/// saltata senza avviso). Normal OpenGL al posto della DirectX, mappe separate al posto della ARM.
+pub fn polyhaven_texture_files(v: &Value, resolution: &str) -> PolyHavenFiles {
     let res = resolution.to_lowercase();
-    let Some(map) = v.as_object() else { return Vec::new() };
+    let mut out = PolyHavenFiles::default();
+    let Some(map) = v.as_object() else { return out };
     let keys: Vec<String> = map.keys().map(|k| k.to_lowercase()).collect();
     let has = |k: &str| keys.iter().any(|x| x == k);
-    let mut urls = Vec::new();
     for (key, entry) in map {
         let k = key.to_lowercase();
         if ["blend", "gltf", "mtlx", "usd", "fbx"].contains(&k.as_str()) {
@@ -247,16 +258,19 @@ pub fn polyhaven_texture_files(v: &Value, resolution: &str) -> Vec<String> {
         if k == "arm" && has("rough") {
             continue;
         }
-        let Some(by_res) = entry.get(&res) else { continue };
-        if let Some(url) = ["png", "jpg"]
-            .iter()
-            .find_map(|f| by_res.get(*f).and_then(|x| x.get("url")).and_then(Value::as_str))
-        {
-            urls.push(url.to_string());
+        let url = entry.get(&res).and_then(|by_res| {
+            ["png", "jpg", "exr"]
+                .iter()
+                .find_map(|f| by_res.get(*f).and_then(|x| x.get("url")).and_then(Value::as_str))
+        });
+        match url {
+            Some(u) => out.urls.push(u.to_string()),
+            None => out.missing.push(key.clone()),
         }
     }
-    urls.sort();
-    urls
+    out.urls.sort();
+    out.missing.sort();
+    out
 }
 
 /// URL della HDRI Poly Haven (`files/<id>` → `hdri` → risoluzione → `hdr`).
@@ -475,9 +489,16 @@ fn download_material_inner(asset: &OnlineAsset, resolution: &str, progress: &dyn
         }
         Provider::PolyHaven => {
             let files = get_json(&format!("https://api.polyhaven.com/files/{}", asset.id))?;
-            let urls = polyhaven_texture_files(&files, resolution);
+            let PolyHavenFiles { urls, missing } = polyhaven_texture_files(&files, resolution);
             if urls.is_empty() {
                 bail!("{}: nessuna mappa disponibile a {resolution}", asset.name);
+            }
+            let notes: Vec<String> = missing
+                .iter()
+                .map(|k| format!("mappa \"{k}\" non disponibile su Poly Haven a {resolution}"))
+                .collect();
+            for n in &notes {
+                tracing::warn!("{}: {n}", asset.id);
             }
             let tmp = std::env::temp_dir().join(format!("forgerender_ph_{}_{resolution}", asset.id));
             std::fs::create_dir_all(&tmp)?;
@@ -489,7 +510,8 @@ fn download_material_inner(asset: &OnlineAsset, resolution: &str, progress: &dyn
                     download_to(url, &tmp.join(fname))?;
                 }
                 progress("importazione delle mappe…");
-                store::import_folder(&tmp, Some(&name), asset.size_m, &source)
+                let m = store::import_folder(&tmp, Some(&name), asset.size_m, &source)?;
+                store::set_notes(&m.dir, &notes)
             })();
             let _ = std::fs::remove_dir_all(&tmp);
             r
@@ -627,15 +649,39 @@ mod tests {
                 "blend":{"1k":{"blend":{"url":"https://dl/x.blend"}}}}"#,
         )
         .unwrap();
-        let urls = polyhaven_texture_files(&files, "1K");
+        let r = polyhaven_texture_files(&files, "1K");
         assert_eq!(
-            urls,
+            r.urls,
             [
                 "https://dl/rock_wall_diff_1k.png",
                 "https://dl/rock_wall_nor_gl_1k.jpg",
                 "https://dl/rock_wall_rough_1k.jpg"
             ]
         );
+        assert!(r.missing.is_empty());
+        // Mappe solo in EXR (come metal_plate_02 sul sito) e mappe senza la risoluzione scelta.
+        let files: Value = serde_json::from_str(
+            r#"{"Diffuse":{"4k":{"jpg":{"url":"https://dl/metal_plate_02_diff_4k.jpg"}}},
+                "Metal":{"4k":{"exr":{"url":"https://dl/metal_plate_02_metal_4k.exr"}}},
+                "Rough":{"4k":{"exr":{"url":"https://dl/metal_plate_02_rough_4k.exr"}},
+                         "2k":{"png":{"url":"https://dl/metal_plate_02_rough_2k.png"}}},
+                "nor_gl":{"4k":{"png":{"url":"https://dl/metal_plate_02_nor_gl_4k.png"},
+                                "exr":{"url":"https://dl/metal_plate_02_nor_gl_4k.exr"}}},
+                "Displacement":{"2k":{"png":{"url":"https://dl/metal_plate_02_disp_2k.png"}}},
+                "mtlx":{"4k":{"mtlx":{"url":"https://dl/metal_plate_02.mtlx"}}}}"#,
+        )
+        .unwrap();
+        let r = polyhaven_texture_files(&files, "4K");
+        assert_eq!(
+            r.urls,
+            [
+                "https://dl/metal_plate_02_diff_4k.jpg",
+                "https://dl/metal_plate_02_metal_4k.exr",
+                "https://dl/metal_plate_02_nor_gl_4k.png",
+                "https://dl/metal_plate_02_rough_4k.exr"
+            ]
+        );
+        assert_eq!(r.missing, ["Displacement"]);
         let hdri: Value = serde_json::from_str(r#"{"hdri":{"2k":{"hdr":{"url":"https://dl/studio_2k.hdr"}}}}"#).unwrap();
         assert_eq!(polyhaven_hdri_file(&hdri, "2K").as_deref(), Some("https://dl/studio_2k.hdr"));
     }

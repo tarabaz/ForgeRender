@@ -30,6 +30,9 @@ struct MaterialFile {
     /// Provenienza (es. "ambientCG Wood049", "importato da cartella").
     #[serde(default)]
     source: String,
+    /// Avvisi dell'import (es. mappe che la fonte non offre alla risoluzione scelta).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    notes: Vec<String>,
     material: Material,
 }
 
@@ -43,6 +46,8 @@ pub struct LibraryMaterial {
     /// Mappe nello slot sbagliato secondo il riconoscimento attuale (vedi [`misassigned_maps`]):
     /// il materiale va riscaricato.
     pub misassigned: Vec<String>,
+    /// Avvisi dell'import salvati con il materiale.
+    pub notes: Vec<String>,
 }
 
 /// Nome di cartella valido su tutti i sistemi.
@@ -149,6 +154,7 @@ pub fn load(dir: &Path) -> anyhow::Result<LibraryMaterial> {
     Ok(LibraryMaterial {
         dir: dir.to_path_buf(),
         misassigned: misassigned_maps(&material),
+        notes: f.notes,
         material,
         source: f.source,
         thumbnail: thumb.is_file().then_some(thumb),
@@ -163,9 +169,16 @@ pub fn save(dir: &Path, material: &Material, source: &str) -> anyhow::Result<()>
             *slot = rel.to_path_buf();
         }
     }
+    // Gli avvisi dell'import restano anche quando si salva il materiale modificato.
+    let notes = std::fs::read_to_string(dir.join(MATERIAL_FILE))
+        .ok()
+        .and_then(|t| serde_json::from_str::<MaterialFile>(&t).ok())
+        .map(|f| f.notes)
+        .unwrap_or_default();
     let f = MaterialFile {
         version: FILE_VERSION,
         source: source.to_string(),
+        notes,
         material: m,
     };
     std::fs::write(dir.join(MATERIAL_FILE), serde_json::to_string_pretty(&f)?)?;
@@ -267,6 +280,15 @@ pub fn save_as(material: &Material, name: &str, source: &str) -> anyhow::Result<
         let _ = std::fs::remove_dir_all(&dest);
     }
     result
+}
+
+/// Registra gli avvisi dell'import nel `materiale.json` e restituisce il materiale ricaricato.
+pub fn set_notes(dir: &Path, notes: &[String]) -> anyhow::Result<LibraryMaterial> {
+    let path = dir.join(MATERIAL_FILE);
+    let mut f: MaterialFile = serde_json::from_str(&std::fs::read_to_string(&path)?)?;
+    f.notes = notes.to_vec();
+    std::fs::write(&path, serde_json::to_string_pretty(&f)?)?;
+    load(dir)
 }
 
 /// Salva la miniatura (RGBA8) del materiale.
@@ -532,6 +554,10 @@ mod tests {
         let upd = update(&all[0].dir, &edited).unwrap();
         assert_eq!(upd.material, edited, "ricaricato uguale a quello salvato");
         assert_eq!(upd.source, "test");
+        // Le note dell'import restano anche dopo "Salva".
+        let noted = set_notes(&all[0].dir, &["mappa \"Displacement\" non disponibile".to_string()]).unwrap();
+        assert_eq!(noted.notes.len(), 1);
+        assert_eq!(update(&all[0].dir, &edited).unwrap().notes, noted.notes);
         assert_eq!(load(&all[0].dir).unwrap().material.roughness, 0.25);
         // Una texture esterna viene copiata dentro la cartella.
         let ext_tex = src.join("esterna.png");

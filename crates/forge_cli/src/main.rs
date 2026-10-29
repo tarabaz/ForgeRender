@@ -472,6 +472,9 @@ fn download_all(args: &Args) -> anyhow::Result<()> {
                 let r = match k {
                     AssetKind::Material => online::download_material(a, &res, &|_| {}).map(|m| {
                         local.insert(online::source_key(p, &a.id));
+                        for n in &m.notes {
+                            print!("[{n}] ");
+                        }
                         m.dir
                     }),
                     AssetKind::Hdri => online::download_hdri(a, &res, &|_| {}),
@@ -513,6 +516,9 @@ fn library(args: &Args) -> anyhow::Result<()> {
                     format!("  ⚠ DA RISCARICARE ({})", m.misassigned.join("; "))
                 };
                 println!("  {:<40} {maps} mappe  [{}]{bad}", m.material.name, m.source);
+                for n in &m.notes {
+                    println!("      nota: {n}");
+                }
             }
             let broken = mats.iter().filter(|m| !m.misassigned.is_empty()).count();
             if broken > 0 {

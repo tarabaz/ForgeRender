@@ -304,7 +304,11 @@ fn poll(app: &mut ForgeApp, ctx: &egui::Context) {
                 lib.items = None;
                 match r {
                     Ok(m) => {
-                        lib.status = Some((format!("«{}» aggiunto alla libreria.", m.material.name), false));
+                        let mut msg = format!("«{}» aggiunto alla libreria.", m.material.name);
+                        if !m.notes.is_empty() {
+                            msg += &format!(" Attenzione: {}.", m.notes.join("; "));
+                        }
+                        lib.status = Some((msg, !m.notes.is_empty()));
                         lib.tab = Tab::Mine;
                         apply_material(app, &m);
                     }
@@ -533,8 +537,13 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
                         "⚠ da riscaricare".to_string()
                     };
                     let r = thumb_card(ui, tex, egui::vec2(CARD, CARD), &m.material.name, &sub, false);
+                    let notes = if m.notes.is_empty() {
+                        String::new()
+                    } else {
+                        format!("\n\n{}", m.notes.join("\n"))
+                    };
                     let r = if m.misassigned.is_empty() {
-                        r.on_hover_text(format!("{}\n{}", m.source, m.dir.display()))
+                        r.on_hover_text(format!("{}\n{}{notes}", m.source, m.dir.display()))
                     } else {
                         r.on_hover_text(format!(
                             "{}\n{}\n\nImportato con un errore di riconoscimento delle mappe:\n{}\n\n\
