@@ -249,6 +249,7 @@ file di output e le immagini. Poi aggiungi una riga all'indice in `reports/READM
 
 ## Documentazione
 
+- [CHANGELOG.md](CHANGELOG.md) — novità di ogni versione e regola per i numeri di versione
 - [reports/](reports/README.md) — report delle misure con dati grezzi, immagini e comandi per rifarle
 - [docs/ROADMAP.it.md](docs/ROADMAP.it.md) — stato, prossimi passi con la complessità, piani tecnici
   ([English](docs/ROADMAP.md))

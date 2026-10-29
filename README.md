@@ -246,6 +246,7 @@ Then add a row to the index in `reports/README.md`.
 
 ## Documentation
 
+- [CHANGELOG.md](CHANGELOG.md) — what changed in each version (Italian)
 - [reports/](reports/README.md) — measurement reports with raw data, images and the commands to reproduce them (Italian)
 - [docs/ROADMAP.md](docs/ROADMAP.md) — status, next steps with complexity, technical plans
   ([italiano](docs/ROADMAP.it.md))

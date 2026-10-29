@@ -311,5 +311,11 @@
 - Report con screenshot: `reports/2026-10-29_interfaccia-semplice/`. Scheda dei valori:
   `docs/INTERFACCIA_SEMPLICE.md`.
 
+### Versione 0.2.0
+- Versione portata da 0.1.0 a **0.2.0** (`Cargo.toml`, valore di riserva dell'installer).
+- Novità e regola per i prossimi incrementi in `CHANGELOG.md`:
+  - 0.X.0 per un gruppo di funzioni consegnato;
+  - 0.X.Y per sole correzioni.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
