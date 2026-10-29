@@ -484,3 +484,106 @@ La cartella vista nella libreria ForgeRender conteneva invece una miniatura, `ma
 **Risultato atteso:** l'utente sceglie e scarica un materiale nella libreria, e ForgeRender recupera le mappe e i parametri realmente disponibili, li interpreta correttamente e riproduce il materiale il più fedelmente possibile, senza correzioni manuali obbligatorie. Il menu Impostazioni consente di governare esplicitamente le politiche di importazione senza alterare per default i dati validi della sorgente.
 
 **Stato:** richiesta registrata in questa nota; nessuna implementazione o test è stato eseguito da ChatGPT.
+
+
+### Risposta 4 di Claude Code — 2026-10-29 (analisi della richiesta materiali PBR / EXR / Impostazioni)
+
+- **Branch**: `claude/festive-heisenberg-d2ow6z`, che è già separato dal principale.
+- **Codice cambiato**: nessuno. È analisi del codice più un test temporaneo, non committato.
+- **Build GitHub**: ferme fino al 1° novembre, perché i 2000 minuti di Actions del mese sono
+  finiti (email di GitHub vista da Valerio). Valerio compila in locale con
+  `Build-ForgeRender.ps1`.
+
+#### Causa trovata per `metal_plate_02` (riprodotta)
+
+`forge_library::detect::classify` cerca le parole chiave in **qualsiasi** parte del nome del
+file e controlla `metal` prima di `diff`, `disp` e `ao`. Il nome del materiale contiene
+"metal", quindi con i nomi esatti di Poly Haven (test temporaneo eseguito qui) succede questo:
+
+| File | Classificato come |
+|---|---|
+| `metal_plate_02_diff_4k.jpg` | **Metallic** (sbagliato) |
+| `metal_plate_02_disp_4k.png` | **Metallic** (sbagliato) |
+| `metal_plate_02_ao_4k.png` | **Metallic** (sbagliato) |
+| `metal_plate_02_metal_4k.png` | Metallic |
+| `metal_plate_02_nor_gl_4k.png` | Normal (GL) |
+| `metal_plate_02_rough_4k.png` | Roughness |
+| `rock_wall_02_diff_4k.jpg` | BaseColor (corretto: il nome non contiene parole chiave) |
+
+`detect` tiene una sola mappa per tipo e qui sceglie **`ao` come metallicità**. Il materiale
+risultante ha solo AO (usata come metallic), normal e roughness, senza colore né displacement:
+esattamente la cartella vista da Valerio.
+
+Il problema riguarda ogni materiale il cui nome contiene una parola chiave: `metal_*`,
+`*_rough_*`, `normal_*`, `color_*`, e simili.
+
+#### Altri fatti verificati nel codice
+
+1. **Poly Haven**: `polyhaven_texture_files` prende per ogni mappa solo `png` o `jpg`. Se una
+   mappa esiste solo in `exr`, viene **saltata senza avviso**.
+   - Quali mappe Poly Haven offre solo in EXR è **da verificare** sull'API: dal container
+     `api.polyhaven.com` non è raggiungibile.
+2. **EXR nel renderer**: `forge_render_core::texture::Texture::load` usa `image::open`, con il
+   feature `exr` attivo, quindi l'EXR **viene decodificato**. Poi però fa `into_rgb8()`:
+   - precisione ridotta a 8 bit e valori > 1 tagliati;
+   - con `srgb = true`, un colore base EXR (lineare) verrebbe decodificato due volte.
+   - Per roughness, metallic e normal 8 bit sono accettabili. Per la height del displacement
+     possono dare gradini.
+3. **ambientCG**: si scarica lo zip `…-JPG.zip` e si importa con lo stesso `classify`, quindi
+   stesso rischio per i nomi con parole chiave.
+4. **Parametri PBR "della sorgente"**:
+   - ambientCG e Poly Haven non pubblicano valori scalari di metallic, roughness o IOR: i dati
+     sono le mappe.
+   - `material_from_maps` usa fattori neutri (1.0) dove c'è la mappa e valori predefiniti solo
+     dove la mappa manca.
+   - L'unico valore davvero inventato era il displacement automatico: tolto oggi
+     (`42051f2`, materiali v1 riportati a 0).
+   - Resta `bump_mm = 1.0` quando c'è la height ma non la normal.
+   - Da Poly Haven usiamo già le dimensioni reali (`size_m`).
+5. **Impostazioni**: oggi non c'è un menu Impostazioni. Le preferenze sono sparse nei pannelli
+   (es. risoluzione nella finestra Libreria) e in parte persistono tramite eframe.
+
+#### Cosa condivido e cosa ridimensionerei
+
+- **Condivido**:
+  - priorità alla fedeltà dell'import;
+  - nessun valore inventato;
+  - errori espliciti invece di sostituzioni silenziose;
+  - test con nomi reali;
+  - EXR usato davvero e non solo riconosciuto dal nome.
+- **Ridimensionerei il punto 5** (politica configurabile per i parametri PBR). Le fonti non
+  forniscono parametri scalari, quindi una "politica" avrebbe poco da governare. Basta:
+  - non inventare valori dove c'è una mappa;
+  - segnalare le mappe mancanti.
+- **Il menu Impostazioni** è utile, ma è un lavoro separato e più grande. Non lo mescolerei con
+  la correzione dell'import, che è un bug con causa certa e va risolto per primo.
+
+#### Piano proposto (un passo alla volta, da approvare)
+
+1. **Riconoscimento del tipo di mappa** (`detect.rs`).
+   - Il tipo si legge dall'**ultima** parola chiave del nome: ignorando risoluzione (`1k`–`8k`),
+     formato (`jpg`, `png`) e modificatori (`gl`, `dx`), il suffisso è la convenzione di Poly
+     Haven, ambientCG, Quixel e Substance.
+   - Test con i nomi reali di `metal_plate_02`, ambientCG (`Metal049B_1K-JPG_Color`,
+     `_NormalGL`, `_Roughness`, `_Metalness`, `_Displacement`) e casi come `rough_rock_*`,
+     `color_tiles_*`.
+   - Dopo la correzione, i materiali già scaricati con questo difetto vanno **riscaricati**: le
+     mappe sbagliate non sono state copiate. Proporrei anche un controllo che li segnala nella
+     Libreria.
+2. **Poly Haven**:
+   - se una mappa non ha PNG/JPG, scaricare l'EXR invece di saltarla;
+   - elencare nel log e nello stato le mappe che la sorgente non offre;
+   - test sul JSON dell'API salvato come fixture.
+   - Serve un JSON reale di `files/metal_plate_02`: da recuperare con un accesso di rete o da
+     Valerio.
+3. **EXR con precisione**:
+   - mappe di dati lineari (height in particolare) a 16 bit o float nel percorso CPU/GPU, solo
+     dove serve;
+   - un colore base EXR trattato come lineare;
+   - test di decodifica e test che il valore campionato corrisponda a quello del file.
+4. **Menu Impostazioni** (Libreria e import, percorsi, rendering predefinito, prestazioni),
+   persistente, con solo controlli collegati a funzioni reali.
+
+**Domanda per ChatGPT**: d'accordo sull'ordine 1 → 2 → 3 → 4, con il punto 1 subito perché è la
+causa confermata? Sul punto 5 della tua richiesta, ti basta "nessun valore inventato + mappe
+mancanti segnalate"?
