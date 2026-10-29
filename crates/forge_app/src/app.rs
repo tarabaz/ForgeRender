@@ -1,6 +1,7 @@
 //! Stato dell'applicazione e orchestrazione: scena, progetto, sessione di
 //! rendering, viewport. La UI vera e propria è nei moduli di `ui`.
 
+use crate::i18n::{tf, tk, tr};
 use crate::viewport::ViewportRenderer;
 use eframe::egui;
 use forge_import::ImportOptions;
@@ -128,10 +129,10 @@ pub enum RenderView {
 impl RenderView {
     pub fn label(self) -> &'static str {
         match self {
-            RenderView::Final => "Finale",
-            RenderView::Raw => "Grezza",
-            RenderView::Albedo => "Albedo",
-            RenderView::Normals => "Normali",
+            RenderView::Final => tr("Finale"),
+            RenderView::Raw => tr("Grezza"),
+            RenderView::Albedo => tr("Albedo"),
+            RenderView::Normals => tr("Normali"),
         }
     }
 }
@@ -206,6 +207,9 @@ pub struct ForgeApp {
     pub prefs_open: bool,
     /// Errore di lettura o salvataggio delle impostazioni, mostrato nella finestra.
     pub prefs_error: Option<String>,
+    /// Lingue disponibili (comprese e file `lang/Lan_*.json`) e file di lingua non validi.
+    pub languages: Vec<std::sync::Arc<crate::i18n::Language>>,
+    pub language_errors: Vec<String>,
     /// Modalità Semplice: aspetto e qualità scelti, valori prima dell'ultimo preset.
     pub simple_look: crate::presets::Look,
     pub simple_quality: crate::presets::Quality,
@@ -305,6 +309,8 @@ impl ForgeApp {
             prefs: Default::default(),
             prefs_open: false,
             prefs_error: None,
+            languages: Vec::new(),
+            language_errors: Vec::new(),
             simple_look: crate::presets::Look::Light,
             simple_quality: crate::presets::Quality::Balanced,
             preset_backup: None,
@@ -344,6 +350,10 @@ impl ForgeApp {
             tracing::warn!("{e}");
         }
         app.prefs_error = err;
+        (app.languages, app.language_errors) = crate::i18n::available();
+        for e in &app.language_errors {
+            tracing::warn!("file di lingua non valido: {e}");
+        }
         app.apply_prefs(prefs, true);
         // Cartelle della libreria (HDRI, materiali, texture).
         match forge_library::paths::ensure() {
@@ -353,7 +363,7 @@ impl ForgeApp {
         // Denoiser: la libreria OIDN è opzionale (accanto all'eseguibile).
         match forge_denoise::OidnDenoiser::load() {
             Ok(d) => {
-                app.denoiser_info = Ok(format!("Open Image Denoise {}", d.version()));
+                app.denoiser_info = Ok(tf("Open Image Denoise {}", &[d.version().to_string()]));
                 app.session.set_denoiser(Some(Box::new(d)));
             }
             Err(e) => {
@@ -374,7 +384,7 @@ impl ForgeApp {
             _ => crate::ui::gizmo::GizmoMode::Move,
         };
         if let Some(mode) = &startup.camera_test {
-            app.add_render_camera(Some("Frontale".into()));
+            app.add_render_camera(Some(tr("Frontale").into()));
             if mode == "dof" {
                 let c = &mut app.scene.render_cameras[0].camera;
                 c.set_focal_mm(85.0);
@@ -683,10 +693,10 @@ impl ForgeApp {
             for &i in &originals {
                 self.scene.nodes[i].removed = true;
             }
-            self.info = Some(format!(
+            self.info = Some(tf(
                 "{} componenti eliminati dal progetto (il file importato non viene modificato). \
                  Ctrl+Z o \"Eliminati\" in fondo all'albero per ripristinarli.",
-                originals.len()
+                &[format!("{}", originals.len())],
             ));
         }
         if deleted > 0 || !originals.is_empty() {
@@ -799,7 +809,7 @@ impl ForgeApp {
     pub fn add_render_camera(&mut self, name: Option<String>) {
         let n = self.scene.render_cameras.len() + 1;
         self.scene.render_cameras.push(forge_scene::RenderCamera {
-            name: name.unwrap_or_else(|| format!("Camera {n}")),
+            name: name.unwrap_or_else(|| tf("Camera {n}", &[format!("{}", n)])),
             camera: self.scene.camera.clone(),
         });
         self.set_active_camera(Some(self.scene.render_cameras.len() - 1));
@@ -954,7 +964,7 @@ impl ForgeApp {
             Err(std::sync::mpsc::TryRecvError::Empty) => {}
             Err(_) => {
                 self.pending_fog = None;
-                self.error = Some("calcolo della nebbia fallito".into());
+                self.error = Some(tr("calcolo della nebbia fallito").into());
             }
         }
     }
@@ -973,7 +983,7 @@ impl ForgeApp {
             Err(std::sync::mpsc::TryRecvError::Empty) => {}
             Err(_) => {
                 self.pending_geometry = None;
-                self.error = Some("compilazione della geometria fallita".into());
+                self.error = Some(tr("compilazione della geometria fallita").into());
             }
         }
     }
@@ -1010,7 +1020,10 @@ impl ForgeApp {
             forge_render_core::BackendKind::Gpu => match self.gpu_backend() {
                 Ok(g) => Box::new(g),
                 Err(e) => {
-                    self.info = Some(format!("GPU non disponibile, il rendering prosegue sulla CPU.\n\n{e}"));
+                    self.info = Some(tf(
+                        "GPU non disponibile, il rendering prosegue sulla CPU.\n\n{e}",
+                        std::slice::from_ref(&e),
+                    ));
                     self.settings.backend = forge_render_core::BackendKind::Cpu;
                     return self.start_render();
                 }
@@ -1018,7 +1031,7 @@ impl ForgeApp {
             forge_render_core::BackendKind::Cpu => match CpuBackend::from_settings(&self.settings) {
                 Ok(b) => Box::new(b),
                 Err(e) => {
-                    self.error = Some(format!("impossibile creare il backend CPU: {e}"));
+                    self.error = Some(tf("impossibile creare il backend CPU: {e}", &[format!("{}", e)]));
                     return;
                 }
             },
@@ -1165,7 +1178,7 @@ impl ForgeApp {
 
     pub fn export_png_dialog(&mut self) {
         let Some(frame) = self.session.latest_frame() else {
-            self.error = Some("nessuna immagine da esportare: avvia prima un rendering".into());
+            self.error = Some(tr("nessuna immagine da esportare: avvia prima un rendering").into());
             return;
         };
         let default_name = format!("render_{}spp.png", frame.samples);
@@ -1186,9 +1199,12 @@ impl ForgeApp {
         ) {
             Ok(()) => {
                 tracing::info!("immagine esportata: {} ({} campioni)", path.display(), frame.samples);
-                self.info = Some(format!("Immagine esportata ({} campioni):\n{}", frame.samples, path.display()));
+                self.info = Some(tf(
+                    "Immagine esportata ({} campioni):\n{}",
+                    &[format!("{}", frame.samples), format!("{}", path.display())],
+                ));
             }
-            Err(e) => self.error = Some(format!("esportazione fallita: {e:#}")),
+            Err(e) => self.error = Some(tf("esportazione fallita: {e:#}", &[format!("{:#}", e)])),
         }
     }
 
@@ -1257,7 +1273,7 @@ impl ForgeApp {
     /// "Prepara scena prodotto": appoggia, fondale se manca, aspetto, qualità, inquadratura.
     pub fn simple_prepare_scene(&mut self) {
         if crate::presets::product_bounds(&self.scene).is_empty() {
-            self.simple_msg = Some("Importa prima un modello: la scena non ha un prodotto da preparare.".into());
+            self.simple_msg = Some(tr("Importa prima un modello: la scena non ha un prodotto da preparare.").into());
             return;
         }
         let backup = crate::presets::prepare_scene(&mut self.scene, &mut self.settings, self.simple_look, self.simple_quality);
@@ -1266,10 +1282,9 @@ impl ForgeApp {
         self.selection.clear();
         self.geometry_changed();
         self.frame_product();
-        self.simple_msg = Some(format!(
+        self.simple_msg = Some(tf(
             "Scena pronta: {} · qualità {}. \"Annulla preset\" la riporta com'era.",
-            self.simple_look.label(),
-            self.simple_quality.label()
+            &[self.simple_look.label().to_string(), self.simple_quality.label().to_string()],
         ));
     }
 
@@ -1277,7 +1292,7 @@ impl ForgeApp {
     /// poi inquadratura. Si annulla con "Annulla preset".
     pub fn simple_fit_scene(&mut self) {
         if crate::presets::product_bounds(&self.scene).is_empty() {
-            self.simple_msg = Some("Importa prima un modello: non c'è un prodotto a cui adattare la scena.".into());
+            self.simple_msg = Some(tr("Importa prima un modello: non c'è un prodotto a cui adattare la scena.").into());
             return;
         }
         let backup = crate::presets::fit_scene(&mut self.scene, &self.settings);
@@ -1285,7 +1300,8 @@ impl ForgeApp {
         self.selected_light = None;
         self.geometry_changed();
         self.frame_product();
-        self.simple_msg = Some("Scena adattata al prodotto: fondale, luci e inquadratura. \"Annulla preset\" la riporta com'era.".into());
+        self.simple_msg =
+            Some(tr("Scena adattata al prodotto: fondale, luci e inquadratura. \"Annulla preset\" la riporta com'era.").into());
     }
 
     /// Ripristina i valori di prima dell'ultimo preset (solo quelli che il preset ha cambiato).
@@ -1294,7 +1310,7 @@ impl ForgeApp {
             b.restore(&mut self.scene, &mut self.settings);
             self.selection.clear();
             self.geometry_changed();
-            self.simple_msg = Some("Preset annullato: luci, ambiente, qualità e fondale come prima.".into());
+            self.simple_msg = Some(tr("Preset annullato: luci, ambiente, qualità e fondale come prima.").into());
         }
     }
 
@@ -1343,6 +1359,9 @@ impl ForgeApp {
     pub fn apply_prefs(&mut self, prefs: crate::prefs::Preferences, startup: bool) {
         let prefs = prefs.sanitized();
         let library_changed = startup || prefs.library_dir != self.prefs.library_dir;
+        if startup || prefs.language != self.prefs.language {
+            crate::i18n::set(self.languages.iter().find(|l| l.code == prefs.language).cloned());
+        }
         prefs.apply_global();
         self.auto_restart = prefs.auto_restart;
         self.library.apply_prefs(&prefs, library_changed);
@@ -1351,12 +1370,12 @@ impl ForgeApp {
         } else if prefs != self.prefs {
             match prefs.save_to(&crate::prefs::file_path()) {
                 Ok(()) => self.prefs_error = None,
-                Err(e) => self.prefs_error = Some(format!("impostazioni non salvate: {e:#}")),
+                Err(e) => self.prefs_error = Some(tf("impostazioni non salvate: {e:#}", &[format!("{:#}", e)])),
             }
         }
         if library_changed {
             if let Err(e) = forge_library::paths::ensure() {
-                self.prefs_error = Some(format!("cartella della libreria non utilizzabile: {e}"));
+                self.prefs_error = Some(tf("cartella della libreria non utilizzabile: {e}", &[format!("{}", e)]));
             }
         }
         self.prefs = prefs;
@@ -1369,10 +1388,10 @@ impl ForgeApp {
             exts.extend(forge_import::SOLIDWORKS_EXTENSIONS);
         }
         let files = rfd::FileDialog::new()
-            .add_filter("Modelli 3D e CAD", &exts)
+            .add_filter(tr("Modelli 3D e CAD"), &exts)
             .add_filter("STEP", &["step", "stp"])
-            .add_filter("Blender / glTF", &["blend", "glb", "gltf"])
-            .add_filter("Mesh (OBJ, STL)", &["obj", "stl"])
+            .add_filter(tr("Blender / glTF"), &["blend", "glb", "gltf"])
+            .add_filter(tr("Mesh (OBJ, STL)"), &["obj", "stl"])
             .pick_files()
             .unwrap_or_default();
         self.ask_import(files);
@@ -1425,9 +1444,9 @@ impl ForgeApp {
             let p = path.to_path_buf();
             let _ = tx.send(TaskMsg::Progress(
                 if solidworks {
-                    "esportazione GLB da SolidWorks…"
+                    tr("esportazione GLB da SolidWorks…")
                 } else {
-                    "esportazione glTF da Blender…"
+                    tr("esportazione glTF da Blender…")
                 }
                 .into(),
             ));
@@ -1443,14 +1462,14 @@ impl ForgeApp {
                 })
                 .expect("thread di esportazione");
             self.pending = Some(Pending {
-                label: format!(
+                label: tf(
                     "Importazione di {}",
-                    path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default()
+                    &[format!("{}", path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default())],
                 ),
                 message: if solidworks {
-                    "avvio di SolidWorks…"
+                    tr("avvio di SolidWorks…")
                 } else {
-                    "avvio di Blender…"
+                    tr("avvio di Blender…")
                 }
                 .into(),
                 path: path.to_path_buf(),
@@ -1476,11 +1495,11 @@ impl ForgeApp {
                 })
                 .expect("thread di importazione");
             self.pending = Some(Pending {
-                label: format!(
+                label: tf(
                     "Importazione di {}",
-                    path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default()
+                    &[format!("{}", path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default())],
                 ),
-                message: "avvio del convertitore…".into(),
+                message: tr("avvio del convertitore…").into(),
                 path: path.to_path_buf(),
                 opts: self.import_opts.clone(),
                 rx,
@@ -1554,25 +1573,32 @@ impl ForgeApp {
                     self.scene.camera = cam.clone();
                     self.sync_orbit_from_camera();
                     let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-                    self.add_render_camera(Some(format!("Camera ({stem})")));
+                    self.add_render_camera(Some(tf("Camera ({stem})", std::slice::from_ref(&stem))));
                 } else {
                     self.orbit.frame(&b);
                     self.camera_changed();
                 }
                 self.tab = InspectorTab::Object;
-                let mut msg = format!(
+                let mut msg = tf(
                     "{}: {} componenti, {} triangoli ({} ms)",
-                    path.display(),
-                    r.components,
-                    r.triangles,
-                    r.duration.as_millis()
+                    &[
+                        format!("{}", path.display()),
+                        format!("{}", r.components),
+                        format!("{}", r.triangles),
+                        format!("{}", r.duration.as_millis()),
+                    ],
                 );
                 if !r.warnings.is_empty() {
-                    msg.push_str(&format!("\nAvvisi:\n- {}", r.warnings.join("\n- ")));
+                    msg.push_str(&tf("\nAvvisi:\n- {}", &[r.warnings.join("\n- ").to_string()]));
                     self.info = Some(msg);
                 }
             }
-            Err(e) => self.error = Some(format!("importazione di {} fallita: {e}", path.display())),
+            Err(e) => {
+                self.error = Some(tf(
+                    "importazione di {} fallita: {e}",
+                    &[format!("{}", path.display()), format!("{}", e)],
+                ))
+            }
         }
     }
 
@@ -1601,7 +1627,10 @@ impl ForgeApp {
                 self.finish_import(&p.path, p.opts.clone(), was_empty, r);
             }
             TaskMsg::Model(Err(e)) | TaskMsg::Blend(Err(e)) => {
-                self.error = Some(format!("importazione di {} fallita:\n{e}", p.path.display()))
+                self.error = Some(tf(
+                    "importazione di {} fallita:\n{e}",
+                    &[format!("{}", p.path.display()), e.to_string()],
+                ))
             }
             TaskMsg::Blend(Ok(export)) => {
                 self.leave_demo_scene();
@@ -1619,7 +1648,7 @@ impl ForgeApp {
                 self.finish_import(&p.path, p.opts.clone(), was_empty, r);
             }
             TaskMsg::Project(Ok(l)) => self.apply_loaded_project(*l),
-            TaskMsg::Project(Err(e)) => self.error = Some(format!("apertura del progetto fallita: {e}")),
+            TaskMsg::Project(Err(e)) => self.error = Some(tf("apertura del progetto fallita: {e}", std::slice::from_ref(&e))),
             TaskMsg::Progress(_) => {}
         }
         self.process_import_queue();
@@ -1627,7 +1656,7 @@ impl ForgeApp {
 
     pub fn open_project_dialog(&mut self) {
         if let Some(p) = rfd::FileDialog::new()
-            .add_filter("Progetto ForgeRender", &[forge_project::EXTENSION])
+            .add_filter(tr("Progetto ForgeRender"), &[forge_project::EXTENSION])
             .pick_file()
         {
             self.open_project(&p);
@@ -1646,7 +1675,7 @@ impl ForgeApp {
 
     pub fn open_project(&mut self, path: &Path) {
         if self.pending.is_some() {
-            self.error = Some("attendi la fine dell'operazione in corso".into());
+            self.error = Some(tr("attendi la fine dell'operazione in corso").into());
             return;
         }
         // Il progetto può reimportare file STEP: caricamento in background.
@@ -1660,8 +1689,11 @@ impl ForgeApp {
             })
             .expect("thread di apertura");
         self.pending = Some(Pending {
-            label: format!("Apertura di {}", path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default()),
-            message: "lettura del progetto e dei file sorgente…".into(),
+            label: tf(
+                "Apertura di {}",
+                &[format!("{}", path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default())],
+            ),
+            message: tr("lettura del progetto e dei file sorgente…").into(),
             path: path.to_path_buf(),
             opts: self.import_opts.clone(),
             rx,
@@ -1675,22 +1707,19 @@ impl ForgeApp {
             self.replace_scene(l.scene, l.meta, Some(l.settings));
             let mut notes = Vec::new();
             if !report.missing_sources.is_empty() {
-                notes.push(format!(
+                notes.push(tf(
                     "File sorgente non trovati:\n- {}",
-                    report
+                    &[report
                         .missing_sources
                         .iter()
                         .map(|p| p.display().to_string())
                         .collect::<Vec<_>>()
                         .join("\n- ")
+                        .to_string()],
                 ));
             }
             if !report.missing_components.is_empty() {
-                notes.push(format!(
-                        "{} componenti con materiale assegnato non sono più presenti (rinominati o rimossi). Le assegnazioni sono conservate:\n- {}",
-                        report.missing_components.len(),
-                        report.missing_components.iter().take(20).map(|c| c.0.clone()).collect::<Vec<_>>().join("\n- ")
-                    ));
+                notes.push(tf("{} componenti con materiale assegnato non sono più presenti (rinominati o rimossi). Le assegnazioni sono conservate:\n- {}", &[format!("{}", report.missing_components.len()), report.missing_components.iter().take(20).map(|c| c.0.clone()).collect::<Vec<_>>().join("\n- ").to_string()]));
             }
             notes.extend(report.warnings);
             if !notes.is_empty() {
@@ -1704,7 +1733,7 @@ impl ForgeApp {
             (Some(p), false) => p.clone(),
             _ => {
                 let Some(p) = rfd::FileDialog::new()
-                    .add_filter("Progetto ForgeRender", &[forge_project::EXTENSION])
+                    .add_filter(tr("Progetto ForgeRender"), &[forge_project::EXTENSION])
                     .set_file_name("progetto.frproject")
                     .save_file()
                 else {
@@ -1718,7 +1747,7 @@ impl ForgeApp {
                 self.meta.path = Some(path);
                 self.unsaved = false;
             }
-            Err(e) => self.error = Some(format!("salvataggio fallito: {e:#}")),
+            Err(e) => self.error = Some(tf("salvataggio fallito: {e:#}", &[format!("{:#}", e)])),
         }
     }
 
@@ -1820,15 +1849,19 @@ impl ForgeApp {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
         self.handle_screenshot(ctx);
-        let title = format!(
+        let title = tf(
             "{APP_TITLE} — {}{}",
-            self.meta
-                .path
-                .as_ref()
-                .and_then(|p| p.file_name())
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_else(|| "senza titolo".into()),
-            if self.unsaved { " *" } else { "" }
+            &[
+                APP_TITLE.to_string(),
+                self.meta
+                    .path
+                    .as_ref()
+                    .and_then(|p| p.file_name())
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "senza titolo".into())
+                    .to_string(),
+                (if self.unsaved { " *" } else { "" }).to_string(),
+            ],
         );
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(title));
     }
@@ -1883,12 +1916,12 @@ pub enum AddKind {
 }
 
 pub const ADD_MENU: &[(&str, AddKind)] = &[
-    ("Pavimento", AddKind::Floor),
-    ("Fondale da studio", AddKind::Backdrop),
-    ("Fondale fotografico (tela inclinata)", AddKind::StudioSweep),
-    ("Parete", AddKind::Wall),
-    ("Cubo", AddKind::Box),
-    ("Sfera", AddKind::Sphere),
-    ("Cilindro", AddKind::Cylinder),
-    ("Tazza", AddKind::Cup),
+    (tk("Pavimento"), AddKind::Floor),
+    (tk("Fondale da studio"), AddKind::Backdrop),
+    (tk("Fondale fotografico (tela inclinata)"), AddKind::StudioSweep),
+    (tk("Parete"), AddKind::Wall),
+    (tk("Cubo"), AddKind::Box),
+    (tk("Sfera"), AddKind::Sphere),
+    (tk("Cilindro"), AddKind::Cylinder),
+    (tk("Tazza"), AddKind::Cup),
 ];

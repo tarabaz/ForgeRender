@@ -17,6 +17,7 @@ mod transform;
 pub mod tree;
 
 use crate::app::ForgeApp;
+use crate::i18n::{tf, tr};
 use eframe::egui;
 
 impl eframe::App for ForgeApp {
@@ -61,7 +62,8 @@ impl ForgeApp {
     fn import_options_window(&mut self, ctx: &egui::Context) {
         let mut open = true;
         let mut go = false;
-        egui::Window::new("Opzioni di importazione")
+        egui::Window::new(tr("Opzioni di importazione"))
+            .id(egui::Id::NULL.with("win-opzioni-di-importazione"))
             .collapsible(false)
             .resizable(false)
             .open(&mut open)
@@ -71,57 +73,59 @@ impl ForgeApp {
                     ui.label(f.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default());
                 }
                 if self.import_queue.len() > 8 {
-                    ui.label(format!("… e altri {}", self.import_queue.len() - 8));
+                    ui.label(tf("… e altri {}", &[format!("{}", self.import_queue.len() - 8)]));
                 }
                 ui.separator();
                 let o = &mut self.import_opts;
                 egui::Grid::new("import-opts").num_columns(2).spacing([12.0, 6.0]).show(ui, |ui| {
-                    ui.label("Unità (STL / OBJ)");
+                    ui.label(tr("Unità (STL / OBJ)"));
                     egui::ComboBox::from_id_salt("unit")
-                        .selected_text(o.unit.label())
+                        .selected_text(tr(o.unit.label()))
                         .show_ui(ui, |ui| {
                             for u in forge_scene::LengthUnit::ALL {
-                                ui.selectable_value(&mut o.unit, u, u.label());
+                                ui.selectable_value(&mut o.unit, u, tr(tr(u.label())));
                             }
                         });
                     ui.end_row();
-                    ui.label("Asse verticale");
+                    ui.label(tr("Asse verticale"));
                     egui::ComboBox::from_id_salt("up")
-                        .selected_text(o.up.label())
+                        .selected_text(tr(o.up.label()))
                         .show_ui(ui, |ui| {
                             for u in [forge_import::UpAxis::Auto, forge_import::UpAxis::Y, forge_import::UpAxis::Z] {
-                                ui.selectable_value(&mut o.up, u, u.label());
+                                ui.selectable_value(&mut o.up, u, tr(tr(u.label())));
                             }
                         })
                         .response
-                        .on_hover_text("Automatico: STL con Z in alto; OBJ, STEP e SolidWorks con Y in alto");
+                        .on_hover_text(tr("Automatico: STL con Z in alto; OBJ, STEP e SolidWorks con Y in alto"));
                     ui.end_row();
-                    ui.label("Qualità triangolazione (STEP)");
+                    ui.label(tr("Qualità triangolazione (STEP)"));
                     ui.horizontal(|ui| {
-                        ui.radio_value(&mut o.step_quality, forge_import::StepQuality::Bassa, "Bassa");
-                        ui.radio_value(&mut o.step_quality, forge_import::StepQuality::Media, "Media");
-                        ui.radio_value(&mut o.step_quality, forge_import::StepQuality::Alta, "Alta");
+                        ui.radio_value(&mut o.step_quality, forge_import::StepQuality::Bassa, tr("Bassa"));
+                        ui.radio_value(&mut o.step_quality, forge_import::StepQuality::Media, tr("Media"));
+                        ui.radio_value(&mut o.step_quality, forge_import::StepQuality::Alta, tr("Alta"));
                     });
                     ui.end_row();
-                    ui.label("Posizione");
-                    ui.checkbox(&mut o.drop_to_floor, "Appoggia sul pavimento dopo l'importazione");
+                    ui.label(tr("Posizione"));
+                    ui.checkbox(&mut o.drop_to_floor, tr("Appoggia sul pavimento dopo l'importazione"));
                     ui.end_row();
-                    ui.label("Angolo di piega normali");
+                    ui.label(tr("Angolo di piega normali"));
                     ui.add(egui::Slider::new(&mut o.crease_angle_deg, 0.0..=90.0).suffix("°"))
-                        .on_hover_text("Solo per mesh senza normali (STL): sotto questo angolo le facce vengono smussate");
+                        .on_hover_text(tr(
+                            "Solo per mesh senza normali (STL): sotto questo angolo le facce vengono smussate",
+                        ));
                     ui.end_row();
                 });
                 ui.label(
-                    egui::RichText::new(
+                    egui::RichText::new(tr(
                         "Lo STEP dichiara le proprie unità; i file SolidWorks richiedono SolidWorks installato su questo PC.",
-                    )
+                    ))
                     .weak()
                     .small(),
                 );
                 ui.separator();
                 ui.horizontal(|ui| {
-                    go = ui.button(egui::RichText::new("Importa").strong()).clicked();
-                    if ui.button("Annulla").clicked() {
+                    go = ui.button(egui::RichText::new(tr("Importa")).strong()).clicked();
+                    if ui.button(tr("Annulla")).clicked() {
                         self.import_queue.clear();
                         self.show_import_options = false;
                     }
@@ -246,7 +250,8 @@ impl ForgeApp {
             self.import_options_window(ctx);
         }
         if let Some(p) = &self.pending {
-            egui::Window::new("Operazione in corso")
+            egui::Window::new(tr("Operazione in corso"))
+                .id(egui::Id::NULL.with("win-operazione-in-corso"))
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_BOTTOM, [0.0, -200.0])
@@ -256,15 +261,16 @@ impl ForgeApp {
                         ui.strong(&p.label);
                     });
                     ui.label(&p.message);
-                    ui.label(egui::RichText::new(format!("{:.0} s", p.started.elapsed().as_secs_f32())).weak());
+                    ui.label(egui::RichText::new(tf("{:.0} s", &[format!("{:.0}", p.started.elapsed().as_secs_f32())])).weak());
                     if !self.import_queue.is_empty() {
-                        ui.label(format!("altri {} file in coda", self.import_queue.len()));
+                        ui.label(tf("altri {} file in coda", &[format!("{}", self.import_queue.len())]));
                     }
                 });
         }
         if let Some(msg) = self.error.clone() {
             let mut open = true;
-            egui::Window::new("Errore")
+            egui::Window::new(tr("Errore"))
+                .id(egui::Id::NULL.with("win-errore"))
                 .collapsible(false)
                 .resizable(false)
                 .open(&mut open)
@@ -281,7 +287,8 @@ impl ForgeApp {
         }
         if let Some(msg) = self.info.clone() {
             let mut open = true;
-            egui::Window::new("Informazioni")
+            egui::Window::new(tr("Informazioni"))
+                .id(egui::Id::NULL.with("win-informazioni"))
                 .collapsible(false)
                 .open(&mut open)
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])

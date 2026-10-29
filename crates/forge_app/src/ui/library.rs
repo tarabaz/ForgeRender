@@ -10,6 +10,7 @@
 //! HDRI) girano su thread separati e comunicano con un canale.
 
 use crate::app::ForgeApp;
+use crate::i18n::{tf, tr};
 use crate::ui::style;
 use eframe::egui;
 use forge_library::categories;
@@ -358,17 +359,17 @@ fn poll(app: &mut ForgeApp, ctx: &egui::Context) {
                 match r {
                     Ok(v) => {
                         if v.is_empty() {
-                            lib.status = Some(("Nessun risultato.".into(), false));
+                            lib.status = Some((tr("Nessun risultato.").into(), false));
                         }
                         lib.results = v;
                     }
-                    Err(e) => lib.status = Some((format!("Ricerca non riuscita: {e}"), true)),
+                    Err(e) => lib.status = Some((tf("Ricerca non riuscita: {e}", std::slice::from_ref(&e)), true)),
                 }
             }
             Msg::Search(..) => {}
             Msg::Progress(p) => {
                 if let Some(b) = &mut lib.busy {
-                    *b = format!("{} — {p}", b.split(" — ").next().unwrap_or_default());
+                    *b = tf("{} — {p}", &[b.split(" — ").next().unwrap_or_default().to_string(), p.to_string()]);
                 }
             }
             Msg::Material(r) => {
@@ -376,9 +377,9 @@ fn poll(app: &mut ForgeApp, ctx: &egui::Context) {
                 lib.items = None;
                 match r {
                     Ok(m) => {
-                        let mut msg = format!("«{}» aggiunto alla libreria.", m.material.name);
+                        let mut msg = tf("«{}» aggiunto alla libreria.", std::slice::from_ref(&m.material.name));
                         if !m.notes.is_empty() {
-                            msg += &format!(" Attenzione: {}.", m.notes.join("; "));
+                            msg += &tf(" Attenzione: {}.", &[m.notes.join("; ").to_string()]);
                         }
                         lib.status = Some((msg, !m.notes.is_empty()));
                         lib.tab = Tab::Mine;
@@ -400,7 +401,7 @@ fn poll(app: &mut ForgeApp, ctx: &egui::Context) {
                 lib.hdris = None;
                 match r {
                     Ok(p) => {
-                        lib.status = Some((format!("HDRI salvata in {}", p.display()), false));
+                        lib.status = Some((tf("HDRI salvata in {}", &[format!("{}", p.display())]), false));
                         crate::ui::inspector::set_hdri(app, p);
                         app.shading_changed();
                     }
@@ -455,7 +456,7 @@ pub fn thumb_card(
                 ui.painter().text(
                     rect.center(),
                     egui::Align2::CENTER_CENTER,
-                    "anteprima…",
+                    tr("anteprima…"),
                     egui::FontId::proportional(11.0),
                     egui::Color32::GRAY,
                 );
@@ -488,23 +489,24 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
         return;
     }
     let mut open = true;
-    egui::Window::new("Libreria materiali e HDRI")
+    egui::Window::new(tr("Libreria materiali e HDRI"))
+        .id(egui::Id::NULL.with("win-libreria-materiali-e-hdri"))
         .open(&mut open)
         .default_size([860.0, 600.0])
         .resizable(true)
         .show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.selectable_value(&mut app.library.tab, Tab::Mine, "La mia libreria");
-                ui.selectable_value(&mut app.library.tab, Tab::Online, "Online (ambientCG, Poly Haven)");
+                ui.selectable_value(&mut app.library.tab, Tab::Mine, tr("La mia libreria"));
+                ui.selectable_value(&mut app.library.tab, Tab::Online, tr("Online (ambientCG, Poly Haven)"));
                 ui.separator();
                 if ui
-                    .button("Apri cartella")
+                    .button(tr("Apri cartella"))
                     .on_hover_text(forge_library::paths::root().display().to_string())
                     .clicked()
                 {
                     open_folder(&forge_library::paths::root());
                 }
-                if ui.button("Aggiorna").clicked() {
+                if ui.button(tr("Aggiorna")).clicked() {
                     app.library.refresh();
                     app.library.thumbs.retain(|k, _| k.starts_with("web:"));
                 }
@@ -539,19 +541,21 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.add(
             egui::TextEdit::singleline(&mut app.library.my_query)
-                .hint_text("cerca (nome, categoria, tag)…")
+                .hint_text(tr("cerca (nome, categoria, tag)…"))
                 .desired_width(190.0),
         )
-        .on_hover_text("Cerca nel nome, nella provenienza, nelle categorie e nei tag (in inglese, es. oak, rusty, tiles)");
+        .on_hover_text(tr(
+            "Cerca nel nome, nella provenienza, nelle categorie e nei tag (in inglese, es. oak, rusty, tiles)",
+        ));
         if ui
-            .button("Importa cartella…")
-            .on_hover_text("Una cartella con le mappe di un materiale (*_Color, *_Roughness, *_Normal…)")
+            .button(tr("Importa cartella…"))
+            .on_hover_text(tr("Una cartella con le mappe di un materiale (*_Color, *_Roughness, *_Normal…)"))
             .clicked()
         {
             if let Some(dir) = rfd::FileDialog::new().pick_folder() {
-                app.library.spawn(&ctx, "Importazione".into(), move |_| {
+                app.library.spawn(&ctx, tr("Importazione").into(), move |_| {
                     Msg::Material(
-                        store::import_folder(&dir, None, None, "importato da cartella")
+                        store::import_folder(&dir, None, None, tr("importato da cartella"))
                             .map(Box::new)
                             .map_err(|e| format!("{e:#}")),
                     )
@@ -559,16 +563,17 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
             }
         }
         if ui
-            .button("Importa zip…")
-            .on_hover_text("Archivi scaricati da ambientCG, Poly Haven, ecc.")
+            .button(tr("Importa zip…"))
+            .on_hover_text(tr("Archivi scaricati da ambientCG, Poly Haven, ecc."))
             .clicked()
         {
-            if let Some(files) = rfd::FileDialog::new().add_filter("Zip", &["zip"]).pick_files() {
-                app.library.spawn(&ctx, "Importazione".into(), move |tx| {
-                    let mut last = Err("nessun file".to_string());
+            if let Some(files) = rfd::FileDialog::new().add_filter(tr("Zip"), &["zip"]).pick_files() {
+                app.library.spawn(&ctx, tr("Importazione").into(), move |tx| {
+                    let mut last = Err(tr("nessun file").to_string());
                     for (i, f) in files.iter().enumerate() {
                         let _ = tx.send(Msg::Progress(format!("{}/{}", i + 1, files.len())));
-                        last = store::import_zip(f, None, None, "importato da zip").map_err(|e| format!("{}: {e:#}", f.display()));
+                        last = store::import_zip(f, None, None, tr("importato da zip"))
+                            .map_err(|e| tf("{}: {e:#}", &[format!("{}", f.display()), format!("{:#}", e)]));
                     }
                     Msg::Material(last.map(Box::new))
                 });
@@ -577,9 +582,12 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
         let n = app.selection.len();
         ui.label(
             egui::RichText::new(if n == 0 {
-                "Clic su un materiale: lo aggiunge al progetto".to_string()
+                tr("Clic su un materiale: lo aggiunge al progetto").to_string()
             } else {
-                format!("Clic su un materiale: lo applica ai {n} componenti selezionati")
+                tf(
+                    "Clic su un materiale: lo applica ai {n} componenti selezionati",
+                    &[format!("{}", n)],
+                )
             })
             .weak()
             .small(),
@@ -588,7 +596,9 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
     let all: Vec<LibraryMaterial> = app.library.materials().to_vec();
     if all.is_empty() {
         ui.add_space(20.0);
-        ui.label("La libreria è vuota: scarica un materiale dalla scheda Online oppure importa una cartella o uno zip.");
+        ui.label(tr(
+            "La libreria è vuota: scarica un materiale dalla scheda Online oppure importa una cartella o uno zip.",
+        ));
         ui.label(
             egui::RichText::new(forge_library::paths::materials_dir().display().to_string())
                 .weak()
@@ -610,33 +620,35 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
             .add(
                 egui::Slider::new(&mut app.library.card, 64.0..=512.0)
                     .step_by(8.0)
-                    .suffix(" px")
+                    .suffix(tr(" px"))
                     .text("anteprime"),
             )
-            .on_hover_text(
+            .on_hover_text(tr(
                 "Dimensione delle anteprime. Oltre i 128 pixel le sfere si renderizzano a 256 o 512 pixel \
                  (la prima volta qualche secondo per materiale, poi restano salvate nella sua cartella).",
-            );
+            ));
         save_card = r.drag_stopped() || (r.changed() && !r.dragged());
         if needs_categories
             && ui
-                .button("Aggiorna categorie")
-                .on_hover_text("Aggiunge categorie e tag dei cataloghi di ambientCG e Poly Haven ai materiali scaricati che non li hanno")
+                .button(tr("Aggiorna categorie"))
+                .on_hover_text(tr(
+                    "Aggiunge categorie e tag dei cataloghi di ambientCG e Poly Haven ai materiali scaricati che non li hanno",
+                ))
                 .clicked()
             && app.library.busy.is_none()
         {
-            app.library.spawn(&ctx, "Aggiornamento delle categorie".into(), |_| {
+            app.library.spawn(&ctx, tr("Aggiornamento delle categorie").into(), |_| {
                 let catalogs: Vec<_> = [Provider::AmbientCg, Provider::PolyHaven]
                     .into_iter()
                     .filter_map(|p| online::catalog(p, AssetKind::Material, false).ok().map(|c| (p, c)))
                     .collect();
                 if catalogs.is_empty() {
-                    return Msg::Categories(Err("Cataloghi non disponibili: controlla la connessione.".into()));
+                    return Msg::Categories(Err(tr("Cataloghi non disponibili: controlla la connessione.").into()));
                 }
                 let r = online::fill_catalog_info(&catalogs);
-                let mut s = format!("Categorie aggiunte a {} materiali.", r.updated);
+                let mut s = tf("Categorie aggiunte a {} materiali.", &[format!("{}", r.updated)]);
                 if !r.not_found.is_empty() {
-                    s += &format!(" Non trovati nel catalogo: {}.", r.not_found.len());
+                    s += &tf(" Non trovati nel catalogo: {}.", &[format!("{}", r.not_found.len())]);
                 }
                 Msg::Categories(Ok(s))
             });
@@ -700,17 +712,29 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
                         filter = f;
                     }
                 };
-                item(ui, CategoryFilter::All, format!("Tutti ({})", matched.len()));
+                item(ui, CategoryFilter::All, tf("Tutti ({})", &[format!("{}", matched.len())]));
                 for (c, n) in &primary {
-                    item(ui, CategoryFilter::Is(c.clone()), format!("{} ({n})", cat_label(c)));
+                    item(
+                        ui,
+                        CategoryFilter::Is(c.clone()),
+                        tf("{} ({n})", &[cat_label(c).to_string(), format!("{}", n)]),
+                    );
                 }
                 if uncategorized > 0 {
-                    item(ui, CategoryFilter::None, format!("Senza categoria ({uncategorized})"));
+                    item(
+                        ui,
+                        CategoryFilter::None,
+                        tf("Senza categoria ({uncategorized})", &[format!("{}", uncategorized)]),
+                    );
                 }
                 if !secondary.is_empty() {
-                    ui.collapsing("Altre etichette", |ui| {
+                    ui.collapsing(tr("Altre etichette"), |ui| {
                         for (c, n) in &secondary {
-                            item(ui, CategoryFilter::Is(c.clone()), format!("{} ({n})", cat_label(c)));
+                            item(
+                                ui,
+                                CategoryFilter::Is(c.clone()),
+                                tf("{} ({n})", &[cat_label(c).to_string(), format!("{}", n)]),
+                            );
                         }
                     });
                 }
@@ -719,7 +743,7 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
         ui.separator();
         ui.vertical(|ui| {
             if shown.is_empty() {
-                ui.label("Nessun materiale con questi filtri.");
+                ui.label(tr("Nessun materiale con questi filtri."));
                 return;
             }
             let cols = grid_cols(ui, card);
@@ -745,27 +769,40 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
         apply_material(app, &m);
         app.library.status = Some((
             if kept {
-                format!(
+                tf(
                     "«{}» applicato con le impostazioni del progetto (non ancora salvate nella libreria).",
-                    m.material.name
+                    std::slice::from_ref(&m.material.name),
                 )
             } else {
-                format!("«{}» applicato.", m.material.name)
+                tf("«{}» applicato.", std::slice::from_ref(&m.material.name))
             },
             false,
         ));
     }
     if let Some(m) = delete {
         match store::delete(&m) {
-            Ok(()) => app.library.status = Some((format!("«{}» eliminato.", m.material.name), false)),
+            Ok(()) => app.library.status = Some((tf("«{}» eliminato.", std::slice::from_ref(&m.material.name)), false)),
             Err(e) => app.library.status = Some((format!("{e:#}"), true)),
         }
         app.library.items = None;
     }
 }
 
+/// Nome della categoria: in italiano la traduzione della libreria, nelle altre lingue il nome
+/// originale del sito (che è in inglese), con l'iniziale maiuscola.
 fn cat_label(c: &str) -> String {
-    categories::label(c)
+    if crate::i18n::current_code() == crate::i18n::SOURCE_CODE {
+        return categories::label(c);
+    }
+    let c = c.trim();
+    let c = c
+        .strip_prefix("collection:")
+        .map(|r| format!("Collection {}", r.trim().replace('_', " ")))
+        .unwrap_or_else(|| c.to_string());
+    let mut ch = c.chars();
+    ch.next()
+        .map(|f| f.to_uppercase().collect::<String>() + ch.as_str())
+        .unwrap_or_default()
 }
 
 /// Il materiale risponde alla ricerca? Tutte le parole devono comparire nel nome, nella
@@ -803,9 +840,9 @@ fn material_card(
         .map(|c| cat_label(c))
         .collect();
     let sub = if !m.misassigned.is_empty() {
-        "⚠ da riscaricare".to_string()
+        tr("⚠ da riscaricare").to_string()
     } else if main.is_empty() {
-        format!("{maps} mappe")
+        tf("{maps} mappe", &[format!("{}", maps)])
     } else {
         main.join(" · ")
     };
@@ -818,36 +855,48 @@ fn material_card(
     let cats = if m.categories.is_empty() {
         String::new()
     } else {
-        format!(
+        tf(
             "\nCategorie: {}",
-            m.categories.iter().map(|c| cat_label(c)).collect::<Vec<_>>().join(", ")
+            &[m.categories.iter().map(|c| cat_label(c)).collect::<Vec<_>>().join(", ").to_string()],
         )
     };
     let tags = if m.tags.is_empty() {
         String::new()
     } else {
-        format!("\nTag: {}", m.tags.join(", "))
+        tf("\nTag: {}", &[m.tags.join(", ").to_string()])
     };
     let r = if m.misassigned.is_empty() {
-        r.on_hover_text(format!("{}\n{}\n{maps} mappe{cats}{tags}{notes}", m.source, m.dir.display()))
+        r.on_hover_text(tf(
+            "{}\n{}\n{maps} mappe{cats}{tags}{notes}",
+            &[
+                m.source.to_string(),
+                format!("{}", m.dir.display()),
+                format!("{}", maps),
+                cats.to_string(),
+                tags.to_string(),
+                notes.to_string(),
+            ],
+        ))
     } else {
-        r.on_hover_text(format!(
+        r.on_hover_text(tf(
             "{}\n{}\n\nImportato con un errore di riconoscimento delle mappe:\n{}\n\n\
              Riscaricalo dalla scheda Online (la copia difettosa viene sostituita).",
-            m.source,
-            m.dir.display(),
-            m.misassigned.join("\n")
+            &[
+                m.source.to_string(),
+                format!("{}", m.dir.display()),
+                m.misassigned.join("\n").to_string(),
+            ],
         ))
     };
     if r.clicked() {
         *apply = Some(m.clone());
     }
     r.context_menu(|ui| {
-        if ui.button("Apri cartella").clicked() {
+        if ui.button(tr("Apri cartella")).clicked() {
             open_folder(&m.dir);
             ui.close();
         }
-        if ui.button("Elimina dalla libreria").clicked() {
+        if ui.button(tr("Elimina dalla libreria")).clicked() {
             *delete = Some(m.clone());
             ui.close();
         }
@@ -860,24 +909,26 @@ fn online_tab(app: &mut ForgeApp, ui: &mut egui::Ui) {
     let mut do_search = false;
     ui.horizontal(|ui| {
         for p in [Provider::AmbientCg, Provider::PolyHaven] {
-            if ui.selectable_value(&mut lib.provider, p, p.label()).changed() {
+            if ui.selectable_value(&mut lib.provider, p, tr(p.label())).changed() {
                 do_search = true;
             }
         }
         ui.separator();
-        do_search |= ui.selectable_value(&mut lib.kind, AssetKind::Material, "Materiali").changed();
+        do_search |= ui.selectable_value(&mut lib.kind, AssetKind::Material, tr("Materiali")).changed();
         do_search |= ui.selectable_value(&mut lib.kind, AssetKind::Hdri, "HDRI").changed();
         ui.separator();
         let r = ui.add(
             egui::TextEdit::singleline(&mut lib.query)
-                .hint_text("es. wood, metal, studio…")
+                .hint_text(tr("es. wood, metal, studio…"))
                 .desired_width(170.0),
         );
         do_search |= r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-        do_search |= ui.button("Cerca").clicked();
+        do_search |= ui.button(tr("Cerca")).clicked();
         if ui
-            .button("Aggiorna catalogo")
-            .on_hover_text("Riscarica l'elenco completo dal sito (si aggiorna da solo una volta a settimana)")
+            .button(tr("Aggiorna catalogo"))
+            .on_hover_text(tr(
+                "Riscarica l'elenco completo dal sito (si aggiorna da solo una volta a settimana)",
+            ))
             .clicked()
         {
             lib.refresh_catalog = true;
@@ -892,12 +943,14 @@ fn online_tab(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 }
             })
             .response
-            .on_hover_text("Risoluzione del download: 1K per prove veloci, 2K–4K per i render finali, 8K solo per primi piani");
+            .on_hover_text(tr(
+                "Risoluzione del download: 1K per prove veloci, 2K–4K per i render finali, 8K solo per primi piani",
+            ));
     });
     ui.label(
-        egui::RichText::new(
+        egui::RichText::new(tr(
             "Contenuti CC0: liberi anche per uso commerciale, senza obbligo di citazione. Le parole di ricerca sono in inglese.",
-        )
+        ))
         .weak()
         .small(),
     );
@@ -907,7 +960,7 @@ fn online_tab(app: &mut ForgeApp, ui: &mut egui::Ui) {
     if lib.searching.is_some() {
         ui.horizontal(|ui| {
             ui.spinner();
-            ui.label("Ricerca in corso…");
+            ui.label(tr("Ricerca in corso…"));
         });
         return;
     }
@@ -927,15 +980,18 @@ fn online_tab(app: &mut ForgeApp, ui: &mut egui::Ui) {
         egui::vec2(CARD, CARD)
     };
     ui.label(
-        egui::RichText::new(format!(
+        egui::RichText::new(tf(
             "{} {} nel catalogo{}",
-            results.len(),
-            if lib.kind == AssetKind::Hdri { "HDRI" } else { "materiali" },
-            if lib.query.trim().is_empty() {
-                String::new()
-            } else {
-                format!(" per «{}»", lib.query.trim())
-            }
+            &[
+                format!("{}", results.len()),
+                (if lib.kind == AssetKind::Hdri { "HDRI" } else { "materiali" }).to_string(),
+                (if lib.query.trim().is_empty() {
+                    String::new()
+                } else {
+                    tf(" per «{}»", &[lib.query.trim().to_string()])
+                })
+                .to_string(),
+            ],
         ))
         .small(),
     );
@@ -955,14 +1011,14 @@ fn online_tab(app: &mut ForgeApp, ui: &mut egui::Ui) {
                             AssetKind::Hdri => online::hdri_downloaded(a, &hdris),
                         };
                         let mut sub = match a.size_m {
-                            Some(s) => format!("{} · {:.2} m", a.category, s),
+                            Some(s) => tf("{} · {:.2} m", &[a.category.to_string(), format!("{:.2}", s)]),
                             None => a.category.clone(),
                         };
                         if have {
-                            sub = format!("✓ in libreria · {sub}");
+                            sub = tf("✓ in libreria · {sub}", &[sub.to_string()]);
                         }
                         let r = thumb_card(ui, tex, size, &a.name, &sub, have)
-                            .on_hover_text(format!("{}\nClic: scarica a {res}", a.tags.join(", ")));
+                            .on_hover_text(tf("{}\nClic: scarica a {res}", &[a.tags.join(", ").to_string(), res.to_string()]));
                         if r.clicked() && app.library.busy.is_none() {
                             download = Some(a.clone());
                         }
@@ -971,7 +1027,7 @@ fn online_tab(app: &mut ForgeApp, ui: &mut egui::Ui) {
             }
         });
     if let Some(a) = download {
-        let label = format!("Download di «{}» ({res})", a.name);
+        let label = tf("Download di «{}» ({res})", &[a.name.to_string(), res.to_string()]);
         app.library.spawn(&ctx, label, move |tx| {
             let progress = |s: &str| {
                 let _ = tx.send(Msg::Progress(s.to_string()));

@@ -3,6 +3,7 @@
 //! trascinando sul navigatore si orbita.
 
 use crate::app::ForgeApp;
+use crate::i18n::tr;
 use eframe::egui;
 use forge_math::Vec3;
 use std::time::{Duration, Instant};
@@ -37,42 +38,42 @@ fn axes() -> [Axis; 6] {
             dir: Vec3::X,
             color: r,
             label: "X",
-            view: "Destra",
+            view: tr("Destra"),
             positive: true,
         },
         Axis {
             dir: Vec3::Y,
             color: g,
             label: "Y",
-            view: "Alto",
+            view: tr("Alto"),
             positive: true,
         },
         Axis {
             dir: Vec3::Z,
             color: b,
             label: "Z",
-            view: "Frontale",
+            view: tr("Frontale"),
             positive: true,
         },
         Axis {
             dir: -Vec3::X,
             color: r,
             label: "-X",
-            view: "Sinistra",
+            view: tr("Sinistra"),
             positive: false,
         },
         Axis {
             dir: -Vec3::Y,
             color: g,
             label: "-Y",
-            view: "Basso",
+            view: tr("Basso"),
             positive: false,
         },
         Axis {
             dir: -Vec3::Z,
             color: b,
             label: "-Z",
-            view: "Retro",
+            view: tr("Retro"),
             positive: false,
         },
     ]
@@ -199,13 +200,13 @@ fn projection_buttons(app: &mut ForgeApp, ui: &egui::Ui, center: egui::Pos2, pai
     let proj = ui
         .interact(proj_rect, egui::Id::NULL.with("nav-proiezione"), egui::Sense::click())
         .on_hover_text(if ortho {
-            "Vista ortografica (clic: torna prospettica)"
+            tr("Vista ortografica (clic: torna prospettica)")
         } else {
-            "Vista prospettica (clic: ortografica, misure senza prospettiva)"
+            tr("Vista prospettica (clic: ortografica, misure senza prospettiva)")
         });
     let iso = ui
         .interact(iso_rect, egui::Id::NULL.with("nav-iso"), egui::Sense::click())
-        .on_hover_text("Vista isometrica (ortografica, 45° di lato)");
+        .on_hover_text(tr("Vista isometrica (ortografica, 45° di lato)"));
     for (r, hot, on) in [(proj_rect, proj.hovered(), ortho), (iso_rect, iso.hovered(), false)] {
         let fill = if on {
             crate::ui::style::ACCENT.gamma_multiply(0.8)
@@ -238,7 +239,7 @@ fn projection_buttons(app: &mut ForgeApp, ui: &egui::Ui, center: egui::Pos2, pai
     painter.text(
         iso_rect.center(),
         egui::Align2::CENTER_CENTER,
-        "Iso",
+        tr("Iso"),
         egui::FontId::proportional(12.0),
         egui::Color32::WHITE,
     );

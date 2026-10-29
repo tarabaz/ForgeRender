@@ -12,6 +12,7 @@
 //! - Ctrl durante il trascinamento: snap ai passi impostati.
 
 use crate::app::ForgeApp;
+use crate::i18n::{tf, tr};
 use crate::viewport::project;
 use eframe::egui;
 use forge_math::{Mat4, Quat, Vec3};
@@ -30,10 +31,10 @@ pub enum GizmoMode {
 impl GizmoMode {
     pub fn label(self) -> &'static str {
         match self {
-            GizmoMode::Select => "Seleziona (Q)",
-            GizmoMode::Move => "Sposta (W)",
-            GizmoMode::Rotate => "Ruota (E)",
-            GizmoMode::Scale => "Scala (R)",
+            GizmoMode::Select => tr("Seleziona (Q)"),
+            GizmoMode::Move => tr("Sposta (W)"),
+            GizmoMode::Rotate => tr("Ruota (E)"),
+            GizmoMode::Scale => tr("Scala (R)"),
         }
     }
 }
@@ -672,7 +673,7 @@ fn apply_drag(app: &mut ForgeApp, rect: egui::Rect, drag: &Drag, pos: egui::Pos2
             let delta = snap(s - drag.start_param, step_m);
             (
                 Op::World(Mat4::from_translation(drag.axes[k] * delta)),
-                format!("{} {:+.1} mm", AXIS_NAMES[k], delta * 1000.0),
+                tf("{} {:+.1} mm", &[AXIS_NAMES[k].to_string(), format!("{:+.1}", delta * 1000.0)]),
             )
         }
         Handle::Plane(_) | Handle::Screen => {
@@ -692,12 +693,14 @@ fn apply_drag(app: &mut ForgeApp, rect: egui::Rect, drag: &Drag, pos: egui::Pos2
             }
             (
                 Op::World(Mat4::from_translation(delta)),
-                format!(
+                tf(
                     "Δ {:.1} mm  (X {:+.1}  Y {:+.1}  Z {:+.1})",
-                    delta.length() * 1000.0,
-                    delta.x * 1000.0,
-                    delta.y * 1000.0,
-                    delta.z * 1000.0
+                    &[
+                        format!("{:.1}", delta.length() * 1000.0),
+                        format!("{:+.1}", delta.x * 1000.0),
+                        format!("{:+.1}", delta.y * 1000.0),
+                        format!("{:+.1}", delta.z * 1000.0),
+                    ],
                 ),
             )
         }
@@ -729,7 +732,10 @@ fn apply_drag(app: &mut ForgeApp, rect: egui::Rect, drag: &Drag, pos: egui::Pos2
             let factor = if factor.abs() < 0.01 { 0.01f32.copysign(factor) } else { factor };
             let mut s = Vec3::ONE;
             s[k] = factor;
-            (Op::Scale(s), format!("Scala {} ×{factor:.3}", AXIS_NAMES[k]))
+            (
+                Op::Scale(s),
+                tf("Scala {} ×{factor:.3}", &[AXIS_NAMES[k].to_string(), format!("{:.3}", factor)]),
+            )
         }
         Handle::ScaleUniform => {
             let mut factor = c2.distance(pos).max(1.0) / drag.start_param;
@@ -737,7 +743,10 @@ fn apply_drag(app: &mut ForgeApp, rect: egui::Rect, drag: &Drag, pos: egui::Pos2
                 factor = 1.0 + snap(factor - 1.0, g.snap_scale);
             }
             let factor = factor.max(0.01);
-            (Op::Scale(Vec3::splat(factor)), format!("Scala ×{factor:.3}"))
+            (
+                Op::Scale(Vec3::splat(factor)),
+                tf("Scala ×{factor:.3}", &[format!("{:.3}", factor)]),
+            )
         }
     };
     match &drag.start {
@@ -750,7 +759,10 @@ fn apply_drag(app: &mut ForgeApp, rect: egui::Rect, drag: &Drag, pos: egui::Pos2
                 if allowed < t.length() - 1e-7 {
                     let t = t.normalize_or_zero() * allowed;
                     op = Op::World(Mat4::from_translation(t));
-                    text = format!("{text}  · a contatto ({:.1} mm)", allowed * 1000.0);
+                    text = tf(
+                        "{text}  · a contatto ({:.1} mm)",
+                        &[text.to_string(), format!("{:.1}", allowed * 1000.0)],
+                    );
                 }
             }
             for (i, st) in start {
@@ -999,7 +1011,10 @@ pub fn cone_handles(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &
                     inner_angle_deg: ni,
                     outer_angle_deg: no,
                 };
-                app.gizmo.readout = Some(format!("Cono {no:.1}°  ·  sfumatura {:.0}%", (1.0 - ni / no.max(1e-3)) * 100.0));
+                app.gizmo.readout = Some(tf(
+                    "Cono {no:.1}°  ·  sfumatura {:.0}%",
+                    &[format!("{:.1}", no), format!("{:.0}", (1.0 - ni / no.max(1e-3)) * 100.0)],
+                ));
                 app.shading_changed();
             }
         }
@@ -1041,46 +1056,46 @@ pub fn toolbar(app: &mut ForgeApp, ui: &mut egui::Ui, rect: egui::Rect) {
         egui::Frame::popup(ui.style()).inner_margin(4.0).show(ui, |ui| {
             ui.horizontal(|ui| {
                 for m in [GizmoMode::Select, GizmoMode::Move, GizmoMode::Rotate, GizmoMode::Scale] {
-                    ui.selectable_value(&mut app.gizmo.mode, m, m.label());
+                    ui.selectable_value(&mut app.gizmo.mode, m, tr(m.label()));
                 }
                 ui.separator();
-                ui.selectable_value(&mut app.gizmo.local, false, "Globale")
-                    .on_hover_text("Assi del mondo (X, Y verso l'alto, Z)");
-                ui.selectable_value(&mut app.gizmo.local, true, "Locale")
-                    .on_hover_text("Assi ruotati con il componente (la scala usa sempre gli assi del componente)");
+                ui.selectable_value(&mut app.gizmo.local, false, tr("Globale"))
+                    .on_hover_text(tr("Assi del mondo (X, Y verso l'alto, Z)"));
+                ui.selectable_value(&mut app.gizmo.local, true, tr("Locale"))
+                    .on_hover_text(tr("Assi ruotati con il componente (la scala usa sempre gli assi del componente)"));
                 ui.separator();
-                ui.menu_button("Snap (Ctrl)", |ui| {
-                    ui.label("Tieni premuto Ctrl durante il trascinamento");
+                ui.menu_button(tr("Snap (Ctrl)"), |ui| {
+                    ui.label(tr("Tieni premuto Ctrl durante il trascinamento"));
                     ui.add(
                         egui::DragValue::new(&mut app.gizmo.snap_move_mm)
                             .range(0.01..=10000.0)
-                            .prefix("Spostamento: ")
-                            .suffix(" mm"),
+                            .prefix(tr("Spostamento: "))
+                            .suffix(tr(" mm")),
                     );
                     ui.add(
                         egui::DragValue::new(&mut app.gizmo.snap_rot_deg)
                             .range(0.1..=180.0)
-                            .prefix("Rotazione: ")
+                            .prefix(tr("Rotazione: "))
                             .suffix("°"),
                     );
                     ui.add(
                         egui::DragValue::new(&mut app.gizmo.snap_scale)
                             .range(0.001..=10.0)
                             .speed(0.01)
-                            .prefix("Scala: ×"),
+                            .prefix(tr("Scala: ×")),
                     );
                 });
                 let (can_undo, can_redo) = app.can_undo_redo();
                 if ui
-                    .add_enabled(can_undo, egui::Button::new("Annulla"))
-                    .on_hover_text("Annulla (Ctrl+Z)")
+                    .add_enabled(can_undo, egui::Button::new(tr("Annulla")))
+                    .on_hover_text(tr("Annulla (Ctrl+Z)"))
                     .clicked()
                 {
                     app.undo();
                 }
                 if ui
-                    .add_enabled(can_redo, egui::Button::new("Ripeti"))
-                    .on_hover_text("Ripeti (Ctrl+Y)")
+                    .add_enabled(can_redo, egui::Button::new(tr("Ripeti")))
+                    .on_hover_text(tr("Ripeti (Ctrl+Y)"))
                     .clicked()
                 {
                     app.redo();

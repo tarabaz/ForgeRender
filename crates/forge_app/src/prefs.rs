@@ -6,6 +6,7 @@
 //! valori predefiniti, il file rovinato viene conservato come `impostazioni.json.non-valido`.
 //! Campi nuovi o sconosciuti non rompono la lettura (`#[serde(default)]`).
 
+use crate::i18n::tf;
 use forge_library::store::ImportDisplacement;
 use forge_render_core::{BackendKind, RenderSettings};
 use serde::{Deserialize, Serialize};
@@ -26,6 +27,8 @@ pub enum UiMode {
 pub struct Preferences {
     /// Modalità dell'interfaccia (selettore in alto).
     pub ui_mode: UiMode,
+    /// Lingua dell'interfaccia (`code` del file `lang/Lan_*.json`: "it", "en"…).
+    pub language: String,
     // --- Libreria e import dei materiali ---
     /// Risoluzione proposta per i download (indice in `online::RESOLUTIONS`: 0 = 1K).
     pub download_resolution: usize,
@@ -53,6 +56,7 @@ impl Default for Preferences {
         let r = RenderSettings::default();
         Self {
             ui_mode: UiMode::Simple,
+            language: crate::i18n::SOURCE_CODE.into(),
             download_resolution: 0,
             download_provider: "ambientcg".into(),
             import_displacement: ImportDisplacement::Off,
@@ -69,6 +73,9 @@ impl Default for Preferences {
 impl Preferences {
     /// Valori fuori intervallo riportati a quelli validi.
     pub fn sanitized(mut self) -> Self {
+        if self.language.trim().is_empty() {
+            self.language = crate::i18n::SOURCE_CODE.into();
+        }
         let max_res = forge_library::online::RESOLUTIONS.len() - 1;
         self.download_resolution = self.download_resolution.min(max_res);
         if !["ambientcg", "polyhaven"].contains(&self.download_provider.as_str()) {
@@ -106,7 +113,7 @@ impl Preferences {
             Err(e) => {
                 return (
                     Self::default(),
-                    Some(format!("impostazioni non lette ({e}): uso i valori predefiniti")),
+                    Some(tf("impostazioni non lette ({e}): uso i valori predefiniti", &[format!("{}", e)])),
                 )
             }
         };
@@ -117,9 +124,9 @@ impl Preferences {
                 let _ = std::fs::copy(path, &bad);
                 (
                     Self::default(),
-                    Some(format!(
+                    Some(tf(
                         "impostazioni non valide ({e}): uso i valori predefiniti; il file è stato conservato come {}",
-                        bad.display()
+                        &[format!("{}", e), format!("{}", bad.display())],
                     )),
                 )
             }
@@ -175,6 +182,7 @@ mod tests {
         assert!(err.is_none(), "file mancante: nessun errore");
         let custom = Preferences {
             ui_mode: UiMode::Advanced,
+            language: "en".into(),
             download_resolution: 2,
             download_provider: "polyhaven".into(),
             import_displacement: ImportDisplacement::FromMaterialX,

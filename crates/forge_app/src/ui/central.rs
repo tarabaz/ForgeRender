@@ -1,4 +1,5 @@
 use crate::app::{ForgeApp, View};
+use crate::i18n::{tf, tr, tr_dyn};
 use crate::ui::style;
 use crate::viewport::project;
 use eframe::egui;
@@ -142,7 +143,7 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
             painter.text(
                 rect.center(),
                 egui::Align2::CENTER_CENTER,
-                "Viewport 3D GPU non disponibile (modalità sicura).\nUsa la vista Render: il rendering CPU funziona normalmente.",
+                tr("Viewport 3D GPU non disponibile (modalità sicura).\nUsa la vista Render: il rendering CPU funziona normalmente."),
                 egui::FontId::proportional(15.0),
                 style::WARN,
             );
@@ -156,7 +157,7 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
         painter.text(
             rect.center_top() + egui::vec2(0.0, 52.0),
             egui::Align2::CENTER_TOP,
-            "Clic sull'oggetto da inquadrare (Esc annulla)",
+            tr("Clic sull'oggetto da inquadrare (Esc annulla)"),
             egui::FontId::proportional(14.0),
             style::ACCENT,
         );
@@ -165,7 +166,7 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
         painter.text(
             rect.center_top() + egui::vec2(0.0, 52.0),
             egui::Align2::CENTER_TOP,
-            "Clic sul punto da mettere a fuoco (Esc annulla)",
+            tr("Clic sul punto da mettere a fuoco (Esc annulla)"),
             egui::FontId::proportional(14.0),
             style::ACCENT,
         );
@@ -283,11 +284,11 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
         app.viewport
             .as_ref()
             .map(|v| v.adapter_info.as_str())
-            .unwrap_or("viewport disattivata"),
+            .unwrap_or(tr("viewport disattivata")),
         if app.selection.is_empty() {
-            "nessuna selezione".to_string()
+            tr("nessuna selezione").to_string()
         } else {
-            format!("{} selezionati", app.selection.len())
+            tf("{} selezionati", &[format!("{}", app.selection.len())])
         }
     );
     painter.text(
@@ -334,9 +335,13 @@ fn draw_cameras(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
             painter.text(
                 frame.left_top().max(rect.left_top()) + egui::vec2(8.0, 40.0),
                 egui::Align2::LEFT_TOP,
-                format!(
+                tf(
                     "Camera {} · {}×{}",
-                    app.scene.render_cameras[i].name, app.settings.width, app.settings.height
+                    &[
+                        app.scene.render_cameras[i].name.to_string(),
+                        format!("{}", app.settings.width),
+                        format!("{}", app.settings.height),
+                    ],
                 ),
                 egui::FontId::proportional(12.0),
                 style::ACCENT,
@@ -426,7 +431,7 @@ fn draw_depth_of_field(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect
             painter.text(
                 b + egui::vec2(8.0, -6.0),
                 egui::Align2::LEFT_BOTTOM,
-                format!("Fuoco {:.2} m", focus),
+                tf("Fuoco {:.2} m", &[format!("{:.2}", focus)]),
                 egui::FontId::proportional(12.0),
                 accent,
             );
@@ -434,7 +439,7 @@ fn draw_depth_of_field(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect
         if let Some(p) = section(focus) {
             painter.add(egui::Shape::closed_line(p, egui::Stroke::new(1.5, accent)));
         }
-        for (d, label) in [(near, "nitido da"), (far, "fino a")] {
+        for (d, label) in [(near, tr("nitido da")), (far, tr("fino a"))] {
             if !d.is_finite() {
                 continue;
             }
@@ -454,7 +459,7 @@ fn draw_depth_of_field(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect
                 painter.text(
                     anchor + off,
                     align,
-                    format!("{label} {:.2} m", d),
+                    tf("{label} {:.2} m", &[label.to_string(), format!("{:.2}", d)]),
                     egui::FontId::proportional(11.0),
                     zone,
                 );
@@ -462,11 +467,23 @@ fn draw_depth_of_field(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect
         }
     }
     // Riepilogo in basso a destra (utile anche guardando attraverso la camera).
-    let far_txt = if far.is_finite() { format!("{far:.2} m") } else { "∞".into() };
+    let far_txt = if far.is_finite() {
+        tf("{far:.2} m", &[format!("{:.2}", far)])
+    } else {
+        "∞".into()
+    };
     painter.text(
         rect.right_bottom() + egui::vec2(-10.0, -10.0),
         egui::Align2::RIGHT_BOTTOM,
-        format!("f/{:.1} · fuoco {:.2} m · nitido {:.2} m – {far_txt}", rc.lens.f_stop, focus, near),
+        tf(
+            "f/{:.1} · fuoco {:.2} m · nitido {:.2} m – {far_txt}",
+            &[
+                format!("{:.1}", rc.lens.f_stop),
+                format!("{:.2}", focus),
+                format!("{:.2}", near),
+                far_txt.to_string(),
+            ],
+        ),
         egui::FontId::proportional(12.0),
         zone,
     );
@@ -729,29 +746,32 @@ fn render_view(app: &mut ForgeApp, ui: &mut egui::Ui) {
         painter.text(
             rect.center(),
             egui::Align2::CENTER_CENTER,
-            "Premi «Avvia render» (F5) per avviare il path tracing",
+            tr("Premi «Avvia render» (F5) per avviare il path tracing"),
             egui::FontId::proportional(16.0),
             egui::Color32::from_gray(160),
         );
     }
     let mut overlay = Vec::new();
     if preparing {
-        overlay.push(("Preparazione della scena (costruzione BVH)…".to_string(), style::WARN));
+        overlay.push((tr("Preparazione della scena (costruzione BVH)…").to_string(), style::WARN));
     }
     if stale && !matches!(progress.state, SessionState::Idle) {
         overlay.push((
-            "Immagine non aggiornata: la scena è cambiata (premi Riavvia)".to_string(),
+            tr("Immagine non aggiornata: la scena è cambiata (premi Riavvia)").to_string(),
             style::WARN,
         ));
     }
     overlay.push((
-        format!("{} · {} campioni", progress.state.label(), progress.samples),
+        tf(
+            "{} · {} campioni",
+            &[tr_dyn(&progress.state.label()).to_string(), format!("{}", progress.samples)],
+        ),
         egui::Color32::from_gray(200),
     ));
     if let Some(f) = app.session.latest_frame().filter(|f| f.denoised.is_some()) {
         if app.render_view == crate::app::RenderView::Final {
             overlay.push((
-                format!("Ripulita a {} campioni (denoiser)", f.denoised_samples),
+                tf("Ripulita a {} campioni (denoiser)", &[format!("{}", f.denoised_samples)]),
                 egui::Color32::from_rgb(140, 200, 140),
             ));
         }
@@ -816,8 +836,8 @@ pub fn material_preview(app: &mut ForgeApp, ui: &mut egui::Ui) {
             ui.image((t.id(), egui::vec2(PREVIEW_SIZE as f32, PREVIEW_SIZE as f32)));
         }
         ui.vertical(|ui| {
-            ui.label(egui::RichText::new("Anteprima").strong());
-            ui.label(egui::RichText::new("Path tracing CPU, 32 campioni").weak().small());
+            ui.label(egui::RichText::new(tr("Anteprima")).strong());
+            ui.label(egui::RichText::new(tr("Path tracing CPU, 32 campioni")).weak().small());
             if pv.pending.is_some() {
                 ui.spinner();
             }

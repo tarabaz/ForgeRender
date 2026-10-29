@@ -8,6 +8,7 @@
 //! "Annulla preset" li ripristina, e solo quelli (le altre modifiche fatte nel frattempo
 //! restano). I valori scelti sono descritti in `docs/INTERFACCIA_SEMPLICE.md`.
 
+use crate::i18n::{tk, tr};
 use forge_math::{Aabb, Mat4, Vec3};
 use forge_render_core::{DenoiseMode, RenderSettings, ToneMapping};
 use forge_scene::{AddedKind, AddedRecord, ComponentId, Environment, Light, Material, MaterialId, Scene, UserTransform};
@@ -30,19 +31,19 @@ impl Look {
 
     pub fn label(self) -> &'static str {
         match self {
-            Look::Light => "Sfondo chiaro",
-            Look::Dark => "Sfondo scuro",
-            Look::Dramatic => "Studio scenografico",
-            Look::Studio => "Studio fotografico",
+            Look::Light => tr("Sfondo chiaro"),
+            Look::Dark => tr("Sfondo scuro"),
+            Look::Dramatic => tr("Studio scenografico"),
+            Look::Studio => tr("Studio fotografico"),
         }
     }
 
     pub fn hint(self) -> &'static str {
         match self {
-            Look::Light => "Fondale bianco e luce morbida: foto da catalogo o e-commerce",
-            Look::Dark => "Fondale scuro lucido e tre punti luce: il prodotto stacca dal nero",
-            Look::Dramatic => "Luce calda di taglio e controluce fredda: foto d'effetto",
-            Look::Studio => "Fondale in tela inclinato e quattro luci da studio: come in sala posa",
+            Look::Light => tr("Fondale bianco e luce morbida: foto da catalogo o e-commerce"),
+            Look::Dark => tr("Fondale scuro lucido e tre punti luce: il prodotto stacca dal nero"),
+            Look::Dramatic => tr("Luce calda di taglio e controluce fredda: foto d'effetto"),
+            Look::Studio => tr("Fondale in tela inclinato e quattro luci da studio: come in sala posa"),
         }
     }
 
@@ -144,17 +145,17 @@ impl Quality {
 
     pub fn label(self) -> &'static str {
         match self {
-            Quality::Draft => "Bozza",
-            Quality::Balanced => "Bilanciata",
-            Quality::High => "Alta",
+            Quality::Draft => tr("Bozza"),
+            Quality::Balanced => tr("Bilanciata"),
+            Quality::High => tr("Alta"),
         }
     }
 
     pub fn hint(self) -> &'static str {
         match self {
-            Quality::Draft => "Veloce, per provare inquadratura e materiali",
-            Quality::Balanced => "Buona per la maggior parte delle foto",
-            Quality::High => "Per la foto finale: più lenta, vetri e riflessi più puliti",
+            Quality::Draft => tr("Veloce, per provare inquadratura e materiali"),
+            Quality::Balanced => tr("Buona per la maggior parte delle foto"),
+            Quality::High => tr("Per la foto finale: più lenta, vetri e riflessi più puliti"),
         }
     }
 
@@ -185,10 +186,10 @@ impl Quality {
 
 /// Formati d'immagine proposti nella modalità Semplice.
 pub const FORMATS: [(&str, &str, u32, u32); 4] = [
-    ("Orizzontale", "16:9, 1920 × 1080", 1920, 1080),
-    ("Quadrato", "1:1, 1080 × 1080 (Instagram)", 1080, 1080),
-    ("Verticale", "4:5, 1080 × 1350 (Instagram)", 1080, 1350),
-    ("Storie", "9:16, 1080 × 1920", 1080, 1920),
+    (tk("Orizzontale"), tk("16:9, 1920 × 1080"), 1920, 1080),
+    (tk("Quadrato"), tk("1:1, 1080 × 1080 (Instagram)"), 1080, 1080),
+    (tk("Verticale"), tk("4:5, 1080 × 1350 (Instagram)"), 1080, 1350),
+    (tk("Storie"), tk("9:16, 1080 × 1920"), 1080, 1920),
 ];
 
 /// Id del materiale del fondale creato dai preset.

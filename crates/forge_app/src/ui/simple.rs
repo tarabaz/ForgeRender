@@ -5,6 +5,7 @@
 //! Cosa si vede e quali valori impostano i preset: `docs/INTERFACCIA_SEMPLICE.md`.
 
 use crate::app::ForgeApp;
+use crate::i18n::{tf, tr};
 use crate::presets::{self, Look, Quality, FORMATS};
 use crate::ui::style;
 use eframe::egui;
@@ -30,7 +31,7 @@ fn step(ui: &mut egui::Ui, n: u32, title: &str) {
     ui.add_space(10.0);
     ui.horizontal(|ui| {
         ui.label(
-            egui::RichText::new(format!(" {n} "))
+            egui::RichText::new(tf(" {n} ", &[format!("{}", n)]))
                 .strong()
                 .size(BIG)
                 .background_color(style::ACCENT)
@@ -62,11 +63,13 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
         .id_salt("simple-scroll")
         .auto_shrink([false, false])
         .show(ui, |ui| {
-            ui.label(egui::RichText::new("Foto prodotto in 5 passi").size(BIG + 3.0).strong());
+            ui.label(egui::RichText::new(tr("Foto prodotto in 5 passi")).size(BIG + 3.0).strong());
             ui.label(
-                egui::RichText::new("Tutte le opzioni sono nella modalità Avanzata (in alto): i valori restano gli stessi.")
-                    .small()
-                    .weak(),
+                egui::RichText::new(tr(
+                    "Tutte le opzioni sono nella modalità Avanzata (in alto): i valori restano gli stessi.",
+                ))
+                .small()
+                .weak(),
             );
             product(app, ui);
             look(app, ui);
@@ -78,44 +81,48 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
 }
 
 fn product(app: &mut ForgeApp, ui: &mut egui::Ui) {
-    step(ui, 1, "Prodotto");
-    if big_button(ui, "Importa modello…", false)
-        .on_hover_text(crate::ui::toolbar::IMPORT_HINT)
+    step(ui, 1, tr("Prodotto"));
+    if big_button(ui, tr("Importa modello…"), false)
+        .on_hover_text(tr(crate::ui::toolbar::IMPORT_HINT))
         .clicked()
     {
         app.import_dialog();
     }
     let has_product = !presets::product_bounds(&app.scene).is_empty();
     ui.add_enabled_ui(has_product, |ui| {
-        if big_button(ui, "Appoggia sulla base", false)
-            .on_hover_text("Porta il punto più basso del prodotto a terra (tutte le parti insieme). Ctrl+Z per annullare")
+        if big_button(ui, tr("Appoggia sulla base"), false)
+            .on_hover_text(tr(
+                "Porta il punto più basso del prodotto a terra (tutte le parti insieme). Ctrl+Z per annullare",
+            ))
             .clicked()
         {
             app.drop_product_to_base();
         }
-        if big_button(ui, "Inquadra il prodotto", false)
-            .on_hover_text("Centra la camera sul prodotto (senza pavimento e fondale); vale anche per il render")
+        if big_button(ui, tr("Inquadra il prodotto"), false)
+            .on_hover_text(tr(
+                "Centra la camera sul prodotto (senza pavimento e fondale); vale anche per il render",
+            ))
             .clicked()
         {
             app.frame_product();
         }
-        if big_button(ui, "Adatta la scena al prodotto", false)
-            .on_hover_text(
+        if big_button(ui, tr("Adatta la scena al prodotto"), false)
+            .on_hover_text(tr(
                 "Dopo aver spostato o scalato il prodotto: rifà fondale e luci sulle sue misure (tiene materiale del \
                  fondale e colori delle luci) e inquadra. Si può annullare",
-            )
+            ))
             .clicked()
         {
             app.simple_fit_scene();
         }
     });
     if !has_product {
-        ui.label(egui::RichText::new("Importa un modello per cominciare.").weak());
+        ui.label(egui::RichText::new(tr("Importa un modello per cominciare.")).weak());
     }
 }
 
 fn look(app: &mut ForgeApp, ui: &mut egui::Ui) {
-    step(ui, 2, "Aspetto");
+    step(ui, 2, tr("Aspetto"));
     let current = presets::matching_look(&app.scene, &app.settings);
     for l in Look::ALL {
         if choice(ui, current == Some(l), l.label(), l.hint()) {
@@ -124,27 +131,29 @@ fn look(app: &mut ForgeApp, ui: &mut egui::Ui) {
     }
     match current {
         Some(l) => {
-            ui.label(egui::RichText::new(format!("Aspetto attuale: {}", l.label())).small());
+            ui.label(egui::RichText::new(tf("Aspetto attuale: {}", &[l.label().to_string()])).small());
         }
         // L'avviso serve solo dopo un preset: una scena appena aperta ha le sue luci.
         None if app.preset_backup.is_some() => {
             ui.colored_label(
                 style::WARN,
-                "Personalizzato: luci, ambiente o visualizzazione sono stati cambiati (anche in Avanzata). \
+                tr(
+                    "Personalizzato: luci, ambiente o visualizzazione sono stati cambiati (anche in Avanzata). \
                  Scegli un aspetto per riapplicarlo.",
+                ),
             );
         }
         None => {
-            ui.label(egui::RichText::new("Scegli un aspetto, poi premi \"Prepara scena prodotto\".").small());
+            ui.label(egui::RichText::new(tr("Scegli un aspetto, poi premi \"Prepara scena prodotto\".")).small());
         }
     }
     light_colors(app, ui);
     ui.add_space(4.0);
-    if big_button(ui, "Prepara scena prodotto", true)
-        .on_hover_text(
+    if big_button(ui, tr("Prepara scena prodotto"), true)
+        .on_hover_text(tr(
             "Appoggia il prodotto sulla base, aggiunge il fondale se manca, applica aspetto e qualità scelti e \
              inquadra. Si può annullare.",
-        )
+        ))
         .clicked()
     {
         if let Some(l) = current {
@@ -155,9 +164,11 @@ fn look(app: &mut ForgeApp, ui: &mut egui::Ui) {
     if ui
         .add_enabled(
             app.preset_backup.is_some(),
-            egui::Button::new(egui::RichText::new("Annulla preset").size(BIG - 1.0)),
+            egui::Button::new(egui::RichText::new(tr("Annulla preset")).size(BIG - 1.0)),
         )
-        .on_hover_text("Riporta luci, ambiente, qualità, fondale e posizione del prodotto a com'erano prima dell'ultimo preset")
+        .on_hover_text(tr(
+            "Riporta luci, ambiente, qualità, fondale e posizione del prodotto a com'erano prima dell'ultimo preset",
+        ))
         .clicked()
     {
         app.simple_undo_preset();
@@ -168,31 +179,35 @@ fn look(app: &mut ForgeApp, ui: &mut egui::Ui) {
 }
 
 fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
-    step(ui, 3, "Materiali");
-    ui.label("Clicca un pezzo nella vista, poi scegli il materiale nella libreria.");
+    step(ui, 3, tr("Materiali"));
+    ui.label(tr("Clicca un pezzo nella vista, poi scegli il materiale nella libreria."));
     match app.selection.iter().next().copied() {
         Some(i) => {
             let mat = app.scene.resolve_material(i).clone();
             let name = app.scene.materials.get(&mat).map(|m| m.name.clone()).unwrap_or_default();
             ui.label(
-                egui::RichText::new(format!(
+                egui::RichText::new(tf(
                     "Selezionato: {}{}  ·  materiale: {name}",
-                    app.scene.nodes[i].name,
-                    if app.selection.len() > 1 {
-                        format!(" e altri {}", app.selection.len() - 1)
-                    } else {
-                        String::new()
-                    }
+                    &[
+                        app.scene.nodes[i].name.to_string(),
+                        (if app.selection.len() > 1 {
+                            tf(" e altri {}", &[format!("{}", app.selection.len() - 1)])
+                        } else {
+                            String::new()
+                        })
+                        .to_string(),
+                        name.to_string(),
+                    ],
                 ))
                 .strong(),
             );
         }
         None => {
-            ui.label(egui::RichText::new("Nessun pezzo selezionato.").weak());
+            ui.label(egui::RichText::new(tr("Nessun pezzo selezionato.")).weak());
         }
     }
-    if big_button(ui, "Apri la libreria materiali", false)
-        .on_hover_text("Clic su un materiale: lo applica ai pezzi selezionati")
+    if big_button(ui, tr("Apri la libreria materiali"), false)
+        .on_hover_text(tr("Clic su un materiale: lo applica ai pezzi selezionati"))
         .clicked()
     {
         app.library.open = true;
@@ -200,7 +215,7 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
 }
 
 fn format_quality(app: &mut ForgeApp, ui: &mut egui::Ui) {
-    step(ui, 4, "Formato e qualità");
+    step(ui, 4, tr("Formato e qualità"));
     let s = &mut app.settings;
     let mut format_changed = false;
     egui::Grid::new("simple-formats").num_columns(2).spacing([6.0, 6.0]).show(ui, |ui| {
@@ -208,8 +223,8 @@ fn format_quality(app: &mut ForgeApp, ui: &mut egui::Ui) {
         for (k, (name, desc, fw, fh)) in FORMATS.iter().enumerate() {
             let sel = s.width == *fw && s.height == *fh;
             if ui
-                .add(egui::Button::selectable(sel, egui::RichText::new(*name).size(BIG - 1.0)).min_size(egui::vec2(w, 30.0)))
-                .on_hover_text(*desc)
+                .add(egui::Button::selectable(sel, egui::RichText::new(tr(name)).size(BIG - 1.0)).min_size(egui::vec2(w, 30.0)))
+                .on_hover_text(tr(desc))
                 .clicked()
             {
                 s.width = *fw;
@@ -222,7 +237,7 @@ fn format_quality(app: &mut ForgeApp, ui: &mut egui::Ui) {
         }
     });
     ui.label(
-        egui::RichText::new(format!("Immagine: {} × {} pixel", s.width, s.height))
+        egui::RichText::new(tf("Immagine: {} × {} pixel", &[format!("{}", s.width), format!("{}", s.height)]))
             .small()
             .weak(),
     );
@@ -234,16 +249,21 @@ fn format_quality(app: &mut ForgeApp, ui: &mut egui::Ui) {
     let current = Quality::matching(&app.settings);
     for q in Quality::ALL {
         let (spp, _) = q.values();
-        if choice(ui, current == Some(q), q.label(), &format!("{} · {spp} campioni", q.hint())) {
+        if choice(
+            ui,
+            current == Some(q),
+            q.label(),
+            &tf("{} · {spp} campioni", &[q.hint().to_string(), format!("{}", spp)]),
+        ) {
             app.simple_apply_quality(q);
         }
     }
     if current.is_none() {
         ui.colored_label(
             style::WARN,
-            format!(
+            tf(
                 "Qualità personalizzata in Avanzata: {} campioni, {} rimbalzi.",
-                app.settings.target_samples, app.settings.max_bounces
+                &[format!("{}", app.settings.target_samples), format!("{}", app.settings.max_bounces)],
             ),
         );
     }
@@ -253,12 +273,12 @@ fn format_quality(app: &mut ForgeApp, ui: &mut egui::Ui) {
     let mut use_gpu = app.settings.backend == BackendKind::Gpu;
     let r = ui.add_enabled(
         gpu_ok,
-        egui::Checkbox::new(&mut use_gpu, egui::RichText::new("Usa la scheda video (GPU)").size(BIG - 1.0)),
+        egui::Checkbox::new(&mut use_gpu, egui::RichText::new(tr("Usa la scheda video (GPU)")).size(BIG - 1.0)),
     );
     let r = if gpu_ok {
-        r.on_hover_text("Molto più veloce con una scheda video recente")
+        r.on_hover_text(tr("Molto più veloce con una scheda video recente"))
     } else {
-        r.on_disabled_hover_text("Nessuna GPU utilizzabile: il render usa il processore")
+        r.on_disabled_hover_text(tr("Nessuna GPU utilizzabile: il render usa il processore"))
     };
     if r.changed() {
         app.settings.backend = if use_gpu { BackendKind::Gpu } else { BackendKind::Cpu };
@@ -266,12 +286,12 @@ fn format_quality(app: &mut ForgeApp, ui: &mut egui::Ui) {
 }
 
 fn render(app: &mut ForgeApp, ui: &mut egui::Ui) {
-    step(ui, 5, "Render");
+    step(ui, 5, tr("Render"));
     let state = app.render_state();
     let label = match state {
-        SessionState::Rendering => "Pausa",
-        SessionState::Paused => "Riprendi",
-        _ => "Avvia render",
+        SessionState::Rendering => tr("Pausa"),
+        SessionState::Paused => tr("Riprendi"),
+        _ => tr("Avvia render"),
     };
     if ui
         .add_enabled_ui(!app.is_preparing(), |ui| big_button(ui, label, true))
@@ -284,17 +304,18 @@ fn render(app: &mut ForgeApp, ui: &mut egui::Ui) {
     let p = app.session.progress();
     if p.target > 0 && (state.is_active() || p.samples > 0) {
         ui.add(
-            egui::ProgressBar::new((p.samples as f32 / p.target as f32).min(1.0)).text(format!("{} / {} campioni", p.samples, p.target)),
+            egui::ProgressBar::new((p.samples as f32 / p.target as f32).min(1.0))
+                .text(tf("{} / {} campioni", &[format!("{}", p.samples), format!("{}", p.target)])),
         );
     }
     if app.is_preparing() {
         ui.horizontal(|ui| {
             ui.spinner();
-            ui.label("Preparazione della scena…");
+            ui.label(tr("Preparazione della scena…"));
         });
     }
-    if big_button(ui, "Salva immagine…", false)
-        .on_hover_text("Salva il render come PNG")
+    if big_button(ui, tr("Salva immagine…"), false)
+        .on_hover_text(tr("Salva il render come PNG"))
         .clicked()
     {
         app.export_png_dialog();
@@ -310,19 +331,19 @@ fn light_colors(app: &mut ForgeApp, ui: &mut egui::Ui) {
     if lights.is_empty() {
         return;
     }
-    egui::CollapsingHeader::new(egui::RichText::new("Colore delle luci").size(BIG - 1.0))
+    egui::CollapsingHeader::new(egui::RichText::new(tr("Colore delle luci")).size(BIG - 1.0))
         .id_salt("simple-light-colors")
         .show(ui, |ui| {
             let mut changed = false;
             ui.horizontal(|ui| {
                 for (name, k, tip) in [
-                    ("Calda", 3200.0, "3200 K: luce gialla come una lampadina"),
-                    ("Neutra", 5500.0, "5500 K: luce bianca da studio"),
-                    ("Fredda", 7500.0, "7500 K: luce azzurrina"),
+                    (tr("Calda"), 3200.0, tr("3200 K: luce gialla come una lampadina")),
+                    (tr("Neutra"), 5500.0, tr("5500 K: luce bianca da studio")),
+                    (tr("Fredda"), 7500.0, tr("7500 K: luce azzurrina")),
                 ] {
                     if ui
                         .add(egui::Button::new(egui::RichText::new(name).size(BIG - 1.0)).min_size(egui::vec2(80.0, 28.0)))
-                        .on_hover_text(format!("Tutte le luci: {tip}"))
+                        .on_hover_text(tf("Tutte le luci: {tip}", &[tip.to_string()]))
                         .clicked()
                     {
                         presets::set_lights_kelvin(&mut app.scene, k);

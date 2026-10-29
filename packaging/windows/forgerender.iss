@@ -52,6 +52,7 @@ Source: "{#OidnDir}\bin\tbb12.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#OidnDir}\doc\LICENSE.txt"; DestDir: "{app}\licenze\OpenImageDenoise"; Flags: ignoreversion
 Source: "{#OidnDir}\doc\third-party-programs*.txt"; DestDir: "{app}\licenze\OpenImageDenoise"; Flags: ignoreversion
 Source: "LEGGIMI.txt"; DestDir: "{app}"; Flags: ignoreversion isreadme
+Source: "..\..\lang\*.json"; DestDir: "{app}\lang"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\ForgeRender"; Filename: "{app}\forgerender.exe"

@@ -58,6 +58,8 @@ $stepExe = Join-Path $bin "forgerender-step.exe"
 # Solo se richiesto: un forgerender-step.exe rimasto da una compilazione precedente non entra nel pacchetto.
 if ($WithStep -and (Test-Path $stepExe)) { Copy-Item $stepExe $staging } else { Write-Host "Pacchetto senza convertitore STEP (usa -WithStep per includerlo)" }
 Copy-Item (Join-Path $PSScriptRoot "LEGGIMI.txt") $staging
+# File di lingua (lang\Lan_*.json): modificabili, e se ne aggiungono altri accanto.
+Copy-Item -Recurse (Join-Path $root "lang") (Join-Path $staging "lang")
 New-Item -ItemType Directory -Force -Path (Join-Path $staging "licenze") | Out-Null
 Copy-Item (Join-Path $root "packaging\licenses\*") (Join-Path $staging "licenze")
 foreach ($dll in $oidnDlls) { Copy-Item (Join-Path $OidnDir "bin\$dll") $staging }

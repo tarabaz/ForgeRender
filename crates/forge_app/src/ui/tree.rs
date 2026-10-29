@@ -1,14 +1,17 @@
 use crate::app::{ForgeApp, InspectorTab};
+use crate::i18n::{tf, tr};
 use eframe::egui;
 use std::collections::BTreeSet;
 
 pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
-    ui.heading("Scena");
+    ui.heading(tr("Scena"));
     ui.label(
-        egui::RichText::new(format!(
+        egui::RichText::new(tf(
             "{} componenti · {} triangoli",
-            app.scene.nodes.len(),
-            fmt_count(app.scene.triangle_count())
+            &[
+                format!("{}", app.scene.nodes.len()),
+                fmt_count(app.scene.triangle_count()).to_string(),
+            ],
         ))
         .weak()
         .small(),
@@ -60,14 +63,14 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
                     ui.add_space(depth as f32 * 14.0);
                     if !node.children.is_empty() {
                         let icon = if app.collapsed.contains(&idx) { "+" } else { "−" };
-                        if ui.small_button(icon).on_hover_text("Espandi/comprimi").clicked() {
+                        if ui.small_button(icon).on_hover_text(tr("Espandi/comprimi")).clicked() {
                             toggle_collapse = Some(idx);
                         }
                     } else {
                         ui.add_space(18.0);
                     }
                     let mut vis = node.visible;
-                    if ui.checkbox(&mut vis, "").on_hover_text("Mostra/nascondi").changed() {
+                    if ui.checkbox(&mut vis, "").on_hover_text(tr("Mostra/nascondi")).changed() {
                         toggle_vis = Some(idx);
                     }
                     let selected = app.selection.contains(&idx);
@@ -78,11 +81,13 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
                     let r = ui.selectable_label(selected, text);
                     let mat = app.scene.resolve_material(idx).clone();
                     let own = app.scene.assignments.contains_key(&node.id);
-                    let r = r.on_hover_text(format!(
+                    let r = r.on_hover_text(tf(
                         "id: {}\nmateriale: {}{}",
-                        node.id,
-                        app.scene.materials.get(&mat).map(|m| m.name.as_str()).unwrap_or("?"),
-                        if own { " (assegnato)" } else { " (ereditato)" }
+                        &[
+                            format!("{}", node.id),
+                            app.scene.materials.get(&mat).map(|m| m.name.as_str()).unwrap_or("?").to_string(),
+                            (if own { tr(" (assegnato)") } else { tr(" (ereditato)") }).to_string(),
+                        ],
                     ));
                     if r.clicked() {
                         click = Some((idx, ui.input(|i| i.modifiers.command || i.modifiers.shift)));
@@ -91,25 +96,27 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
                         frame_node = Some(idx);
                     }
                     r.context_menu(|ui| {
-                        if ui.button("Inquadra").clicked() {
+                        if ui.button(tr("Inquadra")).clicked() {
                             frame_node = Some(idx);
                             ui.close();
                         }
-                        if ui.button(if node.visible { "Nascondi" } else { "Mostra" }).clicked() {
+                        if ui.button(if node.visible { tr("Nascondi") } else { tr("Mostra") }).clicked() {
                             toggle_vis = Some(idx);
                             ui.close();
                         }
-                        if ui.button("Mostra tutto").clicked() {
+                        if ui.button(tr("Mostra tutto")).clicked() {
                             show_all = true;
                             ui.close();
                         }
-                        if ui.button("Duplica (Ctrl+D)").clicked() {
+                        if ui.button(tr("Duplica (Ctrl+D)")).clicked() {
                             duplicate = Some(idx);
                             ui.close();
                         }
                         if ui
-                            .button("Elimina dal progetto (Canc)")
-                            .on_hover_text("Il file importato non viene modificato; si ripristina con Ctrl+Z o da \"Eliminati\"")
+                            .button(tr("Elimina dal progetto (Canc)"))
+                            .on_hover_text(tr(
+                                "Il file importato non viene modificato; si ripristina con Ctrl+Z o da \"Eliminati\"",
+                            ))
                             .clicked()
                         {
                             delete = Some(idx);
@@ -158,15 +165,17 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
     if !removed.is_empty() {
         ui.separator();
         let mut restore: Vec<usize> = Vec::new();
-        egui::CollapsingHeader::new(format!("Eliminati dal progetto ({})", removed.len()))
+        egui::CollapsingHeader::new(tf("Eliminati dal progetto ({})", &[format!("{}", removed.len())]))
             .id_salt("tree-removed")
             .show(ui, |ui| {
                 ui.label(
-                    egui::RichText::new("Componenti dei file importati tolti dal progetto: il file sorgente non è cambiato.")
-                        .weak()
-                        .small(),
+                    egui::RichText::new(tr(
+                        "Componenti dei file importati tolti dal progetto: il file sorgente non è cambiato.",
+                    ))
+                    .weak()
+                    .small(),
                 );
-                if ui.small_button("Ripristina tutti").clicked() {
+                if ui.small_button(tr("Ripristina tutti")).clicked() {
                     restore = removed.clone();
                 }
                 egui::ScrollArea::vertical()
@@ -175,7 +184,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
                     .show(ui, |ui| {
                         for &i in &removed {
                             ui.horizontal(|ui| {
-                                if ui.small_button("Ripristina").clicked() {
+                                if ui.small_button(tr("Ripristina")).clicked() {
                                     restore = vec![i];
                                 }
                                 ui.label(&app.scene.nodes[i].name).on_hover_text(app.scene.nodes[i].id.to_string());
@@ -188,11 +197,11 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
 
     ui.separator();
     ui.horizontal(|ui| {
-        ui.strong("Luci");
-        if ui.small_button("+").on_hover_text("Aggiungi una luce ad area").clicked() {
+        ui.strong(tr("Luci"));
+        if ui.small_button("+").on_hover_text(tr("Aggiungi una luce ad area")).clicked() {
             let (c, r) = app.anchor();
             app.scene.lights.push(forge_scene::Light::area(
-                "Nuova luce",
+                tr("Nuova luce"),
                 c + forge_math::Vec3::new(1.0, 2.0, 1.0) * r,
                 c,
                 r,
@@ -209,11 +218,11 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
     for (i, l) in app.scene.lights.iter().enumerate() {
         ui.horizontal(|ui| {
             let mut on = l.enabled;
-            if ui.checkbox(&mut on, "").on_hover_text("Accendi/spegni").changed() {
+            if ui.checkbox(&mut on, "").on_hover_text(tr("Accendi/spegni")).changed() {
                 light_toggle = Some(i);
             }
             if ui
-                .selectable_label(app.selected_light == Some(i), format!("{} ({})", l.name, l.kind.label()))
+                .selectable_label(app.selected_light == Some(i), format!("{} ({})", l.name, tr(l.kind.label())))
                 .clicked()
             {
                 light_click = Some(i);
@@ -242,9 +251,9 @@ pub fn select(sel: &mut BTreeSet<usize>, i: usize, multi: bool) {
 
 pub fn fmt_count(n: usize) -> String {
     if n >= 1_000_000 {
-        format!("{:.2} M", n as f64 / 1e6)
+        tf("{:.2} M", &[format!("{:.2}", n as f64 / 1e6)])
     } else if n >= 10_000 {
-        format!("{:.1} k", n as f64 / 1e3)
+        tf("{:.1} k", &[format!("{:.1}", n as f64 / 1e3)])
     } else {
         n.to_string()
     }
