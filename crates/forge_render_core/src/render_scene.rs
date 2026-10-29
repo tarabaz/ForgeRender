@@ -430,7 +430,7 @@ fn displacement_plan(scene: &Scene) -> std::collections::HashMap<usize, (crate::
         }
         let m = m.sanitized();
         let path = m.height_texture.as_ref().expect("height");
-        let height = match crate::texture::load_cached(path, false) {
+        let height = match crate::texture::load_precise_cached(path) {
             Ok(t) => t,
             Err(e) => {
                 tracing::error!("displacement di «{}»: {e:#}", m.name);
