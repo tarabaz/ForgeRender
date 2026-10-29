@@ -11,6 +11,9 @@
 
 mod app;
 mod prefs;
+// Usato dal pannello della modalità Semplice (fase 3); fino ad allora solo dai test.
+#[allow(dead_code)]
+mod presets;
 mod ui;
 mod viewport;
 

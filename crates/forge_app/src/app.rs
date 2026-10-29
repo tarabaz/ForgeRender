@@ -559,23 +559,8 @@ impl ForgeApp {
         let r = 0.15 * e;
         let (kind, placement) = match kind {
             AddKind::Floor => (K::Floor { size: (4.0 * e).max(4.0) }, at(c.x, c.z)),
-            AddKind::Backdrop => {
-                let height = (1.5 * e).max(2.0);
-                let radius = 0.25 * height;
-                // La parete del fondale sta a z = -raggio rispetto all'origine della mesh.
-                let wall = back - 0.3 * e + radius;
-                // Il piano si estende davanti alla scena quanto basta a uscire dall'inquadratura.
-                let depth = (c.z - wall) + 2.0 * e;
-                (
-                    K::Backdrop {
-                        width: (3.0 * e).max(3.0),
-                        depth,
-                        height,
-                        radius,
-                    },
-                    at(c.x, wall),
-                )
-            }
+            // Stessa regola della "Prepara scena" della modalità Semplice.
+            AddKind::Backdrop => crate::presets::backdrop_for(&b),
             AddKind::Wall => (
                 K::Wall {
                     width: (3.0 * e).max(3.0),

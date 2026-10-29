@@ -271,5 +271,21 @@
 - Nota: questi EXR di Poly Haven sono convertiti da PNG con compressione DWAA (con perdita),
   scritto nei loro metadati.
 
+### Interfaccia Semplice / Avanzata — Fase 1: modello dei preset
+- Nuovo `forge_app/src/presets.rs`. Gli aspetti (Sfondo chiaro, Sfondo scuro, Studio
+  scenografico), la qualità (Bozza, Bilanciata, Alta) e "Prepara scena prodotto" scrivono negli
+  stessi dati del renderer (luci e ambiente della scena, fondale, `RenderSettings`): niente
+  parametri duplicati.
+- **"Annulla preset"** ripristina solo i valori toccati dal preset.
+- **"Personalizzato"**: c'è un controllo di corrispondenza con il preset.
+- Il fondale del menu Aggiungi usa la stessa funzione (`presets::backdrop_for`).
+- **Test**:
+  - appoggio sulla base;
+  - fondale non duplicato;
+  - annulla che non tocca le altre modifiche;
+  - render reale: luminosità media 0,773 con lo sfondo chiaro contro 0,039 con lo sfondo scuro.
+- Scheda di configurazione con valori e decisioni: `docs/INTERFACCIA_SEMPLICE.md`.
+- Il pannello della modalità Semplice arriva nelle fasi 2–3.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
