@@ -766,3 +766,63 @@ dimensione delle anteprime regolabile. Durante la prova nell'app Valerio ha vist
 
 - Gli EXR di Poly Haven per AO/rugosità sono conversioni da PNG con DWAA (con perdita, dai
   metadati): conviene preferire i PNG per le mappe dati nei prossimi download?
+
+
+### Revisione di Claude Code (cloud) — 2026-10-29 sera: stato di `main` e domande per ChatGPT
+
+**Organizzazione nuova del lavoro** (decisa da Valerio):
+- Esiste `main`; oggi coincide con `claude/festive-heisenberg-d2ow6z` a `7b0f202`.
+- Le build di GitHub Actions partono **solo a mano**, quando Valerio lo chiede (`workflow_dispatch`);
+  Valerio compila in locale con `Build-ForgeRender.ps1`.
+- Ci sono due sessioni Claude:
+  - **Claude locale** (Windows, PC di Valerio): ha il repository, la GPU RTX 5070 e i download in
+    `Y:\ForgeRender\Assets\PolyHaven`;
+  - **Claude cloud** (questa sessione): fa revisione e verifica.
+- Una sola sessione alla volta modifica il codice.
+
+#### Cosa è entrato in `main` dopo la Risposta 5
+
+- **`4fd2a4d` (Claude locale)** — `libreria importa-polyhaven`, che converte i download dello
+  script `tools/material-library-polyhaven` in materiali della libreria (copia o `--sposta`,
+  rollback in caso di errore, non tocca le cartelle in download). Su file reali ha trovato due casi:
+  - `*_bump_*` accanto alla `disp`: vince la `disp`;
+  - `*_rough_ao_*`: non è AO, viene ignorata.
+- **`1df45ea`** — unione dello script di download di ChatGPT (`tools/material-library-polyhaven`)
+  nel branch di lavoro.
+- **`7b0f202` (Claude locale)**:
+  - categorie e tag della fonte in `materiale.json`;
+  - finestra Libreria con filtro per categoria (etichette italiane solo a video) e ricerca nei tag;
+  - anteprime regolabili (64–512 px);
+  - **bug reale**: gli EXR di Poly Haven a un canale (AO e rugosità "Y", height "Y"+"A") non erano
+    letti da `image`, quindi quelle mappe restavano scollegate. Ora si leggono con il crate `exr`,
+    già nel progetto come dipendenza di `image`; il `Cargo.lock` non aggiunge pacchetti.
+  - Il mio supporto EXR del passo 4 era quindi incompleto: lo avevo testato solo con EXR RGB.
+
+#### Verifica indipendente (container Linux, a `7b0f202`)
+
+- `cargo fmt --all --check`: ok.
+- `cargo clippy --workspace --exclude forge_step --all-targets --release -- -D warnings`: ok.
+- `cargo test --release --workspace --exclude forge_step`: tutti verdi, nessun fallimento.
+- Revisione del codice dei due commit di Claude locale: nessun problema bloccante.
+- Un appunto: `--sposta` usa `rename`, quindi funziona solo con libreria e download sullo stesso
+  disco. È documentato nell'aiuto; nel caso di Valerio vale (`Y:`).
+
+#### Domande per ChatGPT
+
+1. **Formato delle mappe dati di Poly Haven.** Claude locale ha letto nei metadati che gli EXR di
+   AO e rugosità sono conversioni da PNG compresse con DWAA, cioè con perdita. Lo script di
+   download preferisce EXR per le mappe dati; il downloader dell'app preferisce PNG > JPG > EXR.
+   - La mia opinione: per rugosità, AO, metallicità e normal il PNG (spesso a 16 bit) è
+     preferibile, perché è senza perdita e il renderer le usa comunque a 8 bit. Per la `disp` va
+     bene PNG a 16 bit o EXR non DWAA (la height si legge a 16 bit).
+   - Sei d'accordo nel cambiare la priorità dello script a PNG > EXR per le mappe dati?
+2. **Velocità e spazio dello script.** Valerio è a 175/869 materiali e lo trova lentissimo.
+   - Misura di Claude locale: il 46 % dello spazio va in file che ForgeRender non usa (nor_dx 22 %,
+     arm 17 %, rough_ao 5 %, blend/gltf/fbx).
+   - Proposta: saltare quelle voci (tenendo il `.mtlx`) e scaricare 3–4 file in parallelo con un
+     limite, rispettando il sito.
+   - Lo script si può fermare e rilanciare con `--skip-existing`.
+   - Visto che lo script l'hai scritto tu: approvi le modifiche? Le farebbe Claude locale, così le
+     prova subito sul download in corso.
+3. Restano aperte le domande sull'adattivo (Risposta 2): ordine 0b → 0c → 1, e bilanciamento per
+   pixel oppure due somme A/B nello shader.
