@@ -13,6 +13,7 @@
 //! rinominato [`KEPT_MANIFEST`]; le mappe non usate (nor_dx, arm, rough_ao, bump, spec…) e
 //! i file .blend/.gltf restano nella cartella dei download. Non si cancella niente.
 
+use crate::online::OnlineAsset;
 use crate::store::{self, LibraryMaterial, Transfer};
 use anyhow::Context;
 use serde::Deserialize;
@@ -167,11 +168,15 @@ fn manifest_notes(c: &Candidate) -> Vec<String> {
     notes
 }
 
-/// Importa un materiale completo. `size_m`: lato reale in metri dal catalogo Poly Haven.
-/// Restituisce il materiale e quante copie difettose dello stesso materiale ha sostituito.
-pub fn import(c: &Candidate, size_m: Option<f32>, transfer: Transfer) -> anyhow::Result<(LibraryMaterial, usize)> {
+/// Importa un materiale completo. `info`: la sua voce nel catalogo Poly Haven (lato reale,
+/// categorie, tag), se c'è. Restituisce il materiale e quante copie difettose dello stesso
+/// materiale ha sostituito.
+pub fn import(c: &Candidate, info: Option<&OnlineAsset>, transfer: Transfer) -> anyhow::Result<(LibraryMaterial, usize)> {
     let mut notes = manifest_notes(c);
-    if size_m.is_none() {
+    let size_m = info.and_then(|a| a.size_m);
+    if info.is_none() {
+        notes.push("materiale non trovato nel catalogo Poly Haven: scala 1 m, nessuna categoria".into());
+    } else if size_m.is_none() {
         notes.push("dimensioni reali non disponibili nel catalogo Poly Haven: scala 1 m".into());
     }
     let m = &c.manifest;
@@ -196,7 +201,10 @@ pub fn import(c: &Candidate, size_m: Option<f32>, transfer: Transfer) -> anyhow:
     if let Err(e) = kept {
         notes.push(format!("manifest del download non conservato ({e})"));
     }
-    let lib = store::set_notes(&lib.dir, &notes)?;
+    let mut lib = store::set_notes(&lib.dir, &notes)?;
+    if let Some(a) = info {
+        lib = store::set_catalog_info(&lib.dir, &a.categories, &a.tags)?;
+    }
     let replaced = crate::online::remove_broken_copies(&lib);
     if transfer == Transfer::Move {
         // Solo cartelle rimaste vuote (remove_dir non cancella quelle con file).
@@ -233,9 +241,14 @@ pub struct Summary {
     pub imported_dirs: Vec<PathBuf>,
 }
 
-/// Importa tutti i materiali completi della cartella dei download. `sizes`: lato reale in
-/// metri per id (dal catalogo Poly Haven). `progress` riceve una riga per materiale.
-pub fn import_all(root: &Path, sizes: &HashMap<String, f32>, opts: Options, progress: &mut dyn FnMut(&str)) -> anyhow::Result<Summary> {
+/// Importa tutti i materiali completi della cartella dei download. `catalog`: voci del
+/// catalogo Poly Haven per id (vuoto se non disponibile). `progress` riceve una riga per materiale.
+pub fn import_all(
+    root: &Path,
+    catalog: &HashMap<String, OnlineAsset>,
+    opts: Options,
+    progress: &mut dyn FnMut(&str),
+) -> anyhow::Result<Summary> {
     let scan = scan(root)?;
     let mut local: HashSet<String> = crate::online::local_source_keys();
     let mut s = Summary {
@@ -255,7 +268,7 @@ pub fn import_all(root: &Path, sizes: &HashMap<String, f32>, opts: Options, prog
             continue;
         }
         attempts += 1;
-        match import(c, sizes.get(&id).copied(), opts.transfer) {
+        match import(c, catalog.get(&id), opts.transfer) {
             Ok((lib, replaced)) => {
                 progress(&format!("{id}: importato in {}", lib.dir.display()));
                 for n in &lib.notes {

@@ -63,7 +63,13 @@ impl Texture {
 
     fn load_with(path: &Path, srgb: bool, precise: bool) -> anyhow::Result<Self> {
         use image::DynamicImage as D;
-        let img = image::open(path).with_context(|| format!("lettura texture {}", path.display()))?;
+        let img = match image::open(path) {
+            Ok(img) => img,
+            Err(e) if path.extension().is_some_and(|x| x.eq_ignore_ascii_case("exr")) => {
+                open_exr_any_channels(path).with_context(|| format!("lettura texture {} ({e})", path.display()))?
+            }
+            Err(e) => return Err(e).with_context(|| format!("lettura texture {}", path.display())),
+        };
         let (w, h) = (img.width(), img.height());
         anyhow::ensure!(w > 0 && h > 0, "texture vuota");
         let float = matches!(img, D::ImageRgb32F(_) | D::ImageRgba32F(_));
@@ -116,6 +122,38 @@ impl Texture {
         let bot = self.texel(x0, y0 + 1).lerp(self.texel(x0 + 1, y0 + 1), tx);
         top.lerp(bot, ty)
     }
+}
+
+/// EXR che `image` non legge perché non ha i canali R, G, B: Poly Haven salva AO e rugosità
+/// con la sola luminanza "Y" e la height con "Y" + "A". Si legge il primo layer con il crate
+/// `exr`; un canale singolo va su R, G e B (immagine in virgola mobile, come gli EXR RGB).
+fn open_exr_any_channels(path: &Path) -> anyhow::Result<image::DynamicImage> {
+    use exr::prelude::{AnyChannel, FlatSamples};
+    let img = exr::prelude::read_first_flat_layer_from_file(path)?;
+    let layer = &img.layer_data;
+    let (w, h) = (layer.size.width(), layer.size.height());
+    let list = &layer.channel_data.list;
+    let named = |n: &str| list.iter().find(|c| c.name.to_string().eq_ignore_ascii_case(n));
+    let values = |c: &AnyChannel<FlatSamples>| c.sample_data.values_as_f32().collect::<Vec<f32>>();
+    let (r, g, b) = match (named("R"), named("G"), named("B")) {
+        (Some(r), Some(g), Some(b)) => (values(r), values(g), values(b)),
+        _ => {
+            // Luminanza, altrimenti il primo canale che non sia l'alfa.
+            let c = named("Y")
+                .or_else(|| list.iter().find(|c| !c.name.to_string().eq_ignore_ascii_case("A")))
+                .context("EXR senza canali di colore o luminanza")?;
+            let v = values(c);
+            (v.clone(), v.clone(), v)
+        }
+    };
+    anyhow::ensure!(
+        [&r, &g, &b].iter().all(|v| v.len() == w * h),
+        "EXR con canali di dimensioni diverse"
+    );
+    let rgb: Vec<f32> = (0..w * h).flat_map(|i| [r[i], g[i], b[i]]).collect();
+    image::Rgb32FImage::from_raw(w as u32, h as u32, rgb)
+        .map(image::DynamicImage::ImageRgb32F)
+        .context("EXR non valido")
 }
 
 type TextureCache = Mutex<HashMap<(PathBuf, bool, bool), Arc<Texture>>>;
@@ -217,6 +255,42 @@ mod tests {
         let p8 = tmp("height8.png");
         image::GrayImage::from_pixel(2, 2, image::Luma([4])).save(&p8).unwrap();
         assert!(!Texture::load_with(&p8, false, true).unwrap().is_precise());
+    }
+
+    /// EXR come quelli di Poly Haven: AO/rugosità con il solo canale "Y", height con "Y" + "A".
+    /// `image` li rifiuta ("non-deep rgb channels"): prima le mappe restavano scollegate.
+    #[test]
+    fn exr_luminance_only() {
+        use exr::prelude::{AnyChannel, AnyChannels, Encoding, FlatSamples, Image, Layer, LayerAttributes, WritableImage};
+        let write = |p: &Path, chans: Vec<AnyChannel<FlatSamples>>| {
+            let layer = Layer::new(
+                (2, 2),
+                LayerAttributes::named("t"),
+                Encoding::FAST_LOSSLESS,
+                AnyChannels::sort(chans.into()),
+            );
+            Image::from_layer(layer).write().to_file(p).unwrap();
+        };
+        let py = tmp("rough_y.exr");
+        write(&py, vec![AnyChannel::new("Y", FlatSamples::F32(vec![0.25, 0.25, 0.75, 0.75]))]);
+        assert!(image::open(&py).is_err(), "il caso che `image` non legge");
+        let t = Texture::load(&py, false).unwrap();
+        // Riga in alto (v = 1) 0.25, riga in basso 0.75; i tre canali uguali.
+        let top = t.sample(Vec2::new(0.25, 0.75));
+        assert!((top.x - 0.25).abs() < 0.003 && top.x == top.y && top.y == top.z, "{top:?}");
+        assert!((t.sample(Vec2::new(0.25, 0.25)).x - 0.75).abs() < 0.003);
+        // Height con alfa: si usa la luminanza, a 16 bit.
+        let ph = tmp("disp_ya.exr");
+        write(
+            &ph,
+            vec![
+                AnyChannel::new("A", FlatSamples::F32(vec![1.0; 4])),
+                AnyChannel::new("Y", FlatSamples::F32(vec![0.01526; 4])),
+            ],
+        );
+        let hp = Texture::load_with(&ph, false, true).unwrap();
+        assert!(hp.is_precise());
+        assert!((hp.sample(Vec2::splat(0.5)).x - 0.01526).abs() < 2e-5);
     }
 
     #[test]

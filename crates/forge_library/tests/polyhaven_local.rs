@@ -2,6 +2,7 @@
 //! `download_polyhaven_materials.py`). File di test separato: è un processo a sé, quindi
 //! può impostare `FORGE_LIBRARY_DIR` senza disturbare i test di `store`.
 
+use forge_library::online::{AssetKind, OnlineAsset, Provider};
 use forge_library::polyhaven_local::{self, Options, KEPT_MANIFEST, MANIFEST};
 use forge_library::store::{self, Transfer};
 use std::collections::HashMap;
@@ -111,14 +112,26 @@ fn import_polyhaven_download_folder() {
         ],
         &[],
     );
-    // Dimensioni reali dal catalogo (metal_plate_02: 2000 mm); bark_brown_01 manca apposta.
-    let sizes: HashMap<String, f32> = [("metal_plate_02".to_string(), 2.0)].into();
+    // Voce del catalogo (metal_plate_02: 2000 mm, categorie e tag come sul sito);
+    // bark_brown_01 manca apposta.
+    let plate_info = OnlineAsset {
+        provider: Provider::PolyHaven,
+        kind: AssetKind::Material,
+        id: "metal_plate_02".into(),
+        name: "Metal Plate 02".into(),
+        category: "metal".into(),
+        categories: vec!["metal".into(), "man made".into(), "floor".into()],
+        tags: vec!["rusty".into(), "steel".into()],
+        thumbnail_url: String::new(),
+        size_m: Some(2.0),
+    };
+    let catalog: HashMap<String, OnlineAsset> = [("metal_plate_02".to_string(), plate_info)].into();
     let mut log = Vec::new();
 
     // Solo elenco: niente cambia.
     let dry = polyhaven_local::import_all(
         &dl,
-        &sizes,
+        &catalog,
         Options {
             dry_run: true,
             ..Default::default()
@@ -134,7 +147,7 @@ fn import_polyhaven_download_folder() {
     let before = names(&bark.join("maps"));
     let one = polyhaven_local::import_all(
         &dl,
-        &sizes,
+        &catalog,
         Options {
             max: Some(1),
             ..Default::default()
@@ -166,11 +179,7 @@ fn import_polyhaven_download_folder() {
     );
     assert!(b.material.height_texture.as_ref().unwrap().ends_with("bark_brown_01_disp_2k.exr"));
     assert!(b.misassigned.is_empty());
-    assert!(
-        b.notes.iter().any(|n| n.contains("dimensioni reali non disponibili")),
-        "{:?}",
-        b.notes
-    );
+    assert!(b.notes.iter().any(|n| n.contains("non trovato nel catalogo")), "{:?}", b.notes);
     assert!(
         b.notes.iter().any(|n| n.contains("\"nor_dx\"") && n.contains("assente")),
         "{:?}",
@@ -180,7 +189,7 @@ fn import_polyhaven_download_folder() {
     // Spostamento di tutto il resto: bark_brown_01 è già in libreria e resta nei download.
     let all = polyhaven_local::import_all(
         &dl,
-        &sizes,
+        &catalog,
         Options {
             transfer: Transfer::Move,
             ..Default::default()
@@ -195,6 +204,9 @@ fn import_polyhaven_download_folder() {
     assert_eq!(p.source, "Poly Haven metal_plate_02 (2K)");
     assert_eq!(p.material.mapping.scale, 2.0);
     assert!(p.notes.is_empty(), "{:?}", p.notes);
+    assert_eq!(p.categories, ["metal", "man made", "floor"]);
+    assert_eq!(p.tags, ["rusty", "steel"]);
+    assert!(b.categories.is_empty(), "non nel catalogo: nessuna categoria inventata");
     assert!(p
         .material
         .metallic_texture
@@ -224,6 +236,24 @@ fn import_polyhaven_download_folder() {
     // La cartella in download non è stata toccata.
     assert_eq!(names(&busy.join("maps")), ["aerial_rocks_02_diff_2k.jpg"]);
     assert_eq!(store::list().len(), 2);
+
+    // Materiale importato senza categorie: si completano dal catalogo, gli altri non cambiano.
+    let bark_info = OnlineAsset {
+        id: "bark_brown_01".into(),
+        name: "Bark Brown 01".into(),
+        category: "bark".into(),
+        categories: vec!["bark".into(), "natural".into()],
+        tags: vec!["tree".into()],
+        size_m: Some(1.0),
+        ..catalog["metal_plate_02"].clone()
+    };
+    let list = vec![catalog["metal_plate_02"].clone(), bark_info];
+    let r = forge_library::online::fill_catalog_info(&[(Provider::PolyHaven, list)]);
+    assert_eq!((r.updated, r.unchanged, r.local), (1, 1, 0), "{r:?}");
+    assert!(r.not_found.is_empty());
+    assert_eq!(store::load(&b.dir).unwrap().categories, ["bark", "natural"]);
+    let again = forge_library::online::fill_catalog_info(&[(Provider::PolyHaven, Vec::new())]);
+    assert_eq!(again.unchanged, 2);
 
     std::fs::remove_dir_all(lib).ok();
     std::fs::remove_dir_all(dl).ok();

@@ -47,7 +47,11 @@ pub struct OnlineAsset {
     pub kind: AssetKind,
     pub id: String,
     pub name: String,
+    /// Prima categoria (mostrata sotto la miniatura).
     pub category: String,
+    /// Tutte le categorie del sito (Poly Haven ne dà più d'una: "wood", "floor", …).
+    #[serde(default)]
+    pub categories: Vec<String>,
     pub tags: Vec<String>,
     pub thumbnail_url: String,
     /// Lato reale della texture in metri, se noto.
@@ -154,6 +158,7 @@ pub fn parse_ambientcg(v: &Value, kind: AssetKind) -> Vec<OnlineAsset> {
                 kind,
                 id,
                 name,
+                categories: if category.is_empty() { Vec::new() } else { vec![category.clone()] },
                 category,
                 tags,
                 thumbnail_url,
@@ -215,6 +220,7 @@ pub fn parse_polyhaven(v: &Value, kind: AssetKind, query: &str) -> Vec<OnlineAss
                     id: id.clone(),
                     name,
                     category: categories.first().cloned().unwrap_or_default(),
+                    categories,
                     tags,
                     thumbnail_url: format!("https://cdn.polyhaven.com/asset_img/thumbs/{id}.png?width=256&height=256"),
                     size_m,
@@ -297,9 +303,10 @@ fn catalog_path(provider: Provider, kind: AssetKind) -> PathBuf {
         AssetKind::Material => "materiali",
         AssetKind::Hdri => "hdri",
     };
+    // v2: con tutte le categorie (le cache precedenti avevano solo la prima e si riscaricano).
     crate::paths::cache_dir()
         .join("catalogo")
-        .join(format!("{}_{k}.json", provider.label().replace(' ', "").to_lowercase()))
+        .join(format!("{}_{k}_v2.json", provider.label().replace(' ', "").to_lowercase()))
 }
 
 fn fetch_catalog(provider: Provider, kind: AssetKind) -> anyhow::Result<Vec<OnlineAsset>> {
@@ -482,8 +489,50 @@ pub fn thumbnail(asset: &OnlineAsset) -> anyhow::Result<Vec<u8>> {
 /// Scarica un materiale e lo aggiunge alla libreria.
 pub fn download_material(asset: &OnlineAsset, resolution: &str, progress: &dyn Fn(&str)) -> anyhow::Result<LibraryMaterial> {
     let m = download_material_inner(asset, resolution, progress)?;
+    let m = store::set_catalog_info(&m.dir, &asset.categories, &asset.tags)?;
     remove_broken_copies(&m);
     Ok(m)
+}
+
+/// Esito di [`fill_catalog_info`].
+#[derive(Debug, Default, PartialEq)]
+pub struct FillReport {
+    pub updated: usize,
+    /// Già con le categorie.
+    pub unchanged: usize,
+    /// Materiali scaricati da un sito ma non trovati nel suo catalogo.
+    pub not_found: Vec<String>,
+    /// Materiali senza provenienza da un sito (importati da cartella o zip).
+    pub local: usize,
+}
+
+/// Aggiunge categorie e tag del catalogo ai materiali della libreria scaricati da ambientCG o
+/// Poly Haven che non li hanno (scaricati o importati prima che si salvassero).
+pub fn fill_catalog_info(catalogs: &[(Provider, Vec<OnlineAsset>)]) -> FillReport {
+    let mut r = FillReport::default();
+    let index: std::collections::HashMap<String, &OnlineAsset> = catalogs
+        .iter()
+        .flat_map(|(p, list)| list.iter().map(move |a| (source_key(*p, &a.id), a)))
+        .collect();
+    for m in store::list() {
+        if !m.categories.is_empty() || !m.tags.is_empty() {
+            r.unchanged += 1;
+            continue;
+        }
+        let Some(key) = library_source_key(&m) else {
+            r.local += 1;
+            continue;
+        };
+        match index.get(key) {
+            Some(a) => match store::set_catalog_info(&m.dir, &a.categories, &a.tags) {
+                Ok(_) => r.updated += 1,
+                Err(e) => tracing::warn!("libreria: {} non aggiornato ({e:#})", m.dir.display()),
+            },
+            None if catalogs.iter().any(|(p, _)| key.starts_with(p.label())) => r.not_found.push(key.to_string()),
+            None => r.local += 1,
+        }
+    }
+    r
 }
 
 fn download_material_inner(asset: &OnlineAsset, resolution: &str, progress: &dyn Fn(&str)) -> anyhow::Result<LibraryMaterial> {
@@ -598,6 +647,8 @@ mod tests {
         assert_eq!(r[0].thumbnail_url, "https://x/256/Wood049.png");
         assert_eq!(r[0].size_m, Some(2.0));
         assert_eq!(r[0].tags, ["wood", "oak"]);
+        assert_eq!(r[0].categories, ["Wood"]);
+        assert!(r[1].categories.is_empty());
         // Campi mancanti: indirizzo standard della miniatura.
         assert!(r[1].thumbnail_url.ends_with("/256-PNG/Metal012.png"));
         assert_eq!(
@@ -615,6 +666,7 @@ mod tests {
             id: id.into(),
             name: name.into(),
             category: cat.into(),
+            categories: vec![cat.into()],
             tags: tags.iter().map(|t| t.to_string()).collect(),
             thumbnail_url: String::new(),
             size_m: None,
@@ -656,6 +708,9 @@ mod tests {
         let rock = parse_polyhaven(&v, AssetKind::Material, "stone");
         assert_eq!(rock.len(), 1);
         assert_eq!(rock[0].size_m, Some(3.0));
+        assert_eq!(rock[0].category, "rock");
+        assert_eq!(rock[0].categories, ["rock", "wall"]);
+        assert_eq!(rock[0].tags, ["stone"]);
         assert!(rock[0].thumbnail_url.contains("/thumbs/rock_wall.png"));
 
         let files: Value = serde_json::from_str(

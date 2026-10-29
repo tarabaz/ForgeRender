@@ -91,6 +91,8 @@ fn print_help() {
              --max N  --sposta (sposta i file invece di copiarli; stesso disco)  --solo-elenco\n    \
              Nella libreria vanno solo le mappe usate, il .mtlx e polyhaven_manifest.json; il resto resta\n    \
              nei download (non si cancella niente). Già in libreria: saltati.\n  \
+         libreria aggiorna-categorie   aggiunge categorie e tag dei cataloghi ai materiali scaricati che\n    \
+             non li hanno  [--aggiorna-catalogo]\n  \
          Per tutti i comandi libreria: --libreria CARTELLA (radice della libreria; FORGE_LIBRARY_DIR ha la precedenza)",
         env!("CARGO_PKG_VERSION")
     );
@@ -534,16 +536,17 @@ fn import_polyhaven(args: &Args) -> anyhow::Result<()> {
             "i file vengono copiati"
         }
     );
-    // Lato reale dei materiali (mm → m) dal catalogo Poly Haven, in cache nella libreria.
-    let sizes: std::collections::HashMap<String, f32> = match online::catalog(Provider::PolyHaven, AssetKind::Material, false) {
-        Ok(c) => c.into_iter().filter_map(|a| a.size_m.map(|s| (a.id, s))).collect(),
-        Err(e) => {
-            println!("Catalogo Poly Haven non disponibile ({e:#}): scala 1 m, annotata nei materiali.");
-            Default::default()
-        }
-    };
+    // Lato reale (mm → m), categorie e tag dal catalogo Poly Haven, in cache nella libreria.
+    let catalog: std::collections::HashMap<String, online::OnlineAsset> =
+        match online::catalog(Provider::PolyHaven, AssetKind::Material, false) {
+            Ok(c) => c.into_iter().map(|a| (a.id.clone(), a)).collect(),
+            Err(e) => {
+                println!("Catalogo Poly Haven non disponibile ({e:#}): scala 1 m e nessuna categoria, annotato nei materiali.");
+                Default::default()
+            }
+        };
     let t0 = Instant::now();
-    let s = polyhaven_local::import_all(&dl, &sizes, opts, &mut |l| println!("{l}"))?;
+    let s = polyhaven_local::import_all(&dl, &catalog, opts, &mut |l| println!("{l}"))?;
     let with_notes = s.imported.iter().filter(|(_, _, n)| !n.is_empty()).count();
     println!("\nRiepilogo ({:.1} s):", t0.elapsed().as_secs_f64());
     println!("  importati:                 {} (con avvisi: {with_notes})", s.imported.len());
@@ -583,6 +586,28 @@ fn import_polyhaven(args: &Args) -> anyhow::Result<()> {
         for (kind, n, b) in &left {
             println!("  {kind:<28} {n:>5} file  {:>9.1} MB", *b as f64 / 1048576.0);
         }
+    }
+    Ok(())
+}
+
+/// Aggiunge categorie e tag dei cataloghi ai materiali scaricati che non li hanno.
+fn fill_categories(args: &Args) -> anyhow::Result<()> {
+    use forge_library::online::{self, AssetKind, Provider};
+    println!("Libreria: {}", forge_library::paths::root().display());
+    let mut catalogs = Vec::new();
+    for p in [Provider::AmbientCg, Provider::PolyHaven] {
+        match online::catalog(p, AssetKind::Material, args.flag("--aggiorna-catalogo")) {
+            Ok(c) => catalogs.push((p, c)),
+            Err(e) => println!("Catalogo {} non disponibile: {e:#}", p.label()),
+        }
+    }
+    let r = online::fill_catalog_info(&catalogs);
+    println!(
+        "Categorie aggiunte: {}; già presenti: {}; importati da cartella o zip (senza fonte): {}",
+        r.updated, r.unchanged, r.local
+    );
+    if !r.not_found.is_empty() {
+        println!("Non trovati nel catalogo ({}): {}", r.not_found.len(), r.not_found.join(", "));
     }
     Ok(())
 }
@@ -648,6 +673,9 @@ fn library(args: &Args) -> anyhow::Result<()> {
         }
         Some("scarica-tutto") => download_all(args),
         Some("importa-polyhaven") => import_polyhaven(args),
-        Some(other) => bail!("comando libreria sconosciuto: {other} (elenco | importa | scarica-tutto | importa-polyhaven)"),
+        Some("aggiorna-categorie") => fill_categories(args),
+        Some(other) => {
+            bail!("comando libreria sconosciuto: {other} (elenco | importa | scarica-tutto | importa-polyhaven | aggiorna-categorie)")
+        }
     }
 }

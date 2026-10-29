@@ -733,3 +733,36 @@ EXR tenuti come sono; spostamento reale solo a download finito.
 - EXR a 8 bit nel renderer per roughness/normal/metallic: convertire o riscaricare con le regole
   del downloader dell'app (png>jpg>exr, niente nor_dx/arm)? Decide Valerio.
 - Attenzione: rilanciare lo script con `--skip-existing` dopo lo spostamento riscarica ciò che è stato spostato.
+
+### Nota di Claude Code — 2026-10-29 (sera): categorie, anteprime grandi, EXR a un canale
+
+Richieste di Valerio: materiali divisi per categoria (869 in una lista non si trovano) e
+dimensione delle anteprime regolabile. Durante la prova nell'app Valerio ha visto errori in console.
+
+#### Fatto
+
+1. Categorie e tag della fonte salvati in `materiale.json` (Poly Haven: tutte, media 3,6 per
+   materiale; ambientCG: una). Import locale, download dall'app, `libreria aggiorna-categorie` e
+   pulsante "Aggiorna categorie" per i materiali già in libreria. Etichette, non sottocartelle: un
+   materiale sta in più categorie e l'id `lib:<cartella>` dei progetti non deve cambiare.
+2. Finestra Libreria: elenco delle categorie con conteggi (nomi italiani solo a video), ricerca
+   anche in categorie e tag, solo le righe visibili disegnate.
+3. Anteprime 64–512 px, miniature renderizzate a 128/256/512 px, al massimo 2 render insieme.
+4. **Bug trovato in prova**: gli EXR di Poly Haven a un canale (AO e rugosità "Y", height "Y"+"A")
+   non venivano letti da `image` ("image does not contain non-deep rgb channels") → rugosità, AO e
+   height scollegate al render. Ora `forge_render_core::texture` li legge con il crate `exr`.
+   Miniature v4 (le v3 si rifanno).
+
+#### Test eseguiti (Windows, PC di Valerio)
+
+- fmt, clippy `-D warnings`: ok. `cargo test --release --workspace --exclude forge_step`: tutti verdi.
+- Nuovi test: EXR "Y" e "Y"+"A" (anche a 16 bit per la height), categorie conservate dopo "Salva",
+  `fill_catalog_info`, categorie nell'import locale, etichette italiane, impostazione delle anteprime.
+- Reale: `aggiorna-categorie` sui 3 materiali di `Y:\ForgeRender\Libreria` (es. aerial_asphalt_01:
+  asphalt, outdoor, floor, road, man made, aerial); app aperta sulla libreria: log senza errori,
+  tutte le mappe EXR caricate, miniature 256 px rigenerate.
+
+#### Domanda aperta per ChatGPT
+
+- Gli EXR di Poly Haven per AO/rugosità sono conversioni da PNG con DWAA (con perdita, dai
+  metadati): conviene preferire i PNG per le mappe dati nei prossimi download?

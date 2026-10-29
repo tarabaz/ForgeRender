@@ -250,6 +250,26 @@
 - Prova reale: `--solo-elenco` (93 completi, 1 in download) e copia `--max 3` in una libreria
   temporanea. **Da fare**: prova `--max 3` in `Y:\ForgeRender\Libreria` controllata da Valerio
   nell'app, poi lo spostamento di tutto a download finito, con il suo ok.
+- Prova `--max 3` in copia su `Y:\ForgeRender\Libreria` fatta (aerial_asphalt_01, aerial_beach_01/02).
+
+### Categorie, anteprime grandi, EXR a un canale (29/10/2026)
+- **Categorie e tag** della fonte in `materiale.json` (`categories`, `tags`): Poly Haven ne dà più
+  d'una per materiale (media 3,6), ambientCG una. Salvate all'import locale e nei download
+  dall'app; `libreria aggiorna-categorie` (e il pulsante "Aggiorna categorie") le aggiunge ai
+  materiali già in libreria. Catalogo in cache con tutte le categorie (`*_v2.json`).
+- **Finestra Libreria**: elenco delle categorie con i conteggi (nomi italiani solo
+  nell'interfaccia, `forge_library::categories`), generiche in "Altre etichette", "Senza
+  categoria"; la ricerca guarda nome, provenienza, categorie e tag. Si disegnano solo le righe
+  visibili (prima tutte: con 869 materiali partivano centinaia di render).
+- **Dimensione delle anteprime** 64–512 px (cursore, salvata in `impostazioni.json`). Miniature
+  a 128/256/512 px secondo i pixel reali (`anteprima-v4[-256|-512].png`), con più campioni per le
+  grandi; al massimo 2 render di miniature insieme.
+- **EXR a un canale**: Poly Haven salva AO e rugosità con la sola luminanza "Y" e la height con
+  "Y"+"A"; `image` non li legge ("non-deep rgb channels") e le mappe restavano scollegate. Ora si
+  leggono con il crate `exr` (stessa versione già in uso). Miniature portate a v4 perché le v3 di
+  quei materiali erano senza rugosità/AO/height.
+- Nota: questi EXR di Poly Haven sono convertiti da PNG con compressione DWAA (con perdita),
+  scritto nei loro metadati.
 
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

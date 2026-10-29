@@ -1036,6 +1036,7 @@ name = "forge_render_core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "exr",
  "forge_accel",
  "forge_math",
  "forge_scene",

@@ -23,6 +23,8 @@ pub struct Preferences {
     pub download_provider: String,
     /// Displacement dei materiali importati.
     pub import_displacement: ImportDisplacement,
+    /// Lato delle anteprime nella finestra Libreria (pixel dell'interfaccia, 64–512).
+    pub library_card_size: u32,
     // --- Percorsi ---
     /// Cartella della libreria scelta dall'utente (`None` = predefinita).
     pub library_dir: Option<PathBuf>,
@@ -43,6 +45,7 @@ impl Default for Preferences {
             download_resolution: 0,
             download_provider: "ambientcg".into(),
             import_displacement: ImportDisplacement::Off,
+            library_card_size: 112,
             library_dir: None,
             new_backend: r.backend,
             new_samples: r.target_samples,
@@ -60,6 +63,7 @@ impl Preferences {
         if !["ambientcg", "polyhaven"].contains(&self.download_provider.as_str()) {
             self.download_provider = "ambientcg".into();
         }
+        self.library_card_size = self.library_card_size.clamp(64, 512);
         self.new_samples = self.new_samples.min(1 << 20);
         self.new_threads = self.new_threads.min(1024);
         if self.library_dir.as_ref().is_some_and(|p| p.as_os_str().is_empty()) {
@@ -162,6 +166,7 @@ mod tests {
             download_resolution: 2,
             download_provider: "polyhaven".into(),
             import_displacement: ImportDisplacement::FromMaterialX,
+            library_card_size: 256,
             library_dir: Some(PathBuf::from("/x/Libreria")),
             new_backend: BackendKind::Gpu,
             new_samples: 256,
@@ -185,9 +190,14 @@ mod tests {
         assert!(err.unwrap().contains("non valide"));
         assert!(p.with_extension("json.non-valido").is_file(), "file rovinato conservato");
         // Campi mancanti o sconosciuti, valori fuori intervallo.
-        std::fs::write(&p, r#"{"download_resolution": 99, "download_provider": "boh", "campo_futuro": 1}"#).unwrap();
+        std::fs::write(
+            &p,
+            r#"{"download_resolution": 99, "download_provider": "boh", "library_card_size": 5000, "campo_futuro": 1}"#,
+        )
+        .unwrap();
         let (d, err) = Preferences::load_from(&p);
         assert!(err.is_none());
+        assert_eq!(d.library_card_size, 512);
         assert_eq!(d.download_resolution, forge_library::online::RESOLUTIONS.len() - 1);
         assert_eq!(d.download_provider, "ambientcg");
         assert!(d.auto_restart);

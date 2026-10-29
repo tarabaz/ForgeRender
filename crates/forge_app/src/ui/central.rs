@@ -746,7 +746,7 @@ pub fn material_preview(app: &mut ForgeApp, ui: &mut egui::Ui) {
         std::thread::Builder::new()
             .name("forge-preview".into())
             .spawn(move || {
-                let _ = tx.send(render_preview(&mat));
+                let _ = tx.send(render_preview(&mat, PREVIEW_SIZE));
             })
             .ok();
         pv.pending = Some((key.clone(), rx));
@@ -769,7 +769,17 @@ pub fn material_preview(app: &mut ForgeApp, ui: &mut egui::Ui) {
     });
 }
 
-pub(crate) fn render_preview(mat: &Material) -> Vec<u8> {
+/// Anteprima del materiale su una sfera, `size` × `size` pixel (RGBA8). I campioni crescono
+/// con il lato (32 a 128 px, fino a 128 a 512 px) perché le anteprime grandi non siano rumorose.
+pub(crate) fn render_preview(mat: &Material, size: u32) -> Vec<u8> {
+    let size = size.clamp(32, 1024);
+    let samples = (32 * size / PREVIEW_SIZE).clamp(32, 128);
+    // Le anteprime piccole usano 2 thread (se ne fanno tante insieme), le grandi metà dei core.
+    let threads = if size <= PREVIEW_SIZE {
+        2
+    } else {
+        std::thread::available_parallelism().map(|n| n.get() / 2).unwrap_or(2).max(2)
+    };
     let mut s = Scene::default();
     let mut m = mat.clone();
     m.id = forge_scene::MaterialId::new("__preview");
@@ -813,16 +823,16 @@ pub(crate) fn render_preview(mat: &Material) -> Vec<u8> {
     };
     let rs = RenderScene::compile(&s);
     let settings = RenderSettings {
-        width: PREVIEW_SIZE,
-        height: PREVIEW_SIZE,
+        width: size,
+        height: size,
         max_bounces: 8,
         ..Default::default()
     };
-    let mut acc = Accumulator::new(PREVIEW_SIZE, PREVIEW_SIZE);
+    let mut acc = Accumulator::new(size, size);
     let mut pass = vec![[0.0; 3]; acc.pixel_count()];
     let cancel = std::sync::atomic::AtomicBool::new(false);
-    if let Ok(mut be) = forge_render_cpu::CpuBackend::new(2) {
-        for i in 0..32 {
+    if let Ok(mut be) = forge_render_cpu::CpuBackend::new(threads) {
+        for i in 0..samples {
             if let Ok(n @ 1..) = be.render_pass(&rs, &settings, i, 1, &mut pass, &cancel) {
                 acc.add_samples(&pass, n);
             }

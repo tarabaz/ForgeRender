@@ -9,9 +9,11 @@
 //!   `materiale.json` + miniatura), import da cartella o da zip.
 //! - [`online`]: ricerca e download da ambientCG e Poly Haven (CC0).
 //! - [`mtlx`]: valori scritti nei file MaterialX che accompagnano i materiali scaricati.
+//! - [`categories`]: nomi in italiano delle categorie dei siti (solo per l'interfaccia).
 //! - [`polyhaven_local`]: import dei materiali Poly Haven scaricati in locale con lo script
 //!   di `tools/material-library-polyhaven`.
 
+pub mod categories;
 pub mod detect;
 pub mod mtlx;
 pub mod online;

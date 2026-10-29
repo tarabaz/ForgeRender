@@ -16,10 +16,17 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 pub const MATERIAL_FILE: &str = "materiale.json";
-/// Anteprima renderizzata (v3: displacement spento di default; le vecchie si rifanno).
-pub const THUMBNAIL_FILE: &str = "anteprima-v3.png";
+/// Anteprima renderizzata (v4: con gli EXR a un canale di Poly Haven letti; nella v3 rugosità,
+/// AO e height in EXR "Y" mancavano. Le vecchie si rifanno).
+pub const THUMBNAIL_FILE: &str = "anteprima-v4.png";
 /// Anteprime delle versioni precedenti: si eliminano quando si salva quella nuova.
-const LEGACY_THUMBNAIL_FILES: [&str; 2] = ["anteprima.png", "anteprima-v2.png"];
+const LEGACY_THUMBNAIL_FILES: [&str; 5] = [
+    "anteprima.png",
+    "anteprima-v2.png",
+    "anteprima-v3.png",
+    "anteprima-v3-256.png",
+    "anteprima-v3-512.png",
+];
 /// Versione di `materiale.json`. Nella 1 il displacement veniva acceso in automatico
 /// all'import (3 % del lato della texture): al caricamento si riporta a 0.
 const FILE_VERSION: u32 = 2;
@@ -33,6 +40,12 @@ struct MaterialFile {
     /// Avvisi dell'import (es. mappe che la fonte non offre alla risoluzione scelta).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     notes: Vec<String>,
+    /// Categorie della fonte (es. Poly Haven: "wood", "floor"), come le scrive il sito.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    categories: Vec<String>,
+    /// Tag della fonte (parole chiave in inglese), usati dalla ricerca.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    tags: Vec<String>,
     material: Material,
 }
 
@@ -48,6 +61,9 @@ pub struct LibraryMaterial {
     pub misassigned: Vec<String>,
     /// Avvisi dell'import salvati con il materiale.
     pub notes: Vec<String>,
+    /// Categorie e tag della fonte (vuoti per i materiali importati da cartella).
+    pub categories: Vec<String>,
+    pub tags: Vec<String>,
 }
 
 /// Nome di cartella valido su tutti i sistemi.
@@ -185,6 +201,8 @@ pub fn load(dir: &Path) -> anyhow::Result<LibraryMaterial> {
         dir: dir.to_path_buf(),
         misassigned: misassigned_maps(&material),
         notes: f.notes,
+        categories: f.categories,
+        tags: f.tags,
         material,
         source: f.source,
         thumbnail: thumb.is_file().then_some(thumb),
@@ -199,16 +217,18 @@ pub fn save(dir: &Path, material: &Material, source: &str) -> anyhow::Result<()>
             *slot = rel.to_path_buf();
         }
     }
-    // Gli avvisi dell'import restano anche quando si salva il materiale modificato.
-    let notes = std::fs::read_to_string(dir.join(MATERIAL_FILE))
+    // Avvisi dell'import, categorie e tag restano anche quando si salva il materiale modificato.
+    let (notes, categories, tags) = std::fs::read_to_string(dir.join(MATERIAL_FILE))
         .ok()
         .and_then(|t| serde_json::from_str::<MaterialFile>(&t).ok())
-        .map(|f| f.notes)
+        .map(|f| (f.notes, f.categories, f.tags))
         .unwrap_or_default();
     let f = MaterialFile {
         version: FILE_VERSION,
         source: source.to_string(),
         notes,
+        categories,
+        tags,
         material: m,
     };
     std::fs::write(dir.join(MATERIAL_FILE), serde_json::to_string_pretty(&f)?)?;
@@ -286,7 +306,7 @@ pub fn update(dir: &Path, material: &Material) -> anyhow::Result<LibraryMaterial
     let mut m = material.clone();
     copy_textures_into(dir, &mut m)?;
     save(dir, &m, &source)?;
-    let _ = std::fs::remove_file(dir.join(THUMBNAIL_FILE));
+    remove_thumbnails(dir);
     load(dir)
 }
 
@@ -321,12 +341,42 @@ pub fn set_notes(dir: &Path, notes: &[String]) -> anyhow::Result<LibraryMaterial
     load(dir)
 }
 
-/// Salva la miniatura (RGBA8) del materiale.
+/// Registra categorie e tag della fonte nel `materiale.json` e restituisce il materiale ricaricato.
+pub fn set_catalog_info(dir: &Path, categories: &[String], tags: &[String]) -> anyhow::Result<LibraryMaterial> {
+    let path = dir.join(MATERIAL_FILE);
+    let mut f: MaterialFile = serde_json::from_str(&std::fs::read_to_string(&path)?)?;
+    f.categories = categories.to_vec();
+    f.tags = tags.to_vec();
+    std::fs::write(&path, serde_json::to_string_pretty(&f)?)?;
+    load(dir)
+}
+
+/// Lati (pixel) delle miniature: 128 è quella standard, le altre si renderizzano solo
+/// quando la libreria mostra anteprime più grandi.
+pub const THUMBNAIL_SIZES: [u32; 3] = [128, 256, 512];
+
+/// Nome del file della miniatura di lato `size` (128 → [`THUMBNAIL_FILE`]).
+pub fn thumbnail_file(size: u32) -> String {
+    if size <= THUMBNAIL_SIZES[0] {
+        THUMBNAIL_FILE.to_string()
+    } else {
+        format!("anteprima-v4-{size}.png")
+    }
+}
+
+/// Elimina tutte le miniature del materiale (si rifanno alla prossima visualizzazione).
+pub fn remove_thumbnails(dir: &Path) {
+    for s in THUMBNAIL_SIZES {
+        let _ = std::fs::remove_file(dir.join(thumbnail_file(s)));
+    }
+}
+
+/// Salva la miniatura (RGBA8) del materiale; il file dipende dal lato (`width`).
 pub fn save_thumbnail(dir: &Path, width: u32, height: u32, rgba: &[u8]) -> anyhow::Result<PathBuf> {
     for old in LEGACY_THUMBNAIL_FILES {
         let _ = std::fs::remove_file(dir.join(old));
     }
-    let p = dir.join(THUMBNAIL_FILE);
+    let p = dir.join(thumbnail_file(width));
     image::save_buffer(&p, rgba, width, height, image::ColorType::Rgba8)?;
     Ok(p)
 }
@@ -709,6 +759,13 @@ mod tests {
         // Le note dell'import restano anche dopo "Salva".
         let noted = set_notes(&all[0].dir, &["mappa \"Displacement\" non disponibile".to_string()]).unwrap();
         assert_eq!(noted.notes.len(), 1);
+        assert_eq!(update(&all[0].dir, &edited).unwrap().notes, noted.notes);
+        // Anche categorie e tag della fonte restano dopo "Salva".
+        let cats = vec!["brick".to_string(), "wall".to_string()];
+        let tagged = set_catalog_info(&all[0].dir, &cats, &["red".to_string()]).unwrap();
+        assert_eq!(tagged.categories, cats);
+        let kept = update(&all[0].dir, &edited).unwrap();
+        assert_eq!((kept.categories, kept.tags), (cats, vec!["red".to_string()]));
         assert_eq!(update(&all[0].dir, &edited).unwrap().notes, noted.notes);
         assert_eq!(load(&all[0].dir).unwrap().material.roughness, 0.25);
         // Una texture esterna viene copiata dentro la cartella.

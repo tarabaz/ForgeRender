@@ -12,6 +12,7 @@
 use crate::app::ForgeApp;
 use crate::ui::style;
 use eframe::egui;
+use forge_library::categories;
 use forge_library::online::{self, AssetKind, OnlineAsset, Provider};
 use forge_library::store::{self, LibraryMaterial};
 use std::collections::HashMap;
@@ -29,7 +30,19 @@ enum Msg {
     Search(u64, Result<Vec<OnlineAsset>, String>),
     Material(Result<Box<LibraryMaterial>, String>),
     Hdri(Result<PathBuf, String>),
+    /// Esito di "Aggiorna categorie".
+    Categories(Result<String, String>),
     Progress(String),
+}
+
+/// Filtro per categoria della scheda "La mia libreria".
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum CategoryFilter {
+    All,
+    /// Categoria del sito, com'è scritta in `materiale.json` (in minuscolo).
+    Is(String),
+    /// Materiali senza categorie (importati da cartella o zip, o non ancora aggiornati).
+    None,
 }
 
 enum Thumb {
@@ -45,6 +58,9 @@ pub struct LibraryUi {
     kind: AssetKind,
     query: String,
     my_query: String,
+    category: CategoryFilter,
+    /// Lato delle anteprime della scheda "La mia libreria" (dalle impostazioni).
+    card: f32,
     resolution: usize,
     items: Option<Vec<LibraryMaterial>>,
     hdris: Option<Vec<PathBuf>>,
@@ -70,6 +86,8 @@ impl Default for LibraryUi {
             kind: AssetKind::Material,
             query: String::new(),
             my_query: String::new(),
+            category: CategoryFilter::All,
+            card: CARD,
             resolution: 1,
             items: None,
             hdris: None,
@@ -139,6 +157,26 @@ fn hdri_preview(path: &Path) -> anyhow::Result<image::RgbaImage> {
     Ok(img)
 }
 
+/// Al massimo due anteprime dei materiali si renderizzano insieme (ognuna usa più thread):
+/// con centinaia di materiali visibili non si avviano centinaia di render in parallelo.
+fn render_slot() -> impl Drop {
+    use std::sync::{Condvar, Mutex};
+    static STATE: (Mutex<usize>, Condvar) = (Mutex::new(0), Condvar::new());
+    struct Slot;
+    impl Drop for Slot {
+        fn drop(&mut self) {
+            *STATE.0.lock().unwrap() -= 1;
+            STATE.1.notify_one();
+        }
+    }
+    let mut n = STATE.0.lock().unwrap();
+    while *n >= 2 {
+        n = STATE.1.wait(n).unwrap();
+    }
+    *n += 1;
+    Slot
+}
+
 fn to_color_image(img: image::RgbaImage) -> egui::ColorImage {
     egui::ColorImage::from_rgba_unmultiplied([img.width() as usize, img.height() as usize], img.as_raw())
 }
@@ -160,6 +198,7 @@ impl LibraryUi {
     /// Valori proposti dalle impostazioni; con `library_changed` si rilegge la libreria.
     pub fn apply_prefs(&mut self, p: &crate::prefs::Preferences, library_changed: bool) {
         self.resolution = p.download_resolution.min(online::RESOLUTIONS.len() - 1);
+        self.card = p.library_card_size as f32;
         self.provider = if p.download_provider == "polyhaven" {
             Provider::PolyHaven
         } else {
@@ -189,7 +228,16 @@ impl LibraryUi {
     /// Dopo un salvataggio: elenco e miniatura del materiale si ricaricano.
     pub fn material_saved(&mut self, m: &LibraryMaterial) {
         self.items = None;
-        self.thumbs.remove(&format!("mat:{}", m.dir.display()));
+        let prefix = format!("mat:{}:", m.dir.display());
+        self.thumbs.retain(|k, _| !k.starts_with(&prefix));
+    }
+
+    /// Miniatura già pronta (senza avviarne il caricamento).
+    fn ready_thumb(&self, key: &str) -> Option<egui::TextureHandle> {
+        match self.thumbs.get(key) {
+            Some(Thumb::Ready(t)) => Some(t.clone()),
+            _ => None,
+        }
     }
 
     /// Texture della miniatura `key`; avvia il caricamento in background se serve.
@@ -225,20 +273,29 @@ impl LibraryUi {
         })
     }
 
-    fn material_thumb(&mut self, ctx: &egui::Context, m: &LibraryMaterial) -> Option<egui::TextureHandle> {
+    /// Miniatura del materiale di lato `size` (uno di [`store::THUMBNAIL_SIZES`]). Finché non è
+    /// pronta si mostra un'altra già caricata dello stesso materiale.
+    fn material_thumb(&mut self, ctx: &egui::Context, m: &LibraryMaterial, size: u32) -> Option<egui::TextureHandle> {
         let dir = m.dir.clone();
         let mat = m.material.clone();
-        self.thumb(ctx, &format!("mat:{}", m.dir.display()), move || {
-            let path = dir.join(store::THUMBNAIL_FILE);
+        let key = format!("mat:{}:{size}", m.dir.display());
+        let tex = self.thumb(ctx, &key, move || {
+            let path = dir.join(store::thumbnail_file(size));
             if let Ok(img) = image::open(&path) {
                 return Ok(to_color_image(img.to_rgba8()));
             }
             // Prima volta: anteprima renderizzata con il path tracer e salvata nella cartella.
-            let rgba = crate::ui::central::render_preview(&mat);
-            let n = (rgba.len() / 4) as f64;
-            let side = n.sqrt() as u32;
+            let _slot = render_slot();
+            let rgba = crate::ui::central::render_preview(&mat, size);
+            let side = ((rgba.len() / 4) as f64).sqrt() as u32;
             let _ = store::save_thumbnail(&dir, side, side, &rgba);
             Ok(egui::ColorImage::from_rgba_unmultiplied([side as usize, side as usize], &rgba))
+        });
+        tex.or_else(|| {
+            store::THUMBNAIL_SIZES
+                .iter()
+                .rev()
+                .find_map(|s| self.ready_thumb(&format!("mat:{}:{s}", m.dir.display())))
         })
     }
 
@@ -329,6 +386,14 @@ fn poll(app: &mut ForgeApp, ctx: &egui::Context) {
                     }
                     Err(e) => lib.status = Some((e, true)),
                 }
+            }
+            Msg::Categories(r) => {
+                lib.busy = None;
+                lib.items = None;
+                lib.status = Some(match r {
+                    Ok(s) => (s, false),
+                    Err(e) => (e, true),
+                });
             }
             Msg::Hdri(r) => {
                 lib.busy = None;
@@ -474,9 +539,10 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.add(
             egui::TextEdit::singleline(&mut app.library.my_query)
-                .hint_text("cerca…")
-                .desired_width(160.0),
-        );
+                .hint_text("cerca (nome, categoria, tag)…")
+                .desired_width(190.0),
+        )
+        .on_hover_text("Cerca nel nome, nella provenienza, nelle categorie e nei tag (in inglese, es. oak, rusty, tiles)");
         if ui
             .button("Importa cartella…")
             .on_hover_text("Una cartella con le mappe di un materiale (*_Color, *_Roughness, *_Normal…)")
@@ -519,15 +585,8 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
             .small(),
         );
     });
-    let q = app.library.my_query.to_lowercase();
-    let items: Vec<LibraryMaterial> = app
-        .library
-        .materials()
-        .iter()
-        .filter(|m| q.is_empty() || m.material.name.to_lowercase().contains(&q) || m.source.to_lowercase().contains(&q))
-        .cloned()
-        .collect();
-    if items.is_empty() {
+    let all: Vec<LibraryMaterial> = app.library.materials().to_vec();
+    if all.is_empty() {
         ui.add_space(20.0);
         ui.label("La libreria è vuota: scarica un materiale dalla scheda Online oppure importa una cartella o uno zip.");
         ui.label(
@@ -537,54 +596,150 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
         );
         return;
     }
+    // Dimensione delle anteprime (salvata nelle impostazioni a fine trascinamento).
+    let mut save_card = false;
+    let needs_categories = all.iter().any(|m| {
+        m.categories.is_empty()
+            && m.tags.is_empty()
+            && [Provider::AmbientCg, Provider::PolyHaven]
+                .iter()
+                .any(|p| m.source.starts_with(p.label()))
+    });
+    ui.horizontal(|ui| {
+        let r = ui
+            .add(
+                egui::Slider::new(&mut app.library.card, 64.0..=512.0)
+                    .step_by(8.0)
+                    .suffix(" px")
+                    .text("anteprime"),
+            )
+            .on_hover_text(
+                "Dimensione delle anteprime. Oltre i 128 pixel le sfere si renderizzano a 256 o 512 pixel \
+                 (la prima volta qualche secondo per materiale, poi restano salvate nella sua cartella).",
+            );
+        save_card = r.drag_stopped() || (r.changed() && !r.dragged());
+        if needs_categories
+            && ui
+                .button("Aggiorna categorie")
+                .on_hover_text("Aggiunge categorie e tag dei cataloghi di ambientCG e Poly Haven ai materiali scaricati che non li hanno")
+                .clicked()
+            && app.library.busy.is_none()
+        {
+            app.library.spawn(&ctx, "Aggiornamento delle categorie".into(), |_| {
+                let catalogs: Vec<_> = [Provider::AmbientCg, Provider::PolyHaven]
+                    .into_iter()
+                    .filter_map(|p| online::catalog(p, AssetKind::Material, false).ok().map(|c| (p, c)))
+                    .collect();
+                if catalogs.is_empty() {
+                    return Msg::Categories(Err("Cataloghi non disponibili: controlla la connessione.".into()));
+                }
+                let r = online::fill_catalog_info(&catalogs);
+                let mut s = format!("Categorie aggiunte a {} materiali.", r.updated);
+                if !r.not_found.is_empty() {
+                    s += &format!(" Non trovati nel catalogo: {}.", r.not_found.len());
+                }
+                Msg::Categories(Ok(s))
+            });
+        }
+    });
+    if save_card {
+        let p = crate::prefs::Preferences {
+            library_card_size: app.library.card.round() as u32,
+            ..app.prefs.clone()
+        };
+        app.apply_prefs(p, false);
+    }
+
+    let q = app.library.my_query.trim().to_lowercase();
+    let matched: Vec<&LibraryMaterial> = all.iter().filter(|m| matches_query(m, &q)).collect();
+    // Conteggi per categoria (sui materiali che rispondono alla ricerca).
+    let mut counts: std::collections::BTreeMap<String, usize> = Default::default();
+    let mut uncategorized = 0;
+    for m in &matched {
+        if m.categories.is_empty() {
+            uncategorized += 1;
+        }
+        let mut seen = std::collections::HashSet::new();
+        for c in &m.categories {
+            let c = c.trim().to_lowercase();
+            if seen.insert(c.clone()) {
+                *counts.entry(c).or_default() += 1;
+            }
+        }
+    }
+    let mut cats: Vec<(String, usize)> = counts.into_iter().collect();
+    cats.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| cat_label(&a.0).cmp(&cat_label(&b.0))));
+    let (secondary, primary): (Vec<_>, Vec<_>) = cats.into_iter().partition(|(c, _)| categories::is_secondary(c));
+    let mut filter = app.library.category.clone();
+    let shown: Vec<LibraryMaterial> = matched
+        .iter()
+        .filter(|m| match &filter {
+            CategoryFilter::All => true,
+            CategoryFilter::None => m.categories.is_empty(),
+            CategoryFilter::Is(c) => m.categories.iter().any(|x| x.trim().eq_ignore_ascii_case(c)),
+        })
+        .map(|m| (*m).clone())
+        .collect();
+
     let mut apply = None;
     let mut delete = None;
-    let cols = grid_cols(ui, CARD);
-    egui::ScrollArea::vertical().id_salt("lib-mine").show(ui, |ui| {
-        for row in items.chunks(cols) {
-            ui.horizontal(|ui| {
-                for m in row {
-                    let tex = app.library.material_thumb(&ctx, m);
-                    let maps = m.material.texture_slots().iter().filter(|s| s.is_some()).count();
-                    let sub = if m.misassigned.is_empty() {
-                        format!("{maps} mappe")
-                    } else {
-                        "⚠ da riscaricare".to_string()
-                    };
-                    let r = thumb_card(ui, tex, egui::vec2(CARD, CARD), &m.material.name, &sub, false);
-                    let notes = if m.notes.is_empty() {
-                        String::new()
-                    } else {
-                        format!("\n\n{}", m.notes.join("\n"))
-                    };
-                    let r = if m.misassigned.is_empty() {
-                        r.on_hover_text(format!("{}\n{}{notes}", m.source, m.dir.display()))
-                    } else {
-                        r.on_hover_text(format!(
-                            "{}\n{}\n\nImportato con un errore di riconoscimento delle mappe:\n{}\n\n\
-                             Riscaricalo dalla scheda Online (la copia difettosa viene sostituita).",
-                            m.source,
-                            m.dir.display(),
-                            m.misassigned.join("\n")
-                        ))
-                    };
-                    if r.clicked() {
-                        apply = Some(m.clone());
+    let card = app.library.card;
+    // Miniatura abbastanza grande per i pixel reali dello schermo.
+    let need_px = card * ctx.pixels_per_point();
+    let tier = store::THUMBNAIL_SIZES
+        .iter()
+        .copied()
+        .find(|s| *s as f32 >= need_px * 0.9)
+        .unwrap_or(store::THUMBNAIL_SIZES[store::THUMBNAIL_SIZES.len() - 1]);
+    ui.horizontal_top(|ui| {
+        ui.vertical(|ui| {
+            ui.set_width(170.0);
+            egui::ScrollArea::vertical().id_salt("lib-cats").show(ui, |ui| {
+                let mut item = |ui: &mut egui::Ui, f: CategoryFilter, text: String| {
+                    if ui.selectable_label(filter == f, text).clicked() {
+                        filter = f;
                     }
-                    r.context_menu(|ui| {
-                        if ui.button("Apri cartella").clicked() {
-                            open_folder(&m.dir);
-                            ui.close();
-                        }
-                        if ui.button("Elimina dalla libreria").clicked() {
-                            delete = Some(m.clone());
-                            ui.close();
+                };
+                item(ui, CategoryFilter::All, format!("Tutti ({})", matched.len()));
+                for (c, n) in &primary {
+                    item(ui, CategoryFilter::Is(c.clone()), format!("{} ({n})", cat_label(c)));
+                }
+                if uncategorized > 0 {
+                    item(ui, CategoryFilter::None, format!("Senza categoria ({uncategorized})"));
+                }
+                if !secondary.is_empty() {
+                    ui.collapsing("Altre etichette", |ui| {
+                        for (c, n) in &secondary {
+                            item(ui, CategoryFilter::Is(c.clone()), format!("{} ({n})", cat_label(c)));
                         }
                     });
                 }
             });
-        }
+        });
+        ui.separator();
+        ui.vertical(|ui| {
+            if shown.is_empty() {
+                ui.label("Nessun materiale con questi filtri.");
+                return;
+            }
+            let cols = grid_cols(ui, card);
+            // Si disegnano (e si renderizzano le miniature) solo le righe visibili.
+            let row_h = card + 34.0 + ui.spacing().item_spacing.y;
+            let rows = shown.len().div_ceil(cols);
+            egui::ScrollArea::vertical()
+                .id_salt("lib-mine")
+                .show_rows(ui, row_h, rows, |ui, range| {
+                    for row in range {
+                        ui.horizontal(|ui| {
+                            for m in &shown[row * cols..((row + 1) * cols).min(shown.len())] {
+                                material_card(app, &ctx, ui, m, card, tier, &mut apply, &mut delete);
+                            }
+                        });
+                    }
+                });
+        });
     });
+    app.library.category = filter;
     if let Some(m) = apply {
         let kept = app.scene.materials.get(&m.material.id).is_some_and(|p| *p != m.material);
         apply_material(app, &m);
@@ -607,6 +762,96 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
         }
         app.library.items = None;
     }
+}
+
+fn cat_label(c: &str) -> String {
+    categories::label(c)
+}
+
+/// Il materiale risponde alla ricerca? Tutte le parole devono comparire nel nome, nella
+/// provenienza, nelle categorie (anche col nome italiano) o nei tag.
+fn matches_query(m: &LibraryMaterial, q: &str) -> bool {
+    q.split_whitespace().all(|w| {
+        m.material.name.to_lowercase().contains(w)
+            || m.source.to_lowercase().contains(w)
+            || m.tags.iter().any(|t| t.to_lowercase().contains(w))
+            || m.categories
+                .iter()
+                .any(|c| c.to_lowercase().contains(w) || cat_label(c).to_lowercase().contains(w))
+    })
+}
+
+/// Tessera di un materiale della libreria: clic = applica, menu = apri cartella / elimina.
+#[allow(clippy::too_many_arguments)]
+fn material_card(
+    app: &mut ForgeApp,
+    ctx: &egui::Context,
+    ui: &mut egui::Ui,
+    m: &LibraryMaterial,
+    card: f32,
+    tier: u32,
+    apply: &mut Option<LibraryMaterial>,
+    delete: &mut Option<LibraryMaterial>,
+) {
+    let tex = app.library.material_thumb(ctx, m, tier);
+    let maps = m.material.texture_slots().iter().filter(|s| s.is_some()).count();
+    let main: Vec<String> = m
+        .categories
+        .iter()
+        .filter(|c| !categories::is_secondary(c))
+        .take(2)
+        .map(|c| cat_label(c))
+        .collect();
+    let sub = if !m.misassigned.is_empty() {
+        "⚠ da riscaricare".to_string()
+    } else if main.is_empty() {
+        format!("{maps} mappe")
+    } else {
+        main.join(" · ")
+    };
+    let r = thumb_card(ui, tex, egui::vec2(card, card), &m.material.name, &sub, false);
+    let notes = if m.notes.is_empty() {
+        String::new()
+    } else {
+        format!("\n\n{}", m.notes.join("\n"))
+    };
+    let cats = if m.categories.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "\nCategorie: {}",
+            m.categories.iter().map(|c| cat_label(c)).collect::<Vec<_>>().join(", ")
+        )
+    };
+    let tags = if m.tags.is_empty() {
+        String::new()
+    } else {
+        format!("\nTag: {}", m.tags.join(", "))
+    };
+    let r = if m.misassigned.is_empty() {
+        r.on_hover_text(format!("{}\n{}\n{maps} mappe{cats}{tags}{notes}", m.source, m.dir.display()))
+    } else {
+        r.on_hover_text(format!(
+            "{}\n{}\n\nImportato con un errore di riconoscimento delle mappe:\n{}\n\n\
+             Riscaricalo dalla scheda Online (la copia difettosa viene sostituita).",
+            m.source,
+            m.dir.display(),
+            m.misassigned.join("\n")
+        ))
+    };
+    if r.clicked() {
+        *apply = Some(m.clone());
+    }
+    r.context_menu(|ui| {
+        if ui.button("Apri cartella").clicked() {
+            open_folder(&m.dir);
+            ui.close();
+        }
+        if ui.button("Elimina dalla libreria").clicked() {
+            *delete = Some(m.clone());
+            ui.close();
+        }
+    });
 }
 
 fn online_tab(app: &mut ForgeApp, ui: &mut egui::Ui) {
