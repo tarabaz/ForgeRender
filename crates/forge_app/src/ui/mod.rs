@@ -175,6 +175,10 @@ impl ForgeApp {
                 i.consume_key(egui::Modifiers::NONE, egui::Key::Delete),
             )
         });
+        // 5 (anche del tastierino): prospettica / ortografica, come in Blender.
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Num5)) {
+            self.toggle_ortho();
+        }
         if dup {
             self.duplicate_selection();
         }

@@ -1653,12 +1653,16 @@ fn camera(app: &mut ForgeApp, ui: &mut egui::Ui) {
             ("Frontale", 0.0, 0.0),
             ("Destra", std::f32::consts::FRAC_PI_2, 0.0),
             ("Alto", 0.0, 1.55),
-            ("Isometrica", 0.785, 0.615),
+            ("Isometrica", std::f32::consts::FRAC_PI_4, crate::ui::navigator::ISO_PITCH),
         ];
         for (name, yaw, pitch) in views {
             if ui.button(name).clicked() {
                 app.orbit.yaw = yaw;
                 app.orbit.pitch = pitch;
+                // L'isometrica è per definizione ortografica.
+                if name == "Isometrica" {
+                    app.orbit.lens.ortho = true;
+                }
                 app.frame_all();
             }
         }
@@ -2124,6 +2128,43 @@ fn fmt_m(m: f32) -> String {
 fn lens_controls(app: &mut ForgeApp, ui: &mut egui::Ui, cam: &mut forge_scene::Camera) -> bool {
     let mut changed = false;
     egui::Grid::new("lens-grid").num_columns(2).spacing([10.0, 6.0]).show(ui, |ui| {
+        ui.label("Proiezione");
+        ui.horizontal(|ui| {
+            changed |= ui
+                .selectable_value(&mut cam.lens.ortho, false, "Prospettica")
+                .on_hover_text("Come una fotocamera: gli oggetti lontani sono più piccoli")
+                .changed();
+            changed |= ui
+                .selectable_value(&mut cam.lens.ortho, true, "Ortografica")
+                .on_hover_text("Raggi paralleli: misure costanti con la distanza (vista tecnica, isometrica). Niente profondità di campo")
+                .changed();
+        });
+        ui.end_row();
+        if cam.lens.ortho {
+            ui.label("Altezza inquadratura");
+            ui.horizontal(|ui| {
+                let mut auto = cam.lens.ortho_height <= 0.0;
+                if ui
+                    .checkbox(&mut auto, "automatica")
+                    .on_hover_text("Quella che la prospettiva avrebbe alla distanza del bersaglio (segue lo zoom)")
+                    .changed()
+                {
+                    cam.lens.ortho_height = if auto { 0.0 } else { 2.0 * cam.ortho_half_height() };
+                    changed = true;
+                }
+                if !auto {
+                    changed |= ui
+                        .add(
+                            egui::DragValue::new(&mut cam.lens.ortho_height)
+                                .range(0.001..=10000.0)
+                                .speed(0.01)
+                                .suffix(" m"),
+                        )
+                        .changed();
+                }
+            });
+            ui.end_row();
+        }
         ui.label("Obiettivo");
         ui.horizontal(|ui| {
             let mut mm = cam.focal_mm();

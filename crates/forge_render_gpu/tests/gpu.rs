@@ -454,6 +454,41 @@ fn gpu_depth_of_field_matches_cpu() {
     assert!(diff < noise * 1.5, "RMSE GPU−CPU {diff} vs rumore CPU−CPU {noise}");
 }
 
+/// Camera ortografica (vista isometrica): stessa immagine su GPU e CPU, diversa dalla prospettica.
+#[test]
+fn gpu_orthographic_matches_cpu() {
+    let Some(mut g) = gpu() else { return };
+    let mut s = Scene::test_scene();
+    s.camera.lens.ortho = true;
+    s.camera.lens.dof = true; // ignorata in ortografica
+    let st = RenderSettings {
+        width: 64,
+        height: 36,
+        ..Default::default()
+    };
+    let spp = 64;
+    let mut cpu = CpuBackend::new(4).unwrap();
+    let a = render_with(&mut cpu, &s, &st, spp);
+    let b = render_with(&mut cpu, &s, &RenderSettings { seed: 4321, ..st.clone() }, spp);
+    let gpu_img = render_with(&mut g, &s, &st, spp);
+    let mut persp = s.clone();
+    persp.camera.lens.ortho = false;
+    persp.camera.lens.dof = false;
+    let p = render_with(&mut cpu, &persp, &st, spp);
+    let rmse = |x: &[[f32; 3]], y: &[[f32; 3]]| {
+        let e: f64 = x
+            .iter()
+            .zip(y)
+            .map(|(p, q)| (0..3).map(|k| ((p[k] - q[k]) as f64).powi(2)).sum::<f64>())
+            .sum();
+        (e / (x.len() * 3) as f64).sqrt()
+    };
+    let (noise, diff, vs_persp) = (rmse(&a, &b), rmse(&a, &gpu_img), rmse(&a, &p));
+    eprintln!("ortografica: RMSE CPU−CPU {noise:.4} GPU−CPU {diff:.4} orto−prospettica {vs_persp:.4}");
+    assert!(vs_persp > 2.0 * noise, "l'ortografica deve cambiare l'immagine");
+    assert!(diff < noise * 1.5, "RMSE GPU−CPU {diff} vs rumore CPU−CPU {noise}");
+}
+
 /// Displacement vero (cubo suddiviso e spostato) con colore, normal map, bump e
 /// metallicità: la GPU converge alla stessa immagine della CPU.
 #[test]

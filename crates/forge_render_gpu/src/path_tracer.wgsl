@@ -72,6 +72,8 @@ const P_CAM_R: u32 = 20u;
 const P_ASPECT: u32 = 23u;
 const P_CAM_U: u32 = 24u;
 const P_CAM_F: u32 = 28u;
+const P_ORTHO_H: u32 = 27u;
+const P_ORTHO_BACK: u32 = 31u;
 const P_ENV_C0: u32 = 32u;
 const P_ENV_C1: u32 = 36u;
 const P_ENV_C2: u32 = 40u;
@@ -1499,6 +1501,12 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         let ndc_y = 1.0 - 2.0 * (f32(gid.y) + jy) / f32(h) + 2.0 * pf(P_SHIFT_Y);
         var dir = normalize(f + r * (ndc_x * th * aspect) + u * (ndc_y * th));
         var origin = cam_pos;
+        // Ortografica: raggi paralleli all'asse (stessa formula di Camera::ray, lato CPU).
+        let oh = pf(P_ORTHO_H);
+        if (oh > 0.0) {
+            dir = f;
+            origin = cam_pos + r * (ndc_x * oh * aspect) + u * (ndc_y * oh) - f * pf(P_ORTHO_BACK);
+        }
         let lr = pf(P_LENS_R);
         if (lr > 0.0) {
             // Lente sottile messa a fuoco sul piano a distanza P_FOCUS.

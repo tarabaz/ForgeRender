@@ -87,6 +87,8 @@ pub struct StartupOptions {
     pub settings: bool,
     /// Modalità dell'interfaccia per questa sessione (non salvata): "semplice" o "avanzata".
     pub ui_mode: Option<crate::prefs::UiMode>,
+    /// Vista isometrica all'avvio (test e screenshot).
+    pub iso: bool,
     /// Esegue "Prepara scena prodotto" all'avvio con l'aspetto indicato (test e screenshot).
     pub prepare: Option<crate::presets::Look>,
     /// Scheda dell'inspector: oggetto | materiali | luci | ambiente | camera | render.
@@ -392,6 +394,12 @@ impl ForgeApp {
         app.prefs_open = startup.settings;
         if let Some(m) = startup.ui_mode {
             app.prefs.ui_mode = m;
+        }
+        if startup.iso {
+            app.orbit.lens.ortho = true;
+            app.orbit.yaw = std::f32::consts::FRAC_PI_4;
+            app.orbit.pitch = crate::ui::navigator::ISO_PITCH;
+            app.camera_changed();
         }
         if let Some(l) = startup.prepare {
             app.simple_look = l;
@@ -1300,6 +1308,12 @@ impl ForgeApp {
         if crate::presets::drop_product_to_base(&mut self.scene).abs() > 0.0 {
             self.geometry_changed();
         }
+    }
+
+    /// Alterna vista prospettica e ortografica (pulsante sotto il navigatore, tasto 5).
+    pub fn toggle_ortho(&mut self) {
+        self.orbit.lens.ortho = !self.orbit.lens.ortho;
+        self.camera_changed();
     }
 
     /// Inquadra il prodotto (senza pavimento e fondale); muove anche la camera di render attiva.

@@ -34,6 +34,10 @@ pub const P_TAN_HALF: usize = 19;
 pub const P_CAM_R: usize = 20;
 pub const P_ASPECT: usize = 23;
 pub const P_CAM_U: usize = 24;
+/// Mezza altezza dell'inquadratura ortografica (0 = prospettica): parola libera dopo P_CAM_U.
+pub const P_ORTHO_H: usize = 27;
+/// Arretramento dell'origine dei raggi ortografici (`Camera::ortho_back`): parola libera dopo P_CAM_F.
+pub const P_ORTHO_BACK: usize = 31;
 pub const P_CAM_F: usize = 28;
 pub const P_ENV_C0: usize = 32;
 pub const P_ENV_C1: usize = 36;

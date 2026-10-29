@@ -510,7 +510,7 @@ fn mouse_ray(app: &ForgeApp, rect: egui::Rect, p: egui::Pos2) -> (Vec3, Vec3) {
     let cam = &app.scene.camera;
     let nx = (p.x - rect.left()) / rect.width() * 2.0 - 1.0;
     let ny = 1.0 - (p.y - rect.top()) / rect.height() * 2.0;
-    (cam.position, cam.ray_dir(nx, ny, rect.width() / rect.height().max(1.0)))
+    cam.ray(nx, ny, rect.width() / rect.height().max(1.0))
 }
 
 /// Parametro del punto dell'asse (c + a·s) più vicino al raggio del mouse.

@@ -39,6 +39,7 @@ fn parse_args() -> StartupOptions {
             }
             "--library" => o.library = true,
             "--settings" => o.settings = true,
+            "--iso" => o.iso = true,
             "--prepara" => {
                 i += 1;
                 o.prepare = match args.get(i).map(String::as_str) {

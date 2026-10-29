@@ -72,10 +72,10 @@ pub fn camera_ray(cam: &Camera, width: u32, height: u32, x: u32, y: u32, rng: &m
     let (jx, jy) = rng.next_2d();
     let ndc_x = 2.0 * (x as f32 + jx) / w - 1.0 + 2.0 * cam.lens.shift_x;
     let ndc_y = 1.0 - 2.0 * (y as f32 + jy) / h + 2.0 * cam.lens.shift_y;
-    let dir = cam.ray_dir(ndc_x, ndc_y, w / h);
+    let (origin, dir) = cam.ray(ndc_x, ndc_y, w / h);
     let lr = cam.lens_radius();
     if lr <= 0.0 {
-        return (cam.position, dir);
+        return (origin, dir);
     }
     let (r, u, f) = cam.basis();
     let focus = cam.position + dir * (cam.lens.focus_distance.max(1e-4) / dir.dot(f).max(1e-6));

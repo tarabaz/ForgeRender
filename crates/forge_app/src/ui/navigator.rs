@@ -181,7 +181,81 @@ pub fn show(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, painter: &egui:
         app.orbit.orbit(d.x * 0.012, d.y * 0.012);
         app.camera_changed();
     }
-    resp.hovered() || resp.dragged() || resp.clicked()
+    let buttons = projection_buttons(app, ui, center, painter);
+    resp.hovered() || resp.dragged() || resp.clicked() || buttons
+}
+
+/// Inclinazione della vista isometrica: atan(1/√2) ≈ 35,26°.
+pub const ISO_PITCH: f32 = 0.615_479_7;
+
+/// Sotto il navigatore: cubo prospettico/ortografico (alterna la proiezione della vista) e
+/// "Iso" (vista isometrica: ortografica, 45° di lato, 35,26° dall'alto).
+fn projection_buttons(app: &mut ForgeApp, ui: &egui::Ui, center: egui::Pos2, painter: &egui::Painter) -> bool {
+    let size = egui::vec2(30.0, 24.0);
+    let y = center.y + RADIUS + BALL + 30.0;
+    let proj_rect = egui::Rect::from_center_size(egui::pos2(center.x - 18.0, y), size);
+    let iso_rect = egui::Rect::from_center_size(egui::pos2(center.x + 18.0, y), size);
+    let ortho = app.orbit.lens.ortho;
+    let proj = ui
+        .interact(proj_rect, egui::Id::NULL.with("nav-proiezione"), egui::Sense::click())
+        .on_hover_text(if ortho {
+            "Vista ortografica (clic: torna prospettica)"
+        } else {
+            "Vista prospettica (clic: ortografica, misure senza prospettiva)"
+        });
+    let iso = ui
+        .interact(iso_rect, egui::Id::NULL.with("nav-iso"), egui::Sense::click())
+        .on_hover_text("Vista isometrica (ortografica, 45° di lato)");
+    for (r, hot, on) in [(proj_rect, proj.hovered(), ortho), (iso_rect, iso.hovered(), false)] {
+        let fill = if on {
+            crate::ui::style::ACCENT.gamma_multiply(0.8)
+        } else if hot {
+            egui::Color32::from_white_alpha(60)
+        } else {
+            egui::Color32::from_black_alpha(120)
+        };
+        painter.rect_filled(r, 4.0, fill);
+    }
+    // Icona: cubo in fil di ferro, con la faccia posteriore più piccola se prospettico.
+    let c = proj_rect.center();
+    let stroke = egui::Stroke::new(1.3, egui::Color32::WHITE);
+    let front = egui::Rect::from_center_size(c + egui::vec2(-2.5, 2.0), egui::vec2(12.0, 12.0));
+    let back = if ortho {
+        front.translate(egui::vec2(5.0, -4.0))
+    } else {
+        egui::Rect::from_center_size(c + egui::vec2(3.0, -2.5), egui::vec2(7.0, 7.0))
+    };
+    painter.rect_stroke(front, 0.0, stroke, egui::StrokeKind::Middle);
+    painter.rect_stroke(back, 0.0, stroke, egui::StrokeKind::Middle);
+    for (a, b) in [
+        (front.left_top(), back.left_top()),
+        (front.right_top(), back.right_top()),
+        (front.left_bottom(), back.left_bottom()),
+        (front.right_bottom(), back.right_bottom()),
+    ] {
+        painter.line_segment([a, b], stroke);
+    }
+    painter.text(
+        iso_rect.center(),
+        egui::Align2::CENTER_CENTER,
+        "Iso",
+        egui::FontId::proportional(12.0),
+        egui::Color32::WHITE,
+    );
+    if proj.clicked() {
+        app.toggle_ortho();
+    }
+    if iso.clicked() {
+        app.orbit.lens.ortho = true;
+        app.nav_anim = Some(NavAnim {
+            from: (app.orbit.yaw, app.orbit.pitch),
+            to: (std::f32::consts::FRAC_PI_4, ISO_PITCH),
+            start: Instant::now(),
+        });
+        app.camera_changed();
+        ui.ctx().request_repaint();
+    }
+    proj.hovered() || iso.hovered() || proj.clicked() || iso.clicked()
 }
 
 #[cfg(test)]

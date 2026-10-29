@@ -73,7 +73,7 @@ fn move_selection(app: &mut ForgeApp, rect: egui::Rect, from: egui::Pos2, to: eg
     let ray = |p: egui::Pos2| {
         let nx = (p.x - rect.left()) / rect.width() * 2.0 - 1.0;
         let ny = 1.0 - (p.y - rect.top()) / rect.height() * 2.0;
-        cam.ray_dir(nx, ny, aspect)
+        cam.ray(nx, ny, aspect)
     };
     // Piano: orizzontale, oppure verticale rivolto verso la camera.
     let normal = if vertical {
@@ -82,13 +82,13 @@ fn move_selection(app: &mut ForgeApp, rect: egui::Rect, from: egui::Pos2, to: eg
     } else {
         Vec3::Y
     };
-    let hit = |d: Vec3| {
+    let hit = |(o, d): (Vec3, Vec3)| {
         let denom = d.dot(normal);
         if denom.abs() < 1e-6 {
             return None;
         }
-        let t = (center - cam.position).dot(normal) / denom;
-        (t > 0.0).then(|| cam.position + d * t)
+        let t = (center - o).dot(normal) / denom;
+        (t > 0.0).then(|| o + d * t)
     };
     let (Some(a), Some(b)) = (hit(ray(from)), hit(ray(to))) else {
         return;
@@ -192,9 +192,9 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
                 let ndc_x = (pos.x - rect.left()) / rect.width() * 2.0 - 1.0;
                 let ndc_y = 1.0 - (pos.y - rect.top()) / rect.height() * 2.0;
                 let view = app.scene.camera.clone();
-                let dir = view.ray_dir(ndc_x, ndc_y, rect.width() / rect.height());
+                let (o, dir) = view.ray(ndc_x, ndc_y, rect.width() / rect.height());
                 let geo = app.geometry_now();
-                if let Some((node, _)) = forge_render_core::pick(&geo, view.position, dir) {
+                if let Some((node, _)) = forge_render_core::pick(&geo, o, dir) {
                     app.aim_at(node);
                 }
             }
@@ -212,10 +212,10 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
                 let ndc_x = (pos.x - rect.left()) / rect.width() * 2.0 - 1.0;
                 let ndc_y = 1.0 - (pos.y - rect.top()) / rect.height() * 2.0;
                 let view = app.scene.camera.clone();
-                let dir = view.ray_dir(ndc_x, ndc_y, rect.width() / rect.height());
+                let (o, dir) = view.ray(ndc_x, ndc_y, rect.width() / rect.height());
                 let geo = app.geometry_now();
-                if let Some((_, t)) = forge_render_core::pick(&geo, view.position, dir) {
-                    let hit = view.position + dir * t;
+                if let Some((_, t)) = forge_render_core::pick(&geo, o, dir) {
+                    let hit = o + dir * t;
                     app.set_focus_point(hit);
                 }
             }
@@ -229,7 +229,7 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
             let ndc_x = (pos.x - rect.left()) / rect.width() * 2.0 - 1.0;
             let ndc_y = 1.0 - (pos.y - rect.top()) / rect.height() * 2.0;
             let cam = app.scene.camera.clone();
-            let dir = cam.ray_dir(ndc_x, ndc_y, rect.width() / rect.height());
+            let (origin, dir) = cam.ray(ndc_x, ndc_y, rect.width() / rect.height());
             // Luci ed emettitori di nebbia: si scelgono cliccando vicino all'icona.
             let near = |p: Vec3| project(&cam, rect, p).map(|q| q.distance(pos)).filter(|d| *d < 10.0);
             let mut best: Option<(f32, bool, usize)> = None;
@@ -264,7 +264,7 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
             let multi = ui.input(|i| i.modifiers.command);
             app.selected_light = None;
             app.selected_fog = None;
-            match forge_render_core::pick(&geo, cam.position, dir) {
+            match forge_render_core::pick(&geo, origin, dir) {
                 Some((node, _)) => {
                     crate::ui::tree::select(&mut app.selection, node, multi);
                     app.selected_material = app.scene.resolve_material(node).clone();

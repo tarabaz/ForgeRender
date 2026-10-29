@@ -47,6 +47,13 @@ pub struct Lens {
     /// Decentramento dell'obiettivo (shift) in frazioni della larghezza / altezza del fotogramma.
     pub shift_x: f32,
     pub shift_y: f32,
+    /// Proiezione ortografica (vista isometrica / tecnica): raggi paralleli, le misure non
+    /// cambiano con la distanza. Niente profondità di campo.
+    pub ortho: bool,
+    /// Altezza dell'inquadratura ortografica in metri; 0 = quella che la prospettiva avrebbe
+    /// alla distanza del bersaglio (così passare da una all'altra non cambia l'inquadratura e
+    /// lo zoom della viewport continua a funzionare).
+    pub ortho_height: f32,
 }
 
 impl Default for Lens {
@@ -59,6 +66,8 @@ impl Default for Lens {
             blade_rotation_deg: 0.0,
             shift_x: 0.0,
             shift_y: 0.0,
+            ortho: false,
+            ortho_height: 0.0,
         }
     }
 }
@@ -76,7 +85,7 @@ impl Camera {
 
     /// Raggio della lente in metri (0 se la profondità di campo è spenta).
     pub fn lens_radius(&self) -> f32 {
-        if !self.lens.dof || !self.lens.f_stop.is_finite() || self.lens.f_stop <= 0.0 {
+        if self.lens.ortho || !self.lens.dof || !self.lens.f_stop.is_finite() || self.lens.f_stop <= 0.0 {
             return 0.0;
         }
         self.focal_mm() * 1e-3 / self.lens.f_stop.max(0.5) * 0.5
@@ -124,9 +133,48 @@ impl Camera {
         Mat4::look_at_rh(self.position, self.target, self.basis().1)
     }
 
+    /// Mezza altezza dell'inquadratura ortografica in metri (vedi [`Lens::ortho_height`]).
+    pub fn ortho_half_height(&self) -> f32 {
+        let h = if self.lens.ortho_height > 0.0 {
+            0.5 * self.lens.ortho_height
+        } else {
+            (self.target - self.position).length() * (self.vfov_deg.to_radians() * 0.5).tan()
+        };
+        h.max(1e-4)
+    }
+
+    /// Arretramento dell'origine dei raggi ortografici: abbastanza per tutta la scena davanti
+    /// e dietro la camera, senza perdere precisione (anche nello shader GPU).
+    pub fn ortho_back(&self) -> f32 {
+        (self.target - self.position).length() + 50.0 * self.ortho_half_height()
+    }
+
     /// Proiezione per la viewport (profondità wgpu 0..1).
     pub fn projection_matrix(&self, aspect: f32, near: f32, far: f32) -> Mat4 {
+        if self.lens.ortho {
+            let h = self.ortho_half_height();
+            let w = h * aspect.max(1e-4);
+            // Profondità ampia anche davanti alla camera: in ortografica la posizione della
+            // camera è solo il piano da cui partono i raggi.
+            return Mat4::orthographic_rh(-w, w, -h, h, -far, far);
+        }
         Mat4::perspective_rh(self.vfov_deg.to_radians(), aspect.max(1e-4), near, far)
+    }
+
+    /// Raggio primario (origine, direzione) per coordinate NDC (-1..1, y verso l'alto):
+    /// prospettica dalla posizione della camera, ortografica parallelo all'asse.
+    /// Per la ortografica l'origine arretra lungo l'asse, così si vede anche ciò che sta dietro
+    /// la posizione della camera (in ortografica la posizione non conta, solo la direzione).
+    #[inline]
+    pub fn ray(&self, ndc_x: f32, ndc_y: f32, aspect: f32) -> (Vec3, Vec3) {
+        if self.lens.ortho {
+            let (r, u, f) = self.basis();
+            let h = self.ortho_half_height();
+            let back = self.ortho_back();
+            (self.position + r * (ndc_x * h * aspect) + u * (ndc_y * h) - f * back, f)
+        } else {
+            (self.position, self.ray_dir(ndc_x, ndc_y, aspect))
+        }
     }
 
     /// Direzione del raggio primario per coordinate NDC (-1..1, y verso l'alto).
@@ -255,6 +303,36 @@ mod tests {
         let o = OrbitController::from_camera(&cam);
         let c2 = o.camera();
         assert!((c2.position - cam.position).length() < 1e-4);
+    }
+
+    /// Ortografica: raggi paralleli all'asse, inquadratura uguale alla prospettica al bersaglio.
+    #[test]
+    fn ortho_rays_are_parallel_and_match_frame_at_target() {
+        let mut cam = Camera::default();
+        let f = cam.forward();
+        let persp_h = (cam.target - cam.position).length() * (cam.vfov_deg.to_radians() * 0.5).tan();
+        cam.lens.ortho = true;
+        cam.lens.dof = true;
+        assert_eq!(cam.lens_radius(), 0.0, "niente profondità di campo in ortografica");
+        let (o1, d1) = cam.ray(-1.0, 1.0, 1.5);
+        let (o2, d2) = cam.ray(1.0, -1.0, 1.5);
+        assert!((d1 - f).length() < 1e-6 && (d2 - f).length() < 1e-6);
+        // Sul piano del bersaglio i raggi d'angolo distano quanto l'inquadratura prospettica.
+        let at = |o: Vec3, d: Vec3| o + d * (cam.target - o).dot(f) / d.dot(f);
+        let (p1, p2) = (at(o1, d1), at(o2, d2));
+        let (r, u, _) = cam.basis();
+        assert!(((p1 - p2).dot(u) - 2.0 * persp_h).abs() < 1e-3);
+        assert!(((p2 - p1).dot(r) - 2.0 * persp_h * 1.5).abs() < 1e-3);
+        // Altezza fissata: l'inquadratura non dipende dalla distanza.
+        cam.lens.ortho_height = 2.0;
+        cam.position = cam.target - f * 50.0;
+        assert!((cam.ortho_half_height() - 1.0).abs() < 1e-6);
+        // Proiezione: il bersaglio al centro, un punto a mezza altezza sul bordo.
+        let vp = cam.projection_matrix(1.0, 0.01, 100.0) * cam.view_matrix();
+        let c = vp * cam.target.extend(1.0);
+        assert!(c.x.abs() < 1e-4 && c.y.abs() < 1e-4);
+        let e = vp * (cam.target + u * 1.0).extend(1.0);
+        assert!((e.y / e.w - 1.0).abs() < 1e-4);
     }
 
     #[test]
