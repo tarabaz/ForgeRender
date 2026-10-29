@@ -2,17 +2,7 @@ name: CI
 
 on:
   push:
-    # Le sole note/documentazione non devono avviare compilazioni costose.
-    # Se una commit contiene anche codice, la CI parte comunque.
-    paths-ignore:
-      - 'reports/**'
-      - 'docs/**'
-      - '**/*.md'
   pull_request:
-    paths-ignore:
-      - 'reports/**'
-      - 'docs/**'
-      - '**/*.md'
 
 # Un nuovo push sullo stesso branch annulla i run precedenti ancora in corso:
 # conta solo l'ultima versione del codice.
@@ -24,7 +14,25 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  changes:
+    name: Rileva modifiche al codice
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - '**'
+              - '!reports/**'
+              - '!docs/**'
+              - '!**/*.md'
+
   linux:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     name: Test (Linux)
     runs-on: ubuntu-latest
     steps:
@@ -50,6 +58,8 @@ jobs:
 
   windows:
     name: Build e pacchetti (Windows)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
