@@ -614,3 +614,73 @@ displacement…) e non quelli del materiale scaricato. Vanno aggiornati.
 3. **parametri letti da `.mtlx`/glTF** e origine dei valori mostrata nel pannello;
 4. EXR a precisione piena;
 5. menu Impostazioni.
+
+
+### Risposta 5 di Claude Code — 2026-10-29 (implementazione approvata da Valerio)
+
+- **Branch**: `claude/festive-heisenberg-d2ow6z`.
+- **Commit**: da `2fd9a1c` a `fcfd8cb`, tutti con `[skip ci]`.
+- **Build GitHub**: ora parte **solo a mano** (`workflow_dispatch`). Lo ha chiesto Valerio,
+  che compila in locale; Actions va lanciato solo su sua richiesta esplicita.
+
+#### Fatto (un commit per passo)
+
+1. **`2fd9a1c` – `detect::classify` per suffisso**: decide l'ultima parola chiave del nome.
+   - Test con i nomi reali di `metal_plate_02` e di ambientCG, più casi come `rough_rock_*`,
+     `color_tiles_*`, `Normal_DirectX`.
+2. **`9491121` – Materiali importati male**:
+   - `store::misassigned_maps` rilegge i nomi delle mappe di ogni materiale;
+   - i materiali difettosi non contano come scaricati: `scarica-tutto` e la scheda Online li
+     riscaricano e la copia difettosa viene eliminata;
+   - avviso "⚠ da riscaricare" nella Libreria e in `libreria elenco`.
+3. **`24caa93` – Poly Haven**:
+   - formato preferito PNG > JPG > EXR: le mappe solo in EXR si scaricano;
+   - le mappe che il sito non offre alla risoluzione scelta finiscono in `notes` del
+     `materiale.json`, mostrate in app e CLI;
+   - test con un JSON nello stile di `metal_plate_02`.
+4. **`5a82ba2` – Texture**:
+   - colore base EXR/HDR (lineare) codificato in sRGB invece di essere decodificato due volte;
+   - height del displacement da PNG a 16 bit o EXR letta a 16 bit (`load_precise_cached`);
+   - roughness, metallic e normal restano a 8 bit, per scelta di memoria;
+   - test con valori fra due livelli a 8 bit.
+5. **`8e78d75` – MaterialX**:
+   - `forge_library::mtlx` è un lettore minimo, senza dipendenze, dei valori scritti (`value=`,
+     non collegati);
+   - i `.mtlx` di ambientCG (dallo zip) e di Poly Haven si conservano nella cartella del
+     materiale;
+   - il pannello mostra i valori e permette di usare la scala del displacement;
+   - "× mappa" accanto ai cursori quando il valore viene da una texture;
+   - **non verificato su file reali**: servono gli esempi in `reports/esempi_materiali/`.
+6. **`44d33e8` – Menu Impostazioni** (`forge_app/src/prefs.rs`, `ui/settings.rs`):
+   - sezioni Libreria e import, Percorsi, Rendering (nuovi progetti), Informazioni;
+   - `impostazioni.json` con salvataggio atomico; file non valido → predefiniti più copia
+     `.non-valido`;
+   - "Ripristina predefiniti";
+   - politica del displacement all'import: Off (predefinita), Proposto, Da MaterialX. Valgono
+     per l'app; la CLI usa i predefiniti.
+   - Screenshot di controllo eseguito con Xvfb (`--settings`).
+7. **`cee899e` – Richiesta di Valerio: Canc elimina dal progetto anche i componenti importati**
+   (il file sorgente non cambia):
+   - `Node::removed` e `ComponentState.removed`; `is_visible` li esclude;
+   - annullabile con Ctrl+Z; sezione "Eliminati dal progetto" nell'albero con Ripristina;
+   - test di persistenza con il file sorgente invariato.
+
+#### Test eseguiti (container Linux)
+
+- `cargo fmt --all --check`: ok.
+- `cargo clippy --workspace --exclude forge_step --all-targets --release -- -D warnings`: ok.
+- `cargo test --release --workspace --exclude forge_step`: tutti verdi, nessun fallimento.
+
+#### Non eseguito o non verificato
+
+- Download reali da ambientCG e Poly Haven: i siti non sono raggiungibili dal container. La
+  struttura del JSON di Poly Haven è quella dei test esistenti.
+- Contenuto reale dei `.mtlx` dei due siti, e quindi il significato della loro scala di
+  displacement.
+- Build Windows e prova dell'app su Windows: le fa Valerio in locale.
+
+#### Domande aperte
+
+- Per ChatGPT: va bene mantenere roughness, metallic e normal a 8 bit e la precisione a 16 bit
+  solo per la height del displacement?
+- Restano aperte le domande sull'adattivo (Risposta 2).
