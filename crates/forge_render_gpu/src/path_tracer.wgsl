@@ -1048,21 +1048,28 @@ fn fog_clip(b: u32, o: vec3<f32>, d: vec3<f32>, tmax: f32) -> vec2<f32> {
     return vec2<f32>(tn, tf);
 }
 
-// Strato del majorant alla distanza t e fine del tratto: (fine, majorant).
+// Tratto a majorant costante da t (al più fino a t1): (fine, majorant). Griglia 3D di blocchi
+// percorsa con un DDA, come BakedFog::majorant_segment sulla CPU.
 fn fog_segment(b: u32, o: vec3<f32>, d: vec3<f32>, t: f32, t1: f32) -> vec2<f32> {
-    let n = S[b + 5u];
-    let y0 = sf(b + 1u);
-    let h = sf(b + 3u);
-    let y = o.y + d.y * t;
-    let k = min(u32(max(floor((y - y0) / h - 0.5), 0.0)), n - 1u);
-    var tb = INF;
-    if (d.y > 1e-9 && k + 1u < n) {
-        tb = (y0 + (f32(k) + 1.5) * h - o.y) / d.y;
-    } else if (d.y < -1e-9 && k > 0u) {
-        tb = (y0 + (f32(k) + 0.5) * h - o.y) / d.y;
+    let res = fog_res(b);
+    let bs = S[b + 14u];
+    let side = sf(b + 3u) * f32(bs);
+    let mres = (res + vec3<u32>(bs - 1u)) / bs;
+    let mn = sv3(b);
+    // Blocco in cui il raggio sta entrando (punto un filo più avanti).
+    let q = (o + d * (t + 1e-4 * side) - mn) / side;
+    let blk = vec3<u32>(min(max(floor(q), vec3<f32>(0.0)), vec3<f32>(mres - vec3<u32>(1u))));
+    var tb = t1;
+    for (var a: u32 = 0u; a < 3u; a = a + 1u) {
+        if (d[a] > 1e-9) {
+            tb = min(tb, (mn[a] + f32(blk[a] + 1u) * side - o[a]) / d[a]);
+        } else if (d[a] < -1e-9) {
+            tb = min(tb, (mn[a] + f32(blk[a]) * side - o[a]) / d[a]);
+        }
     }
     tb = min(max(tb, t + 1e-6 * (1.0 + abs(t))), t1);
-    return vec2<f32>(tb, sf(S[b + 13u] + k));
+    let idx = (blk.y * mres.z + blk.z) * mres.x + blk.x;
+    return vec2<f32>(tb, sf(S[b + 13u] + idx));
 }
 
 // Prima collisione reale (delta tracking): (t, indice nebbia), t < 0 se nessuna.

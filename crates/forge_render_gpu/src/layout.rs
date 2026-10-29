@@ -87,7 +87,8 @@ pub const PRIM_WORDS: usize = 28;
 pub const MAT_WORDS: usize = 36;
 pub const LIGHT_WORDS: usize = 24;
 /// Intestazione di una nebbia: min(3), lato cella, risoluzione(3), unità di densità,
-/// albedo(3), anisotropia, offset dei dati (u16 a coppie), offset dei majorant, 2 libere.
+/// albedo(3), anisotropia, offset dei dati (u16 a coppie), offset dei majorant per blocco,
+/// lato del blocco in celle, 1 libera.
 pub const FOG_WORDS: usize = 16;
 
 pub struct SceneBuffer {
@@ -422,7 +423,7 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
         w.f(x);
     }
 
-    // --- Nebbie: intestazioni, poi densità a 16 bit (due per parola) e majorant per strato ---
+    // --- Nebbie: intestazioni, poi densità a 16 bit (due per parola) e majorant per blocco ---
     p[P_N_FOGS] = scene.fogs.len() as u32;
     p[P_OFF_FOGS] = w.pos();
     let header_at = w.pos() as usize;
@@ -435,7 +436,7 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
             w.u(pair[0] as u32 | (*pair.get(1).unwrap_or(&0) as u32) << 16);
         }
         let off_major = w.pos();
-        for &m in &f.slab_majorant {
+        for &m in &f.macro_majorant {
             w.f(m);
         }
         let h = &mut w.w[header_at + k * FOG_WORDS..header_at + (k + 1) * FOG_WORDS];
@@ -455,7 +456,7 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
             f.anisotropy.to_bits(),
             off_data,
             off_major,
-            0,
+            forge_volume::MACRO_CELLS as u32,
             0,
         ];
         h.copy_from_slice(&words);

@@ -65,8 +65,7 @@ predefinita sopra il box (zona 3.2 × 0.95 × 3.2 m, 5 s simulati, collisioni at
 - Il calcolo della nebbia si fa una volta e resta in cache finché non cambiano i suoi parametri o
   la geometria; nell'app gira in background.
 - Il costo del rendering dipende dalla densità e dai rimbalzi nella nebbia (scattering multiplo).
-  Ottimizzazione prevista: majorant su una griglia 3D grossolana con attraversamento DDA (oggi è
-  per strato orizzontale).
+  Il majorant per strato orizzontale è stato sostituito da una griglia 3D (vedi sotto).
 
 ### Simulazione fluida della nebbia (seconda versione), 28/10/2026
 
@@ -82,3 +81,22 @@ Ottimizzazioni misurate sulla scena "beuta": riquadro di lavoro attorno alla neb
 passo fino a 2 celle con controllo delle pareti (200 → 110 s), pressione rosso/nero sul posto
 (pressione 40 → 10 s), trasporto di vapore e gas pesante insieme e solo vicino alla nebbia
 (110 → 40 s). Il calcolo si fa una volta, in background, e resta in cache.
+
+### Majorant 3D della nebbia (griglia di blocchi 8³ con DDA), 29/10/2026
+
+Container di sviluppo (Xeon 4 vCPU, **3 thread**, solo CPU: la GPU software del container non
+regge il buffer di questa scena, 182 MB contro un limite di 134 MB). Scena demo
+`samples/scene/cocktail-ghiaccio-secco`, senza profondità di campo, seed 12345, 320×400,
+32 campioni, `render --backend cpu --threads 3`. Stessi parametri prima e dopo; la simulazione
+della nebbia (circa 45 s, fuori dal tempo di rendering) non cambia.
+
+| Vista | Prima (majorant per strato) | Dopo (majorant per blocco) | Guadagno |
+|---|---:|---:|---:|
+| Intera (demo) | 20.25 s · 632.7 ms/passata | 11.91 s · 372.2 ms/passata | 1.70× |
+| Ravvicinata sulla nebbia | 26.55 s · 829.7 ms/passata | 13.44 s · 419.8 ms/passata | 1.98× |
+
+Controllo dell'immagine: luminosità media per canale uguale entro lo 0.3 % (rumore Monte Carlo:
+con lo stesso seed la sequenza casuale cambia perché cambiano i passi), nessuna differenza
+visibile. Test: majorant ≥ densità in ogni punto dei tratti lungo 2000 raggi casuali, blocchi
+vuoti presenti; furnace, Beer–Lambert, ratio tracking, ombra e GPU contro CPU invariati.
+Da misurare sul PC di riferimento (RTX 5070) con la stessa scena.

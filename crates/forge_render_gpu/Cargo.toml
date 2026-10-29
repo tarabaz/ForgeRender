@@ -10,6 +10,7 @@ forge_math.workspace = true
 forge_scene.workspace = true
 forge_render_core.workspace = true
 forge_render_cpu.workspace = true
+forge_volume.workspace = true
 wgpu.workspace = true
 pollster.workspace = true
 bytemuck.workspace = true
@@ -18,4 +19,3 @@ tracing.workspace = true
 
 [dev-dependencies]
 image.workspace = true
-forge_volume.workspace = true

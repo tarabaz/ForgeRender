@@ -125,7 +125,7 @@ fn majorant_bounds_the_interpolated_density() {
     for _ in 0..20000 {
         let p = lo + (hi - lo) * Vec3::new(rng.next_f32(), rng.next_f32(), rng.next_f32());
         let d = b.density(p);
-        assert!(d <= b.majorant_at_y(p.y), "{d} > {} a {p}", b.majorant_at_y(p.y));
+        assert!(d <= b.majorant_at(p), "{d} > {} a {p}", b.majorant_at(p));
     }
 }
 
@@ -289,4 +289,38 @@ fn grid_quality_and_zone_offset() {
     assert!((b.0.y - a.0.y - 0.2).abs() < 1e-6 && (b.1.y - a.1.y - 0.2).abs() < 1e-6);
     assert_eq!(moved.emitter, base.emitter);
     assert_ne!(sim_key(&base), sim_key(&moved));
+}
+
+/// Lungo raggi casuali i tratti del DDA coprono l'intervallo senza buchi e in ogni punto
+/// di ogni tratto la densità sta sotto il majorant del tratto (delta tracking non distorto).
+/// Inoltre la nebbia lascia blocchi vuoti (majorant 0) da saltare in un colpo.
+#[test]
+fn macro_majorant_bounds_density_along_rays() {
+    let b = bake(&small_fog(), None, None);
+    let (lo, hi) = b.bounds();
+    let mut rng = forge_math::Pcg32::new(11, 3);
+    let rnd3 = |rng: &mut forge_math::Pcg32| Vec3::new(rng.next_f32(), rng.next_f32(), rng.next_f32());
+    let mut segments = 0usize;
+    for _ in 0..2000 {
+        let o = lo + (hi - lo) * rnd3(&mut rng);
+        let d = (rnd3(&mut rng) * 2.0 - Vec3::ONE).normalize_or(Vec3::Y);
+        // Uscita dal riquadro.
+        let inv = d.recip();
+        let t1 = ((lo - o) * inv).max((hi - o) * inv).min_element();
+        let mut t = 0.0f32;
+        while t < t1 {
+            let (tb, maj) = b.majorant_segment(o, d, t, t1);
+            assert!(tb > t && tb <= t1, "tratto non valido {t} → {tb} (fine {t1})");
+            for k in 0..8 {
+                let s = t + (tb - t) * (k as f32 + 0.5) / 8.0;
+                let dens = b.density(o + d * s);
+                assert!(dens <= maj, "{dens} > {maj} a t = {s}");
+            }
+            t = tb;
+            segments += 1;
+        }
+    }
+    assert!(segments > 2000);
+    let empty = b.macro_majorant.iter().filter(|&&m| m == 0.0).count();
+    assert!(empty > 0, "nessun blocco vuoto su {}", b.macro_majorant.len());
 }

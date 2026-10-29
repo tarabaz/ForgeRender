@@ -1,7 +1,8 @@
 //! Trasporto nei mezzi partecipanti (nebbie volumetriche).
 //!
 //! - Distanza di collisione: delta tracking (Woodcock) con majorant costante a
-//!   tratti per strato orizzontale; non distorto, nessun passo di integrazione.
+//!   tratti su una griglia 3D di blocchi (8³ celle) percorsa con un DDA; non distorto,
+//!   nessun passo di integrazione.
 //! - Trasmittanza dei raggi d'ombra: ratio tracking sugli stessi tratti.
 //! - Funzione di fase Henyey–Greenstein, campionata esattamente (peso 1).
 //!
@@ -24,26 +25,14 @@ fn clip(f: &BakedFog, o: Vec3, d: Vec3, t_max: f32) -> Option<(f32, f32)> {
     (tn < tf).then_some((tn, tf))
 }
 
-/// Tratti a majorant costante lungo il raggio: chiama `visit(t_a, t_b, majorant)`
-/// in ordine finché restituisce `true`.
+/// Tratti a majorant costante lungo il raggio (blocchi della griglia dei majorant, vedi
+/// [`BakedFog::majorant_segment`]): chiama `visit(t_a, t_b, majorant)` in ordine finché
+/// restituisce `true`.
 fn for_each_segment(f: &BakedFog, o: Vec3, d: Vec3, t0: f32, t1: f32, mut visit: impl FnMut(f32, f32, f32) -> bool) {
-    let n = f.slab_majorant.len();
-    let (y0, h) = (f.spec.min.y, f.spec.cell);
     let mut t = t0;
     while t < t1 {
-        let y = o.y + d.y * t;
-        let k = (((y - y0) / h - 0.5).floor().max(0.0) as usize).min(n - 1);
-        // Confine del tratto: il prossimo cambio di strato lungo y.
-        let tb = if d.y > 1e-9 && k + 1 < n {
-            (y0 + (k as f32 + 1.5) * h - o.y) / d.y
-        } else if d.y < -1e-9 && k > 0 {
-            (y0 + (k as f32 + 0.5) * h - o.y) / d.y
-        } else {
-            f32::INFINITY
-        };
-        // Avanzamento minimo per non fermarsi sui confini per errori di arrotondamento.
-        let tb = tb.max(t + 1e-6 * (1.0 + t.abs())).min(t1);
-        if !visit(t, tb, f.slab_majorant[k]) {
+        let (tb, maj) = f.majorant_segment(o, d, t, t1);
+        if !visit(t, tb, maj) {
             return;
         }
         t = tb;

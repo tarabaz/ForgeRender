@@ -115,5 +115,19 @@
   come ANSI). Non eseguito nel container (PowerShell non disponibile): da collaudare sul PC.
 ### Fase 3 — Baseline visiva e profiling: da fare dopo la fase 2
 
+### Ottimizzazione 1 — Majorant 3D della nebbia: fatta, da provare sul PC
+- Prima: un majorant per strato orizzontale (massimo dell'intera fetta di quota): il tappeto
+  denso sul bancone alzava il majorant ovunque in quella fetta, con molti passi a vuoto.
+- Dopo: griglia di blocchi 8³ celle (`forge_volume::MACRO_CELLS`), majorant = massimo delle celle
+  del blocco più una di bordo (supporto dell'interpolazione trilineare); il raggio percorre i
+  blocchi con un DDA (`BakedFog::majorant_segment` sulla CPU, `fog_segment` in WGSL, stessa
+  logica). Delta tracking e ratio tracking restano non distorti.
+- Misure (container, CPU 3 thread, scena cocktail, 320×400, 32 campioni, seed fisso):
+  vista intera 20.25 → 11.91 s (1.70×), vista ravvicinata 26.55 → 13.44 s (1.98×);
+  immagine uguale entro il rumore. Dettagli in docs/BENCHMARK.md.
+- Test nuovi: majorant ≥ densità lungo i tratti di 2000 raggi casuali, blocchi vuoti presenti.
+  Tutti i test del workspace verdi; GPU verificata con i test esistenti (furnace, Beer–Lambert,
+  ghiaccio secco GPU contro CPU).
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

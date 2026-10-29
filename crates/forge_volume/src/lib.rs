@@ -32,9 +32,11 @@ pub struct BakedFog {
     /// Densità quantizzata: σt = `data[i] as f32 * unit`.
     pub data: Vec<u16>,
     pub unit: f32,
-    /// Majorant di σt tra i centri degli strati `k` e `k+1` (ultimo = strato in cima),
-    /// valido per l'interpolazione trilineare.
-    pub slab_majorant: Vec<f32>,
+    /// Blocchi di [`MACRO_CELLS`]³ celle per lato (`res` diviso per eccesso).
+    pub macro_res: [usize; 3],
+    /// Majorant di σt per blocco (stesso ordine di [`GridSpec::index`]: x, poi z, poi y),
+    /// valido per l'interpolazione trilineare in tutto il blocco (include le celle di bordo).
+    pub macro_majorant: Vec<f32>,
     pub albedo: Vec3,
     pub anisotropy: f32,
     pub max_density: f32,
@@ -52,11 +54,14 @@ impl BakedFog {
         // basta che `max` coincida (si accetta una cella in più sui lati corti).
         let unit = density.max(1e-12) / 65535.0;
         let n = spec.len();
+        let data = vec![if density > 0.0 { 65535 } else { 0 }; n];
+        let (macro_res, macro_majorant) = macro_majorants(&spec, &data, unit);
         BakedFog {
             spec,
-            data: vec![if density > 0.0 { 65535 } else { 0 }; n],
+            data,
             unit,
-            slab_majorant: vec![density * 1.0001; spec.res[1]],
+            macro_res,
+            macro_majorant,
             albedo,
             anisotropy,
             max_density: density,
@@ -94,11 +99,44 @@ impl BakedFog {
         l(l(x00, x10, t.y), l(x01, x11, t.y), t.z) * self.unit
     }
 
-    /// Majorant valido alla quota `y` (in coordinate del mondo).
-    pub fn majorant_at_y(&self, y: f32) -> f32 {
-        let k = ((y - self.spec.min.y) / self.spec.cell - 0.5).floor();
-        let k = (k.max(0.0) as usize).min(self.slab_majorant.len() - 1);
-        self.slab_majorant[k]
+    /// Blocco della griglia dei majorant che contiene `p` (indici limitati alla griglia).
+    fn macro_block(&self, p: Vec3) -> [usize; 3] {
+        let q = (p - self.spec.min) / (self.spec.cell * MACRO_CELLS as f32);
+        [0, 1, 2].map(|a| (q[a].floor().max(0.0) as usize).min(self.macro_res[a] - 1))
+    }
+
+    fn macro_index(&self, b: [usize; 3]) -> usize {
+        (b[1] * self.macro_res[2] + b[2]) * self.macro_res[0] + b[0]
+    }
+
+    /// Majorant valido nel punto `p` (quello del suo blocco).
+    pub fn majorant_at(&self, p: Vec3) -> f32 {
+        self.macro_majorant[self.macro_index(self.macro_block(p))]
+    }
+
+    /// Tratto a majorant costante del raggio `o + d·t` a partire da `t` (al più fino a `t1`):
+    /// restituisce (fine del tratto, majorant). Si percorre la griglia dei blocchi con un
+    /// DDA: i blocchi vuoti si saltano in un colpo, quelli radi con pochi passi.
+    pub fn majorant_segment(&self, o: Vec3, d: Vec3, t: f32, t1: f32) -> (f32, f32) {
+        let side = self.spec.cell * MACRO_CELLS as f32;
+        // Il blocco è quello in cui il raggio sta entrando: il punto un filo più avanti
+        // evita di riprendere il blocco appena lasciato per arrotondamento (il majorant
+        // copre comunque mezza cella oltre il bordo del blocco).
+        let b = self.macro_block(o + d * (t + 1e-4 * side));
+        let mut tb = t1;
+        for a in 0..3 {
+            let edge = if d[a] > 1e-9 {
+                b[a] + 1
+            } else if d[a] < -1e-9 {
+                b[a]
+            } else {
+                continue;
+            };
+            tb = tb.min((self.spec.min[a] + edge as f32 * side - o[a]) / d[a]);
+        }
+        // Avanzamento minimo per non fermarsi sui confini per errori di arrotondamento.
+        let tb = tb.max(t + 1e-6 * (1.0 + t.abs())).min(t1);
+        (tb, self.macro_majorant[self.macro_index(b)])
     }
 
     /// Volume di nebbia "piena" equivalente (m³): ∫σt / densità massima impostata.
@@ -145,6 +183,37 @@ pub fn sim_key(fog: &FogVolume) -> String {
 /// Zona simulata effettiva (estesa fino al suolo se le collisioni sono attive).
 fn zone(f: &FogVolume, ground: Option<f32>) -> (Vec3, Vec3) {
     f.bounds_over(if f.collisions { ground } else { None })
+}
+
+/// Lato dei blocchi della griglia dei majorant, in celle.
+pub const MACRO_CELLS: usize = 8;
+
+/// Majorant per blocchi di `MACRO_CELLS`³ celle: massimo di σt sulle celle del blocco più
+/// una di bordo per lato, cioè su tutte le celle che l'interpolazione trilineare usa per i
+/// punti del blocco (fino a mezza cella oltre il suo bordo).
+fn macro_majorants(spec: &GridSpec, data: &[u16], unit: f32) -> ([usize; 3], Vec<f32>) {
+    let b = MACRO_CELLS;
+    let mres = spec.res.map(|r| r.div_ceil(b).max(1));
+    let n = mres[0] * mres[1] * mres[2];
+    let maj = (0..n)
+        .into_par_iter()
+        .map(|i| {
+            let bx = i % mres[0];
+            let bz = (i / mres[0]) % mres[2];
+            let by = i / (mres[0] * mres[2]);
+            let range = |k: usize, a: usize| (k * b).saturating_sub(1)..=((k + 1) * b).min(spec.res[a] - 1);
+            let mut m = 0u16;
+            for y in range(by, 1) {
+                for z in range(bz, 2) {
+                    for x in range(bx, 0) {
+                        m = m.max(data[spec.index(x, y, z)]);
+                    }
+                }
+            }
+            m as f32 * unit * 1.0001
+        })
+        .collect();
+    (mres, maj)
 }
 
 /// Griglie usate dalla nebbia: (simulazione, dettaglio). Gli ostacoli che contano sono
@@ -296,14 +365,7 @@ pub fn bake_detail(fog: &FogVolume, sim_state: &SimState, solid: Option<SolidFn>
     let max_density = values.iter().cloned().fold(0.0f32, f32::max);
     let unit = if max_density > 0.0 { max_density / 65535.0 } else { 1.0 };
     let data: Vec<u16> = values.iter().map(|v| (v / unit).round().clamp(0.0, 65535.0) as u16).collect();
-    // Majorant per strato: massimo degli strati k e k+1 (l'interpolazione resta sotto).
-    let layer = spec.res[0] * spec.res[2];
-    let layer_max: Vec<f32> = (0..spec.res[1])
-        .map(|y| data[y * layer..(y + 1) * layer].iter().copied().max().unwrap_or(0) as f32 * unit)
-        .collect();
-    let slab_majorant: Vec<f32> = (0..spec.res[1])
-        .map(|k| layer_max[k].max(*layer_max.get(k + 1).unwrap_or(&0.0)) * 1.0001)
-        .collect();
+    let (macro_res, macro_majorant) = macro_majorants(&spec, &data, unit);
     let bake_ms = t1.elapsed().as_secs_f64() * 1e3;
     tracing::info!(
         "nebbia «{}»: simulazione {}×{}×{} celle, {} passi in {:.0} ms; densità {}×{}×{} in {:.0} ms",
@@ -322,7 +384,8 @@ pub fn bake_detail(fog: &FogVolume, sim_state: &SimState, solid: Option<SolidFn>
         spec,
         data,
         unit,
-        slab_majorant,
+        macro_res,
+        macro_majorant,
         albedo: Vec3::from_array(f.albedo),
         anisotropy: f.anisotropy,
         max_density,
