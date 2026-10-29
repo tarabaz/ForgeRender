@@ -179,7 +179,7 @@ devono restare verdi.
   √luminosità.
   - File: `accum.rs` (variante di `pixel_error`), `adaptive.rs` (riceve T),
     `session.rs` (passa esposizione e tone mapping).
-  - Il vecchio criterio resta scegliibile con un'impostazione o una variabile d'ambiente, per
+  - Il vecchio criterio resta selezionabile con un'impostazione o una variabile d'ambiente, per
     confrontarli sulla stessa build.
   - Test: media globale **e per riquadro** entro la tolleranza contro il riferimento sulla scena
     con cielo; arresto automatico; senza soglia nessun cambiamento.
