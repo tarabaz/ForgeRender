@@ -93,6 +93,9 @@ pub struct Node {
     pub pivot: Vec3,
     /// Snap a contatto: spostandolo con il gizmo si ferma quando tocca un altro oggetto.
     pub contact_snap: bool,
+    /// Eliminato dal progetto (componente di un file importato: il file non cambia). Come
+    /// nascosto, ma non compare nell'albero e "Mostra tutto" non lo riporta; si ripristina.
+    pub removed: bool,
 }
 
 /// Copia di un componente (con il suo sotto-albero) creata dall'utente. Le copie
@@ -200,6 +203,7 @@ impl Scene {
             user: UserTransform::default(),
             pivot: Vec3::ZERO,
             contact_snap: false,
+            removed: false,
         });
         match parent {
             Some(p) => self.nodes[p].children.push(idx),
@@ -419,10 +423,10 @@ impl Scene {
         self.nodes[idx].user.translation += local;
     }
 
-    /// Visibile se il nodo e tutti i suoi antenati sono visibili.
+    /// Visibile se il nodo e tutti i suoi antenati sono visibili (e non eliminati).
     pub fn is_visible(&self, mut idx: NodeIndex) -> bool {
         loop {
-            if !self.nodes[idx].visible {
+            if !self.nodes[idx].visible || self.nodes[idx].removed {
                 return false;
             }
             match self.nodes[idx].parent {

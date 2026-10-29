@@ -54,10 +54,12 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             app.duplicate_selection();
             structural = true;
         }
-        if sel.iter().any(|&i| app.scene.is_copy(i) || app.scene.is_added(i))
+        if !sel.is_empty()
             && ui
                 .button("Elimina")
-                .on_hover_text("Canc: elimina le copie e gli oggetti aggiunti selezionati")
+                .on_hover_text(
+                    "Canc: elimina dal progetto i componenti selezionati (i file importati non vengono modificati; Ctrl+Z per annullare)",
+                )
                 .clicked()
         {
             app.delete_selected_copies();
@@ -237,7 +239,7 @@ fn tips(ui: &mut egui::Ui) {
         egui::RichText::new(
             "Gizmo nella viewport: W sposta · E ruota · R scala · Q solo selezione · Ctrl durante il trascinamento = snap · Esc annulla.\n\
              H nasconde la selezione · Shift+H nasconde tutto il resto · Alt+H mostra tutto · Ctrl+Z / Ctrl+Y annulla e ripeti.\n\
-             Ctrl+D duplica · Canc elimina una copia.\n\
+             Ctrl+D duplica · Canc elimina dal progetto.\n\
              Alt + trascina sposta la selezione sul piano orizzontale, Alt + Shift + trascina in verticale.\n\
              Le trasformazioni non modificano il file CAD: vengono salvate nel progetto.",
         )

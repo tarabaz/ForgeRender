@@ -104,6 +104,7 @@ pub struct StartupOptions {
 pub struct NodeState {
     user: forge_scene::UserTransform,
     visible: bool,
+    removed: bool,
 }
 
 /// Contenuto della vista Render.
@@ -450,6 +451,7 @@ impl ForgeApp {
         NodeState {
             user: n.user,
             visible: n.visible,
+            removed: n.removed,
         }
     }
 
@@ -591,37 +593,65 @@ impl ForgeApp {
         self.show_selection_tab();
     }
 
-    /// Canc: elimina le copie selezionate (i componenti dei file importati si nascondono, non si eliminano).
+    /// Canc: elimina dal progetto i componenti selezionati. Copie e oggetti aggiunti si
+    /// tolgono dalla scena; i componenti dei file importati restano nel file sorgente (che non
+    /// viene toccato) ma vengono segnati come eliminati: spariscono da vista, render e albero,
+    /// e si ripristinano con Ctrl+Z o dalla voce "Eliminati" dell'albero.
     pub fn delete_selected_copies(&mut self) {
         let ids: Vec<forge_scene::ComponentId> = crate::ui::gizmo::top_selected(self)
             .into_iter()
             .map(|i| self.scene.nodes[i].id.clone())
             .collect();
         let mut deleted = 0;
-        let mut originals = 0;
+        let mut original_ids = Vec::new();
         for id in ids {
             match self.scene.find(&id) {
                 Some(i) if self.scene.delete_copy(i) => deleted += 1,
                 Some(i) if self.scene.delete_added(i) => deleted += 1,
-                Some(_) => originals += 1,
+                Some(_) => original_ids.push(id),
                 None => {}
             }
         }
-        if deleted > 0 {
+        // Gli indici si cercano dopo: eliminare copie e oggetti aggiunti li sposta.
+        let originals: Vec<usize> = original_ids.iter().filter_map(|id| self.scene.find(id)).collect();
+        if !originals.is_empty() {
+            self.push_undo(&originals);
+            for &i in &originals {
+                self.scene.nodes[i].removed = true;
+            }
+            self.info = Some(format!(
+                "{} componenti eliminati dal progetto (il file importato non viene modificato). \
+                 Ctrl+Z o \"Eliminati\" in fondo all'albero per ripristinarli.",
+                originals.len()
+            ));
+        }
+        if deleted > 0 || !originals.is_empty() {
             self.selection.clear();
             self.geometry_changed();
         }
-        if originals > 0 {
-            self.info = Some(
-                "I componenti dei file importati non si eliminano (il file sorgente resta com'è): \
-                 nascondili con H. Si eliminano solo le copie create con Duplica e gli oggetti del menu Aggiungi."
-                    .into(),
-            );
+    }
+
+    /// Componenti dei file importati eliminati dal progetto.
+    pub fn removed_nodes(&self) -> Vec<usize> {
+        (0..self.scene.nodes.len()).filter(|&i| self.scene.nodes[i].removed).collect()
+    }
+
+    /// Riporta nel progetto i componenti eliminati indicati (annullabile).
+    pub fn restore_removed(&mut self, nodes: &[usize]) {
+        if nodes.is_empty() {
+            return;
         }
+        self.push_undo(nodes);
+        for &i in nodes {
+            self.scene.nodes[i].removed = false;
+        }
+        self.geometry_changed();
     }
 
     pub fn show_all(&mut self) {
-        let hidden: Vec<usize> = (0..self.scene.nodes.len()).filter(|&i| !self.scene.nodes[i].visible).collect();
+        let hidden: Vec<usize> = (0..self.scene.nodes.len())
+            .filter(|&i| !self.scene.nodes[i].visible && !self.scene.nodes[i].removed)
+            .collect();
         if hidden.is_empty() {
             return;
         }
@@ -656,6 +686,7 @@ impl ForgeApp {
                         NodeState {
                             user: n.user,
                             visible: n.visible,
+                            removed: n.removed,
                         },
                     )
                 })
@@ -663,6 +694,7 @@ impl ForgeApp {
             for (i, st) in entry {
                 self.scene.nodes[i].user = st.user;
                 self.scene.nodes[i].visible = st.visible;
+                self.scene.nodes[i].removed = st.removed;
             }
             dst.push((n, current));
             self.geometry_changed();

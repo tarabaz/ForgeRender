@@ -189,5 +189,17 @@
   salvato con "Salva" resta. Le miniature si rifanno (`anteprima-v3.png`).
 - Pannello Rilievo: pulsante "Valore proposto" (3 % del lato) per i materiali con rilievo vero.
 
+### Libreria: riconoscimento delle mappe dal suffisso; eliminazione dei componenti importati
+- **Bug**: con nomi come `metal_plate_02` (Poly Haven) le mappe `diff`, `disp` e `ao` venivano
+  prese per metallicità ("metal" nel nome del materiale). Ne restava una sola (l'AO, usata come
+  metallic) e il materiale perdeva colore e displacement.
+- **Correzione**: ora decide l'ultima parola chiave del nome. Test con i nomi reali.
+- **Materiali già importati male**: segnalati ("⚠ da riscaricare" nella Libreria, `libreria
+  elenco`). Non contano come già scaricati: `scarica-tutto` e la scheda Online li riscaricano e
+  la copia difettosa viene eliminata.
+- **Canc** elimina dal progetto anche i componenti dei file importati, senza toccare il file. Il
+  componente è segnato `removed` (salvato nel progetto): sparisce da viewport, render e albero.
+  Si ripristina con Ctrl+Z o da "Eliminati dal progetto" in fondo all'albero.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

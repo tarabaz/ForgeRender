@@ -25,6 +25,11 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             }
             skip_depth = None;
         }
+        // Eliminati dal progetto: fuori dall'albero (con i figli), elencati in fondo.
+        if app.scene.nodes[idx].removed {
+            skip_depth = Some(depth);
+            continue;
+        }
         rows.push((idx, depth));
         if app.collapsed.contains(&idx) {
             skip_depth = Some(depth);
@@ -42,6 +47,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
     let mut frame_node: Option<usize> = None;
     let mut show_all = false;
     let mut duplicate: Option<usize> = None;
+    let mut delete: Option<usize> = None;
 
     egui::ScrollArea::vertical()
         .id_salt("tree-scroll")
@@ -101,6 +107,14 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
                             duplicate = Some(idx);
                             ui.close();
                         }
+                        if ui
+                            .button("Elimina dal progetto (Canc)")
+                            .on_hover_text("Il file importato non viene modificato; si ripristina con Ctrl+Z o da \"Eliminati\"")
+                            .clicked()
+                        {
+                            delete = Some(idx);
+                            ui.close();
+                        }
                     });
                 });
             }
@@ -115,6 +129,10 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
         app.push_undo(&[i]);
         app.scene.nodes[i].visible = !app.scene.nodes[i].visible;
         app.geometry_changed();
+    }
+    if let Some(i) = delete {
+        app.selection = BTreeSet::from([i]);
+        app.delete_selected_copies();
     }
     if let Some(i) = duplicate {
         app.selection.clear();
@@ -134,6 +152,38 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
     if let Some(i) = frame_node {
         app.selection = BTreeSet::from([i]);
         app.frame_selection();
+    }
+
+    let removed = app.removed_nodes();
+    if !removed.is_empty() {
+        ui.separator();
+        let mut restore: Vec<usize> = Vec::new();
+        egui::CollapsingHeader::new(format!("Eliminati dal progetto ({})", removed.len()))
+            .id_salt("tree-removed")
+            .show(ui, |ui| {
+                ui.label(
+                    egui::RichText::new("Componenti dei file importati tolti dal progetto: il file sorgente non è cambiato.")
+                        .weak()
+                        .small(),
+                );
+                if ui.small_button("Ripristina tutti").clicked() {
+                    restore = removed.clone();
+                }
+                egui::ScrollArea::vertical()
+                    .id_salt("tree-removed-list")
+                    .max_height(120.0)
+                    .show(ui, |ui| {
+                        for &i in &removed {
+                            ui.horizontal(|ui| {
+                                if ui.small_button("Ripristina").clicked() {
+                                    restore = vec![i];
+                                }
+                                ui.label(&app.scene.nodes[i].name).on_hover_text(app.scene.nodes[i].id.to_string());
+                            });
+                        }
+                    });
+            });
+        app.restore_removed(&restore);
     }
 
     ui.separator();

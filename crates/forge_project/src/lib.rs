@@ -38,6 +38,9 @@ pub struct ComponentState {
     /// Snap a contatto attivo per il componente.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub contact_snap: bool,
+    /// Eliminato dal progetto (il file sorgente non cambia).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub removed: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -158,6 +161,7 @@ pub fn to_project_file(scene: &Scene, meta: &ProjectMeta, settings: &RenderSetti
                         visible: n.visible,
                         transform: (!n.user.is_identity()).then_some(n.user),
                         contact_snap: n.contact_snap,
+                        removed: n.removed,
                     },
                 )
             })
@@ -293,6 +297,7 @@ pub fn load(path: &Path) -> anyhow::Result<LoadedProject> {
         if let Some(i) = scene.find(&id) {
             scene.nodes[i].visible = st.visible;
             scene.nodes[i].contact_snap = st.contact_snap;
+            scene.nodes[i].removed = st.removed;
             if let Some(t) = st.transform {
                 scene.nodes[i].user = t;
             }
@@ -440,6 +445,19 @@ mod tests {
         assert!(!s2.nodes[s2.find(&vite).unwrap()].visible);
         assert_eq!(s2.nodes[s2.find(&staffa).unwrap()].user, scene.nodes[si].user);
         assert!(s2.nodes[s2.find(&vite).unwrap()].contact_snap);
+        // Componente importato eliminato dal progetto: resta eliminato alla riapertura,
+        // il file sorgente non cambia.
+        let obj_before = std::fs::read(&obj).unwrap();
+        let mut s3 = loaded.scene.clone();
+        let vi3 = s3.find(&vite).unwrap();
+        s3.nodes[vi3].removed = true;
+        save(&pfile, &s3, &meta, &settings).unwrap();
+        let reloaded = load(&pfile).unwrap();
+        let vr = reloaded.scene.find(&vite).unwrap();
+        assert!(reloaded.scene.nodes[vr].removed);
+        assert!(!reloaded.scene.is_visible(vr));
+        assert!(!reloaded.scene.nodes[reloaded.scene.find(&staffa).unwrap()].removed);
+        assert_eq!(std::fs::read(&obj).unwrap(), obj_before);
         assert!((s2.bounds_of(s2.find(&staffa).unwrap()).center() - scene.bounds_of(si).center()).length() < 1e-6);
         assert_eq!(s2.lights, scene.lights);
         assert_eq!(s2.camera, scene.camera);

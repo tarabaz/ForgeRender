@@ -46,6 +46,8 @@ Comandi della viewport
   Home = inquadra tutto, F5 = avvia render, Ctrl+S salva, Ctrl+O apri, Ctrl+I importa
   Gizmo: W sposta, E ruota, R scala, Q solo selezione; Ctrl durante il trascinamento = snap
   H nasconde la selezione, Shift+H isola, Alt+H mostra tutto; Ctrl+Z / Ctrl+Y annulla e ripeti
+  Canc elimina dal progetto la selezione (anche i componenti importati: il file sorgente non
+  viene modificato); si ripristina con Ctrl+Z o da "Eliminati dal progetto" in fondo all'albero
   Camere di rendering (scheda Camera): il render usa la camera attiva, la vista resta libera
 
 Versione portable: nessuna installazione, non scrive nulla nel registro né fuori
