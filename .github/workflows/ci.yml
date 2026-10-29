@@ -26,25 +26,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  changes:
-    name: Rileva modifiche al codice
-    runs-on: ubuntu-latest
-    outputs:
-      code: ${{ steps.filter.outputs.code }}
-    steps:
-      - uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            code:
-              - '**'
-              - '!reports/**'
-              - '!docs/**'
-              - '!**/*.md'
-
   linux:
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
     name: Test (Linux)
     runs-on: ubuntu-latest
     steps:
@@ -70,8 +52,6 @@ jobs:
 
   windows:
     name: Build e pacchetti (Windows)
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
