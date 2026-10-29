@@ -315,9 +315,84 @@ pub fn backdrop(width: f32, depth: f32, height: f32, radius: f32, segments: u32)
     m
 }
 
+/// Fondale fotografico in tela: pavimento lungo `depth` davanti, raccordo di raggio `radius`
+/// e telo che sale **inclinato all'indietro** di `tilt_deg` rispetto alla verticale (come un
+/// fondale appeso al supporto e tirato verso la camera) fino all'altezza `height`.
+/// Larghezza `width` lungo X, origine al piede del raccordo; normali verso la scena (+Y, +Z).
+pub fn studio_sweep(width: f32, depth: f32, height: f32, radius: f32, tilt_deg: f32, segments: u32) -> Mesh {
+    let mut m = Mesh {
+        name: "Fondale fotografico".into(),
+        ..Default::default()
+    };
+    let r = radius.clamp(0.01, height.max(0.02));
+    // L'arco si ferma dove la tangente è inclinata di `tilt` rispetto alla verticale.
+    let end = std::f32::consts::FRAC_PI_2 - tilt_deg.clamp(0.0, 45.0).to_radians();
+    let mut profile: Vec<(f32, f32)> = vec![(depth, 0.0), (0.0, 0.0)];
+    let segs = segments.max(4);
+    for k in 1..=segs {
+        let a = k as f32 / segs as f32 * end;
+        profile.push((-r * a.sin(), r - r * a.cos()));
+    }
+    // Tratto dritto lungo la tangente di fine arco, fino all'altezza.
+    let (z0, y0) = *profile.last().expect("profilo");
+    let dir = (-end.cos(), end.sin());
+    if height > y0 {
+        let t = (height - y0) / dir.1.max(1e-4);
+        profile.push((z0 + dir.0 * t, height));
+    }
+    let w = width * 0.5;
+    let mut len = vec![0.0f32];
+    for k in 1..profile.len() {
+        let (a, b) = (profile[k - 1], profile[k]);
+        len.push(len[k - 1] + ((b.0 - a.0).powi(2) + (b.1 - a.1).powi(2)).sqrt());
+    }
+    for (k, &(z, y)) in profile.iter().enumerate() {
+        for x in [-w, w] {
+            m.positions.push(Vec3::new(x, y, z));
+            m.uvs
+                .push(Vec2::new((x + w) / width.max(1e-6), len[k] / len[len.len() - 1].max(1e-6)));
+        }
+    }
+    for k in 0..profile.len() as u32 - 1 {
+        let (a, b, c, d) = (2 * k, 2 * k + 1, 2 * k + 2, 2 * k + 3);
+        m.indices.push([a, b, d]);
+        m.indices.push([a, d, c]);
+    }
+    m.compute_normals(30.0);
+    m
+}
+
 #[cfg(test)]
 mod backdrop_tests {
     use super::*;
+
+    #[test]
+    fn studio_sweep_leans_back_and_faces_the_scene() {
+        let (h, r, tilt) = (2.5, 0.5, 12.0f32);
+        let m = studio_sweep(4.0, 3.0, h, r, tilt, 16);
+        let b = m.bounds();
+        assert!((b.max.y - h).abs() < 1e-4 && b.min.y.abs() < 1e-6, "{b:?}");
+        // La sommità del telo è più indietro del raccordo: inclinato all'indietro.
+        let top_z = m
+            .positions
+            .iter()
+            .filter(|p| (p.y - h).abs() < 1e-4)
+            .map(|p| p.z)
+            .fold(f32::MAX, f32::min);
+        let expected = -r * (90.0 - tilt).to_radians().sin() - (h - r * (1.0 - (90.0 - tilt).to_radians().cos())) * tilt.to_radians().tan();
+        assert!((top_z - expected).abs() < 1e-3, "{top_z} invece di {expected}");
+        for t in &m.indices {
+            let [a, b, c] = t.map(|i| m.positions[i as usize]);
+            let n = (b - a).cross(c - a).normalize();
+            // Tutto il telo guarda la scena: in su o verso +Z, mai di spalle.
+            assert!(n.y > -1e-3 && n.z > -1e-3, "{n}");
+            let ctr = (a + b + c) / 3.0;
+            if ctr.y > r + 0.05 {
+                // Tratto inclinato: normale inclinata verso l'alto di `tilt`.
+                assert!((n.y - tilt.to_radians().sin()).abs() < 0.02, "{n}");
+            }
+        }
+    }
 
     #[test]
     fn backdrop_faces_the_scene() {

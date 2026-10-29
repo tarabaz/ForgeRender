@@ -244,7 +244,8 @@ impl ForgeApp {
         if viewport.is_none() {
             tracing::warn!("modalità sicura: viewport 3D GPU non disponibile, il rendering CPU resta utilizzabile");
         }
-        let scene = Scene::test_scene();
+        // Scena di partenza: oggetti di prova sul fondale fotografico con le luci da studio.
+        let scene = crate::presets::studio_demo_scene();
         let orbit = OrbitController::from_camera(&scene.camera);
         let mut app = Self {
             scene,
@@ -562,12 +563,42 @@ impl ForgeApp {
         self.show_selection_tab();
     }
 
-    /// Crea un oggetto semplice dimensionato e posizionato rispetto alla scena:
-    /// pavimento e fondale sotto/dietro tutto, le forme di lato sul pavimento.
+    /// Ingombro di riferimento per posizionare luci e oggetti nuovi, così compaiono vicino a
+    /// ciò che si sta guardando: i pezzi selezionati, altrimenti il prodotto (senza pavimento,
+    /// fondale e pareti), altrimenti tutta la scena. Prima si usava sempre tutta la scena: con un
+    /// pavimento grande o un ambiente importato le luci finivano a metri di distanza.
+    pub fn anchor_bounds(&self) -> forge_math::Aabb {
+        let mut b = forge_math::Aabb::EMPTY;
+        for &s in &self.selection {
+            if s < self.scene.nodes.len() {
+                b.grow(&self.scene.bounds_of(s));
+            }
+        }
+        if b.is_empty() {
+            b = crate::presets::product_bounds(&self.scene);
+        }
+        if b.is_empty() {
+            b = self.scene.bounds();
+        }
+        b
+    }
+
+    /// Centro e raggio di [`Self::anchor_bounds`] (raggio almeno 5 cm; scena vuota: origine, 1 m).
+    pub fn anchor(&self) -> (forge_math::Vec3, f32) {
+        let b = self.anchor_bounds();
+        if b.is_empty() {
+            (forge_math::Vec3::ZERO, 1.0)
+        } else {
+            (b.center(), b.radius().max(0.05))
+        }
+    }
+
+    /// Crea un oggetto semplice dimensionato e posizionato rispetto al riferimento
+    /// ([`Self::anchor_bounds`]): pavimento e fondale sotto/dietro, le forme di lato sulla base.
     pub fn add_object(&mut self, kind: AddKind) {
         use forge_math::{Mat4, Vec3};
         use forge_scene::AddedKind as K;
-        let b = self.scene.bounds();
+        let b = self.anchor_bounds();
         let (c, ground, e, back, right) = if b.is_empty() {
             (Vec3::ZERO, 0.0, 1.0, -0.5, 0.5)
         } else {
@@ -581,7 +612,8 @@ impl ForgeApp {
         let (kind, placement) = match kind {
             AddKind::Floor => (K::Floor { size: (4.0 * e).max(4.0) }, at(c.x, c.z)),
             // Stessa regola della "Prepara scena" della modalità Semplice.
-            AddKind::Backdrop => crate::presets::backdrop_for(&b),
+            AddKind::Backdrop => crate::presets::backdrop_for(&b, crate::presets::BackdropStyle::Curved),
+            AddKind::StudioSweep => crate::presets::backdrop_for(&b, crate::presets::BackdropStyle::Sweep),
             AddKind::Wall => (
                 K::Wall {
                     width: (3.0 * e).max(3.0),
@@ -1233,6 +1265,21 @@ impl ForgeApp {
         ));
     }
 
+    /// "Adatta la scena al prodotto": fondale e luci rifatti sulle misure attuali del prodotto,
+    /// poi inquadratura. Si annulla con "Annulla preset".
+    pub fn simple_fit_scene(&mut self) {
+        if crate::presets::product_bounds(&self.scene).is_empty() {
+            self.simple_msg = Some("Importa prima un modello: non c'è un prodotto a cui adattare la scena.".into());
+            return;
+        }
+        let backup = crate::presets::fit_scene(&mut self.scene, &self.settings);
+        self.preset_backup = Some(backup);
+        self.selected_light = None;
+        self.geometry_changed();
+        self.frame_product();
+        self.simple_msg = Some("Scena adattata al prodotto: fondale, luci e inquadratura. \"Annulla preset\" la riporta com'era.".into());
+    }
+
     /// Ripristina i valori di prima dell'ultimo preset (solo quelli che il preset ha cambiato).
     pub fn simple_undo_preset(&mut self) {
         if let Some(b) = self.preset_backup.take() {
@@ -1813,6 +1860,7 @@ fn with_extension(p: PathBuf, ext: &str) -> PathBuf {
 pub enum AddKind {
     Floor,
     Backdrop,
+    StudioSweep,
     Wall,
     Box,
     Sphere,
@@ -1823,6 +1871,7 @@ pub enum AddKind {
 pub const ADD_MENU: &[(&str, AddKind)] = &[
     ("Pavimento", AddKind::Floor),
     ("Fondale da studio", AddKind::Backdrop),
+    ("Fondale fotografico (tela inclinata)", AddKind::StudioSweep),
     ("Parete", AddKind::Wall),
     ("Cubo", AddKind::Box),
     ("Sfera", AddKind::Sphere),

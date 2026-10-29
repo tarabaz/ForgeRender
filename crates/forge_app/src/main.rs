@@ -7,7 +7,7 @@
 //!     --screenshot F.png   salva uno screenshot della finestra ed esce (test automatici)
 //!     --screenshot-after N attende N campioni prima dello screenshot
 //!     --modalita semplice|avanzata   modalità dell'interfaccia per questa sessione
-//!     --prepara chiaro|scuro|scenografico   "Prepara scena prodotto" all'avvio
+//!     --prepara studio|chiaro|scuro|scenografico   "Prepara scena prodotto" all'avvio
 
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
@@ -45,6 +45,7 @@ fn parse_args() -> StartupOptions {
                     Some("chiaro") => Some(presets::Look::Light),
                     Some("scuro") => Some(presets::Look::Dark),
                     Some("scenografico") => Some(presets::Look::Dramatic),
+                    Some("studio") => Some(presets::Look::Studio),
                     _ => None,
                 };
             }

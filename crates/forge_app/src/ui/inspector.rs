@@ -834,12 +834,8 @@ fn texture_slot(ui: &mut egui::Ui, slot: &mut Option<std::path::PathBuf>, id: &s
 // ----------------------------------------------------------------------
 
 fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
-    let b = app.scene.bounds();
-    let (center, radius) = if b.is_empty() {
-        (Vec3::ZERO, 1.0)
-    } else {
-        (b.center(), b.radius())
-    };
+    // Preset e luci nuove vicino a selezione o prodotto, non a tutta la scena (pavimento compreso).
+    let (center, radius) = app.anchor();
     ui.horizontal_wrapped(|ui| {
         ui.label("Preset:");
         for (id, name) in light::PRESETS {

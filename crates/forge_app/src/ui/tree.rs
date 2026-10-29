@@ -190,12 +190,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.strong("Luci");
         if ui.small_button("+").on_hover_text("Aggiungi una luce ad area").clicked() {
-            let b = app.scene.bounds();
-            let (c, r) = if b.is_empty() {
-                (forge_math::Vec3::ZERO, 1.0)
-            } else {
-                (b.center(), b.radius())
-            };
+            let (c, r) = app.anchor();
             app.scene.lights.push(forge_scene::Light::area(
                 "Nuova luce",
                 c + forge_math::Vec3::new(1.0, 2.0, 1.0) * r,

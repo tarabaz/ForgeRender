@@ -20,6 +20,14 @@ pub enum AddedKind {
         height: f32,
         radius: f32,
     },
+    /// Fondale fotografico in tela: raccordo e telo inclinato all'indietro di `tilt_deg`.
+    StudioSweep {
+        width: f32,
+        depth: f32,
+        height: f32,
+        radius: f32,
+        tilt_deg: f32,
+    },
     /// Parete verticale (normale verso +Z).
     Wall {
         width: f32,
@@ -47,6 +55,7 @@ impl AddedKind {
         match self {
             AddedKind::Floor { .. } => "Pavimento",
             AddedKind::Backdrop { .. } => "Fondale da studio",
+            AddedKind::StudioSweep { .. } => "Fondale fotografico",
             AddedKind::Wall { .. } => "Parete",
             AddedKind::Box { .. } => "Cubo",
             AddedKind::Sphere { .. } => "Sfera",
@@ -65,6 +74,13 @@ impl AddedKind {
                 height,
                 radius,
             } => primitives::backdrop(width, depth, height, radius, 24),
+            AddedKind::StudioSweep {
+                width,
+                depth,
+                height,
+                radius,
+                tilt_deg,
+            } => primitives::studio_sweep(width, depth, height, radius, tilt_deg, 32),
             AddedKind::Wall { width, height } => {
                 let mut m = primitives::plane(width, height);
                 // Piano XZ ruotato in verticale, rivolto verso +Z, base a y = 0.

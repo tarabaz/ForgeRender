@@ -139,6 +139,30 @@ pub fn preset(name: &str, center: Vec3, radius: f32) -> Option<Vec<Light>> {
             Light::area("Rim", at(0.5, 2.5, -3.0), center, 1.0 * r, 1.0 * r, 15.0),
         ],
         "softbox" => vec![Light::area("Softbox grande", at(0.0, 3.5, 1.0), center, 4.0 * r, 3.0 * r, 4.0)],
+        // Set da studio fotografico (con il fondale in tela): softbox principale a 45°,
+        // riempimento, luce dall'alto per i contorni e luce che schiarisce il fondale dietro il
+        // prodotto. Nessuna si vede direttamente in camera (si vedono i riflessi).
+        "studio-fotografico" => {
+            let hidden = |mut l: Light| {
+                l.visible_to_camera = false;
+                l
+            };
+            vec![
+                hidden(Light::area("Softbox principale", at(-2.2, 2.2, 2.2), center, 2.2 * r, 2.8 * r, 4.5)),
+                hidden(Light::area("Riempimento", at(2.6, 1.3, 1.8), center, 2.0 * r, 2.0 * r, 1.2)),
+                hidden(Light::area("Luce dall'alto", at(0.0, 3.2, -0.6), center, 2.5 * r, 0.8 * r, 5.0)),
+                // Dietro il prodotto, bassa e rivolta verso il telo: schiarisce il fondale senza
+                // illuminare il prodotto e senza proiettarne l'ombra.
+                hidden(Light::area(
+                    "Luce del fondale",
+                    at(0.0, 0.3, -1.3),
+                    at(0.0, 1.5, -3.5),
+                    2.5 * r,
+                    0.6 * r,
+                    2.0,
+                )),
+            ]
+        }
         "industriale" => (0..3)
             .map(|i| {
                 let x = (i as f32 - 1.0) * 2.0;
@@ -166,8 +190,9 @@ pub fn preset(name: &str, center: Vec3, radius: f32) -> Option<Vec<Light>> {
     Some(lights)
 }
 
-pub const PRESETS: [(&str, &str); 5] = [
+pub const PRESETS: [(&str, &str); 6] = [
     ("studio", "Studio neutro"),
+    ("studio-fotografico", "Studio fotografico (4 luci)"),
     ("tre-punti", "Tre punti luce"),
     ("softbox", "Softbox"),
     ("industriale", "Illuminazione industriale"),

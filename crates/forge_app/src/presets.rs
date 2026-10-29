@@ -10,7 +10,7 @@
 
 use forge_math::{Aabb, Mat4, Vec3};
 use forge_render_core::{DenoiseMode, RenderSettings, ToneMapping};
-use forge_scene::{AddedKind, ComponentId, Environment, Light, Material, MaterialId, Scene, UserTransform};
+use forge_scene::{AddedKind, AddedRecord, ComponentId, Environment, Light, Material, MaterialId, Scene, UserTransform};
 
 /// Aspetto della foto prodotto.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -21,16 +21,19 @@ pub enum Look {
     Dark,
     /// Luce calda di taglio e controluce fredda, ambiente scuro.
     Dramatic,
+    /// Fondale fotografico in tela inclinato e set da studio con quattro luci.
+    Studio,
 }
 
 impl Look {
-    pub const ALL: [Look; 3] = [Look::Light, Look::Dark, Look::Dramatic];
+    pub const ALL: [Look; 4] = [Look::Studio, Look::Light, Look::Dark, Look::Dramatic];
 
     pub fn label(self) -> &'static str {
         match self {
             Look::Light => "Sfondo chiaro",
             Look::Dark => "Sfondo scuro",
             Look::Dramatic => "Studio scenografico",
+            Look::Studio => "Studio fotografico",
         }
     }
 
@@ -39,12 +42,26 @@ impl Look {
             Look::Light => "Fondale bianco e luce morbida: foto da catalogo o e-commerce",
             Look::Dark => "Fondale scuro lucido e tre punti luce: il prodotto stacca dal nero",
             Look::Dramatic => "Luce calda di taglio e controluce fredda: foto d'effetto",
+            Look::Studio => "Fondale in tela inclinato e quattro luci da studio: come in sala posa",
         }
     }
 
     /// Valori impostati dal preset.
     pub fn spec(self) -> LookSpec {
         match self {
+            Look::Studio => LookSpec {
+                lights: "studio-fotografico",
+                environment: Environment::Uniform {
+                    color: [1.0, 1.0, 1.0],
+                    strength: 0.12,
+                },
+                environment_visible: true,
+                backdrop: BackdropStyle::Sweep,
+                backdrop_color: [0.80, 0.80, 0.79],
+                backdrop_roughness: 0.95,
+                tone_mapping: ToneMapping::AcesFilmic,
+                exposure_ev: 0.0,
+            },
             Look::Light => LookSpec {
                 lights: "studio",
                 environment: Environment::Uniform {
@@ -52,6 +69,7 @@ impl Look {
                     strength: 0.9,
                 },
                 environment_visible: true,
+                backdrop: BackdropStyle::Curved,
                 backdrop_color: [0.85, 0.85, 0.85],
                 backdrop_roughness: 0.65,
                 tone_mapping: ToneMapping::AcesFilmic,
@@ -64,6 +82,7 @@ impl Look {
                     strength: 0.0,
                 },
                 environment_visible: true,
+                backdrop: BackdropStyle::Curved,
                 backdrop_color: [0.03, 0.03, 0.03],
                 backdrop_roughness: 0.35,
                 tone_mapping: ToneMapping::AcesFilmic,
@@ -78,6 +97,7 @@ impl Look {
                     strength: 0.5,
                 },
                 environment_visible: true,
+                backdrop: BackdropStyle::Curved,
                 backdrop_color: [0.05, 0.045, 0.04],
                 backdrop_roughness: 0.3,
                 tone_mapping: ToneMapping::AcesFilmic,
@@ -87,6 +107,15 @@ impl Look {
     }
 }
 
+/// Tipo di fondale.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BackdropStyle {
+    /// Fondale curvo con parete verticale (Aggiungi → Fondale da studio).
+    Curved,
+    /// Fondale fotografico in tela, inclinato all'indietro (Aggiungi → Fondale fotografico).
+    Sweep,
+}
+
 /// Cosa imposta un [`Look`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct LookSpec {
@@ -94,6 +123,8 @@ pub struct LookSpec {
     pub lights: &'static str,
     pub environment: Environment,
     pub environment_visible: bool,
+    /// Fondale che "Prepara scena" mette (o sostituisce, se ce n'è uno dell'altro tipo).
+    pub backdrop: BackdropStyle,
     pub backdrop_color: [f32; 3],
     pub backdrop_roughness: f32,
     pub tone_mapping: ToneMapping,
@@ -165,7 +196,10 @@ pub const BACKDROP_MATERIAL: &str = "preset-fondale";
 
 /// Oggetti di scenografia (non fanno parte del prodotto).
 fn is_scenery(kind: &AddedKind) -> bool {
-    matches!(kind, AddedKind::Floor { .. } | AddedKind::Backdrop { .. } | AddedKind::Wall { .. })
+    matches!(
+        kind,
+        AddedKind::Floor { .. } | AddedKind::Backdrop { .. } | AddedKind::StudioSweep { .. } | AddedKind::Wall { .. }
+    )
 }
 
 fn scenery_ids(scene: &Scene) -> Vec<ComponentId> {
@@ -203,8 +237,11 @@ pub fn product_bounds(scene: &Scene) -> Aabb {
 }
 
 /// Fondale dimensionato e posizionato dietro un prodotto con questo ingombro (stessa regola
-/// del menu Aggiungi → Fondale da studio).
-pub fn backdrop_for(b: &Aabb) -> (AddedKind, Mat4) {
+/// dei menu Aggiungi → Fondale da studio / Fondale fotografico).
+pub fn backdrop_for(b: &Aabb, style: BackdropStyle) -> (AddedKind, Mat4) {
+    if style == BackdropStyle::Sweep {
+        return sweep_for(b);
+    }
     let (c, ground, e, back) = if b.is_empty() {
         (Vec3::ZERO, 0.0, 1.0, -0.5)
     } else {
@@ -228,13 +265,47 @@ pub fn backdrop_for(b: &Aabb) -> (AddedKind, Mat4) {
     )
 }
 
-/// Fondale presente nella scena (il primo).
+/// Inclinazione all'indietro del telo del fondale fotografico (gradi dalla verticale).
+pub const SWEEP_TILT_DEG: f32 = 10.0;
+
+/// Fondale fotografico in tela per un prodotto con questo ingombro: raccordo ampio (il telo
+/// "cade" morbido) e telo inclinato all'indietro, largo abbastanza per uscire dall'inquadratura.
+fn sweep_for(b: &Aabb) -> (AddedKind, Mat4) {
+    let (c, ground, e, back) = if b.is_empty() {
+        (Vec3::ZERO, 0.0, 1.0, -0.5)
+    } else {
+        let s = b.max - b.min;
+        ((b.min + b.max) * 0.5, b.min.y, s.x.max(s.z).max(0.5), b.min.z)
+    };
+    // Largo e alto abbastanza da riempire anche un'inquadratura 16:9 o verticale.
+    let height = (2.5 * e).max(2.5);
+    let radius = 0.3 * height;
+    // Il piede del raccordo sta dietro il prodotto; il telo poi sale e arretra.
+    let foot = back - 0.35 * e;
+    let depth = (c.z - foot) + 2.5 * e;
+    (
+        AddedKind::StudioSweep {
+            width: (7.0 * e).max(6.0),
+            depth,
+            height,
+            radius,
+            tilt_deg: SWEEP_TILT_DEG,
+        },
+        Mat4::from_translation(Vec3::new(c.x, ground, foot)),
+    )
+}
+
+fn style_of(kind: &AddedKind) -> Option<BackdropStyle> {
+    match kind {
+        AddedKind::Backdrop { .. } => Some(BackdropStyle::Curved),
+        AddedKind::StudioSweep { .. } => Some(BackdropStyle::Sweep),
+        _ => None,
+    }
+}
+
+/// Fondale presente nella scena (il primo, curvo o fotografico).
 pub fn find_backdrop(scene: &Scene) -> Option<ComponentId> {
-    scene
-        .added
-        .iter()
-        .find(|r| matches!(r.kind, AddedKind::Backdrop { .. }))
-        .map(|r| r.id.clone())
+    scene.added.iter().find(|r| style_of(&r.kind).is_some()).map(|r| r.id.clone())
 }
 
 /// Valori che un preset sta per cambiare, per "Annulla preset".
@@ -250,6 +321,8 @@ pub struct PresetBackup {
     denoise_mode: DenoiseMode,
     /// Fondale aggiunto dal preset (da togliere annullando).
     added_backdrop: Option<ComponentId>,
+    /// Fondale dell'altro tipo tolto dal preset (da rimettere annullando), con il suo materiale.
+    removed_backdrop: Option<(AddedRecord, Option<MaterialId>)>,
     /// Assegnazione del fondale prima del preset.
     backdrop_assignment: Option<(ComponentId, Option<MaterialId>)>,
     /// Materiale del fondale prima del preset (se esisteva).
@@ -270,6 +343,7 @@ impl PresetBackup {
             max_bounces: s.max_bounces,
             denoise_mode: s.denoise.mode,
             added_backdrop: None,
+            removed_backdrop: None,
             backdrop_assignment: find_backdrop(scene).map(|id| {
                 let m = scene.assignments.get(&id).cloned();
                 (id, m)
@@ -295,6 +369,15 @@ impl PresetBackup {
         if let Some(id) = &self.added_backdrop {
             if let Some(i) = scene.find(id) {
                 scene.delete_added(i);
+            }
+        }
+        if let Some((rec, m)) = &self.removed_backdrop {
+            if scene.find(&rec.id).is_none() {
+                scene.instantiate_added(rec);
+                scene.added.push(rec.clone());
+                if let Some(m) = m {
+                    scene.assignments.insert(rec.id.clone(), m.clone());
+                }
             }
         }
         if let Some((id, m)) = &self.backdrop_assignment {
@@ -378,14 +461,78 @@ pub fn drop_product_to_base(scene: &mut Scene) -> f32 {
 pub fn prepare_scene(scene: &mut Scene, s: &mut RenderSettings, look: Look, quality: Quality) -> PresetBackup {
     let mut backup = PresetBackup::capture(scene, s);
     drop_product_to_base(scene);
-    if find_backdrop(scene).is_none() {
-        let (kind, placement) = backdrop_for(&product_bounds(scene));
-        let i = scene.add_object(kind, placement);
-        backup.added_backdrop = Some(scene.nodes[i].id.clone());
-    }
+    fit_backdrop(scene, look.spec().backdrop, &mut backup);
     apply_look(scene, s, look);
     quality.apply(s);
     backup
+}
+
+/// Mette un fondale del tipo `want` dimensionato e posizionato sul prodotto: quello presente
+/// (di qualunque tipo) viene tolto e rifatto, mantenendo il suo materiale. Annotato nel backup.
+fn fit_backdrop(scene: &mut Scene, want: BackdropStyle, backup: &mut PresetBackup) {
+    let mut material = None;
+    if let Some(r) = scene.added.iter().find(|r| style_of(&r.kind).is_some()).cloned() {
+        let m = scene.assignments.get(&r.id).cloned();
+        material = m.clone();
+        if let Some(i) = scene.find(&r.id) {
+            scene.delete_added(i);
+        }
+        backup.removed_backdrop = Some((r, m));
+    }
+    let (kind, placement) = backdrop_for(&product_bounds(scene), want);
+    let i = scene.add_object(kind, placement);
+    let id = scene.nodes[i].id.clone();
+    if let Some(m) = material {
+        scene.assignments.insert(id.clone(), m);
+    }
+    backup.added_backdrop = Some(id);
+}
+
+/// "Adatta la scena al prodotto": dopo aver spostato o scalato il prodotto, rifà fondale (dello
+/// stesso tipo e con lo stesso materiale) e luci dell'aspetto attuale sulle sue nuove misure,
+/// tenendo i colori delle luci. Senza aspetto riconosciuto le luci restano come sono.
+pub fn fit_scene(scene: &mut Scene, s: &RenderSettings) -> PresetBackup {
+    let mut backup = PresetBackup::capture(scene, s);
+    // Le luci sono ancora dimensionate sulle vecchie misure: l'aspetto si riconosce dal resto.
+    let look = matching_look(scene, s).or_else(|| look_ignoring_light_placement(scene, s));
+    let style = scene
+        .added
+        .iter()
+        .find_map(|r| style_of(&r.kind))
+        .or(look.map(|l| l.spec().backdrop))
+        .unwrap_or(BackdropStyle::Sweep);
+    fit_backdrop(scene, style, &mut backup);
+    if let Some(l) = look {
+        let b = product_bounds(scene);
+        if !b.is_empty() {
+            let colors: Vec<[f32; 3]> = scene.lights.iter().map(|l| l.color).collect();
+            if let Some(mut lights) = forge_scene::light::preset(l.spec().lights, b.center(), b.radius().max(1e-3)) {
+                for (l, c) in lights.iter_mut().zip(colors) {
+                    l.color = c;
+                }
+                scene.lights = lights;
+            }
+        }
+    }
+    backup
+}
+
+/// Aspetto riconosciuto da ambiente, visualizzazione e nomi delle luci, senza guardare dove
+/// stanno le luci (servono dopo che il prodotto è stato spostato o scalato).
+fn look_ignoring_light_placement(scene: &Scene, s: &RenderSettings) -> Option<Look> {
+    Look::ALL.into_iter().find(|l| {
+        let spec = l.spec();
+        let names: Vec<String> = forge_scene::light::preset(spec.lights, Vec3::ZERO, 1.0)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|l| l.name)
+            .collect();
+        scene.lights.iter().map(|l| &l.name).eq(names.iter())
+            && scene.environment == spec.environment
+            && s.environment_visible == spec.environment_visible
+            && s.tone_mapping == spec.tone_mapping
+            && (s.exposure_ev - spec.exposure_ev).abs() < 1e-4
+    })
 }
 
 /// Aspetto corrispondente allo stato attuale (luci, ambiente e visualizzazione uguali al
@@ -400,12 +547,45 @@ pub fn matching_look(scene: &Scene, s: &RenderSettings) -> Option<Look> {
     Look::ALL.into_iter().find(|l| {
         let spec = l.spec();
         let lights = forge_scene::light::preset(spec.lights, center, radius).unwrap_or_default();
-        scene.lights == lights
+        // Il colore delle luci si può cambiare senza uscire dall'aspetto.
+        scene.lights.len() == lights.len()
+            && scene.lights.iter().zip(&lights).all(|(a, b)| {
+                let mut a = a.clone();
+                a.color = b.color;
+                a == *b
+            })
             && scene.environment == spec.environment
             && s.environment_visible == spec.environment_visible
             && s.tone_mapping == spec.tone_mapping
             && (s.exposure_ev - spec.exposure_ev).abs() < 1e-4
     })
+}
+
+/// Colore delle luci da una temperatura in kelvin (3200 calda, 5500 neutra, 7500 fredda).
+/// I portali non emettono e restano come sono.
+pub fn set_lights_kelvin(scene: &mut Scene, kelvin: f32) {
+    let c = forge_scene::light::kelvin_to_rgb(kelvin);
+    for l in &mut scene.lights {
+        if !matches!(l.kind, forge_scene::LightKind::Portal { .. }) {
+            l.color = c;
+        }
+    }
+}
+
+/// Scena con cui si apre l'app: gli oggetti della scena di test (senza il suo pavimento) sul
+/// fondale fotografico, con le luci da studio e la camera sul prodotto.
+pub fn studio_demo_scene() -> Scene {
+    let mut scene = Scene::test_scene();
+    if let Some(i) = scene.find(&ComponentId("test/Scena/pavimento".into())) {
+        scene.remove_subtree(i);
+    }
+    let mut s = RenderSettings::default();
+    let _ = prepare_scene(&mut scene, &mut s, Look::Studio, Quality::Balanced);
+    let b = product_bounds(&scene);
+    let mut orbit = forge_scene::OrbitController::from_camera(&scene.camera);
+    orbit.frame(&b);
+    scene.camera = orbit.camera();
+    scene
 }
 
 #[cfg(test)]
@@ -537,13 +717,93 @@ mod tests {
         assert!(dark < light * 0.5, "sfondo scuro {dark} contro chiaro {light}");
     }
 
+    /// "Studio fotografico": fondale in tela inclinato e 4 luci; passando a un aspetto con il
+    /// fondale curvo il telo viene sostituito, e "Annulla preset" lo rimette.
+    #[test]
+    fn studio_look_uses_sweep_and_swaps_backdrop_undoably() {
+        let mut scene = product_scene();
+        let mut s = RenderSettings::default();
+        let _ = prepare_scene(&mut scene, &mut s, Look::Studio, Quality::Balanced);
+        let rec = backdrop_record_of(&scene);
+        assert!(matches!(rec.kind, AddedKind::StudioSweep { .. }), "{:?}", rec.kind);
+        assert_eq!(scene.lights.len(), 4);
+        assert!(scene.lights.iter().all(|l| !l.visible_to_camera), "luci fuori dall'inquadratura");
+        assert_eq!(matching_look(&scene, &s), Some(Look::Studio));
+        // Colore delle luci: resta l'aspetto Studio, non "Personalizzato".
+        set_lights_kelvin(&mut scene, 3200.0);
+        assert_ne!(scene.lights[0].color, [1.0; 3]);
+        assert_eq!(matching_look(&scene, &s), Some(Look::Studio));
+        // Il prodotto sta davanti al telo.
+        let b = product_bounds(&scene);
+        assert!(rec.placement.w_axis.z < b.min.z, "telo dietro il prodotto");
+        // Sfondo chiaro vuole il fondale curvo: il telo viene sostituito.
+        let undo = prepare_scene(&mut scene, &mut s, Look::Light, Quality::Balanced);
+        assert!(matches!(backdrop_record_of(&scene).kind, AddedKind::Backdrop { .. }));
+        assert_eq!(scene.added.iter().filter(|r| style_of(&r.kind).is_some()).count(), 1);
+        undo.restore(&mut scene, &mut s);
+        assert!(matches!(backdrop_record_of(&scene).kind, AddedKind::StudioSweep { .. }));
+        assert_eq!(scene.added.iter().filter(|r| style_of(&r.kind).is_some()).count(), 1);
+        assert_eq!(
+            scene.assignments.get(&backdrop_record_of(&scene).id),
+            Some(&MaterialId::new(BACKDROP_MATERIAL))
+        );
+    }
+
+    #[test]
+    fn studio_demo_scene_is_ready() {
+        let scene = studio_demo_scene();
+        assert!(scene.find(&ComponentId("test/Scena/pavimento".into())).is_none());
+        assert!(matches!(backdrop_record_of(&scene).kind, AddedKind::StudioSweep { .. }));
+        let b = product_bounds(&scene);
+        assert!(b.min.y.abs() < 1e-4, "oggetti appoggiati");
+        // La camera guarda il prodotto.
+        assert!((scene.camera.target - b.center()).length() < 1e-3);
+    }
+
+    /// Prodotto ingrandito e spostato dopo il preset: "Adatta" rifà fondale e luci sulle nuove
+    /// misure, tiene materiale del fondale, aspetto e colori delle luci; si annulla.
+    #[test]
+    fn fit_scene_follows_the_product() {
+        let mut scene = product_scene();
+        let mut s = RenderSettings::default();
+        let _ = prepare_scene(&mut scene, &mut s, Look::Studio, Quality::Balanced);
+        set_lights_kelvin(&mut scene, 3200.0);
+        let warm = scene.lights[0].color;
+        let old = backdrop_record_of(&scene);
+        // L'utente scala il prodotto di 3 volte e lo sposta di lato.
+        scene.nodes[0].user.scale = Vec3::splat(3.0);
+        scene.nodes[0].user.translation += Vec3::new(2.0, 0.0, 0.0);
+        drop_product_to_base(&mut scene);
+        let undo = fit_scene(&mut scene, &s);
+        let new = backdrop_record_of(&scene);
+        let (AddedKind::StudioSweep { width: w0, .. }, AddedKind::StudioSweep { width: w1, .. }) = (&old.kind, &new.kind) else {
+            panic!("tipo di fondale cambiato");
+        };
+        assert!(w1 > w0, "fondale più grande: {w0} → {w1}");
+        let b = product_bounds(&scene);
+        assert!(
+            (new.placement.w_axis.x - b.center().x).abs() < 1e-3,
+            "fondale centrato sul prodotto"
+        );
+        assert_eq!(scene.assignments.get(&new.id), Some(&MaterialId::new(BACKDROP_MATERIAL)));
+        assert_eq!(matching_look(&scene, &s), Some(Look::Studio), "luci rifatte sulle nuove misure");
+        assert_eq!(scene.lights[0].color, warm, "colori tenuti");
+        undo.restore(&mut scene, &mut s);
+        assert_eq!(backdrop_record_of(&scene).kind, old.kind);
+    }
+
+    fn backdrop_record_of(scene: &Scene) -> AddedRecord {
+        let id = find_backdrop(scene).expect("fondale");
+        scene.added.iter().find(|r| r.id == id).cloned().unwrap()
+    }
+
     #[test]
     fn backdrop_sizing_matches_add_menu_rule() {
         let b = Aabb {
             min: Vec3::new(-0.5, 0.0, -0.25),
             max: Vec3::new(0.5, 0.4, 0.25),
         };
-        let (kind, m) = backdrop_for(&b);
+        let (kind, m) = backdrop_for(&b, BackdropStyle::Curved);
         let AddedKind::Backdrop { width, height, .. } = kind else {
             panic!()
         };

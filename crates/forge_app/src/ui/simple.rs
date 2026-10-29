@@ -99,6 +99,15 @@ fn product(app: &mut ForgeApp, ui: &mut egui::Ui) {
         {
             app.frame_product();
         }
+        if big_button(ui, "Adatta la scena al prodotto", false)
+            .on_hover_text(
+                "Dopo aver spostato o scalato il prodotto: rifà fondale e luci sulle sue misure (tiene materiale del \
+                 fondale e colori delle luci) e inquadra. Si può annullare",
+            )
+            .clicked()
+        {
+            app.simple_fit_scene();
+        }
     });
     if !has_product {
         ui.label(egui::RichText::new("Importa un modello per cominciare.").weak());
@@ -129,6 +138,7 @@ fn look(app: &mut ForgeApp, ui: &mut egui::Ui) {
             ui.label(egui::RichText::new("Scegli un aspetto, poi premi \"Prepara scena prodotto\".").small());
         }
     }
+    light_colors(app, ui);
     ui.add_space(4.0);
     if big_button(ui, "Prepara scena prodotto", true)
         .on_hover_text(
@@ -289,4 +299,46 @@ fn render(app: &mut ForgeApp, ui: &mut egui::Ui) {
     {
         app.export_png_dialog();
     }
+}
+
+/// Colore delle luci: tre temperature rapide per tutte, poi un colore per ciascuna luce.
+/// Cambiare il colore non fa uscire dall'aspetto scelto (non diventa "Personalizzato").
+fn light_colors(app: &mut ForgeApp, ui: &mut egui::Ui) {
+    let lights: Vec<usize> = (0..app.scene.lights.len())
+        .filter(|&i| !matches!(app.scene.lights[i].kind, forge_scene::LightKind::Portal { .. }))
+        .collect();
+    if lights.is_empty() {
+        return;
+    }
+    egui::CollapsingHeader::new(egui::RichText::new("Colore delle luci").size(BIG - 1.0))
+        .id_salt("simple-light-colors")
+        .show(ui, |ui| {
+            let mut changed = false;
+            ui.horizontal(|ui| {
+                for (name, k, tip) in [
+                    ("Calda", 3200.0, "3200 K: luce gialla come una lampadina"),
+                    ("Neutra", 5500.0, "5500 K: luce bianca da studio"),
+                    ("Fredda", 7500.0, "7500 K: luce azzurrina"),
+                ] {
+                    if ui
+                        .add(egui::Button::new(egui::RichText::new(name).size(BIG - 1.0)).min_size(egui::vec2(80.0, 28.0)))
+                        .on_hover_text(format!("Tutte le luci: {tip}"))
+                        .clicked()
+                    {
+                        presets::set_lights_kelvin(&mut app.scene, k);
+                        changed = true;
+                    }
+                }
+            });
+            for i in lights {
+                ui.horizontal(|ui| {
+                    let l = &mut app.scene.lights[i];
+                    changed |= ui.color_edit_button_rgb(&mut l.color).changed();
+                    ui.label(&l.name);
+                });
+            }
+            if changed {
+                app.shading_changed();
+            }
+        });
 }
