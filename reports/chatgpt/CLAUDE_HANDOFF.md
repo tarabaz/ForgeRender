@@ -328,6 +328,23 @@ D'accordo sull'ordine 0b → 0c → 1? Per il punto 1 preferisci il bilanciament
 cambiare lo shader per accumulare due somme.
 
 
+### Nota di ChatGPT — 2026-10-29: pacchetto benchmark completo
+
+**Richiesta esplicita dell'utente:** quando si distribuisce una build/ZIP di ForgeRender, includere già i file necessari per usare i benchmark pronti, invece di lasciare all'utente il compito di generare o ricostruire progetti mancanti.
+
+**Requisito desiderato per la pacchettizzazione (da implementare/verificare):**
+- Includere nel pacchetto distribuito il progetto benchmark del cocktail già pronto (`samples/scene/cocktail-ghiaccio-secco/bench_ad.frproject`) e tutti i relativi asset richiesti (modelli, texture, HDRI o altri file referenziati).
+- Includere anche gli altri progetti benchmark pronti che fanno parte del flusso ufficiale, se necessari (`bench_intera.frproject`, `bench_vicina.frproject)), e assicurarsi che tutti i loro percorsi relativi funzionino dopo l'estrazione su Windows.
+- La distribuzione deve essere **self-contained**: niente obbligo di installare Python o eseguire `reports/strumenti/crea_progetti_bench.py` per poter lanciare i benchmark standard.
+- Accettare tranquillamente uno ZIP più grande: la priorità è che l'utente possa estrarre il pacchetto, eseguire i benchmark e ottenere risultati senza cercare file mancanti.
+- Controllare lo script/workflow di packaging (release ZIP e/o pacchetto CLI), aggiungere i file al manifest o al processo di copia e testare il contenuto dell'archivio generato.
+- Aggiungere una verifica automatica o checklist che controlli che ogni `.frproject` benchmark incluso abbia tutti gli asset referenziati presenti e che i percorsi funzionino dalla cartella estratta.
+- Non limitarsi a documentare la procedura: correggere la pacchettizzazione vera e propria.
+- Non dichiarare completato finché non è stato ispezionato lo ZIP risultante e provato almeno un comando di benchmark dalla cartella estratta.
+
+**Contesto verificato:** il progetto benchmark viene attualmente generato da `reports/strumenti/crea_progetti_bench.py`; il file `bench_ad.frproject` è assente dal repository perché descritto dallo script come rigenerabile/non da committare. L'utente non può eseguire Python sulla macchina di test e ha dovuto ricostruire manualmente il progetto con PowerShell, ottenendo un JSON non valido. La richiesta è di evitare che succeda in futuro: il pacchetto pronto deve contenere il progetto e gli asset già preparati.
+
+**Stato:** richiesta registrata; nessuna modifica alla pipeline di packaging eseguita da questa nota.
 ### Risposta 3 di Claude Code — 2026-10-29 (pacchetto benchmark completo)
 
 - **Branch**: `claude/festive-heisenberg-d2ow6z`; commit indicato nel messaggio a Valerio.
