@@ -549,6 +549,9 @@ fn draw_lights(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
         };
         let stroke = egui::Stroke::new(if selected { 2.0 } else { 1.2 }, color);
         let Some(p) = project(cam, rect, l.position) else { continue };
+        if l.has_range() && l.range > 0.0 {
+            draw_range_bubble(cam, painter, rect, l, color, selected);
+        }
         match l.kind {
             LightKind::Area { width, height } | LightKind::Portal { width, height } => {
                 // Portale: azzurro tratteggiato, la freccia indica l'interno della stanza.
@@ -626,6 +629,59 @@ fn draw_lights(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
             egui::FontId::proportional(11.0),
             color,
         );
+    }
+}
+
+/// Bolla del raggio d'azione di una luce Point/Spot: contorno pieno dove la luce finisce,
+/// tratteggiato dove comincia la sfumatura, più l'equatore per dare la profondità.
+fn draw_range_bubble(
+    cam: &forge_scene::Camera,
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    l: &forge_scene::Light,
+    color: egui::Color32,
+    selected: bool,
+) {
+    // Contorno della sfera visto dalla camera: cerchio perpendicolare alla linea di vista.
+    let view = if cam.lens.ortho {
+        cam.target - cam.position
+    } else {
+        l.position - cam.position
+    }
+    .normalize_or(Vec3::Z);
+    let hint = if view.y.abs() > 0.99 { Vec3::X } else { Vec3::Y };
+    let a = hint.cross(view).normalize();
+    let b = view.cross(a);
+    let ring = |r: f32, u: Vec3, v: Vec3| -> Vec<egui::Pos2> {
+        (0..=64)
+            .filter_map(|k| {
+                let t = k as f32 / 64.0 * std::f32::consts::TAU;
+                project(cam, rect, l.position + (u * t.cos() + v * t.sin()) * r)
+            })
+            .collect()
+    };
+    let alpha = if selected { 0.9 } else { 0.45 };
+    let outer = ring(l.range, a, b);
+    if outer.len() > 2 {
+        painter.add(egui::Shape::line(outer, egui::Stroke::new(1.2, color.gamma_multiply(alpha))));
+    }
+    let fade = l.range_fade_start();
+    if fade > 1e-4 && fade < l.range - 1e-4 {
+        let inner = ring(fade, a, b);
+        if inner.len() > 2 {
+            painter.add(egui::Shape::dashed_line(
+                &inner,
+                egui::Stroke::new(1.0, color.gamma_multiply(alpha * 0.8)),
+                5.0,
+                4.0,
+            ));
+        }
+    }
+    if selected {
+        let eq = ring(l.range, Vec3::X, Vec3::Z);
+        if eq.len() > 2 {
+            painter.add(egui::Shape::line(eq, egui::Stroke::new(0.8, color.gamma_multiply(0.35))));
+        }
     }
 }
 

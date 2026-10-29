@@ -145,6 +145,29 @@ pub struct RenderLight {
     pub emission: Vec3,
     pub cast_shadows: bool,
     pub visible_to_camera: bool,
+    /// Raggio d'azione di Point e Spot (0 = illimitato) e distanza a cui inizia la sfumatura.
+    pub range: f32,
+    pub fade_start: f32,
+}
+
+impl RenderLight {
+    /// Fattore del raggio d'azione alla distanza `dist`: 1 dentro, 0 oltre `range`, sfumato
+    /// (smoothstep) tra `fade_start` e `range`. Uguale nel path tracer della GPU.
+    #[inline]
+    pub fn range_window(&self, dist: f32) -> f32 {
+        if self.range <= 0.0 {
+            return 1.0;
+        }
+        if dist >= self.range {
+            return 0.0;
+        }
+        let w = self.range - self.fade_start;
+        if w <= 1e-6 || dist <= self.fade_start {
+            return 1.0;
+        }
+        let t = (dist - self.fade_start) / w;
+        1.0 - t * t * (3.0 - 2.0 * t)
+    }
 }
 
 /// Portale di luce (finestra): rettangolo da cui entra la luce dell'ambiente.
@@ -584,6 +607,8 @@ impl RenderScene {
                     emission: l.radiance_color(),
                     cast_shadows: l.cast_shadows,
                     visible_to_camera: l.visible_to_camera,
+                    range: if l.has_range() { l.range.max(0.0) } else { 0.0 },
+                    fade_start: if l.has_range() { l.range_fade_start() } else { 0.0 },
                 }
             })
             .collect();

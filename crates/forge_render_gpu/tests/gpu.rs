@@ -489,6 +489,88 @@ fn gpu_orthographic_matches_cpu() {
     assert!(diff < noise * 1.5, "RMSE GPU−CPU {diff} vs rumore CPU−CPU {noise}");
 }
 
+/// Raggio d'azione di una puntiforme e di uno spot (bolla con sfumatura): stessa immagine su
+/// GPU e CPU, diversa dalla luce illimitata.
+#[test]
+fn gpu_light_range_matches_cpu() {
+    let Some(mut g) = gpu() else { return };
+    // Pavimento e cubo diffusi: il confronto riguarda la luce diretta, senza caustiche.
+    let mut s = Scene {
+        environment: Environment::Uniform {
+            color: [1.0; 3],
+            strength: 0.05,
+        },
+        ..Default::default()
+    };
+    let floor = s.add_mesh(primitives::cuboid(Vec3::new(8.0, 0.1, 8.0)));
+    s.add_node(
+        None,
+        ComponentId("pavimento".into()),
+        "Pavimento",
+        Mat4::from_translation(Vec3::new(0.0, -0.05, 0.0)),
+        Some(floor),
+    );
+    let cube = s.add_mesh(primitives::cuboid(Vec3::ONE));
+    s.add_node(
+        None,
+        ComponentId("cubo".into()),
+        "Cubo",
+        Mat4::from_translation(Vec3::new(0.0, 0.5, 0.0)),
+        Some(cube),
+    );
+    s.camera = Camera {
+        position: Vec3::new(2.5, 2.5, 4.0),
+        target: Vec3::new(0.0, 0.3, 0.0),
+        up: Vec3::Y,
+        vfov_deg: 50.0,
+        ..Default::default()
+    };
+    let mut p = Light::point("P", Vec3::new(1.2, 1.2, 0.8), 3.0);
+    p.range = 1.6;
+    p.range_softness = 0.6;
+    let mut spot = Light {
+        kind: forge_scene::LightKind::Spot {
+            inner_angle_deg: 30.0,
+            outer_angle_deg: 60.0,
+        },
+        target: Vec3::ZERO,
+        ..Light::point("S", Vec3::new(-1.0, 2.0, 1.0), 6.0)
+    };
+    spot.range = 2.4;
+    spot.range_softness = 0.0;
+    s.lights = vec![p, spot];
+    let st = RenderSettings {
+        width: 64,
+        height: 36,
+        // Niente caustiche del vetro: il confronto riguarda la luce diretta.
+        max_bounces: 2,
+        clamp_indirect: 1.0,
+        ..Default::default()
+    };
+    let spp = 64;
+    let mut cpu = CpuBackend::new(4).unwrap();
+    let a = render_with(&mut cpu, &s, &st, spp);
+    let b = render_with(&mut cpu, &s, &RenderSettings { seed: 4321, ..st.clone() }, spp);
+    let gpu_img = render_with(&mut g, &s, &st, spp);
+    let mut free = s.clone();
+    for l in &mut free.lights {
+        l.range = 0.0;
+    }
+    let f = render_with(&mut cpu, &free, &st, spp);
+    let rmse = |x: &[[f32; 3]], y: &[[f32; 3]]| {
+        let e: f64 = x
+            .iter()
+            .zip(y)
+            .map(|(p, q)| (0..3).map(|k| ((p[k] - q[k]) as f64).powi(2)).sum::<f64>())
+            .sum();
+        (e / (x.len() * 3) as f64).sqrt()
+    };
+    let (noise, diff, vs_free) = (rmse(&a, &b), rmse(&a, &gpu_img), rmse(&a, &f));
+    eprintln!("raggio d'azione: RMSE CPU−CPU {noise:.4} GPU−CPU {diff:.4} limitata−illimitata {vs_free:.4}");
+    assert!(vs_free > 2.0 * noise, "il raggio d'azione deve cambiare l'immagine");
+    assert!(diff < noise * 1.5, "RMSE GPU−CPU {diff} vs rumore CPU−CPU {noise}");
+}
+
 /// Displacement vero (cubo suddiviso e spostato) con colore, normal map, bump e
 /// metallicità: la GPU converge alla stessa immagine della CPU.
 #[test]

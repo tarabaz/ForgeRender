@@ -45,11 +45,33 @@ pub struct Light {
     pub cast_shadows: bool,
     /// Se vera, una luce ad area è visibile direttamente dalla camera.
     pub visible_to_camera: bool,
+    /// Raggio d'azione in metri di Point e Spot (0 = illimitato, fisico). Oltre il raggio la
+    /// luce non arriva; non dipende dall'intensità.
+    #[serde(default)]
+    pub range: f32,
+    /// Sfumatura sul bordo del raggio d'azione, come frazione del raggio (0 = taglio netto,
+    /// 1 = sfuma dalla sorgente al bordo).
+    #[serde(default = "default_range_softness")]
+    pub range_softness: f32,
+}
+
+fn default_range_softness() -> f32 {
+    0.5
 }
 
 impl Light {
     pub fn direction(&self) -> Vec3 {
         (self.target - self.position).normalize_or(-Vec3::Y)
+    }
+
+    /// Il raggio d'azione vale solo per Point e Spot.
+    pub fn has_range(&self) -> bool {
+        matches!(self.kind, LightKind::Point | LightKind::Spot { .. })
+    }
+
+    /// Distanza a cui inizia la sfumatura del raggio d'azione (uguale a `range` se netta).
+    pub fn range_fade_start(&self) -> f32 {
+        self.range.max(0.0) * (1.0 - self.range_softness.clamp(0.0, 1.0))
     }
 
     pub fn radiance_color(&self) -> Vec3 {
@@ -67,6 +89,8 @@ impl Light {
             enabled: true,
             cast_shadows: true,
             visible_to_camera: false,
+            range: 0.0,
+            range_softness: default_range_softness(),
         }
     }
 
@@ -90,6 +114,8 @@ impl Light {
             enabled: true,
             cast_shadows: true,
             visible_to_camera: false,
+            range: 0.0,
+            range_softness: default_range_softness(),
         }
     }
 }

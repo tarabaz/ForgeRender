@@ -1055,6 +1055,47 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 }
                 _ => {}
             }
+            if l.has_range() {
+                // Raggio d'azione: indipendente dall'intensità (la bolla nella viewport).
+                let mut limited = l.range > 0.0;
+                ui.label("Raggio d'azione");
+                if ui
+                    .checkbox(&mut limited, "Limitato")
+                    .on_hover_text("Spento = luce fisica, arriva ovunque. Acceso = la luce si ferma al bordo della bolla")
+                    .changed()
+                {
+                    l.range = if limited {
+                        ((l.position - center).length() * 1.5).max(radius).max(0.1)
+                    } else {
+                        0.0
+                    };
+                    changed = true;
+                }
+                ui.end_row();
+                if l.range > 0.0 {
+                    ui.label("Distanza massima (m)");
+                    changed |= ui
+                        .add(
+                            egui::DragValue::new(&mut l.range)
+                                .speed((radius * 0.01).max(0.001))
+                                .range(0.01..=1e4),
+                        )
+                        .on_hover_text("Fin dove arriva la luce (bolla piena nella viewport)")
+                        .changed();
+                    ui.end_row();
+                    let mut soft = l.range_softness * 100.0;
+                    ui.label("Sfumatura del raggio (%)");
+                    if ui
+                        .add(egui::Slider::new(&mut soft, 0.0..=100.0).suffix(" %"))
+                        .on_hover_text("0 % = taglio netto al bordo, 100 % = sfuma dalla sorgente al bordo (bolla tratteggiata)")
+                        .changed()
+                    {
+                        l.range_softness = soft / 100.0;
+                        changed = true;
+                    }
+                    ui.end_row();
+                }
+            }
         });
         changed |= vec3_edit(ui, "Posizione", &mut l.position, (radius * 0.01) as f64);
         if !matches!(l.kind, LightKind::Point) {

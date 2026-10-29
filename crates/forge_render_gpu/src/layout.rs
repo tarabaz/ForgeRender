@@ -288,14 +288,16 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
     p[P_N_LIGHTS] = scene.lights.len() as u32;
     for l in &scene.lights {
         let z = forge_math::Vec3::ZERO;
+        // Point/Spot: raggio d'azione e inizio della sfumatura in c.x, c.y.
+        let rng = forge_math::Vec3::new(l.range, l.fade_start, 0.0);
         let (kind, a, b, c, d, hw, hh, area, ci, co) = match l.kind {
-            RenderLightKind::Point { position } => (0, position, z, z, z, 0.0, 0.0, 0.0, 0.0, 0.0),
+            RenderLightKind::Point { position } => (0, position, z, rng, z, 0.0, 0.0, 0.0, 0.0, 0.0),
             RenderLightKind::Spot {
                 position,
                 direction,
                 cos_inner,
                 cos_outer,
-            } => (1, position, direction, z, z, 0.0, 0.0, 0.0, cos_inner, cos_outer),
+            } => (1, position, direction, rng, z, 0.0, 0.0, 0.0, cos_inner, cos_outer),
             RenderLightKind::Directional { direction } => (2, z, direction, z, z, 0.0, 0.0, 0.0, 0.0, 0.0),
             RenderLightKind::Area {
                 center,

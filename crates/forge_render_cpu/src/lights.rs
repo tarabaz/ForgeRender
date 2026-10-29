@@ -24,10 +24,14 @@ pub fn sample_light(light: &RenderLight, p: Vec3, u1: f32, u2: f32) -> Option<Li
                 return None;
             }
             let dist = d2.sqrt();
+            let window = light.range_window(dist);
+            if window <= 0.0 {
+                return None;
+            }
             Some(LightSample {
                 wi: d / dist,
                 dist,
-                li: light.emission / d2,
+                li: light.emission * (window / d2),
                 pdf: 0.0,
                 delta: true,
             })
@@ -46,7 +50,7 @@ pub fn sample_light(light: &RenderLight, p: Vec3, u1: f32, u2: f32) -> Option<Li
             let dist = d2.sqrt();
             let wi = d / dist;
             let cos = (-wi).dot(direction);
-            let falloff = smoothstep(cos_outer, cos_inner.max(cos_outer + 1e-4), cos);
+            let falloff = smoothstep(cos_outer, cos_inner.max(cos_outer + 1e-4), cos) * light.range_window(dist);
             if falloff <= 0.0 {
                 return None;
             }
@@ -136,4 +140,42 @@ pub fn intersect_area(light: &RenderLight, o: Vec3, d: Vec3, t_max: f32) -> Opti
 fn smoothstep(e0: f32, e1: f32, x: f32) -> f32 {
     let t = ((x - e0) / (e1 - e0)).clamp(0.0, 1.0);
     t * t * (3.0 - 2.0 * t)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn point(range: f32, fade_start: f32) -> RenderLight {
+        RenderLight {
+            kind: RenderLightKind::Point { position: Vec3::ZERO },
+            emission: Vec3::splat(10.0),
+            cast_shadows: true,
+            visible_to_camera: false,
+            range,
+            fade_start,
+        }
+    }
+
+    #[test]
+    fn range_cuts_and_fades_independently_of_intensity() {
+        let li = |l: &RenderLight, d: f32| sample_light(l, Vec3::new(d, 0.0, 0.0), 0.5, 0.5).map_or(0.0, |s| s.li.x);
+        // Illimitata: legge dell'inverso del quadrato, invariata.
+        let free = point(0.0, 0.0);
+        assert!((li(&free, 2.0) - 2.5).abs() < 1e-5);
+        assert!((li(&free, 50.0) - 10.0 / 2500.0).abs() < 1e-7);
+        // Raggio 4 m, sfumatura da 2 m: piena dentro, metà a 3 m, zero oltre.
+        let l = point(4.0, 2.0);
+        assert!((li(&l, 1.5) - li(&free, 1.5)).abs() < 1e-5);
+        assert!((li(&l, 3.0) - 0.5 * li(&free, 3.0)).abs() < 1e-5);
+        assert_eq!(li(&l, 4.0), 0.0);
+        assert_eq!(li(&l, 9.0), 0.0);
+        // Taglio netto (sfumatura 0): piena fino al bordo.
+        let hard = point(4.0, 4.0);
+        assert!((li(&hard, 3.99) - li(&free, 3.99)).abs() < 1e-6);
+        // Indipendente dall'intensità: stesso rapporto con emissione 10× più forte.
+        let mut strong = point(4.0, 2.0);
+        strong.emission *= 10.0;
+        assert!((li(&strong, 3.0) / li(&l, 3.0) - 10.0).abs() < 1e-3);
+    }
 }

@@ -784,6 +784,17 @@ fn sample_light(i: u32, p: vec3<f32>, u1: f32, u2: f32) -> LSample {
         fall = t * t * (3.0 - 2.0 * t);
         if (fall <= 0.0) { return s; }
     }
+    // Raggio d'azione (Point/Spot): come RenderLight::range_window.
+    let range = sf(b + 16u);
+    if (range > 0.0) {
+        if (dist >= range) { return s; }
+        let fs = sf(b + 17u);
+        let w = range - fs;
+        if (w > 1e-6 && dist > fs) {
+            let t = (dist - fs) / w;
+            fall = fall * (1.0 - t * t * (3.0 - 2.0 * t));
+        }
+    }
     s.wi = wi;
     s.dist = dist;
     s.li = em * (fall / d2);
