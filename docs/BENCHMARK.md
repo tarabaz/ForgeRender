@@ -100,3 +100,35 @@ con lo stesso seed la sequenza casuale cambia perché cambiano i passi), nessuna
 visibile. Test: majorant ≥ densità in ogni punto dei tratti lungo 2000 raggi casuali, blocchi
 vuoti presenti; furnace, Beer–Lambert, ratio tracking, ombra e GPU contro CPU invariati.
 Da misurare sul PC di riferimento (RTX 5070) con la stessa scena.
+
+### Campionamento adattivo (prima versione), 29/10/2026
+
+Container di sviluppo, CPU 3 thread. Errore = RMSE contro un riferimento; "costo" = campioni (o
+tempo) × errore², cioè quanto serve per una data qualità: più basso è meglio.
+
+**Scena di test con mezza inquadratura di cielo** (96×54, riferimento 2048 campioni; test
+`forge_render_cpu/tests/adaptive.rs`, errore relativo alla luminosità):
+
+| | campioni/pixel | errore | costo (campioni × errore²) |
+|---|---:|---:|---:|
+| Uniforme 64 / 128 / 256 / 512 | 64 / 128 / 256 / 512 | 0.0760 / 0.0577 / 0.0404 / 0.0310 | 0.37 / 0.43 / 0.42 / 0.49 |
+| Adattivo soglia 0.08 | 50.2 (max 109) | 0.0662 | 0.22 |
+| Adattivo soglia 0.04 | 219.8 (max 467) | 0.0328 | 0.24 |
+
+Circa 1.8× più efficiente; media dell'immagine uguale al riferimento entro l'1 %.
+
+**Scena del cocktail** (320×400, senza profondità di campo; riferimento = media di due render a
+1024 campioni con seed diversi, rumore del riferimento sottratto; errore sull'immagine PNG):
+
+| | tempo | campioni/pixel | errore | tempo × errore² |
+|---|---:|---:|---:|---:|
+| Uniforme 32 | 12.9 s | 32 | 0.088 | 0.100 |
+| Uniforme 128 | 55.0 s | 128 | 0.050 | 0.139 |
+| Adattivo soglia 0.08 | 170.7 s | 338 (max 1024) | 0.040 | 0.278 |
+| Adattivo soglia 0.04 | 272.8 s | 621 (max 1024) | 0.025 | 0.174 |
+
+Qui l'adattivo è **meno** efficiente (da 1.25 a 2 volte): la stima dell'errore è relativa alla
+luminosità (come in Cycles) e nelle zone scure con nebbia e scintille resta alta anche quando il
+rumore non si vede, quindi quei riquadri lavorano fino al massimo. La funzione è spenta di
+default; prossimo passo proposto: stimare l'errore nello spazio dell'immagine mostrata
+(dopo il tone mapping), da misurare con queste stesse due scene.

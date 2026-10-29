@@ -12,6 +12,7 @@
 pub mod layout;
 
 use anyhow::{anyhow, Context};
+use forge_render_core::adaptive::TileMask;
 use forge_render_core::{RenderBackend, RenderScene, RenderSettings};
 use layout::*;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -54,6 +55,17 @@ pub struct GpuBackend {
     target: Option<Target>,
     info: GpuInfo,
     samples_per_pass: u32,
+    /// Maschera del campionamento adattivo (un bit per riquadro), almeno una parola.
+    mask: wgpu::Buffer,
+}
+
+fn mask_buffer(device: &wgpu::Device, words: usize) -> wgpu::Buffer {
+    device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("forge-gpu-mask"),
+        size: (words.max(1) * 4) as u64,
+        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    })
 }
 
 fn is_warp(info: &wgpu::AdapterInfo) -> bool {
@@ -160,6 +172,14 @@ impl GpuBackend {
                         min_binding_size: None,
                     },
                 ),
+                entry(
+                    3,
+                    wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                ),
             ],
         });
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -188,7 +208,9 @@ impl GpuBackend {
             info.device_type,
             info.driver
         );
+        let mask = mask_buffer(&device, 1);
         Ok(Self {
+            mask,
             device,
             queue,
             pipeline,
@@ -291,6 +313,37 @@ impl RenderBackend for GpuBackend {
         out: &mut [[f32; 3]],
         cancel: &AtomicBool,
     ) -> anyhow::Result<u32> {
+        self.pass(scene, settings, first_sample, max_samples, out, cancel, None)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn render_pass_masked(
+        &mut self,
+        scene: &RenderScene,
+        settings: &RenderSettings,
+        first_sample: u32,
+        max_samples: u32,
+        out: &mut [[f32; 3]],
+        cancel: &AtomicBool,
+        mask: &TileMask,
+    ) -> anyhow::Result<u32> {
+        self.pass(scene, settings, first_sample, max_samples, out, cancel, Some(mask))
+    }
+}
+
+impl GpuBackend {
+    /// Una passata di `n` campioni per pixel (solo i riquadri attivi se c'è la maschera).
+    #[allow(clippy::too_many_arguments)]
+    fn pass(
+        &mut self,
+        scene: &RenderScene,
+        settings: &RenderSettings,
+        first_sample: u32,
+        max_samples: u32,
+        out: &mut [[f32; 3]],
+        cancel: &AtomicBool,
+        mask: Option<&TileMask>,
+    ) -> anyhow::Result<u32> {
         let (w, h) = (settings.width, settings.height);
         anyhow::ensure!(out.len() == (w * h) as usize, "buffer di uscita di dimensione errata");
         if cancel.load(Ordering::Relaxed) {
@@ -320,6 +373,15 @@ impl RenderBackend for GpuBackend {
         p[P_MAX_BOUNCES] = settings.max_bounces;
         p[P_RR_START] = settings.russian_roulette_start;
         p[P_FLAGS] = settings.environment_visible as u32;
+        if let Some(m) = mask {
+            let bits = m.bits();
+            if (self.mask.size() as usize) < bits.len() * 4 {
+                self.mask = mask_buffer(&self.device, bits.len());
+            }
+            self.queue.write_buffer(&self.mask, 0, bytemuck::cast_slice(&bits));
+            p[P_FLAGS] |= 2;
+            p[P_TILES_X] = m.tiles_x;
+        }
         fv(&mut p, P_CLAMP, settings.clamp_indirect);
         for k in 0..3 {
             fv(&mut p, P_CAM_POS + k, cam.position[k]);
@@ -353,6 +415,10 @@ impl RenderBackend for GpuBackend {
                 wgpu::BindGroupEntry {
                     binding: 2,
                     resource: t.out.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: self.mask.as_entire_binding(),
                 },
             ],
         });
@@ -451,5 +517,23 @@ impl RenderBackend for SharedGpu {
             .lock()
             .map_err(|_| anyhow!("backend GPU non disponibile (errore precedente)"))?;
         g.render_pass(scene, settings, first_sample, max_samples, out, cancel)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn render_pass_masked(
+        &mut self,
+        scene: &RenderScene,
+        settings: &RenderSettings,
+        first_sample: u32,
+        max_samples: u32,
+        out: &mut [[f32; 3]],
+        cancel: &AtomicBool,
+        mask: &TileMask,
+    ) -> anyhow::Result<u32> {
+        let mut g = self
+            .0
+            .lock()
+            .map_err(|_| anyhow!("backend GPU non disponibile (errore precedente)"))?;
+        g.render_pass_masked(scene, settings, first_sample, max_samples, out, cancel, mask)
     }
 }

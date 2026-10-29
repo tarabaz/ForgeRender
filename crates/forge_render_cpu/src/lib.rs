@@ -126,4 +126,35 @@ impl RenderBackend for CpuBackend {
         // Il backend CPU calcola un campione per passata: passate brevi, interruzioni immediate.
         Ok(if cancel.load(Ordering::Relaxed) { 0 } else { 1 })
     }
+
+    /// Solo i pixel dei riquadri attivi: gli altri si saltano (valgono 0, la sessione li ignora).
+    #[allow(clippy::too_many_arguments)]
+    fn render_pass_masked(
+        &mut self,
+        scene: &RenderScene,
+        settings: &RenderSettings,
+        sample_index: u32,
+        _max_samples: u32,
+        out: &mut [[f32; 3]],
+        cancel: &AtomicBool,
+        mask: &forge_render_core::adaptive::TileMask,
+    ) -> anyhow::Result<u32> {
+        let w = settings.width as usize;
+        anyhow::ensure!(out.len() == w * settings.height as usize, "buffer di uscita di dimensione errata");
+        self.pool.install(|| {
+            out.par_chunks_mut(w).enumerate().for_each(|(y, row)| {
+                if cancel.load(Ordering::Relaxed) {
+                    return;
+                }
+                for (x, px) in row.iter_mut().enumerate() {
+                    *px = if mask.pixel_active(x, y) {
+                        render_pixel(scene, settings, x as u32, y as u32, sample_index)
+                    } else {
+                        [0.0; 3]
+                    };
+                }
+            });
+        });
+        Ok(if cancel.load(Ordering::Relaxed) { 0 } else { 1 })
+    }
 }

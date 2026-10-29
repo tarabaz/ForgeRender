@@ -8,6 +8,8 @@
 @group(0) @binding(0) var<uniform> P: array<vec4<u32>, 20>;
 @group(0) @binding(1) var<storage, read> S: array<u32>;
 @group(0) @binding(2) var<storage, read_write> OUT: array<vec4<f32>>;
+// Campionamento adattivo: un bit per riquadro di 16×16 pixel (1 = riceve ancora campioni).
+@group(0) @binding(3) var<storage, read> MASK: array<u32>;
 
 const PI: f32 = 3.14159265358979;
 const INV_PI: f32 = 0.318309886183791;
@@ -99,6 +101,8 @@ const P_N_SELECT: u32 = 66u;
 const P_OFF_PORTALS: u32 = 76u;
 const P_N_PORTALS: u32 = 77u;
 const P_PORTAL_AREA: u32 = 78u;
+const P_TILES_X: u32 = 79u;
+const ADAPTIVE_TILE: u32 = 16u;
 const PORTAL_WORDS: u32 = 16u;
 
 const TRI_WORDS: u32 = 12u;
@@ -1470,6 +1474,14 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let h = pu(P_HEIGHT);
     if (gid.x >= w || gid.y >= h) { return; }
     let idx = gid.y * w + gid.x;
+    if ((pu(P_FLAGS) & 2u) != 0u) {
+        // Riquadro già abbastanza pulito: nessun campione (la sessione ignora il pixel).
+        let tile = (gid.y / ADAPTIVE_TILE) * pu(P_TILES_X) + gid.x / ADAPTIVE_TILE;
+        if (((MASK[tile >> 5u] >> (tile & 31u)) & 1u) == 0u) {
+            OUT[idx] = vec4<f32>(0.0);
+            return;
+        }
+    }
     let first = pu(P_FIRST_SAMPLE);
     let n = pu(P_N_SAMPLES);
     let cam_pos = pv3(P_CAM_POS);

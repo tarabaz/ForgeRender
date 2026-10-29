@@ -44,6 +44,8 @@ struct JobInfo {
     key: (u32, u32, u32, u32, u32, u64, bool),
     threads: usize,
     target: u32,
+    /// Soglia di rumore e campioni minimi inviati alla sessione.
+    adaptive: (f32, u32),
 }
 
 /// Compilazione della geometria in corso su un thread separato.
@@ -941,6 +943,7 @@ impl ForgeApp {
             key: self.settings.accumulation_key(),
             threads: self.settings.effective_threads(),
             target: self.settings.target_samples,
+            adaptive: (self.settings.noise_threshold, self.settings.adaptive_min_samples),
             backend: self.settings.backend,
         });
         self.view = View::Render;
@@ -990,6 +993,11 @@ impl ForgeApp {
         if job.target != self.settings.target_samples {
             job.target = self.settings.target_samples;
             self.session.set_target(job.target);
+        }
+        let adaptive = (self.settings.noise_threshold, self.settings.adaptive_min_samples);
+        if job.adaptive != adaptive {
+            job.adaptive = adaptive;
+            self.session.set_adaptive(adaptive.0, adaptive.1);
         }
         let state = self.session.progress().state;
         if self.auto_restart && state.is_active() && self.render_is_stale() && !self.is_preparing() {

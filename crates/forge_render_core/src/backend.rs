@@ -24,4 +24,22 @@ pub trait RenderBackend: Send {
         out: &mut [[f32; 3]],
         cancel: &AtomicBool,
     ) -> anyhow::Result<u32>;
+
+    /// Come [`render_pass`](Self::render_pass), ma solo i pixel dei riquadri attivi della
+    /// maschera contano (campionamento adattivo): un backend può saltare gli altri e
+    /// scriverci 0. Il comportamento predefinito calcola tutta l'immagine (corretto, la
+    /// sessione ignora i pixel fermi, ma senza risparmio di tempo).
+    #[allow(clippy::too_many_arguments)]
+    fn render_pass_masked(
+        &mut self,
+        scene: &RenderScene,
+        settings: &RenderSettings,
+        first_sample: u32,
+        max_samples: u32,
+        out: &mut [[f32; 3]],
+        cancel: &AtomicBool,
+        _mask: &crate::adaptive::TileMask,
+    ) -> anyhow::Result<u32> {
+        self.render_pass(scene, settings, first_sample, max_samples, out, cancel)
+    }
 }

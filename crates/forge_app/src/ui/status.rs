@@ -30,6 +30,10 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             .desired_width(260.0)
             .text(format!("{} / {} campioni", p.samples, target));
         ui.add(bar);
+        if p.active_fraction < 1.0 && p.state.is_active() {
+            ui.label(format!("ancora in lavorazione: {:.0}% dell'immagine", p.active_fraction * 100.0))
+                .on_hover_text("Campionamento adattivo: le zone già pulite non ricevono più campioni");
+        }
         if app.is_preparing() {
             ui.spinner();
             ui.label("costruzione BVH…");

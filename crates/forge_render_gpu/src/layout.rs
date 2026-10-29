@@ -77,6 +77,8 @@ pub const P_N_FOGS: usize = 75;
 pub const P_OFF_PORTALS: usize = 76;
 pub const P_N_PORTALS: usize = 77;
 pub const P_PORTAL_AREA: usize = 78;
+/// Campionamento adattivo: riquadri per riga della maschera (attiva col bit 2 di P_FLAGS).
+pub const P_TILES_X: usize = 79;
 /// Portale: centro(3), mezza larghezza, normale(3), mezza altezza, u(3), 0, v(3), 0.
 pub const PORTAL_WORDS: usize = 16;
 

@@ -72,7 +72,8 @@ fn print_help() {
          render [opzioni]           rendering headless verso PNG\n    \
              --project F.frproject | --mesh F.obj/.stl/.step/.glb/.blend | --test-scene (default)\n    \
              --out F.png  --spp N  --width W  --height H  --threads T  --bounces B  --backend cpu|gpu\n    \
-             --unit mm|cm|m|in  (per --mesh, default mm)  --quiet\n    \
+             --unit mm|cm|m|in  (per --mesh, default mm)  --quiet  --seed N\n    \
+             --noise-threshold T (campionamento adattivo, es. 0.01; --spp resta il massimo)  --adaptive-min N\n    \
              --hdri F.hdr|F.exr  --hdri-strength S  --hdri-rotation GRADI\n    \
              --denoise off|finale  --denoise-quality veloce|bilanciata|alta  --cuda  --denoise-strength 0..1\n  \
          bench [opzioni]            benchmark della scena di test con diversi numeri di thread\n    \
@@ -153,6 +154,15 @@ fn render(args: &Args) -> anyhow::Result<()> {
     if let Some(v) = args.parse("--bounces")? {
         settings.max_bounces = v;
     }
+    if let Some(v) = args.parse("--seed")? {
+        settings.seed = v;
+    }
+    if let Some(v) = args.parse("--noise-threshold")? {
+        settings.noise_threshold = v;
+    }
+    if let Some(v) = args.parse("--adaptive-min")? {
+        settings.adaptive_min_samples = v;
+    }
     if settings.target_samples == 0 {
         bail!("--spp deve essere > 0 per il rendering da riga di comando");
     }
@@ -227,6 +237,16 @@ fn render(args: &Args) -> anyhow::Result<()> {
         p.device,
         out.display()
     );
+    if settings.noise_threshold > 0.0 && p.width > 0 && p.height > 0 {
+        let px = p.width as f64 * p.height as f64;
+        println!(
+            "campionamento adattivo: soglia {} | campioni per pixel: media {:.1}, massimo {} | {} campioni in totale",
+            settings.noise_threshold,
+            p.pixel_samples as f64 / px,
+            p.samples,
+            p.pixel_samples
+        );
+    }
     Ok(())
 }
 

@@ -115,6 +115,21 @@
   come ANSI). Non eseguito nel container (PowerShell non disponibile): da collaudare sul PC.
 ### Fase 3 — Baseline visiva e profiling: da fare dopo la fase 2
 
+### Ottimizzazione 2 — Campionamento adattivo (prima versione): fatto, spento di default
+- Accumulatore con campioni per pixel e somma "B" delle passate alterne per stimare il rumore;
+  maschera a riquadri 16×16 (`forge_render_core::adaptive`): un riquadro si ferma quando l'errore
+  medio è sotto la soglia e lo sono anche i vicini; la sessione finisce quando tutti sono fermi
+  (o al massimo di campioni). CPU e GPU saltano i riquadri fermi (`render_pass_masked`; GPU con
+  un buffer di bit). Scheda Render: "Arresto a soglia di rumore", soglia e campioni minimi;
+  barra di stato con la parte dell'immagine ancora in lavorazione; CLI `--noise-threshold`,
+  `--adaptive-min`, `--seed`.
+- Test: media uguale al riferimento, fermata automatica, efficienza su scena con cielo (CPU);
+  GPU contro CPU; senza soglia tutti i pixel ricevono tutti i campioni (nessun cambiamento).
+- Misure (docs/BENCHMARK.md): scena di test con cielo ≈ 1.8× più efficiente; **scena del
+  cocktail meno efficiente** (1.25–2×) perché la stima relativa dell'errore tiene attive le zone
+  scure con nebbia. Per questo resta spento di default.
+- Prossimo passo proposto (da confermare): errore stimato nello spazio dell'immagine mostrata.
+
 ### Ottimizzazione 1 — Majorant 3D della nebbia: fatta, da provare sul PC
 - Prima: un majorant per strato orizzontale (massimo dell'intera fetta di quota): il tappeto
   denso sul bancone alzava il majorant ovunque in quella fetta, con molti passi a vuoto.

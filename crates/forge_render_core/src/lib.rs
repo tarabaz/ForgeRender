@@ -8,6 +8,7 @@
 //!   e accumulo progressivo dei campioni.
 
 mod accum;
+pub mod adaptive;
 mod backend;
 mod denoise;
 pub mod displace;

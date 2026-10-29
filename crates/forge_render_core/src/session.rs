@@ -6,6 +6,7 @@
 //! interrotta (pausa, annullamento, nuova scena) viene scartata per intero,
 //! così l'accumulo non contiene mai campioni parziali.
 
+use crate::adaptive::TileMask;
 use crate::{Accumulator, DenoiseMode, DenoiseSettings, Denoiser, Guides, RenderBackend, RenderScene, RenderSettings};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -56,6 +57,11 @@ pub struct Progress {
     pub device: String,
     /// Stato della riduzione del rumore (filtro, dispositivo, tempo o errore); vuoto se inattiva.
     pub denoiser: String,
+    /// Frazione dell'immagine che riceve ancora campioni (1 senza campionamento adattivo).
+    pub active_fraction: f32,
+    /// Campioni calcolati davvero, sommati su tutti i pixel (col campionamento adattivo
+    /// sono meno di `samples × pixel`).
+    pub pixel_samples: u64,
 }
 
 impl Progress {
@@ -73,7 +79,13 @@ impl Progress {
         if s <= 0.0 {
             0.0
         } else {
-            self.width as f64 * self.height as f64 * self.samples as f64 / s / 1e6
+            // Campioni calcolati davvero (col campionamento adattivo i pixel fermi non contano).
+            let n = if self.pixel_samples > 0 {
+                self.pixel_samples as f64
+            } else {
+                self.width as f64 * self.height as f64 * self.samples as f64
+            };
+            n / s / 1e6
         }
     }
 
@@ -118,6 +130,8 @@ enum Cmd {
     Resume,
     Cancel,
     SetTarget(u32),
+    /// Soglia di rumore e campioni minimi del campionamento adattivo.
+    SetAdaptive(f32, u32),
     SetDenoise(DenoiseSettings),
     SetDenoiser(Option<Box<dyn Denoiser>>),
     Shutdown,
@@ -167,6 +181,8 @@ impl RenderSession {
                 backend: String::new(),
                 device: String::new(),
                 denoiser: String::new(),
+                active_fraction: 1.0,
+                pixel_samples: 0,
             }),
             frame: Mutex::new(None),
             frame_version: AtomicU64::new(0),
@@ -233,6 +249,11 @@ impl RenderSession {
         let _ = self.tx.send(Cmd::SetTarget(target));
     }
 
+    /// Cambia la soglia del campionamento adattivo senza ripartire (0 = spento).
+    pub fn set_adaptive(&self, threshold: f32, min_samples: u32) {
+        let _ = self.tx.send(Cmd::SetAdaptive(threshold, min_samples));
+    }
+
     /// Aggiorna le impostazioni del denoiser senza ripartire.
     pub fn set_denoise(&self, settings: DenoiseSettings) {
         let _ = self.tx.send(Cmd::SetDenoise(settings));
@@ -292,6 +313,8 @@ struct Active {
     denoised_at: Option<(u32, DenoiseKey)>,
     /// Soglia della prossima anteprima ripulita.
     next_preview: u32,
+    /// Riquadri che ricevono ancora campioni (campionamento adattivo acceso).
+    mask: Option<TileMask>,
 }
 
 type DenoiseKey = (crate::DenoiseQuality, bool, bool);
@@ -422,6 +445,8 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
         p.backend = a.job.backend.name();
         p.device = a.job.backend.device_info();
         p.denoiser = if dn.enabled() { dn.status.clone() } else { String::new() };
+        p.active_fraction = a.mask.as_ref().map(TileMask::active_fraction).unwrap_or(1.0);
+        p.pixel_samples = a.accum.total_samples();
     };
 
     loop {
@@ -472,7 +497,12 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
                         denoised: None,
                         denoised_at: None,
                         next_preview: dn.settings.first_preview_samples,
+                        mask: None,
                     };
+                    let mut a = a;
+                    if a.job.settings.noise_threshold > 0.0 {
+                        a.mask = Some(TileMask::all(w, h));
+                    }
                     tracing::info!(
                         "render avviato: {}x{}, {} campioni, backend {}",
                         w,
@@ -540,6 +570,22 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
                         publish(a, &dn, &shared);
                     }
                 }
+                Cmd::SetAdaptive(threshold, min) => {
+                    if let Some(a) = active.as_mut() {
+                        a.job.settings.noise_threshold = threshold;
+                        a.job.settings.adaptive_min_samples = min;
+                        if threshold <= 0.0 {
+                            a.mask = None;
+                        } else if a.mask.is_none() {
+                            a.mask = Some(TileMask::all(a.accum.width, a.accum.height));
+                        }
+                        if state == SessionState::Completed && !a.done() {
+                            a.running_since = Some(Instant::now());
+                            state = SessionState::Rendering;
+                        }
+                        update_progress(a, &dn, &state, Duration::ZERO, &shared);
+                    }
+                }
                 Cmd::SetTarget(t) => {
                     if let Some(a) = active.as_mut() {
                         a.job.settings.target_samples = t;
@@ -571,17 +617,35 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
         } else {
             target.saturating_sub(sample_index).max(1)
         };
-        let result = a.job.backend.render_pass(
-            &a.job.scene,
-            &a.job.settings,
-            sample_index,
-            max_samples,
-            &mut a.pass,
-            &shared.interrupt,
-        );
+        let result = match &a.mask {
+            Some(m) => a.job.backend.render_pass_masked(
+                &a.job.scene,
+                &a.job.settings,
+                sample_index,
+                max_samples,
+                &mut a.pass,
+                &shared.interrupt,
+                m,
+            ),
+            None => a.job.backend.render_pass(
+                &a.job.scene,
+                &a.job.settings,
+                sample_index,
+                max_samples,
+                &mut a.pass,
+                &shared.interrupt,
+            ),
+        };
         match result {
             Ok(n) if n > 0 => {
-                a.accum.add_samples(&a.pass, n);
+                a.accum.add_samples_masked(&a.pass, n, a.mask.as_ref());
+                // Campionamento adattivo: si fermano i riquadri già sotto la soglia di rumore.
+                let st = &a.job.settings;
+                if let Some(m) = a.mask.as_mut() {
+                    if a.accum.samples >= st.adaptive_min_samples {
+                        m.update(&a.accum, st.noise_threshold);
+                    }
+                }
                 let dt = t0.elapsed();
                 let done = a.done();
                 if done {
@@ -635,7 +699,7 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
 impl Active {
     fn done(&self) -> bool {
         let t = self.job.settings.target_samples;
-        t != 0 && self.accum.samples >= t
+        (t != 0 && self.accum.samples >= t) || self.mask.as_ref().is_some_and(TileMask::all_done)
     }
 }
 

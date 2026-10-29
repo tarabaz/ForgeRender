@@ -45,10 +45,6 @@ fn vec3_edit(ui: &mut egui::Ui, label: &str, v: &mut Vec3, speed: f64) -> bool {
     changed
 }
 
-fn unavailable(ui: &mut egui::Ui, what: &str, phase: &str) {
-    ui.add_enabled(false, egui::Label::new(format!("{what}: non disponibile ({phase})")));
-}
-
 // ----------------------------------------------------------------------
 // Materiali
 // ----------------------------------------------------------------------
@@ -1574,7 +1570,46 @@ fn render(app: &mut ForgeApp, ui: &mut egui::Ui) {
             .weak()
             .small(),
     );
-    unavailable(ui, "Arresto a soglia di rumore", "Fase 6");
+    // Campionamento adattivo: le zone già pulite smettono di ricevere campioni.
+    ui.horizontal(|ui| {
+        let mut on = s.noise_threshold > 0.0;
+        if ui
+            .checkbox(&mut on, "Arresto a soglia di rumore")
+            .on_hover_text(
+                "Campionamento adattivo: ogni zona dell'immagine si ferma quando il rumore stimato \
+                 scende sotto la soglia; il tempo va alle zone difficili (vetro, ombre, nebbia). \
+                 Il numero di campioni sopra resta il massimo.",
+            )
+            .changed()
+        {
+            s.noise_threshold = if on { 0.03 } else { 0.0 };
+            changed = true;
+        }
+    });
+    if s.noise_threshold > 0.0 {
+        egui::Grid::new("adaptive-grid").num_columns(2).spacing([10.0, 6.0]).show(ui, |ui| {
+            ui.label("Soglia di rumore");
+            changed |= ui
+                .add(
+                    egui::Slider::new(&mut s.noise_threshold, 0.002..=0.1)
+                        .logarithmic(true)
+                        .fixed_decimals(3),
+                )
+                .on_hover_text(
+                    "Più bassa = più pulita e più lenta. Sulla scena di test: 0.08 ≈ qualità di 64 campioni, \
+                     0.04 ≈ 256, 0.02 ≈ 1000. Conviene con sfondi e zone facili; nelle scene scure con \
+                     nebbia e scintille può costare più del rendering uniforme (in sviluppo).",
+                )
+                .changed();
+            ui.end_row();
+            ui.label("Campioni minimi");
+            changed |= ui
+                .add(egui::DragValue::new(&mut s.adaptive_min_samples).range(4..=4096))
+                .on_hover_text("Campioni per pixel prima di valutare il rumore (evita di fermare troppo presto zone con luce rara)")
+                .changed();
+            ui.end_row();
+        });
+    }
 
     ui.separator();
     ui.strong("Path tracing");

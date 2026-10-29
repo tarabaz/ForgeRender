@@ -776,3 +776,43 @@ fn gpu_volume_absorption_and_priority() {
     let c = mean(&render_with(&mut g, &glass_wins, &st, 4));
     assert!((c.x - 1.0).abs() < 0.01, "vetro prioritario: {c}");
 }
+
+/// Campionamento adattivo sulla GPU: si ferma da solo, salta i riquadri puliti e dà la
+/// stessa immagine (in media) della CPU uniforme.
+#[test]
+fn gpu_adaptive_sampling() {
+    let Some(g) = gpu() else { return };
+    use forge_render_core::{RenderSession, SessionState};
+    use std::sync::Arc;
+    let mut s = Scene::test_scene();
+    s.camera.position = Vec3::new(0.3, 1.2, 4.2);
+    s.camera.target = Vec3::new(0.0, 1.0, 0.0);
+    let rs = Arc::new(RenderScene::compile(&s));
+    let run = |backend: Box<dyn RenderBackend>, spp: u32, threshold: f32| {
+        let session = RenderSession::new();
+        let st = RenderSettings {
+            width: 96,
+            height: 54,
+            target_samples: spp,
+            noise_threshold: threshold,
+            ..Default::default()
+        };
+        let id = session.start(rs.clone(), st, backend);
+        let p = session.wait(id, std::time::Duration::from_secs(600));
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        (p, session.latest_frame().unwrap().linear.to_vec())
+    };
+    let mean = |img: &[[f32; 3]]| img.iter().map(|p| (p[0] + p[1] + p[2]) as f64).sum::<f64>() / (3.0 * img.len() as f64);
+    let (_, reference) = run(Box::new(CpuBackend::new(4).unwrap()), 512, 0.0);
+    let (p, img) = run(Box::new(g), 2048, 0.08);
+    eprintln!(
+        "GPU adattivo: {} campioni al massimo, {:.1} per pixel in media",
+        p.samples,
+        p.pixel_samples as f64 / (96.0 * 54.0)
+    );
+    assert_eq!(p.state, SessionState::Completed);
+    assert!(p.samples < 2048, "non si è fermato da solo");
+    assert!(p.pixel_samples < p.samples as u64 * 96 * 54, "nessun riquadro saltato");
+    let (mr, mg) = (mean(&reference), mean(&img));
+    assert!((mr - mg).abs() < 0.02 * mr, "media GPU {mg:.4} contro CPU {mr:.4}");
+}

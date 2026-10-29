@@ -145,6 +145,18 @@ pub struct RenderSettings {
     pub environment_visible: bool,
     pub backend: BackendKind,
     pub denoise: DenoiseSettings,
+    /// Campionamento adattivo: errore relativo stimato sotto cui una zona dell'immagine
+    /// smette di ricevere campioni (0 = spento, tutti i pixel fino a `target_samples`).
+    /// Sulla scena di test 0.08 ≈ qualità di 64 campioni uniformi, 0.04 ≈ 256, 0.02 ≈ 1000.
+    #[serde(default)]
+    pub noise_threshold: f32,
+    /// Campioni minimi per pixel prima di valutare il rumore.
+    #[serde(default = "default_adaptive_min")]
+    pub adaptive_min_samples: u32,
+}
+
+fn default_adaptive_min() -> u32 {
+    16
 }
 
 impl Default for RenderSettings {
@@ -163,6 +175,8 @@ impl Default for RenderSettings {
             environment_visible: true,
             backend: BackendKind::Cpu,
             denoise: DenoiseSettings::default(),
+            noise_threshold: 0.0,
+            adaptive_min_samples: default_adaptive_min(),
         }
     }
 }
@@ -200,6 +214,12 @@ impl RenderSettings {
             1.0
         };
         s.denoise.first_preview_samples = s.denoise.first_preview_samples.clamp(1, 4096);
+        s.noise_threshold = if s.noise_threshold.is_finite() {
+            s.noise_threshold.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        s.adaptive_min_samples = s.adaptive_min_samples.clamp(2, 65536);
         s
     }
 
