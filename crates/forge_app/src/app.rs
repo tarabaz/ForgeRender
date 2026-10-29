@@ -83,6 +83,8 @@ pub struct StartupOptions {
     pub screenshot_after_samples: u32,
     /// Apre la finestra della libreria.
     pub library: bool,
+    /// Apre la finestra delle impostazioni.
+    pub settings: bool,
     /// Scheda dell'inspector: oggetto | materiali | luci | ambiente | camera | render.
     pub tab: Option<String>,
     /// Seleziona il componente con questo nome.
@@ -193,6 +195,11 @@ pub struct ForgeApp {
     denoise_sent: Option<forge_render_core::DenoiseSettings>,
     pub gizmo: crate::ui::gizmo::Gizmo,
     pub library: crate::ui::library::LibraryUi,
+    /// Impostazioni dell'app (menu Impostazioni) e finestra aperta.
+    pub prefs: crate::prefs::Preferences,
+    pub prefs_open: bool,
+    /// Errore di lettura o salvataggio delle impostazioni, mostrato nella finestra.
+    pub prefs_error: Option<String>,
     /// "Pilota": la camera di rendering attiva segue la vista della viewport.
     pub camera_follow: bool,
     /// Animazione della vista avviata dal navigatore degli assi.
@@ -282,6 +289,9 @@ impl ForgeApp {
             denoise_sent: None,
             gizmo: Default::default(),
             library: Default::default(),
+            prefs: Default::default(),
+            prefs_open: false,
+            prefs_error: None,
             camera_follow: false,
             nav_anim: None,
             focus_pick: false,
@@ -311,6 +321,13 @@ impl ForgeApp {
                 .ok();
             app.gpu_warmup = Some(rx);
         }
+        // Impostazioni: libreria, import, valori dei nuovi progetti.
+        let (prefs, err) = crate::prefs::Preferences::load_from(&crate::prefs::file_path());
+        if let Some(e) = &err {
+            tracing::warn!("{e}");
+        }
+        app.prefs_error = err;
+        app.apply_prefs(prefs, true);
         // Cartelle della libreria (HDRI, materiali, texture).
         match forge_library::paths::ensure() {
             Ok(root) => tracing::info!("libreria: {}", root.display()),
@@ -357,6 +374,7 @@ impl ForgeApp {
             app.tab = InspectorTab::Camera;
         }
         app.library.open = startup.library;
+        app.prefs_open = startup.settings;
         if let Some(t) = &startup.tab {
             app.tab = match t.as_str() {
                 "oggetto" => InspectorTab::Object,
@@ -1139,13 +1157,14 @@ impl ForgeApp {
     }
 
     pub fn new_test_scene(&mut self) {
+        let settings = self.prefs.new_project_settings();
         self.replace_scene(
             Scene::test_scene(),
             ProjectMeta {
                 test_scene: true,
                 ..Default::default()
             },
-            None,
+            Some(settings),
         );
     }
 
@@ -1154,7 +1173,32 @@ impl ForgeApp {
             lights: forge_scene::light::preset("studio", forge_math::Vec3::ZERO, 1.0).unwrap_or_default(),
             ..Default::default()
         };
-        self.replace_scene(s, ProjectMeta::default(), None);
+        let settings = self.prefs.new_project_settings();
+        self.replace_scene(s, ProjectMeta::default(), Some(settings));
+    }
+
+    /// Adotta nuove impostazioni: le applica e (se non è l'avvio) le salva subito.
+    /// `startup`: anche i valori che valgono solo all'avvio (render della scena iniziale).
+    pub fn apply_prefs(&mut self, prefs: crate::prefs::Preferences, startup: bool) {
+        let prefs = prefs.sanitized();
+        let library_changed = startup || prefs.library_dir != self.prefs.library_dir;
+        prefs.apply_global();
+        self.auto_restart = prefs.auto_restart;
+        self.library.apply_prefs(&prefs, library_changed);
+        if startup {
+            self.settings = prefs.new_project_settings();
+        } else if prefs != self.prefs {
+            match prefs.save_to(&crate::prefs::file_path()) {
+                Ok(()) => self.prefs_error = None,
+                Err(e) => self.prefs_error = Some(format!("impostazioni non salvate: {e:#}")),
+            }
+        }
+        if library_changed {
+            if let Err(e) = forge_library::paths::ensure() {
+                self.prefs_error = Some(format!("cartella della libreria non utilizzabile: {e}"));
+            }
+        }
+        self.prefs = prefs;
     }
 
     pub fn import_dialog(&mut self) {

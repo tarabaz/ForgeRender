@@ -157,6 +157,21 @@ impl LibraryUi {
         self.hdris.get_or_insert_with(forge_library::paths::list_hdri).clone()
     }
 
+    /// Valori proposti dalle impostazioni; con `library_changed` si rilegge la libreria.
+    pub fn apply_prefs(&mut self, p: &crate::prefs::Preferences, library_changed: bool) {
+        self.resolution = p.download_resolution.min(online::RESOLUTIONS.len() - 1);
+        self.provider = if p.download_provider == "polyhaven" {
+            Provider::PolyHaven
+        } else {
+            Provider::AmbientCg
+        };
+        if library_changed {
+            self.refresh();
+            self.thumbs.retain(|k, _| k.starts_with("web:"));
+            self.results.clear();
+        }
+    }
+
     pub fn refresh(&mut self) {
         self.items = None;
         self.hdris = None;

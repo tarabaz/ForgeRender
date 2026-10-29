@@ -74,6 +74,32 @@ fn unique_dir(base: &Path, name: &str) -> PathBuf {
     p
 }
 
+/// Displacement dei materiali importati (impostazione dell'app; la CLI usa il predefinito).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum ImportDisplacement {
+    /// Spento: la height resta collegata, si accende dal pannello (predefinito).
+    #[default]
+    Off,
+    /// Valore proposto: 3 % del lato della texture.
+    Proposed,
+    /// Scala scritta nel file MaterialX della fonte, se c'è; altrimenti spento.
+    FromMaterialX,
+}
+
+static IMPORT_DISPLACEMENT: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+pub fn set_import_displacement(p: ImportDisplacement) {
+    IMPORT_DISPLACEMENT.store(p as u8, std::sync::atomic::Ordering::Relaxed);
+}
+
+pub fn import_displacement() -> ImportDisplacement {
+    match IMPORT_DISPLACEMENT.load(std::sync::atomic::Ordering::Relaxed) {
+        1 => ImportDisplacement::Proposed,
+        2 => ImportDisplacement::FromMaterialX,
+        _ => ImportDisplacement::Off,
+    }
+}
+
 /// Materiale ForgeRender costruito dalle mappe trovate. `size_m`: lato reale della
 /// texture in metri (proiezione box), se noto.
 pub fn material_from_maps(name: &str, id: &str, set: &MapSet, size_m: Option<f32>) -> Material {
@@ -95,7 +121,11 @@ pub fn material_from_maps(name: &str, id: &str, set: &MapSet, size_m: Option<f32
         // height map (metalli, vernici, plastiche) contengono solo micro-variazioni normalizzate
         // su tutta la scala e con un valore automatico diventano bozzi. Si accende dal pannello.
         bump_mm: if has(&set.normal) { 0.0 } else { 1.0 },
-        displacement_mm: 0.0,
+        displacement_mm: if has(&set.height) && import_displacement() == ImportDisplacement::Proposed {
+            default_displacement_mm(size_m)
+        } else {
+            0.0
+        },
         ao_texture: set.ao.clone(),
         opacity_texture: set.opacity.clone(),
         mapping: TextureMapping {
@@ -369,6 +399,16 @@ pub fn import_folder(src: &Path, name: Option<&str>, size_m: Option<f32>, source
                 }
             }
         }
+        if import_displacement() == ImportDisplacement::FromMaterialX && m.height_texture.is_some() {
+            let scale = crate::mtlx::find_in(&dest)
+                .and_then(|p| crate::mtlx::read(&p).ok())
+                .and_then(|v| crate::mtlx::displacement_scale(&v));
+            if let Some(s) = scale {
+                let mut m = m.clone();
+                m.displacement_mm = (s * 1000.0).clamp(0.0, 1000.0);
+                save(&dest, &m, source)?;
+            }
+        }
         load(&dest)
     })();
     if result.is_err() {
@@ -542,6 +582,30 @@ mod tests {
         let mx = crate::mtlx::find_in(&z.dir).expect("mtlx conservato");
         assert_eq!(crate::mtlx::displacement_scale(&crate::mtlx::read(&mx).unwrap()), Some(0.05));
         assert!(!z.dir.join("Metal012.usdc").exists());
+
+        // Politica del displacement all'import (impostazione dell'app).
+        assert_eq!(import_displacement(), ImportDisplacement::Off);
+        let hsrc = lib_root("hsrc");
+        gray(&hsrc.join("Rock_Color.png"), 120);
+        gray(&hsrc.join("Rock_Displacement.png"), 90);
+        std::fs::write(
+            hsrc.join("Rock.mtlx"),
+            r#"<materialx><displacement name="d"><input name="scale" type="float" value="0.02"/></displacement></materialx>"#,
+        )
+        .unwrap();
+        let off = import_folder(&hsrc, Some("Roccia off"), Some(2.0), "t").unwrap();
+        assert_eq!(off.material.displacement_mm, 0.0);
+        set_import_displacement(ImportDisplacement::Proposed);
+        let prop = import_folder(&hsrc, Some("Roccia proposto"), Some(2.0), "t").unwrap();
+        assert_eq!(prop.material.displacement_mm, default_displacement_mm(Some(2.0)));
+        set_import_displacement(ImportDisplacement::FromMaterialX);
+        let mtlx = import_folder(&hsrc, Some("Roccia mtlx"), Some(2.0), "t").unwrap();
+        assert!((mtlx.material.displacement_mm - 20.0).abs() < 1e-3);
+        set_import_displacement(ImportDisplacement::Off);
+        for m in [off, prop, mtlx] {
+            delete(&m).unwrap();
+        }
+        std::fs::remove_dir_all(hsrc).ok();
 
         // Elenco, ricaricamento e cancellazione.
         let all = list();

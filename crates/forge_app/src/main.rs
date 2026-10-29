@@ -10,6 +10,7 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 mod app;
+mod prefs;
 mod ui;
 mod viewport;
 
@@ -34,6 +35,7 @@ fn parse_args() -> StartupOptions {
                 o.screenshot_after_samples = args.get(i).and_then(|s| s.parse().ok()).unwrap_or(0);
             }
             "--library" => o.library = true,
+            "--settings" => o.settings = true,
             "--tab" => {
                 i += 1;
                 o.tab = args.get(i).cloned();

@@ -24,6 +24,11 @@ Benchmark pronti (dalla cartella estratta, in PowerShell; non serve altro)
   .\forgerender-cli.exe render --project $p\bench_ad.frproject --backend gpu --width 320 --height 400 --spp 1024 --seed 7 --noise-threshold 0.04 --adaptive-map mappa04.png --out ad04.png
   Elenco completo e significato di ogni misura: README del repository, sezione Benchmark.
 
+Impostazioni (pulsante "Impostazioni" nella barra o File -> Impostazioni...)
+  Risoluzione e sito dei download, displacement all'import, cartella della libreria, valori
+  dei nuovi progetti (CPU/GPU, campioni, thread). Salvate in impostazioni.json accanto al
+  programma (portable) o in %LOCALAPPDATA%\ForgeRender (installato).
+
 Libreria (pulsante "Libreria" nella barra)
   Materiali PBR veri con tutte le mappe (colore, rugosità/gloss, metallicità, normal GL/DX,
   rilievo, occlusione, opacità con ritaglio). Scarica da ambientCG e Poly Haven (CC0, gratuiti

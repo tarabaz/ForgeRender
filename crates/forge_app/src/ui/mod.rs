@@ -8,6 +8,7 @@ pub mod gizmo;
 pub(crate) mod inspector;
 pub mod library;
 pub mod navigator;
+mod settings;
 mod status;
 pub mod style;
 mod toolbar;
@@ -232,6 +233,7 @@ impl ForgeApp {
 
     fn dialogs(&mut self, ctx: &egui::Context) {
         crate::ui::library::window(self, ctx);
+        crate::ui::settings::window(self, ctx);
         if self.show_import_options {
             self.import_options_window(ctx);
         }

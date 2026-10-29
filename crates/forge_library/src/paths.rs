@@ -2,11 +2,30 @@
 //!
 //! Ordine di scelta della radice:
 //! 1. variabile d'ambiente `FORGE_LIBRARY_DIR`;
-//! 2. versione portable (`portable.txt` accanto all'eseguibile): `<exe>/Libreria`;
-//! 3. versione installata: `Documenti/ForgeRender/Libreria` (la cartella dei
+//! 2. cartella scelta nelle Impostazioni dell'app ([`set_custom_root`]);
+//! 3. versione portable (`portable.txt` accanto all'eseguibile): `<exe>/Libreria`;
+//! 4. versione installata: `Documenti/ForgeRender/Libreria` (la cartella dei
 //!    programmi non è scrivibile).
 
 use std::path::{Path, PathBuf};
+use std::sync::RwLock;
+
+static CUSTOM_ROOT: RwLock<Option<PathBuf>> = RwLock::new(None);
+
+/// Cartella della libreria scelta dall'utente (`None` = quella predefinita).
+pub fn set_custom_root(dir: Option<PathBuf>) {
+    *CUSTOM_ROOT.write().unwrap() = dir;
+}
+
+/// Radice predefinita (senza la cartella scelta dall'utente).
+pub fn default_root() -> PathBuf {
+    if let Some(exe_dir) = std::env::current_exe().ok().and_then(|p| p.parent().map(Path::to_path_buf)) {
+        if exe_dir.join("portable.txt").exists() {
+            return exe_dir.join("Libreria");
+        }
+    }
+    documents().join("ForgeRender").join("Libreria")
+}
 
 pub const HDRI: &str = "HDRI";
 pub const MATERIALS: &str = "Materiali";
@@ -33,12 +52,10 @@ pub fn root() -> PathBuf {
     if let Some(p) = std::env::var_os("FORGE_LIBRARY_DIR") {
         return PathBuf::from(p);
     }
-    if let Some(exe_dir) = std::env::current_exe().ok().and_then(|p| p.parent().map(Path::to_path_buf)) {
-        if exe_dir.join("portable.txt").exists() {
-            return exe_dir.join("Libreria");
-        }
+    if let Some(p) = CUSTOM_ROOT.read().unwrap().clone() {
+        return p;
     }
-    documents().join("ForgeRender").join("Libreria")
+    default_root()
 }
 
 pub fn hdri_dir() -> PathBuf {

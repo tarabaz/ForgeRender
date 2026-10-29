@@ -40,6 +40,11 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 app.export_png_dialog();
                 ui.close();
             }
+            ui.separator();
+            if ui.button("Impostazioni…").clicked() {
+                app.prefs_open = true;
+                ui.close();
+            }
         });
         ui.menu_button("Vista", |ui| {
             if ui.button("Inquadra tutto  (Home)").clicked() {
@@ -74,6 +79,13 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             .clicked()
         {
             app.library.open = !app.library.open;
+        }
+        if ui
+            .selectable_label(app.prefs_open, "Impostazioni")
+            .on_hover_text("Libreria e import, percorsi, valori dei nuovi progetti")
+            .clicked()
+        {
+            app.prefs_open = !app.prefs_open;
         }
         ui.separator();
 
@@ -113,7 +125,16 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             ui.colored_label(crate::ui::style::WARN, "Modalità sicura")
                 .on_hover_text("Avviato senza accelerazione GPU: viewport 3D disattivata");
         }
-        ui.checkbox(&mut app.auto_restart, "Riavvio automatico")
-            .on_hover_text("Quando cambi materiali, luci o camera il rendering riparte senza riutilizzare campioni incompatibili");
+        if ui
+            .checkbox(&mut app.auto_restart, "Riavvio automatico")
+            .on_hover_text("Quando cambi materiali, luci o camera il rendering riparte senza riutilizzare campioni incompatibili")
+            .changed()
+        {
+            let p = crate::prefs::Preferences {
+                auto_restart: app.auto_restart,
+                ..app.prefs.clone()
+            };
+            app.apply_prefs(p, false);
+        }
     });
 }

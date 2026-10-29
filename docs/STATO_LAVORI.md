@@ -217,5 +217,21 @@
 - **Pannello**: "× mappa" accanto a colore, metallic e roughness quando il valore viene da una
   mappa (il cursore la moltiplica).
 
+### Menu Impostazioni
+- Finestra **Impostazioni**, da File → Impostazioni… o dal pulsante nella barra. Le sezioni:
+  - **Libreria e import**: risoluzione e sito proposti per i download; displacement all'import
+    (spento, valore proposto o dal file MaterialX);
+  - **Percorsi**: cartella della libreria modificabile;
+  - **Rendering**: dispositivo, campioni e thread dei nuovi progetti, riavvio automatico;
+  - **Informazioni**: versione, cartelle di libreria, log e impostazioni.
+- Salvate subito in `impostazioni.json`: accanto al programma nella portable, in
+  `%LOCALAPPDATA%\ForgeRender` nell'installata.
+  - File mancante: valori predefiniti.
+  - File non valido: valori predefiniti e copia `.non-valido` conservata.
+  - "Ripristina predefiniti" riporta tutto ai valori iniziali.
+- Solo controlli collegati a funzioni reali. La CLI usa i valori predefiniti.
+- Test: salvataggio e rilettura, file non valido o parziale, politiche di displacement
+  all'import.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
