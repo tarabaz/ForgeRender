@@ -273,6 +273,12 @@ pub fn polyhaven_texture_files(v: &Value, resolution: &str) -> PolyHavenFiles {
     out
 }
 
+/// URL del file MaterialX di un materiale Poly Haven alla risoluzione scelta, se c'è.
+pub fn polyhaven_mtlx_file(v: &Value, resolution: &str) -> Option<String> {
+    let res = resolution.to_lowercase();
+    v.get("mtlx")?.get(&res)?.get("mtlx")?.get("url")?.as_str().map(str::to_string)
+}
+
 /// URL della HDRI Poly Haven (`files/<id>` → `hdri` → risoluzione → `hdr`).
 pub fn polyhaven_hdri_file(v: &Value, resolution: &str) -> Option<String> {
     let res = resolution.to_lowercase();
@@ -509,6 +515,12 @@ fn download_material_inner(asset: &OnlineAsset, resolution: &str, progress: &dyn
                     let fname = fname.split('?').next().unwrap_or(fname);
                     download_to(url, &tmp.join(fname))?;
                 }
+                // Descrizione MaterialX (facoltativa: se manca o non si scarica, si va avanti).
+                if let Some(url) = polyhaven_mtlx_file(&files, resolution) {
+                    if let Err(e) = download_to(&url, &tmp.join(format!("{}.mtlx", store::folder_name(&asset.id)))) {
+                        tracing::warn!("{}: file MaterialX non scaricato ({e:#})", asset.id);
+                    }
+                }
                 progress("importazione delle mappe…");
                 let m = store::import_folder(&tmp, Some(&name), asset.size_m, &source)?;
                 store::set_notes(&m.dir, &notes)
@@ -682,6 +694,8 @@ mod tests {
             ]
         );
         assert_eq!(r.missing, ["Displacement"]);
+        assert_eq!(polyhaven_mtlx_file(&files, "4K").as_deref(), Some("https://dl/metal_plate_02.mtlx"));
+        assert_eq!(polyhaven_mtlx_file(&files, "1K"), None);
         let hdri: Value = serde_json::from_str(r#"{"hdri":{"2k":{"hdr":{"url":"https://dl/studio_2k.hdr"}}}}"#).unwrap();
         assert_eq!(polyhaven_hdri_file(&hdri, "2K").as_deref(), Some("https://dl/studio_2k.hdr"));
     }

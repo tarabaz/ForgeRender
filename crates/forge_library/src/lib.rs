@@ -8,8 +8,10 @@
 //! - [`store`]: materiali salvati nella libreria (cartella con le mappe +
 //!   `materiale.json` + miniatura), import da cartella o da zip.
 //! - [`online`]: ricerca e download da ambientCG e Poly Haven (CC0).
+//! - [`mtlx`]: valori scritti nei file MaterialX che accompagnano i materiali scaricati.
 
 pub mod detect;
+pub mod mtlx;
 pub mod online;
 pub mod paths;
 pub mod store;

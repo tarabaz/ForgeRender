@@ -402,15 +402,34 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 .show(ui, |ui| changed |= relief_controls(ui, m));
         }
     }
+    changed |= mtlx_values(ui, m);
+    // Con una mappa il valore del cursore la moltiplica: il materiale segue la mappa.
+    let from_map = |ui: &mut egui::Ui, tex: &Option<std::path::PathBuf>| {
+        if let Some(p) = tex {
+            ui.label(egui::RichText::new("× mappa").small().weak()).on_hover_text(format!(
+                "Il valore viene dalla mappa {} (il cursore la moltiplica: 1 = mappa così com'è)",
+                p.file_name().map(|n| n.to_string_lossy()).unwrap_or_default()
+            ));
+        }
+    };
     egui::Grid::new("mat-grid").num_columns(2).spacing([10.0, 6.0]).show(ui, |ui| {
         ui.label("Colore base");
-        changed |= ui.color_edit_button_rgb(&mut m.base_color).changed();
+        ui.horizontal(|ui| {
+            changed |= ui.color_edit_button_rgb(&mut m.base_color).changed();
+            from_map(ui, &m.base_color_texture);
+        });
         ui.end_row();
         ui.label("Metallic");
-        changed |= ui.add(egui::Slider::new(&mut m.metallic, 0.0..=1.0)).changed();
+        ui.horizontal(|ui| {
+            changed |= ui.add(egui::Slider::new(&mut m.metallic, 0.0..=1.0)).changed();
+            from_map(ui, &m.metallic_texture);
+        });
         ui.end_row();
         ui.label("Roughness");
-        changed |= ui.add(egui::Slider::new(&mut m.roughness, 0.0..=1.0)).changed();
+        ui.horizontal(|ui| {
+            changed |= ui.add(egui::Slider::new(&mut m.roughness, 0.0..=1.0)).changed();
+            from_map(ui, &m.roughness_texture);
+        });
         ui.end_row();
         ui.label("Specular");
         changed |= ui
@@ -630,6 +649,64 @@ fn mapping_controls(ui: &mut egui::Ui, m: &mut Material, obj_size: Option<f32>) 
             changed = true;
         }
     });
+    changed
+}
+
+/// Valori scritti nel file MaterialX scaricato con il materiale (se c'è): si mostrano e si
+/// applicano su richiesta. Il file si rilegge solo quando cambia materiale (cache per percorso).
+fn mtlx_values(ui: &mut egui::Ui, m: &mut Material) -> bool {
+    let Some(dir) = forge_library::store::dir_of(&m.id) else {
+        return false;
+    };
+    let Some(path) = forge_library::mtlx::find_in(&dir) else {
+        return false;
+    };
+    let key = egui::Id::NULL.with(("mtlx", path.to_string_lossy().into_owned()));
+    let values: std::sync::Arc<Vec<forge_library::mtlx::MtlxValue>> = ui.ctx().data_mut(|d| {
+        d.get_temp(key).unwrap_or_else(|| {
+            let v = std::sync::Arc::new(forge_library::mtlx::read(&path).unwrap_or_default());
+            d.insert_temp(key, v.clone());
+            v
+        })
+    });
+    let mut changed = false;
+    egui::CollapsingHeader::new("Valori del file del materiale (MaterialX)")
+        .default_open(false)
+        .show(ui, |ui| {
+            ui.label(
+                egui::RichText::new(format!(
+                    "{}: valori scritti dalla fonte (non collegati a mappe).",
+                    path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default()
+                ))
+                .small()
+                .weak(),
+            );
+            let shown: Vec<_> = values.iter().filter(|v| v.ty != "filename" && v.ty != "string").collect();
+            if shown.is_empty() {
+                ui.label(egui::RichText::new("Nessun valore numerico nel file.").small());
+            }
+            for v in shown {
+                ui.label(
+                    egui::RichText::new(format!("{}.{} = {}", v.node, v.input, v.value))
+                        .small()
+                        .monospace(),
+                );
+            }
+            if let (Some(scale), true) = (forge_library::mtlx::displacement_scale(&values), m.height_texture.is_some()) {
+                let mm = scale * 1000.0;
+                if ui
+                    .button(format!("Usa la scala del displacement del file ({mm:.1} mm)"))
+                    .on_hover_text(
+                        "MaterialX esprime la scala in unità della scena (metri): valore × 1000 = mm. \
+                         Da verificare sul risultato: applicalo e guarda il render.",
+                    )
+                    .clicked()
+                {
+                    m.displacement_mm = mm.clamp(0.0, 1000.0);
+                    changed = true;
+                }
+            }
+        });
     changed
 }
 

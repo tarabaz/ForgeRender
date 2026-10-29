@@ -201,5 +201,21 @@
   componente è segnato `removed` (salvato nel progetto): sparisce da viewport, render e albero.
   Si ripristina con Ctrl+Z o da "Eliminati dal progetto" in fondo all'albero.
 
+### Materiali: EXR, Poly Haven completo, file MaterialX, origine dei valori
+- **Poly Haven**: le mappe disponibili solo in EXR ora si scaricano (prima venivano saltate).
+  Le mappe che il sito non offre alla risoluzione scelta finiscono come nota nel materiale e
+  sono mostrate nella Libreria e nella CLI.
+- **Texture**:
+  - il colore base in EXR (lineare) viene codificato correttamente in sRGB (prima risultava
+    decodificato due volte, molto più scuro);
+  - la height del displacement da PNG a 16 bit o EXR viene letta a 16 bit.
+- **MaterialX**: i file `.mtlx` di ambientCG (dentro lo zip) e di Poly Haven si conservano nella
+  cartella del materiale. Il pannello mostra i valori scritti dalla fonte e permette di usare la
+  scala del displacement del file.
+  - Lettore minimo senza dipendenze, testato su esempi nello stile della specifica.
+  - **Non ancora verificato su file reali**: servono gli esempi in `reports/esempi_materiali/`.
+- **Pannello**: "× mappa" accanto a colore, metallic e roughness quando il valore viene da una
+  mappa (il cursore la moltiplica).
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

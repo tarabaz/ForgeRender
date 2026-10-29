@@ -359,6 +359,16 @@ pub fn import_folder(src: &Path, name: Option<&str>, size_m: Option<f32>, source
         let id = format!("lib:{}", dest.file_name().and_then(|n| n.to_str()).unwrap_or("materiale"));
         let m = material_from_maps(&name, &id, &local, size_m);
         save(&dest, &m, source)?;
+        // File MaterialX della fonte: si conserva per leggerne i valori (vedi `mtlx`).
+        if let Ok(rd) = std::fs::read_dir(src) {
+            for p in rd.flatten().map(|e| e.path()) {
+                if p.extension().is_some_and(|e| e.eq_ignore_ascii_case("mtlx")) {
+                    if let Some(n) = p.file_name() {
+                        let _ = std::fs::copy(&p, dest.join(n));
+                    }
+                }
+            }
+        }
         load(&dest)
     })();
     if result.is_err() {
@@ -416,7 +426,8 @@ pub fn import_zip(zip_path: &Path, name: Option<&str>, size_m: Option<f32>, sour
             else {
                 continue;
             };
-            if detect::classify(&fname).is_none() {
+            let is_mtlx = fname.extension().is_some_and(|e| e.eq_ignore_ascii_case("mtlx"));
+            if detect::classify(&fname).is_none() && !is_mtlx {
                 continue;
             }
             let mut out = std::fs::File::create(tmp.join(&fname))?;
@@ -517,6 +528,9 @@ mod tests {
             }
             z.start_file("Metal012.usdc", opt).unwrap();
             z.write_all(b"x").unwrap();
+            z.start_file("Metal012.mtlx", opt).unwrap();
+            z.write_all(br#"<materialx><displacement name="d"><input name="scale" type="float" value="0.05"/></displacement></materialx>"#)
+                .unwrap();
             z.finish().unwrap();
         }
         let z = import_zip(&zpath, None, None, "ambientCG Metal012").unwrap();
@@ -524,6 +538,10 @@ mod tests {
         assert_eq!(z.material.metallic, 1.0);
         assert!(z.material.metallic_texture.is_some());
         assert_eq!(z.source, "ambientCG Metal012");
+        // Il file MaterialX dello zip resta nella cartella del materiale.
+        let mx = crate::mtlx::find_in(&z.dir).expect("mtlx conservato");
+        assert_eq!(crate::mtlx::displacement_scale(&crate::mtlx::read(&mx).unwrap()), Some(0.05));
+        assert!(!z.dir.join("Metal012.usdc").exists());
 
         // Elenco, ricaricamento e cancellazione.
         let all = list();
