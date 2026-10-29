@@ -84,7 +84,8 @@ fn print_help() {
          libreria scarica-tutto     scarica i cataloghi completi di ambientCG e Poly Haven nella libreria\n    \
              --fonte ambientcg|polyhaven|tutte (default tutte)  --tipo materiali|hdri|tutto (default materiali)\n    \
              --risoluzione 1K|2K|4K|8K (default 1K)  --filtro TESTO  --max N  --aggiorna-catalogo\n    \
-             --solo-elenco (conta e stima lo spazio senza scaricare). Già scaricati: saltati; si può interrompere e riprendere",
+             --solo-elenco (conta e stima lo spazio senza scaricare). Già scaricati: saltati, tranne quelli\n    \
+             con mappe nello slot sbagliato (riscaricati e sostituiti); si può interrompere e riprendere",
         env!("CARGO_PKG_VERSION")
     );
 }
@@ -506,7 +507,19 @@ fn library(args: &Args) -> anyhow::Result<()> {
             println!("\nMateriali ({}):", mats.len());
             for m in &mats {
                 let maps = m.material.texture_slots().iter().filter(|s| s.is_some()).count();
-                println!("  {:<40} {maps} mappe  [{}]", m.material.name, m.source);
+                let bad = if m.misassigned.is_empty() {
+                    String::new()
+                } else {
+                    format!("  ⚠ DA RISCARICARE ({})", m.misassigned.join("; "))
+                };
+                println!("  {:<40} {maps} mappe  [{}]{bad}", m.material.name, m.source);
+            }
+            let broken = mats.iter().filter(|m| !m.misassigned.is_empty()).count();
+            if broken > 0 {
+                println!(
+                    "\n{broken} materiali hanno mappe nello slot sbagliato (import precedente al 29/10/2026). \
+                     `forgerender-cli libreria scarica-tutto` li riscarica e sostituisce la copia difettosa."
+                );
             }
             let hdri = forge_library::paths::list_hdri();
             println!("\nHDRI ({}):", hdri.len());

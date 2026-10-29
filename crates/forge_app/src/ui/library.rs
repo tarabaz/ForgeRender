@@ -527,8 +527,23 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 for m in row {
                     let tex = app.library.material_thumb(&ctx, m);
                     let maps = m.material.texture_slots().iter().filter(|s| s.is_some()).count();
-                    let r = thumb_card(ui, tex, egui::vec2(CARD, CARD), &m.material.name, &format!("{maps} mappe"), false);
-                    let r = r.on_hover_text(format!("{}\n{}", m.source, m.dir.display()));
+                    let sub = if m.misassigned.is_empty() {
+                        format!("{maps} mappe")
+                    } else {
+                        "⚠ da riscaricare".to_string()
+                    };
+                    let r = thumb_card(ui, tex, egui::vec2(CARD, CARD), &m.material.name, &sub, false);
+                    let r = if m.misassigned.is_empty() {
+                        r.on_hover_text(format!("{}\n{}", m.source, m.dir.display()))
+                    } else {
+                        r.on_hover_text(format!(
+                            "{}\n{}\n\nImportato con un errore di riconoscimento delle mappe:\n{}\n\n\
+                             Riscaricalo dalla scheda Online (la copia difettosa viene sostituita).",
+                            m.source,
+                            m.dir.display(),
+                            m.misassigned.join("\n")
+                        ))
+                    };
                     if r.clicked() {
                         apply = Some(m.clone());
                     }

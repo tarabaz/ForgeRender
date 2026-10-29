@@ -40,6 +40,9 @@ pub struct LibraryMaterial {
     pub material: Material,
     pub source: String,
     pub thumbnail: Option<PathBuf>,
+    /// Mappe nello slot sbagliato secondo il riconoscimento attuale (vedi [`misassigned_maps`]):
+    /// il materiale va riscaricato.
+    pub misassigned: Vec<String>,
 }
 
 /// Nome di cartella valido su tutti i sistemi.
@@ -145,6 +148,7 @@ pub fn load(dir: &Path) -> anyhow::Result<LibraryMaterial> {
     let thumb = dir.join(THUMBNAIL_FILE);
     Ok(LibraryMaterial {
         dir: dir.to_path_buf(),
+        misassigned: misassigned_maps(&material),
         material,
         source: f.source,
         thumbnail: thumb.is_file().then_some(thumb),
@@ -166,6 +170,32 @@ pub fn save(dir: &Path, material: &Material, source: &str) -> anyhow::Result<()>
     };
     std::fs::write(dir.join(MATERIAL_FILE), serde_json::to_string_pretty(&f)?)?;
     Ok(())
+}
+
+/// Mappe il cui nome indica un tipo diverso dallo slot in cui sono. Succedeva ai materiali
+/// importati prima del riconoscimento per suffisso (29/10/2026): con nomi come
+/// `metal_plate_02_ao_4k.png` l'AO finiva come metallicità e il colore veniva scartato.
+/// Le mappe con nomi non riconoscibili (scelte a mano) non contano.
+pub fn misassigned_maps(m: &Material) -> Vec<String> {
+    use detect::MapKind as K;
+    type Slot<'a> = (&'a Option<PathBuf>, &'static str, fn(K) -> bool);
+    let slots: [Slot; 7] = [
+        (&m.base_color_texture, "colore", |k| k == K::BaseColor),
+        (&m.roughness_texture, "rugosità", |k| matches!(k, K::Roughness | K::Gloss)),
+        (&m.normal_texture, "normal", |k| matches!(k, K::Normal(_))),
+        (&m.metallic_texture, "metallicità", |k| k == K::Metallic),
+        (&m.height_texture, "rilievo", |k| k == K::Height),
+        (&m.ao_texture, "occlusione", |k| k == K::Ao),
+        (&m.opacity_texture, "opacità", |k| k == K::Opacity),
+    ];
+    slots
+        .into_iter()
+        .filter_map(|(p, slot, ok)| {
+            let p = p.as_ref()?;
+            let kind = detect::classify(p)?;
+            (!ok(kind)).then(|| format!("{slot}: {}", p.file_name().map(|n| n.to_string_lossy()).unwrap_or_default()))
+        })
+        .collect()
 }
 
 /// Cartella della libreria del materiale con id `lib:<cartella>`, se esiste.
@@ -522,6 +552,17 @@ mod tests {
         assert_eq!(load(&all[0].dir).unwrap().material.name, "Mattoni");
         assert!(save_as(&upd.material, "  ", "").is_err());
         delete(&copy).unwrap();
+
+        // Materiale importato col vecchio riconoscimento: una mappa nello slot sbagliato.
+        let mut broken = load(&all[0].dir).unwrap().material;
+        assert!(misassigned_maps(&broken).is_empty());
+        broken.metallic_texture = broken.normal_texture.clone();
+        let bad = misassigned_maps(&broken);
+        assert_eq!(bad.len(), 1, "{bad:?}");
+        assert!(bad[0].starts_with("metallicità"), "{bad:?}");
+        // Una texture con un nome qualsiasi scelta a mano non è un errore.
+        broken.metallic_texture = Some(PathBuf::from("la_mia_texture.png"));
+        assert!(misassigned_maps(&broken).is_empty());
         assert_eq!(dir_of(&MaterialId::new("lib:non-esiste")), None);
         assert_eq!(dir_of(&MaterialId::new("acciaio")), None);
         delete(&all[1]).unwrap();

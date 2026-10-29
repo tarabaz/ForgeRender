@@ -406,12 +406,32 @@ pub fn hdri_downloaded(asset: &OnlineAsset, local_hdris: &[PathBuf]) -> bool {
     })
 }
 
+/// Chiave "sito id" di un materiale scaricato (dalla sua origine "sito id (risoluzione)").
+fn library_source_key(m: &store::LibraryMaterial) -> Option<&str> {
+    m.source.rsplit_once(" (").map(|(k, _)| k)
+}
+
 /// Chiavi "sito id" dei materiali della libreria (per riconoscere quelli già scaricati).
+/// Quelli con mappe nello slot sbagliato non contano: vanno riscaricati.
 pub fn local_source_keys() -> std::collections::HashSet<String> {
     store::list()
-        .into_iter()
-        .filter_map(|m| m.source.rsplit_once(" (").map(|(k, _)| k.to_string()))
+        .iter()
+        .filter(|m| m.misassigned.is_empty())
+        .filter_map(|m| library_source_key(m).map(str::to_string))
         .collect()
+}
+
+/// Dopo un nuovo download: elimina le copie difettose dello stesso materiale.
+fn remove_broken_copies(new: &store::LibraryMaterial) {
+    let Some(key) = library_source_key(new) else { return };
+    for old in store::list() {
+        if old.dir != new.dir && !old.misassigned.is_empty() && library_source_key(&old) == Some(key) {
+            match store::delete(&old) {
+                Ok(()) => tracing::info!("libreria: sostituita la copia difettosa {}", old.dir.display()),
+                Err(e) => tracing::warn!("libreria: {} non eliminata ({e:#})", old.dir.display()),
+            }
+        }
+    }
 }
 
 /// Miniatura (PNG/JPG), con cache su disco.
@@ -435,6 +455,12 @@ pub fn thumbnail(asset: &OnlineAsset) -> anyhow::Result<Vec<u8>> {
 
 /// Scarica un materiale e lo aggiunge alla libreria.
 pub fn download_material(asset: &OnlineAsset, resolution: &str, progress: &dyn Fn(&str)) -> anyhow::Result<LibraryMaterial> {
+    let m = download_material_inner(asset, resolution, progress)?;
+    remove_broken_copies(&m);
+    Ok(m)
+}
+
+fn download_material_inner(asset: &OnlineAsset, resolution: &str, progress: &dyn Fn(&str)) -> anyhow::Result<LibraryMaterial> {
     let source = format!("{} {} ({resolution})", asset.provider.label(), asset.id);
     let name = format!("{} {resolution}", asset.name);
     match asset.provider {
