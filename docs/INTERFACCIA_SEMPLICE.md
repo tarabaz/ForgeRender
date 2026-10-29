@@ -5,8 +5,9 @@ come deve essere impostata per avere la resa migliore: modificate i valori nella
 **"Proposta"**, aggiungete le vostre note nella colonna **"Decisione"**, e i valori vengono
 riportati nel codice (`crates/forge_app/src/presets.rs`).
 
-Stato: **Fase 1 completata** (modello dei preset e test). Il pannello della modalità Semplice
-arriva nelle fasi 2–3. I valori delle tabelle 2 e 3 sono **già quelli del codice**.
+Stato: **implementata** (fasi 1–3, report in `reports/2026-10-29_interfaccia-semplice/`). Il
+selettore Semplice/Avanzata è in alto a sinistra; la Semplice è la modalità predefinita. I valori
+di questa scheda sono **quelli del codice**.
 
 ## 1. Cosa si vede nella modalità Semplice (pannello di destra, dall'alto in basso)
 
@@ -15,7 +16,7 @@ spiega cosa fa.
 
 | # | Sezione | Controllo | Cosa fa davvero | Decisione |
 |---|---|---|---|---|
-| 0 | Barra in alto | Selettore **Semplice / Avanzata** | Cambia solo il pannello di destra; i valori restano gli stessi | |
+| 0 | Barra in alto | Selettore **Semplice / Avanzata** (predefinita: Semplice; ricordata nelle Impostazioni) | Cambia solo il pannello di destra; i valori restano gli stessi | |
 | 1 | Prodotto | **Importa modello…** | Stesso import del menu File (GLB, STEP, OBJ, STL, SolidWorks su Windows) | |
 | 1 | Prodotto | **Appoggia sulla base** | Porta il punto più basso del prodotto a quota 0, senza spostarlo in orizzontale (tutte le parti insieme) | |
 | 1 | Prodotto | **Inquadra il prodotto** | Camera sul prodotto (senza pavimento e fondale); muove anche la camera di render attiva | |

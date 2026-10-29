@@ -85,6 +85,10 @@ pub struct StartupOptions {
     pub library: bool,
     /// Apre la finestra delle impostazioni.
     pub settings: bool,
+    /// Modalità dell'interfaccia per questa sessione (non salvata): "semplice" o "avanzata".
+    pub ui_mode: Option<crate::prefs::UiMode>,
+    /// Esegue "Prepara scena prodotto" all'avvio con l'aspetto indicato (test e screenshot).
+    pub prepare: Option<crate::presets::Look>,
     /// Scheda dell'inspector: oggetto | materiali | luci | ambiente | camera | render.
     pub tab: Option<String>,
     /// Seleziona il componente con questo nome.
@@ -200,6 +204,12 @@ pub struct ForgeApp {
     pub prefs_open: bool,
     /// Errore di lettura o salvataggio delle impostazioni, mostrato nella finestra.
     pub prefs_error: Option<String>,
+    /// Modalità Semplice: aspetto e qualità scelti, valori prima dell'ultimo preset.
+    pub simple_look: crate::presets::Look,
+    pub simple_quality: crate::presets::Quality,
+    pub preset_backup: Option<crate::presets::PresetBackup>,
+    /// Esito dell'ultima azione della modalità Semplice (mostrato nel pannello, non in finestra).
+    pub simple_msg: Option<String>,
     /// "Pilota": la camera di rendering attiva segue la vista della viewport.
     pub camera_follow: bool,
     /// Animazione della vista avviata dal navigatore degli assi.
@@ -292,6 +302,10 @@ impl ForgeApp {
             prefs: Default::default(),
             prefs_open: false,
             prefs_error: None,
+            simple_look: crate::presets::Look::Light,
+            simple_quality: crate::presets::Quality::Balanced,
+            preset_backup: None,
+            simple_msg: None,
             camera_follow: false,
             nav_anim: None,
             focus_pick: false,
@@ -375,6 +389,13 @@ impl ForgeApp {
         }
         app.library.open = startup.library;
         app.prefs_open = startup.settings;
+        if let Some(m) = startup.ui_mode {
+            app.prefs.ui_mode = m;
+        }
+        if let Some(l) = startup.prepare {
+            app.simple_look = l;
+            app.simple_prepare_scene();
+        }
         if let Some(t) = &startup.tab {
             app.tab = match t.as_str() {
                 "oggetto" => InspectorTab::Object,
@@ -984,6 +1005,18 @@ impl ForgeApp {
         self.view = View::Render;
     }
 
+    /// GPU utilizzabile? Senza aspettare: `None` finché la preparazione in background non è
+    /// finita (o se non è mai partita, come in modalità sicura).
+    pub fn gpu_ready(&mut self) -> Option<bool> {
+        if self.gpu.is_none() {
+            if let Some(Ok(r)) = self.gpu_warmup.as_ref().map(|rx| rx.try_recv()) {
+                self.gpu = Some(r);
+                self.gpu_warmup = None;
+            }
+        }
+        self.gpu.as_ref().map(Result::is_ok)
+    }
+
     /// Dispositivo GPU condiviso, creato al primo utilizzo.
     pub fn gpu_backend(&mut self) -> Result<forge_render_gpu::SharedGpu, String> {
         if self.gpu.is_none() {
@@ -1160,6 +1193,88 @@ impl ForgeApp {
         };
         let settings = self.prefs.new_project_settings();
         self.replace_scene(s, ProjectMeta::default(), Some(settings));
+    }
+
+    // --- Modalità Semplice (logica in `presets`) ---
+
+    /// Applica un aspetto (luci, ambiente, visualizzazione, colore del fondale).
+    pub fn simple_apply_look(&mut self, look: crate::presets::Look) {
+        self.preset_backup = Some(crate::presets::PresetBackup::capture(&self.scene, &self.settings));
+        crate::presets::apply_look(&mut self.scene, &mut self.settings, look);
+        self.simple_look = look;
+        self.selected_light = None;
+        self.appearance_changed();
+        self.shading_changed();
+    }
+
+    /// Applica una qualità (campioni, rimbalzi, denoiser).
+    pub fn simple_apply_quality(&mut self, q: crate::presets::Quality) {
+        self.preset_backup = Some(crate::presets::PresetBackup::capture(&self.scene, &self.settings));
+        q.apply(&mut self.settings);
+        self.simple_quality = q;
+    }
+
+    /// "Prepara scena prodotto": appoggia, fondale se manca, aspetto, qualità, inquadratura.
+    pub fn simple_prepare_scene(&mut self) {
+        if crate::presets::product_bounds(&self.scene).is_empty() {
+            self.simple_msg = Some("Importa prima un modello: la scena non ha un prodotto da preparare.".into());
+            return;
+        }
+        let backup = crate::presets::prepare_scene(&mut self.scene, &mut self.settings, self.simple_look, self.simple_quality);
+        self.preset_backup = Some(backup);
+        self.selected_light = None;
+        self.selection.clear();
+        self.geometry_changed();
+        self.frame_product();
+        self.simple_msg = Some(format!(
+            "Scena pronta: {} · qualità {}. \"Annulla preset\" la riporta com'era.",
+            self.simple_look.label(),
+            self.simple_quality.label()
+        ));
+    }
+
+    /// Ripristina i valori di prima dell'ultimo preset (solo quelli che il preset ha cambiato).
+    pub fn simple_undo_preset(&mut self) {
+        if let Some(b) = self.preset_backup.take() {
+            b.restore(&mut self.scene, &mut self.settings);
+            self.selection.clear();
+            self.geometry_changed();
+            self.simple_msg = Some("Preset annullato: luci, ambiente, qualità e fondale come prima.".into());
+        }
+    }
+
+    /// Appoggia tutto il prodotto sulla base (annullabile con Ctrl+Z).
+    pub fn drop_product_to_base(&mut self) {
+        let roots = crate::presets::product_roots(&self.scene);
+        if roots.is_empty() {
+            return;
+        }
+        self.push_undo(&roots);
+        if crate::presets::drop_product_to_base(&mut self.scene).abs() > 0.0 {
+            self.geometry_changed();
+        }
+    }
+
+    /// Inquadra il prodotto (senza pavimento e fondale); muove anche la camera di render attiva.
+    pub fn frame_product(&mut self) {
+        let b = crate::presets::product_bounds(&self.scene);
+        if b.is_empty() {
+            return self.frame_all();
+        }
+        self.orbit.frame(&b);
+        // Formati verticali (4:5, 9:16): conta anche l'apertura orizzontale, più stretta.
+        let aspect = self.settings.aspect();
+        if aspect < 1.0 {
+            let half_v = (self.orbit.vfov_deg.to_radians() * 0.5).min(1.5);
+            let half_h = (half_v.tan() * aspect).atan().max(1e-3);
+            self.orbit.distance = b.radius().max(1e-4) / half_h.sin() * 1.1;
+        }
+        self.scene.camera = self.orbit.camera();
+        if let Some(c) = self.scene.active_camera.and_then(|i| self.scene.render_cameras.get_mut(i)) {
+            c.camera = self.scene.camera.clone();
+            self.unsaved = true;
+        }
+        self.camera_rev += 1;
     }
 
     /// Adotta nuove impostazioni: le applica e (se non è l'avvio) le salva subito.

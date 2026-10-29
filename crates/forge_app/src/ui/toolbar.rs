@@ -4,6 +4,8 @@ use forge_render_core::SessionState;
 
 pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
     egui::MenuBar::new().ui(ui, |ui| {
+        mode_switch(app, ui);
+        ui.separator();
         ui.menu_button("File", |ui| {
             if ui.button("Nuova scena vuota").clicked() {
                 app.new_empty_scene();
@@ -27,14 +29,10 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 ui.close();
             }
             ui.separator();
-            if ui.button("Importa mesh OBJ/STL…  (Ctrl+I)").clicked() {
+            if ui.button("Importa modello…  (Ctrl+I)").on_hover_text(IMPORT_HINT).clicked() {
                 app.import_dialog();
                 ui.close();
             }
-            ui.add_enabled(false, egui::Button::new("Importa STEP…"))
-                .on_disabled_hover_text("Non ancora disponibile: importazione STEP tramite Open CASCADE (Fase 5)");
-            ui.add_enabled(false, egui::Button::new("Importa da SolidWorks (SLDPRT/SLDASM)…"))
-                .on_disabled_hover_text("Non ancora disponibile: bridge con le API di SolidWorks (Fase 5)");
             ui.separator();
             if ui.button("Esporta immagine PNG…").clicked() {
                 app.export_png_dialog();
@@ -67,7 +65,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
         });
 
         ui.separator();
-        if ui.button("Importa").on_hover_text("Importa mesh OBJ/STL (Ctrl+I)").clicked() {
+        if ui.button("Importa").on_hover_text(IMPORT_HINT).clicked() {
             app.import_dialog();
         }
         if ui.button("Salva").on_hover_text("Salva progetto (Ctrl+S)").clicked() {
@@ -137,4 +135,27 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             app.apply_prefs(p, false);
         }
     });
+}
+
+/// Formati che l'import accetta davvero (vedi `ForgeApp::import_dialog`).
+pub const IMPORT_HINT: &str = "Importa un modello (Ctrl+I): glTF/GLB, OBJ, STL, Blender .blend (con Blender installato), \
+     STEP (con il convertitore forgerender-step), SolidWorks SLDPRT/SLDASM (su Windows, con SolidWorks installato)";
+
+/// Selettore Semplice | Avanzata: cambia solo il pannello di destra, i valori restano gli stessi.
+fn mode_switch(app: &mut ForgeApp, ui: &mut egui::Ui) {
+    use crate::prefs::UiMode;
+    let mut mode = app.prefs.ui_mode;
+    let big = |t: &str| egui::RichText::new(t).strong().size(15.0);
+    ui.label(egui::RichText::new("Modalità").weak());
+    ui.selectable_value(&mut mode, UiMode::Simple, big("Semplice"))
+        .on_hover_text("Pannello guidato: prepara la scena, scegli aspetto e qualità, avvia il render");
+    ui.selectable_value(&mut mode, UiMode::Advanced, big("Avanzata"))
+        .on_hover_text("Tutti i controlli: oggetti, materiali, luci, ambiente, effetti, camera, render");
+    if mode != app.prefs.ui_mode {
+        let p = crate::prefs::Preferences {
+            ui_mode: mode,
+            ..app.prefs.clone()
+        };
+        app.apply_prefs(p, false);
+    }
 }

@@ -13,9 +13,19 @@ use std::path::{Path, PathBuf};
 
 pub const FILE_NAME: &str = "impostazioni.json";
 
+/// Modalità dell'interfaccia: Semplice (pannello guidato) o Avanzata (tutte le schede).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum UiMode {
+    #[default]
+    Simple,
+    Advanced,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Preferences {
+    /// Modalità dell'interfaccia (selettore in alto).
+    pub ui_mode: UiMode,
     // --- Libreria e import dei materiali ---
     /// Risoluzione proposta per i download (indice in `online::RESOLUTIONS`: 0 = 1K).
     pub download_resolution: usize,
@@ -42,6 +52,7 @@ impl Default for Preferences {
     fn default() -> Self {
         let r = RenderSettings::default();
         Self {
+            ui_mode: UiMode::Simple,
             download_resolution: 0,
             download_provider: "ambientcg".into(),
             import_displacement: ImportDisplacement::Off,
@@ -163,6 +174,7 @@ mod tests {
         assert_eq!(d, Preferences::default());
         assert!(err.is_none(), "file mancante: nessun errore");
         let custom = Preferences {
+            ui_mode: UiMode::Advanced,
             download_resolution: 2,
             download_provider: "polyhaven".into(),
             import_displacement: ImportDisplacement::FromMaterialX,

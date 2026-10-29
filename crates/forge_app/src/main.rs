@@ -6,13 +6,13 @@
 //!     --render             avvia subito il rendering
 //!     --screenshot F.png   salva uno screenshot della finestra ed esce (test automatici)
 //!     --screenshot-after N attende N campioni prima dello screenshot
+//!     --modalita semplice|avanzata   modalità dell'interfaccia per questa sessione
+//!     --prepara chiaro|scuro|scenografico   "Prepara scena prodotto" all'avvio
 
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 mod app;
 mod prefs;
-// Usato dal pannello della modalità Semplice (fase 3); fino ad allora solo dai test.
-#[allow(dead_code)]
 mod presets;
 mod ui;
 mod viewport;
@@ -39,6 +39,23 @@ fn parse_args() -> StartupOptions {
             }
             "--library" => o.library = true,
             "--settings" => o.settings = true,
+            "--prepara" => {
+                i += 1;
+                o.prepare = match args.get(i).map(String::as_str) {
+                    Some("chiaro") => Some(presets::Look::Light),
+                    Some("scuro") => Some(presets::Look::Dark),
+                    Some("scenografico") => Some(presets::Look::Dramatic),
+                    _ => None,
+                };
+            }
+            "--modalita" => {
+                i += 1;
+                o.ui_mode = match args.get(i).map(String::as_str) {
+                    Some("semplice") => Some(prefs::UiMode::Simple),
+                    Some("avanzata") => Some(prefs::UiMode::Advanced),
+                    _ => None,
+                };
+            }
             "--tab" => {
                 i += 1;
                 o.tab = args.get(i).cloned();

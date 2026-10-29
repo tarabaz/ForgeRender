@@ -9,6 +9,7 @@ pub(crate) mod inspector;
 pub mod library;
 pub mod navigator;
 mod settings;
+mod simple;
 mod status;
 pub mod style;
 mod toolbar;
@@ -46,7 +47,10 @@ impl eframe::App for ForgeApp {
             .default_size(360.0)
             .min_size(260.0)
             .max_size((total * 0.45).max(280.0))
-            .show(ui, |ui| inspector::show(self, ui));
+            .show(ui, |ui| match self.prefs.ui_mode {
+                crate::prefs::UiMode::Simple => simple::show(self, ui),
+                crate::prefs::UiMode::Advanced => inspector::show(self, ui),
+            });
         egui::CentralPanel::default().show(ui, |ui| central::show(self, ui, frame));
 
         self.dialogs(&ctx);

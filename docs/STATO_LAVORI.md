@@ -287,5 +287,29 @@
 - Scheda di configurazione con valori e decisioni: `docs/INTERFACCIA_SEMPLICE.md`.
 - Il pannello della modalità Semplice arriva nelle fasi 2–3.
 
+### Interfaccia Semplice / Avanzata — Fasi 2–3: selettore e pannello Semplice
+- **Selettore Semplice | Avanzata** in alto a sinistra, ricordato nelle Impostazioni
+  (predefinita: Semplice).
+- **Pannello Semplice** "Foto prodotto in 5 passi" con pulsanti grandi:
+  1. Importa / Appoggia sulla base / Inquadra il prodotto;
+  2. Aspetto (3 scelte), Prepara scena prodotto, Annulla preset, indicatore "Personalizzato";
+  3. Materiali (pezzo selezionato, libreria);
+  4. Formato (4) e Qualità (3), GPU;
+  5. Avvia render con avanzamento, Salva immagine.
+- **Avanzata invariata**: stessi dati. Dopo "Prepara scena" la scheda Render mostra i valori
+  impostati (verificato con screenshot).
+- Menu File: tolte le voci grigie e false "Importa STEP/SolidWorks — non disponibile" (funzionano
+  da "Importa"); "Importa modello…" con i formati veri.
+- Opzioni di avvio per test e screenshot: `--modalita semplice|avanzata`,
+  `--prepara chiaro|scuro|scenografico`.
+- Problemi risolti durante la prova:
+  - i simboli ★ ↶ ▶ non sono nel carattere dell'app e sono stati tolti;
+  - l'avviso "Personalizzato" compariva su una scena appena aperta;
+  - il messaggio di conferma era una finestra che copriva il pannello;
+  - `gpu_backend()` bloccava l'interfaccia se chiamata durante la preparazione della GPU
+    (aggiunto `gpu_ready()`, che non aspetta).
+- Report con screenshot: `reports/2026-10-29_interfaccia-semplice/`. Scheda dei valori:
+  `docs/INTERFACCIA_SEMPLICE.md`.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
