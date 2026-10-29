@@ -331,8 +331,31 @@ pub fn save_thumbnail(dir: &Path, width: u32, height: u32, rgba: &[u8]) -> anyho
     Ok(p)
 }
 
+/// Come arrivano i file nella cartella del materiale.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Transfer {
+    /// Copiati: l'origine resta com'era.
+    #[default]
+    Copy,
+    /// Spostati (stesso disco: niente doppio spazio). Se l'import fallisce tornano al loro posto.
+    Move,
+}
+
 /// Importa le mappe di una cartella come nuovo materiale della libreria (i file vengono copiati).
 pub fn import_folder(src: &Path, name: Option<&str>, size_m: Option<f32>, source: &str) -> anyhow::Result<LibraryMaterial> {
+    import_folder_with(src, name, size_m, source, Transfer::Copy)
+}
+
+/// Come [`import_folder`], scegliendo se copiare o spostare i file. Arrivano nella cartella
+/// del materiale solo le mappe collegate agli slot (più i canali estratti dalla ARM che
+/// servono) e il file MaterialX; tutto il resto resta nell'origine.
+pub fn import_folder_with(
+    src: &Path,
+    name: Option<&str>,
+    size_m: Option<f32>,
+    source: &str,
+    transfer: Transfer,
+) -> anyhow::Result<LibraryMaterial> {
     let files = detect::image_files(src);
     let set = detect::detect(&files);
     if set.is_empty() {
@@ -351,11 +374,25 @@ pub fn import_folder(src: &Path, name: Option<&str>, size_m: Option<f32>, source
     std::fs::create_dir_all(crate::paths::materials_dir())?;
     let dest = unique_dir(&crate::paths::materials_dir(), &name);
     std::fs::create_dir_all(&dest)?;
+    // File spostati (origine, destinazione): in caso di errore tornano indietro.
+    let moved: std::cell::RefCell<Vec<(PathBuf, PathBuf)>> = Default::default();
+    let put = |from: &Path, to: &Path| -> anyhow::Result<()> {
+        match transfer {
+            Transfer::Copy => {
+                std::fs::copy(from, to).with_context(|| format!("copia di {}", from.display()))?;
+            }
+            Transfer::Move => {
+                std::fs::rename(from, to).with_context(|| format!("spostamento di {}", from.display()))?;
+                moved.borrow_mut().push((from.to_path_buf(), to.to_path_buf()));
+            }
+        }
+        Ok(())
+    };
     let result = (|| -> anyhow::Result<LibraryMaterial> {
         let copy = |p: &Option<PathBuf>| -> anyhow::Result<Option<PathBuf>> {
             let Some(p) = p else { return Ok(None) };
             let to = dest.join(p.file_name().context("nome di file non valido")?);
-            std::fs::copy(p, &to).with_context(|| format!("copia di {}", p.display()))?;
+            put(p, &to)?;
             Ok(Some(to))
         };
         let mut local = MapSet {
@@ -370,20 +407,19 @@ pub fn import_folder(src: &Path, name: Option<&str>, size_m: Option<f32>, source
             opacity: copy(&set.opacity)?,
             packed: None,
         };
-        // Mappa ARM/ORM: si separa nei canali che mancano come file singoli.
+        // Mappa ARM/ORM: si estraggono solo i canali che mancano come file singoli
+        // (la metallicità tutta nera non si usa).
         if let Some(packed) = &set.packed {
-            if local.roughness.is_none() || local.metallic.is_none() || local.ao.is_none() {
+            let need = [local.ao.is_none(), local.roughness.is_none(), local.metallic.is_none()];
+            if need.contains(&true) {
                 let stem = folder_name(&name).replace(' ', "_");
-                let (ao, rough, metal) = detect::split_packed(packed, &dest, &stem)?;
-                local.ao = local.ao.or(Some(ao));
-                if local.roughness.is_none() {
-                    local.roughness = Some(rough);
+                let [ao, rough, metal] = detect::split_packed(packed, &dest, &stem, need)?;
+                local.ao = local.ao.take().or(ao);
+                if let Some(r) = rough {
+                    local.roughness = Some(r);
                     local.roughness_is_gloss = false;
                 }
-                // La metallicità impacchettata si usa solo se non è tutta nera.
-                if local.metallic.is_none() && !is_black(&metal) {
-                    local.metallic = Some(metal);
-                }
+                local.metallic = local.metallic.take().or(metal);
             }
         }
         let id = format!("lib:{}", dest.file_name().and_then(|n| n.to_str()).unwrap_or("materiale"));
@@ -394,7 +430,7 @@ pub fn import_folder(src: &Path, name: Option<&str>, size_m: Option<f32>, source
             for p in rd.flatten().map(|e| e.path()) {
                 if p.extension().is_some_and(|e| e.eq_ignore_ascii_case("mtlx")) {
                     if let Some(n) = p.file_name() {
-                        let _ = std::fs::copy(&p, dest.join(n));
+                        let _ = put(&p, &dest.join(n));
                     }
                 }
             }
@@ -412,13 +448,16 @@ pub fn import_folder(src: &Path, name: Option<&str>, size_m: Option<f32>, source
         load(&dest)
     })();
     if result.is_err() {
+        for (from, to) in moved.borrow().iter().rev() {
+            if let Err(e) = std::fs::rename(to, from) {
+                // Il file resta nella cartella del materiale, che quindi non si cancella.
+                tracing::error!("libreria: {} non riportato in {} ({e})", to.display(), from.display());
+                return result;
+            }
+        }
         let _ = std::fs::remove_dir_all(&dest);
     }
     result
-}
-
-fn is_black(p: &Path) -> bool {
-    image::open(p).map(|i| i.to_luma8().pixels().all(|px| px.0[0] < 3)).unwrap_or(true)
 }
 
 /// Nome leggibile da un nome di cartella/zip: "Wood049_2K-JPG" → "Wood049".
@@ -543,6 +582,9 @@ mod tests {
         assert_eq!(rough.get_pixel(0, 0).0[0], 180);
         assert!(mat.ao_texture.is_some());
         assert!(mat.metallic_texture.is_none());
+        // Si scrivono solo i canali usati: niente PNG della metallicità nera.
+        assert!(!m.dir.join("Mattoni_Metalness.png").exists());
+        assert!(!m.dir.join("brick_arm_1k.png").exists(), "la ARM separata non va in libreria");
         assert_eq!(mat.bump_mm, 0.0, "con la normal map il rilievo resta spento");
         assert!(mat.height_texture.is_some());
         assert_eq!(mat.displacement_mm, 0.0, "displacement spento di default");
@@ -550,6 +592,34 @@ mod tests {
         // Il JSON salva percorsi relativi: la cartella è spostabile.
         let json = std::fs::read_to_string(m.dir.join(MATERIAL_FILE)).unwrap();
         assert!(!json.contains(root.to_str().unwrap()), "{json}");
+
+        // Spostamento: arrivano solo le mappe usate e il MaterialX, il resto resta nell'origine.
+        let msrc = lib_root("move");
+        gray(&msrc.join("tile_diff_1k.png"), 120);
+        gray(&msrc.join("tile_rough_1k.png"), 60);
+        gray(&msrc.join("tile_nor_dx_1k.png"), 128);
+        gray(&msrc.join("tile_nor_gl_1k.png"), 128);
+        std::fs::write(msrc.join("tile_1k.mtlx"), "<materialx/>").unwrap();
+        std::fs::write(msrc.join("tile_1k.blend"), "x").unwrap();
+        let mv = import_folder_with(&msrc, Some("Piastrelle"), None, "t", Transfer::Move).unwrap();
+        for n in ["tile_diff_1k.png", "tile_rough_1k.png", "tile_nor_gl_1k.png", "tile_1k.mtlx"] {
+            assert!(mv.dir.join(n).is_file(), "{n} spostato");
+            assert!(!msrc.join(n).exists(), "{n} non più nell'origine");
+        }
+        for n in ["tile_nor_dx_1k.png", "tile_1k.blend"] {
+            assert!(msrc.join(n).is_file(), "{n} resta nell'origine");
+            assert!(!mv.dir.join(n).exists());
+        }
+        delete(&mv).unwrap();
+        // Errore a metà (ARM illeggibile da separare): i file spostati tornano indietro.
+        let bsrc = lib_root("move_bad");
+        gray(&bsrc.join("bad_diff_1k.png"), 120);
+        std::fs::write(bsrc.join("bad_arm_1k.png"), "non è un'immagine").unwrap();
+        assert!(import_folder_with(&bsrc, Some("Rotto"), None, "t", Transfer::Move).is_err());
+        assert!(bsrc.join("bad_diff_1k.png").is_file(), "il colore è tornato nell'origine");
+        assert!(!crate::paths::materials_dir().join("Rotto").exists());
+        std::fs::remove_dir_all(msrc).ok();
+        std::fs::remove_dir_all(bsrc).ok();
 
         // Zip stile ambientCG, con una cartella interna e file non immagine.
         let zpath = src.join("Metal012_1K-JPG.zip");

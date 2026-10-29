@@ -110,6 +110,23 @@ pub fn list_hdri() -> Vec<PathBuf> {
     list_files(&hdri_dir(), &["hdr", "exr"], 1)
 }
 
+/// Tutti i file di una cartella (anche nelle sottocartelle fino a `depth`), in ordine alfabetico.
+pub(crate) fn list_files_all(dir: &Path, depth: u32) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let Ok(rd) = std::fs::read_dir(dir) else { return out };
+    for p in rd.flatten().map(|e| e.path()) {
+        if p.is_dir() {
+            if depth > 0 {
+                out.extend(list_files_all(&p, depth - 1));
+            }
+        } else {
+            out.push(p);
+        }
+    }
+    out.sort();
+    out
+}
+
 pub(crate) fn list_files(dir: &Path, exts: &[&str], depth: u32) -> Vec<PathBuf> {
     let mut out = Vec::new();
     let Ok(rd) = std::fs::read_dir(dir) else { return out };

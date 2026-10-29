@@ -85,7 +85,13 @@ fn print_help() {
              --fonte ambientcg|polyhaven|tutte (default tutte)  --tipo materiali|hdri|tutto (default materiali)\n    \
              --risoluzione 1K|2K|4K|8K (default 1K)  --filtro TESTO  --max N  --aggiorna-catalogo\n    \
              --solo-elenco (conta e stima lo spazio senza scaricare). Già scaricati: saltati, tranne quelli\n    \
-             con mappe nello slot sbagliato (riscaricati e sostituiti); si può interrompere e riprendere",
+             con mappe nello slot sbagliato (riscaricati e sostituiti); si può interrompere e riprendere\n  \
+         libreria importa-polyhaven CARTELLA   importa i materiali scaricati con lo script\n    \
+             tools/material-library-polyhaven (solo le cartelle con material.json, cioè complete)\n    \
+             --max N  --sposta (sposta i file invece di copiarli; stesso disco)  --solo-elenco\n    \
+             Nella libreria vanno solo le mappe usate, il .mtlx e polyhaven_manifest.json; il resto resta\n    \
+             nei download (non si cancella niente). Già in libreria: saltati.\n  \
+         Per tutti i comandi libreria: --libreria CARTELLA (radice della libreria; FORGE_LIBRARY_DIR ha la precedenza)",
         env!("CARGO_PKG_VERSION")
     );
 }
@@ -501,7 +507,93 @@ fn download_all(args: &Args) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Importa nella libreria i materiali Poly Haven scaricati in locale con lo script.
+fn import_polyhaven(args: &Args) -> anyhow::Result<()> {
+    use forge_library::online::{self, AssetKind, Provider};
+    use forge_library::polyhaven_local::{self, Options};
+    use forge_library::store::Transfer;
+    let Some(dir) = args.0.get(1).filter(|a| !a.starts_with("--")) else {
+        bail!("indica la cartella dei download Poly Haven (es. Y:\\ForgeRender\\Assets\\PolyHaven)");
+    };
+    let dl = PathBuf::from(dir);
+    let transfer = if args.flag("--sposta") { Transfer::Move } else { Transfer::Copy };
+    let opts = Options {
+        max: args.parse("--max")?,
+        transfer,
+        dry_run: args.flag("--solo-elenco"),
+    };
+    println!("Libreria: {}", forge_library::paths::root().display());
+    println!(
+        "Download: {}  ({})",
+        dl.display(),
+        if opts.dry_run {
+            "solo elenco"
+        } else if transfer == Transfer::Move {
+            "i file vengono SPOSTATI"
+        } else {
+            "i file vengono copiati"
+        }
+    );
+    // Lato reale dei materiali (mm → m) dal catalogo Poly Haven, in cache nella libreria.
+    let sizes: std::collections::HashMap<String, f32> = match online::catalog(Provider::PolyHaven, AssetKind::Material, false) {
+        Ok(c) => c.into_iter().filter_map(|a| a.size_m.map(|s| (a.id, s))).collect(),
+        Err(e) => {
+            println!("Catalogo Poly Haven non disponibile ({e:#}): scala 1 m, annotata nei materiali.");
+            Default::default()
+        }
+    };
+    let t0 = Instant::now();
+    let s = polyhaven_local::import_all(&dl, &sizes, opts, &mut |l| println!("{l}"))?;
+    let with_notes = s.imported.iter().filter(|(_, _, n)| !n.is_empty()).count();
+    println!("\nRiepilogo ({:.1} s):", t0.elapsed().as_secs_f64());
+    println!("  importati:                 {} (con avvisi: {with_notes})", s.imported.len());
+    println!("  copie difettose sostituite: {}", s.replaced);
+    println!("  già in libreria (saltati): {}", s.already_present.len());
+    println!(
+        "  {}: {}",
+        if opts.dry_run {
+            "da importare"
+        } else {
+            "non importati (limite --max)"
+        },
+        s.pending.len()
+    );
+    println!("  errori:                    {}", s.failed.len());
+    for (id, e) in &s.failed {
+        println!("      {id}: {e}");
+    }
+    println!("  incompleti (senza material.json, non toccati): {}", s.incomplete.len());
+    for d in &s.incomplete {
+        println!("      {}", d.file_name().map(|n| n.to_string_lossy()).unwrap_or_default());
+    }
+    if !s.invalid.is_empty() {
+        println!("  manifest illeggibili:      {}", s.invalid.len());
+        for (d, e) in &s.invalid {
+            println!("      {}: {e}", d.display());
+        }
+    }
+    if transfer == Transfer::Move && !s.imported_dirs.is_empty() {
+        let left = polyhaven_local::leftovers(&s.imported_dirs);
+        let total: u64 = left.iter().map(|(_, _, b)| b).sum();
+        println!(
+            "\nRimasti nei download dei materiali importati (non cancellati): {} file, {:.1} MB",
+            left.iter().map(|(_, n, _)| n).sum::<usize>(),
+            total as f64 / 1048576.0
+        );
+        for (kind, n, b) in &left {
+            println!("  {kind:<28} {n:>5} file  {:>9.1} MB", *b as f64 / 1048576.0);
+        }
+    }
+    Ok(())
+}
+
 fn library(args: &Args) -> anyhow::Result<()> {
+    if let Some(d) = args.value("--libreria") {
+        if std::env::var_os("FORGE_LIBRARY_DIR").is_some() {
+            println!("Attenzione: FORGE_LIBRARY_DIR è impostata e ha la precedenza su --libreria.");
+        }
+        forge_library::paths::set_custom_root(Some(PathBuf::from(d)));
+    }
     let root = forge_library::paths::ensure()?;
     match args.0.first().map(String::as_str) {
         Some("elenco") | None => {
@@ -555,6 +647,7 @@ fn library(args: &Args) -> anyhow::Result<()> {
             Ok(())
         }
         Some("scarica-tutto") => download_all(args),
-        Some(other) => bail!("comando libreria sconosciuto: {other} (elenco | importa | scarica-tutto)"),
+        Some("importa-polyhaven") => import_polyhaven(args),
+        Some(other) => bail!("comando libreria sconosciuto: {other} (elenco | importa | scarica-tutto | importa-polyhaven)"),
     }
 }

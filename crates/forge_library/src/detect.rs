@@ -143,6 +143,8 @@ pub fn classify(path: &Path) -> Option<MapKind> {
     let (i, kind) = w.iter().enumerate().rev().find_map(|(i, x)| word_kind(x).map(|k| (i, k)))?;
     match kind {
         Word::Ignore => None,
+        // "rough_ao" (Poly Haven): rugosità moltiplicata per l'occlusione, non è l'AO.
+        Word::Map(MapKind::Ao) if i > 0 && matches!(w[i - 1].as_str(), "rough" | "roughness") => None,
         // Convenzione DirectX se lo dicono le parole che seguono ("nor_dx", "Normal_DirectX").
         Word::Map(MapKind::Normal(dx)) => {
             // ("DirectX" viene diviso in "direct" + "x").
@@ -151,6 +153,19 @@ pub fn classify(path: &Path) -> Option<MapKind> {
         }
         Word::Map(k) => Some(k),
     }
+}
+
+/// Mappa di rilievo di tipo "bump" (Poly Haven ne offre a volte una accanto alla `disp`):
+/// come height si usa solo se manca il displacement vero.
+fn is_bump(path: &Path) -> bool {
+    let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+        return false;
+    };
+    words(stem)
+        .iter()
+        .rev()
+        .find(|x| word_kind(x).is_some())
+        .is_some_and(|x| x == "bump")
 }
 
 /// Parole che indicano il tipo di mappa (da togliere per ricavare il nome del materiale).
@@ -240,6 +255,7 @@ pub fn detect(files: &[PathBuf]) -> MapSet {
     let mut gloss: Option<PathBuf> = None;
     let mut normal_gl: Option<PathBuf> = None;
     let mut normal_dx: Option<PathBuf> = None;
+    let mut bump: Option<PathBuf> = None;
     let mut sorted = files.to_vec();
     sorted.sort();
     for f in &sorted {
@@ -250,6 +266,7 @@ pub fn detect(files: &[PathBuf]) -> MapSet {
             Some(MapKind::Normal(false)) => pick(&mut normal_gl, f),
             Some(MapKind::Normal(true)) => pick(&mut normal_dx, f),
             Some(MapKind::Metallic) => pick(&mut set.metallic, f),
+            Some(MapKind::Height) if is_bump(f) => pick(&mut bump, f),
             Some(MapKind::Height) => pick(&mut set.height, f),
             Some(MapKind::Ao) => pick(&mut set.ao, f),
             Some(MapKind::Opacity) => pick(&mut set.opacity, f),
@@ -262,6 +279,9 @@ pub fn detect(files: &[PathBuf]) -> MapSet {
             set.roughness = Some(g);
             set.roughness_is_gloss = true;
         }
+    }
+    if set.height.is_none() {
+        set.height = bump;
     }
     match (normal_gl, normal_dx) {
         (Some(gl), _) => set.normal = Some(gl),
@@ -279,20 +299,23 @@ pub fn image_files(dir: &Path) -> Vec<PathBuf> {
     crate::paths::list_files(dir, &IMAGE_EXTENSIONS, 1)
 }
 
-/// Divide una mappa ARM/ORM in tre PNG in scala di grigi (occlusione, rugosità,
-/// metallicità) dentro `out_dir`. Restituisce i percorsi creati.
-pub fn split_packed(packed: &Path, out_dir: &Path, stem: &str) -> anyhow::Result<(PathBuf, PathBuf, PathBuf)> {
+/// Estrae da una mappa ARM/ORM i canali indicati da `need` (occlusione, rugosità,
+/// metallicità) come PNG in scala di grigi dentro `out_dir`. Si scrivono solo i canali
+/// richiesti; la metallicità tutta nera (materiale non metallico) non si salva.
+pub fn split_packed(packed: &Path, out_dir: &Path, stem: &str, need: [bool; 3]) -> anyhow::Result<[Option<PathBuf>; 3]> {
     let img = image::open(packed)?.to_rgb8();
     let (w, h) = img.dimensions();
-    let mut out = Vec::new();
+    let mut out = [None, None, None];
     for (c, name) in [(0usize, "AO"), (1, "Roughness"), (2, "Metalness")] {
+        if !need[c] || (c == 2 && img.pixels().all(|px| px.0[2] < 3)) {
+            continue;
+        }
         let ch = image::GrayImage::from_fn(w, h, |x, y| image::Luma([img.get_pixel(x, y).0[c]]));
         let p = out_dir.join(format!("{stem}_{name}.png"));
         ch.save(&p)?;
-        out.push(p);
+        out[c] = Some(p);
     }
-    let mut it = out.into_iter();
-    Ok((it.next().unwrap(), it.next().unwrap(), it.next().unwrap()))
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -390,6 +413,53 @@ mod tests {
         assert_eq!(set.metallic, Some(f("metal_plate_02_metal_4k.png")));
         assert_eq!(set.ao, Some(f("metal_plate_02_ao_4k.png")));
         assert_eq!(set.count(), 6);
+    }
+
+    /// Cartelle reali di Poly Haven (download a 2k): `bump` accanto alla `disp`, `rough_ao`
+    /// accanto alla `ao`. Prima vincevano bump e (per caso) ao solo per ordine alfabetico.
+    #[test]
+    fn polyhaven_bump_and_rough_ao() {
+        assert_eq!(k("aerial_rocks_02_rough_ao_2k.exr"), None);
+        assert_eq!(k("asphalt_02_rough_ao_2k.exr"), None);
+        assert_eq!(k("aerial_rocks_02_ao_2k.exr"), Some(MapKind::Ao));
+        assert_eq!(k("aerial_rocks_02_rough_2k.exr"), Some(MapKind::Roughness));
+        assert_eq!(k("bark_brown_01_bump_2k.exr"), Some(MapKind::Height));
+        assert_eq!(k("bark_brown_01_spec_2k.exr"), None);
+        assert_eq!(k("aerial_mud_1_ref_2k.exr"), None);
+        assert_eq!(k("bi_stretch_anisotropy_rotation_2k.exr"), None);
+        assert_eq!(k("bi_stretch_spec_ior_2k.exr"), None);
+        let f = |n: &str| PathBuf::from(n);
+        let bark: Vec<PathBuf> = [
+            "bark_brown_01_2k.blend",
+            "bark_brown_01_2k.gltf",
+            "bark_brown_01_2k.mtlx",
+            "bark_brown_01_ao_2k.exr",
+            "bark_brown_01_arm_2k.exr",
+            "bark_brown_01_bump_2k.exr",
+            "bark_brown_01_diff_2k.jpg",
+            "bark_brown_01_disp_2k.exr",
+            "bark_brown_01_nor_dx_2k.exr",
+            "bark_brown_01_nor_gl_2k.exr",
+            "bark_brown_01_rough_2k.exr",
+            "bark_brown_01_spec_2k.exr",
+        ]
+        .iter()
+        .map(|n| f(n))
+        .collect();
+        let set = detect(&bark);
+        assert_eq!(set.height, Some(f("bark_brown_01_disp_2k.exr")));
+        assert_eq!(set.ao, Some(f("bark_brown_01_ao_2k.exr")));
+        assert_eq!(set.normal, Some(f("bark_brown_01_nor_gl_2k.exr")));
+        assert_eq!(set.base_color, Some(f("bark_brown_01_diff_2k.jpg")));
+        assert_eq!(set.roughness, Some(f("bark_brown_01_rough_2k.exr")));
+        assert_eq!(set.metallic, None);
+        // Solo la bump: si usa come height.
+        let only_bump = detect(&[f("x_diff_2k.jpg"), f("x_bump_2k.exr")]);
+        assert_eq!(only_bump.height, Some(f("x_bump_2k.exr")));
+        // Solo la rough_ao: nessuna AO.
+        let rock = detect(&[f("aerial_rocks_02_rough_ao_2k.exr"), f("aerial_rocks_02_rough_2k.exr")]);
+        assert_eq!(rock.ao, None);
+        assert_eq!(rock.roughness, Some(f("aerial_rocks_02_rough_2k.exr")));
     }
 
     #[test]

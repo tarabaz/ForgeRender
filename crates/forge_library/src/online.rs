@@ -441,17 +441,23 @@ pub fn local_source_keys() -> std::collections::HashSet<String> {
         .collect()
 }
 
-/// Dopo un nuovo download: elimina le copie difettose dello stesso materiale.
-fn remove_broken_copies(new: &store::LibraryMaterial) {
-    let Some(key) = library_source_key(new) else { return };
+/// Dopo un nuovo download o import: elimina le copie difettose dello stesso materiale.
+/// Restituisce quante ne ha eliminate.
+pub(crate) fn remove_broken_copies(new: &store::LibraryMaterial) -> usize {
+    let Some(key) = library_source_key(new) else { return 0 };
+    let mut removed = 0;
     for old in store::list() {
         if old.dir != new.dir && !old.misassigned.is_empty() && library_source_key(&old) == Some(key) {
             match store::delete(&old) {
-                Ok(()) => tracing::info!("libreria: sostituita la copia difettosa {}", old.dir.display()),
+                Ok(()) => {
+                    removed += 1;
+                    tracing::info!("libreria: sostituita la copia difettosa {}", old.dir.display());
+                }
                 Err(e) => tracing::warn!("libreria: {} non eliminata ({e:#})", old.dir.display()),
             }
         }
     }
+    removed
 }
 
 /// Miniatura (PNG/JPG), con cache su disco.

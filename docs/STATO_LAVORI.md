@@ -233,5 +233,23 @@
 - Test: salvataggio e rilettura, file non valido o parziale, politiche di displacement
   all'import.
 
+### Import della libreria Poly Haven scaricata in locale (29/10/2026, fase 2)
+- Comando `forgerender-cli libreria importa-polyhaven <cartella> [--max N] [--sposta]
+  [--solo-elenco] [--libreria DIR]` per le cartelle dello script
+  `tools/material-library-polyhaven` (modulo `forge_library::polyhaven_local`).
+  - Solo le cartelle con `material.json` (complete); quelle in download non si toccano.
+  - Nome "<nome> 2K", provenienza "Poly Haven <id> (2K)", scala reale dal catalogo Poly Haven.
+  - Nella libreria vanno solo le mappe collegate agli slot, il .mtlx e `polyhaven_manifest.json`;
+    nor_dx, arm, rough_ao, bump, spec, .blend/.gltf restano nei download. Non si cancella niente.
+  - `--sposta`: spostamento con `rename`; se l'import fallisce i file tornano al loro posto.
+  - Note nel materiale: mappe mancanti, stati di download anomali, risoluzioni diverse, scala
+    non disponibile, slot base mancanti.
+- Riconoscimento: la `disp` vince sulla `bump` (bark_brown_01/02), `rough_ao` ignorata; dalla
+  ARM si estraggono solo i canali che mancano (niente PNG inutili, niente metallicità nera).
+- `store::import_folder_with(…, Transfer::Copy | Transfer::Move)`.
+- Prova reale: `--solo-elenco` (93 completi, 1 in download) e copia `--max 3` in una libreria
+  temporanea. **Da fare**: prova `--max 3` in `Y:\ForgeRender\Libreria` controllata da Valerio
+  nell'app, poi lo spostamento di tutto a download finito, con il suo ok.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

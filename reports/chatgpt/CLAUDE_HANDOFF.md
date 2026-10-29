@@ -684,3 +684,52 @@ displacement…) e non quelli del materiale scaricato. Vanno aggiornati.
 - Per ChatGPT: va bene mantenere roughness, metallic e normal a 8 bit e la precisione a 16 bit
   solo per la height del displacement?
 - Restano aperte le domande sull'adattivo (Risposta 2).
+
+### Nota di Claude Code — 2026-10-29: import della libreria Poly Haven scaricata in locale
+
+Richiesta di Valerio: rendere la cartella scaricata con
+`tools/material-library-polyhaven/download_polyhaven_materials.py` (`Y:\ForgeRender\Assets\PolyHaven`)
+una libreria ForgeRender (`Y:\ForgeRender\Libreria`), spostando i file e tenendo solo ciò che serve.
+
+#### Fase 1 — analisi (numeri reali, download ancora in corso)
+
+- Catalogo API `assets?t=textures`: 869 texture, tutte con `dimensions`.
+- Alle ~18:55: 53 materiali completi, 1,70 GB (media 32,8 MB) → stima totale ~28 GB.
+  `index.csv`/`errors.txt` non ancora scritti. Tutte le mappe a 2k; colore JPG, il resto EXR.
+- Spazio: mappe usate + mtlx 54 %, nor_dx 22 %, arm 17 %, rough_ao 5 %, altre 2 %, blend/gltf 1 %.
+- `detect::classify` sui file veri: corretto per diff/nor_gl/rough/disp/ao/metal; **errori**:
+  `bark_brown_01_bump_2k.exr` presa come height al posto della `disp` (ordine alfabetico),
+  `*_rough_ao_2k.exr` classificata come AO (perdeva con `_ao_` solo per caso).
+
+#### Fase 2 — fatto (approvato da Valerio)
+
+1. `detect`: disp prima di bump; `rough_ao` ignorata; `split_packed` estrae solo i canali che
+   mancano e non salva la metallicità tutta nera.
+2. `store::import_folder_with(…, Transfer)`: copia o spostamento con ritorno dei file in caso di errore.
+3. `forge_library::polyhaven_local` (scan, import, import_all, leftovers) + test di integrazione
+   `crates/forge_library/tests/polyhaven_local.rs` (metal_plate_02 e bark_brown_01 con EXR veri,
+   copia, `--max`, spostamento, cartella in download non toccata).
+4. CLI `libreria importa-polyhaven` con `--max`, `--sposta`, `--solo-elenco`, `--libreria`.
+
+Decisioni di Valerio: in libreria solo le mappe usate + .mtlx + `polyhaven_manifest.json`; le
+mappe non usate e i .blend/.gltf restano nei download e non si cancella niente senza il suo ok;
+EXR tenuti come sono; spostamento reale solo a download finito.
+
+#### Test eseguiti (Windows, PC di Valerio)
+
+- `cargo fmt --all`, `cargo clippy --workspace --exclude forge_step --all-targets --release -- -D warnings`: ok.
+- `cargo test -p forge_library -p forge_cli --release`: 15 + 1 (integrazione) verdi.
+- CLI reale: `--solo-elenco` → 93 da importare, 1 incompleto (in download); copia `--max 3` in una
+  libreria temporanea → 3 importati, 0 avvisi, scala dal catalogo (aerial_asphalt_01 = 30 m).
+
+#### Non eseguito
+
+- Prova `--max 3` in `Y:\ForgeRender\Libreria` e controllo nell'app (miniature, render, pannello).
+- Spostamento reale (`--sposta`) sui download: aspetta la fine del download e l'ok di Valerio.
+- Pulsante "Importa libreria Poly Haven…" nella finestra Libreria.
+
+#### Domande aperte
+
+- EXR a 8 bit nel renderer per roughness/normal/metallic: convertire o riscaricare con le regole
+  del downloader dell'app (png>jpg>exr, niente nor_dx/arm)? Decide Valerio.
+- Attenzione: rilanciare lo script con `--skip-existing` dopo lo spostamento riscarica ciò che è stato spostato.
