@@ -17,15 +17,11 @@ chiavi: è Claude Code ad avviarlo sul tuo PC con l'opzione `--mcp`.
 - ForgeRender **0.4.0 o successivo** compilato (`Build-ForgeRender.ps1`).
 - **Claude Code** installato su Windows (il comando `claude` nel terminale).
 
-Individua il file `forgerender.exe` nella cartella del pacchetto portable estratto, nella cartella `target\\release` della build locale oppure nella directory dell'installazione. Usa sempre il percorso completo del file, che cambia da un PC all'altro:
+Individua `forgerender.exe` nella cartella del pacchetto portable estratto, in `target\release`
+della build locale oppure nella directory dell'installazione. Usa il percorso completo del file:
 
-```
-$exe = (Resolve-Path "C:\PERCORSO\REALE\forgerender.exe").Path
-```
-
-Lo script di build ci copia accanto anche le DLL del denoiser, quindi il render ha anche la
-riduzione del rumore. A differenza della cartella del portable, questo percorso non cambia a ogni
-versione: la configurazione si fa una volta sola.
+Le DLL distribuite con ForgeRender, comprese quelle del denoiser, devono rimanere accanto
+all'eseguibile. Il percorso varia in base a dove hai installato o estratto il programma.
 
 ## 2. Collegarlo a Claude Code (una volta)
 
