@@ -27,7 +27,7 @@ La complessità è una stima di lavoro e rischio per questo codice:
 | 12 | DLSS Ray Reconstruction come anteprima interattiva veloce | Molto alta | SDK NVIDIA | Solo RTX, interop Vulkan con wgpu |
 | 13 | Ray tracing hardware (RT core) | Molto alta | OptiX o ray query Vulkan | — |
 | 14 | Generatore di edera: rampicanti fotorealistici che crescono sugli oggetti | Alta | — | **Da fare più avanti**, non pianificato ora |
-| 15 | Utilizzo GPU / VRAM tramite NVML | Bassa | — | — |
+| 15 | Utilizzo GPU / VRAM tramite NVML | Bassa | ✅ 0.6.0 (solo NVIDIA) | — |
 | 16 | Import di volumi OpenVDB (fumo/fuoco simulati in Blender Mantaflow, EmberGen, Houdini) | Media | renderer della nebbia ✅ | Lettore VDB in Rust puro; il renderer gestisce già griglie di densità |
 
 Ordine consigliato per ciò che resta: 4 → 3 → 5, poi il resto secondo necessità.
@@ -135,7 +135,7 @@ accumulo corretto, export PNG.
   HDRI, texture, displacement, profondità di campo, convergenza statistica all'immagine CPU
 - ✅ Selettore CPU/GPU nell'interfaccia e nella CLI, ripiego automatico sulla CPU
 - ✅ Misure sulla RTX 5070 ([BENCHMARK.md](BENCHMARK.md)): 139 Mcampioni/s, 4,6 volte il 9900X a 24 thread
-- ⏳ NVML, ray tracing hardware, rendering ibrido CPU+GPU
+- ✅ NVML (utilizzo e VRAM, schede NVIDIA) · ⏳ ray tracing hardware, rendering ibrido CPU+GPU
 
 ## Fase 5 — CAD 🟡
 - ✅ glTF/GLB (esportazione consigliata da SolidWorks), OBJ, STL, Blender `.blend`

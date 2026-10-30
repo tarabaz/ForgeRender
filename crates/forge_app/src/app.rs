@@ -215,6 +215,7 @@ pub struct ForgeApp {
     /// Schermata di benvenuto aperta e sua immagine.
     pub splash_open: bool,
     pub splash_texture: Option<egui::TextureHandle>,
+    pub logo_texture: Option<egui::TextureHandle>,
     /// Modalità Semplice: aspetto e qualità scelti, valori prima dell'ultimo preset.
     pub simple_look: crate::presets::Look,
     pub simple_quality: crate::presets::Quality,
@@ -248,6 +249,9 @@ pub struct ForgeApp {
     frames: u64,
     /// "Controllo IA" acceso: Claude può comandare la finestra (`docs/MCP.md`).
     pub mcp: Option<crate::mcp::Server>,
+    /// Modalità Semplice: la GPU è già stata proposta come dispositivo predefinito (una volta
+    /// sola, poi vale la scelta dell'utente).
+    pub simple_gpu_checked: bool,
     /// Ultimo render avviato dall'assistente (salvato appena finisce).
     pub mcp_render: Option<crate::mcp::tools::RenderJob>,
 }
@@ -322,6 +326,7 @@ impl ForgeApp {
             language_errors: Vec::new(),
             splash_open: false,
             splash_texture: None,
+            logo_texture: None,
             simple_look: crate::presets::Look::Light,
             simple_quality: crate::presets::Quality::Balanced,
             preset_backup: None,
@@ -344,6 +349,7 @@ impl ForgeApp {
             frames: 0,
             mcp: None,
             mcp_render: None,
+            simple_gpu_checked: false,
         };
         // Prepara il backend GPU in background (creazione dispositivo e compilazione
         // dello shader da parte del driver), così è pronto quando serve.
@@ -1867,6 +1873,7 @@ impl ForgeApp {
                 self.gpu_warmup = None;
             }
         }
+        self.apply_simple_defaults();
         self.update_render_job();
         self.monitor.tick();
         let state = self.render_state();
@@ -1890,6 +1897,25 @@ impl ForgeApp {
             ],
         );
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(title));
+    }
+
+    /// Modalità Semplice: valori di base sempre attivi (vedi `presets::apply_simple_base`) e GPU
+    /// come dispositivo predefinito appena si sa che funziona.
+    fn apply_simple_defaults(&mut self) {
+        if self.prefs.ui_mode != crate::prefs::UiMode::Simple {
+            return;
+        }
+        crate::presets::apply_simple_base(&mut self.settings);
+        if !self.simple_gpu_checked {
+            match self.gpu_ready() {
+                Some(true) => {
+                    self.settings.backend = forge_render_core::BackendKind::Gpu;
+                    self.simple_gpu_checked = true;
+                }
+                Some(false) => self.simple_gpu_checked = true,
+                None => {}
+            }
+        }
     }
 
     /// Screenshot automatico per i test della GUI (`--screenshot`).

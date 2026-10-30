@@ -91,7 +91,7 @@ impl ForgeApp {
                         .selected_text(tr(o.unit.label()))
                         .show_ui(ui, |ui| {
                             for u in forge_scene::LengthUnit::ALL {
-                                ui.selectable_value(&mut o.unit, u, tr(tr(u.label())));
+                                ui.selectable_value(&mut o.unit, u, tr(u.label()));
                             }
                         });
                     ui.end_row();
@@ -100,7 +100,7 @@ impl ForgeApp {
                         .selected_text(tr(o.up.label()))
                         .show_ui(ui, |ui| {
                             for u in [forge_import::UpAxis::Auto, forge_import::UpAxis::Y, forge_import::UpAxis::Z] {
-                                ui.selectable_value(&mut o.up, u, tr(tr(u.label())));
+                                ui.selectable_value(&mut o.up, u, tr(u.label()));
                             }
                         })
                         .response

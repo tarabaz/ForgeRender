@@ -153,7 +153,8 @@ pub fn list() -> Value {
                 "samples": {"type": "integer", "description": "Campioni per pixel (64 bozza, 256 buona, 1024 finale)."},
                 "quality": {"type": "string", "enum": ["bozza", "bilanciata", "alta"]},
                 "device": {"type": "string", "enum": ["cpu", "gpu"]},
-                "denoise": {"type": "boolean"},
+                "denoise": {"type": "boolean", "description": "Riduzione del rumore sull'immagine finale (consigliata sempre)."},
+                "denoise_preview": {"type": "boolean", "description": "Ripulisce anche l'anteprima durante il render (a 8, 16, 32… campioni), non solo l'immagine finale."},
                 "exposure_ev": {"type": "number"}
             }), &[]),
         tool("render", "Avvia il render, salva il PNG alla fine e restituisce l'anteprima da guardare. Aspetta al massimo max_wait_s: se il render è più lungo risponde \"in corso\" e la finestra lo finisce e lo salva da sola; poi chiama render_status.",

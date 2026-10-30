@@ -1780,7 +1780,9 @@ fn render(app: &mut ForgeApp, ui: &mut egui::Ui) {
         .selected_text(tr(app.settings.backend.label()))
         .show_ui(ui, |ui| {
             for b in [forge_render_core::BackendKind::Cpu, forge_render_core::BackendKind::Gpu] {
-                ui.selectable_value(&mut app.settings.backend, b, tr(tr(b.label())));
+                if ui.selectable_value(&mut app.settings.backend, b, tr(b.label())).changed() {
+                    app.simple_gpu_checked = true;
+                }
             }
         });
     if app.settings.backend != prev_backend {
@@ -1954,7 +1956,7 @@ fn render(app: &mut ForgeApp, ui: &mut egui::Ui) {
         .selected_text(tr(s.tone_mapping.label()))
         .show_ui(ui, |ui| {
             for t in [ToneMapping::AcesFilmic, ToneMapping::Standard] {
-                changed |= ui.selectable_value(&mut s.tone_mapping, t, tr(tr(t.label()))).changed();
+                changed |= ui.selectable_value(&mut s.tone_mapping, t, tr(t.label())).changed();
             }
         });
     changed |= ui
@@ -1997,7 +1999,7 @@ fn denoiser(app: &mut ForgeApp, ui: &mut egui::Ui) -> bool {
         .selected_text(tr(d.mode.label()))
         .show_ui(ui, |ui| {
             for m in [DenoiseMode::Final, DenoiseMode::Progressive, DenoiseMode::Off] {
-                changed |= ui.selectable_value(&mut d.mode, m, tr(tr(m.label()))).changed();
+                changed |= ui.selectable_value(&mut d.mode, m, tr(m.label())).changed();
             }
         })
         .response
@@ -2024,7 +2026,7 @@ fn denoiser(app: &mut ForgeApp, ui: &mut egui::Ui) -> bool {
             let mut c = false;
             egui::ComboBox::from_id_salt(id).selected_text(tr(q.label())).show_ui(ui, |ui| {
                 for v in [DenoiseQuality::High, DenoiseQuality::Balanced, DenoiseQuality::Fast] {
-                    c |= ui.selectable_value(q, v, tr(tr(v.label()))).changed();
+                    c |= ui.selectable_value(q, v, tr(v.label())).changed();
                 }
             });
             c
@@ -2070,7 +2072,7 @@ fn denoiser(app: &mut ForgeApp, ui: &mut egui::Ui) -> bool {
     ui.horizontal(|ui| {
         ui.label(tr("Vista:"));
         for v in [RenderView::Final, RenderView::Raw, RenderView::Albedo, RenderView::Normals] {
-            ui.selectable_value(&mut app.render_view, v, tr(tr(v.label())));
+            ui.selectable_value(&mut app.render_view, v, tr(v.label()));
         }
     });
     if !status.is_empty() {

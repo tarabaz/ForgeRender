@@ -268,20 +268,47 @@ fn format_quality(app: &mut ForgeApp, ui: &mut egui::Ui) {
         );
     }
     ui.add_space(6.0);
-    // Non si aspetta la preparazione della GPU: finché non è pronta il controllo resta attivo.
+    // Dispositivo: due pulsanti ben visibili. Non si aspetta la preparazione della GPU: finché
+    // non è pronta il pulsante resta attivo.
     let gpu_ok = app.gpu_ready() != Some(false);
-    let mut use_gpu = app.settings.backend == BackendKind::Gpu;
-    let r = ui.add_enabled(
-        gpu_ok,
-        egui::Checkbox::new(&mut use_gpu, egui::RichText::new(tr("Usa la scheda video (GPU)")).size(BIG - 1.0)),
-    );
-    let r = if gpu_ok {
-        r.on_hover_text(tr("Molto più veloce con una scheda video recente"))
-    } else {
-        r.on_disabled_hover_text(tr("Nessuna GPU utilizzabile: il render usa il processore"))
-    };
-    if r.changed() {
-        app.settings.backend = if use_gpu { BackendKind::Gpu } else { BackendKind::Cpu };
+    ui.label(egui::RichText::new(tr("Dispositivo di calcolo")).size(BIG - 1.0));
+    let mut backend = app.settings.backend;
+    egui::Grid::new("simple-device").num_columns(2).spacing([6.0, 6.0]).show(ui, |ui| {
+        let w = (ui.available_width() - 6.0) / 2.0;
+        let gpu = ui.add_enabled(
+            gpu_ok,
+            egui::Button::selectable(
+                backend == BackendKind::Gpu,
+                egui::RichText::new(tr("Scheda video (GPU)")).size(BIG - 1.0),
+            )
+            .min_size(egui::vec2(w, 30.0)),
+        );
+        let gpu = if gpu_ok {
+            gpu.on_hover_text(tr("Molto più veloce con una scheda video recente"))
+        } else {
+            gpu.on_disabled_hover_text(tr("Nessuna GPU utilizzabile: il render usa il processore"))
+        };
+        if gpu.clicked() {
+            backend = BackendKind::Gpu;
+        }
+        if ui
+            .add(
+                egui::Button::selectable(
+                    backend == BackendKind::Cpu,
+                    egui::RichText::new(tr("Processore (CPU)")).size(BIG - 1.0),
+                )
+                .min_size(egui::vec2(w, 30.0)),
+            )
+            .on_hover_text(tr("Usa tutti i core del processore: funziona su ogni PC"))
+            .clicked()
+        {
+            backend = BackendKind::Cpu;
+        }
+        ui.end_row();
+    });
+    if backend != app.settings.backend {
+        app.settings.backend = backend;
+        app.simple_gpu_checked = true;
     }
 }
 

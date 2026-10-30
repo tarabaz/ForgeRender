@@ -1,5 +1,7 @@
 //! Diagnostica: informazioni di sistema, utilizzo CPU/RAM e log consultabili dalla UI.
 
+pub mod gpu;
+
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -68,6 +70,9 @@ pub struct ResourceMonitor {
     pub cpu_usage_percent: f32,
     pub used_ram_bytes: u64,
     pub process_ram_bytes: u64,
+    /// Schede NVIDIA lette con NVML (vuoto senza driver NVIDIA: vedi `nvml_available`).
+    pub gpus: Vec<gpu::GpuSample>,
+    nvml: Option<gpu::NvmlMonitor>,
 }
 
 impl Default for ResourceMonitor {
@@ -86,7 +91,14 @@ impl ResourceMonitor {
             cpu_usage_percent: 0.0,
             used_ram_bytes: 0,
             process_ram_bytes: 0,
+            gpus: Vec::new(),
+            nvml: gpu::NvmlMonitor::open(),
         }
+    }
+
+    /// `true` se il driver NVIDIA permette di leggere utilizzo GPU e VRAM.
+    pub fn nvml_available(&self) -> bool {
+        self.nvml.is_some()
     }
 
     /// Aggiorna al massimo una volta al secondo (la misura della CPU richiede un intervallo).
@@ -102,6 +114,9 @@ impl ResourceMonitor {
         if let Ok(pid) = sysinfo::get_current_pid() {
             self.sys.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[pid]), true);
             self.process_ram_bytes = self.sys.process(pid).map(|p| p.memory()).unwrap_or(0);
+        }
+        if let Some(n) = &self.nvml {
+            self.gpus = n.sample();
         }
     }
 }

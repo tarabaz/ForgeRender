@@ -11,6 +11,45 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.6.0 — 30/10/2026
+
+**Modalità Semplice**
+- Valori di base sempre attivi (nascosti nel pannello, visibili in Avanzata): arresto a soglia di
+  rumore 0,050 con almeno 32 campioni; denoiser "Anteprima veloce + finale" (ripulisce anche
+  durante il render), CUDA acceso (se la scheda non lo supporta il denoiser usa da solo la CPU),
+  qualità finale alta e anteprima veloce, prima anteprima a 8 campioni, intensità 90 %, dettagli
+  preservati. Le qualità Bozza/Bilanciata/Alta usano anche loro il denoiser in anteprima.
+- **Dispositivo di calcolo** con due pulsanti, "Scheda video (GPU)" e "Processore (CPU)", al posto
+  della casella. La GPU diventa predefinita appena risulta funzionante (una volta sola: poi vale la
+  scelta dell'utente o di Claude).
+
+**Correzioni**
+- Fondali (curvo degli aspetti chiaro, scuro e scenografico, tela dello studio e Aggiungi →
+  Fondale) larghi 12 volte il prodotto e alti 3,5 volte: prima i bordi entravano nelle
+  inquadrature 16:9 e nelle viste tre quarti e isometrica.
+
+**Statistiche**
+- **Utilizzo GPU e VRAM** (usata, totale e libera) letti ogni secondo dal driver NVIDIA (NVML,
+  `nvml.dll` / `libnvidia-ml.so.1`, caricata solo se c'è), per la scheda che fa il render. Con
+  schede AMD o Intel la riga dice "lettura non disponibile" e il motivo. Non provato su una
+  scheda NVIDIA vera in questa versione (nessuna nel container di sviluppo).
+
+**Schermata di benvenuto**
+- Nuova grafica dal mockup: render del cocktail, logo ForgeRender (`assets/logo.png`) con
+  "v. 0.6.0" sotto; in piccolo, sotto le informazioni, le licenze dei componenti open source
+  (Open Image Denoise Apache 2.0, librerie Rust MIT/Apache 2.0, Open CASCADE LGPL). Tolte le righe Formati e
+  Interfaccia; "Mostra all'avvio" spostato in Impostazioni → Informazioni.
+
+**Controllo IA**
+- `set_render_settings` accetta `denoise_preview` (denoiser anche durante il render) e le risposte
+  dicono se il denoiser è installato (`denoiser_installato`).
+
+**Guide**
+- `docs/MCP.md` e `docs/MCP.en.md` con screenshot del programma (barra nei tre stati, finestra
+  comandata con legenda, registro) ed esempi renderizzati con il denoiser: i quattro aspetti, le
+  viste della camera, una luce prima e dopo, materiali creati. Script per rifarle in
+  `tools/guida-mcp/`.
+
 ## 0.5.0 — 30/10/2026
 
 **Controllo IA separato dal programma**

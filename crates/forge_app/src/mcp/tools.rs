@@ -136,6 +136,8 @@ fn scene_info(app: &mut ForgeApp, a: &Args) -> R {
         "campioni": s.target_samples,
         "dispositivo": if s.backend == BackendKind::Gpu { "gpu" } else { "cpu" },
         "denoiser": s.denoise.mode != DenoiseMode::Off,
+        "denoiser_installato": app.denoiser_info.is_ok(),
+        "denoiser_anteprima": s.denoise.mode == DenoiseMode::Progressive,
         "esposizione_ev": s.exposure_ev,
         "ambiente_visibile": s.environment_visible,
         "stato": state_name(&p.state),
@@ -854,9 +856,18 @@ fn set_render_settings(app: &mut ForgeApp, a: &Args) -> R {
             "cpu" => BackendKind::Cpu,
             _ => return Err(format!("dispositivo \"{d}\": cpu o gpu")),
         };
+        // Scelta esplicita: la modalità Semplice non la cambia più da sola.
+        app.simple_gpu_checked = true;
     }
     if let Some(d) = a.bool("denoise")? {
         app.settings.denoise.mode = if d { DenoiseMode::Final } else { DenoiseMode::Off };
+    }
+    if let Some(p) = a.bool("denoise_preview")? {
+        app.settings.denoise.mode = match (p, app.settings.denoise.mode) {
+            (true, _) => DenoiseMode::Progressive,
+            (false, DenoiseMode::Progressive) => DenoiseMode::Final,
+            (false, m) => m,
+        };
     }
     if let Some(e) = a.f32("exposure_ev")? {
         app.settings.exposure_ev = e.clamp(-10.0, 10.0);
@@ -866,7 +877,8 @@ fn set_render_settings(app: &mut ForgeApp, a: &Args) -> R {
     done(json!({
         "larghezza": s.width, "altezza": s.height, "campioni": s.target_samples,
         "dispositivo": if s.backend == BackendKind::Gpu { "gpu" } else { "cpu" },
-        "denoiser": s.denoise.mode != DenoiseMode::Off, "esposizione_ev": s.exposure_ev,
+        "denoiser": s.denoise.mode != DenoiseMode::Off, "denoiser_anteprima": s.denoise.mode == DenoiseMode::Progressive,
+        "denoiser_installato": app.denoiser_info.is_ok(), "esposizione_ev": s.exposure_ev,
     }))
 }
 

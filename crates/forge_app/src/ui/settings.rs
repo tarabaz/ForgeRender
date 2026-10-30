@@ -66,7 +66,7 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
                     Section::Library => library(ui, &mut p),
                     Section::Paths => paths(ui, &mut p),
                     Section::Rendering => rendering(ui, &mut p),
-                    Section::About => about(ui),
+                    Section::About => about(ui, &mut p),
                 });
             });
             ui.separator();
@@ -228,9 +228,12 @@ fn rendering(ui: &mut egui::Ui, p: &mut Preferences) {
     });
 }
 
-fn about(ui: &mut egui::Ui) {
+fn about(ui: &mut egui::Ui, p: &mut Preferences) {
     ui.heading(tr("Informazioni"));
     ui.label(crate::app::APP_TITLE);
+    ui.checkbox(&mut p.show_splash, tr("Mostra all'avvio")).on_hover_text(tr(
+        "Schermata di benvenuto all'avvio (si riapre da File → Benvenuto e informazioni…)",
+    ));
     egui::Grid::new("prefs-about").num_columns(2).spacing([12.0, 6.0]).show(ui, |ui| {
         ui.label(tr("Libreria"));
         ui.label(egui::RichText::new(forge_library::paths::root().display().to_string()).monospace());

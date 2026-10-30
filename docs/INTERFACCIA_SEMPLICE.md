@@ -29,14 +29,31 @@ spiega cosa fa.
 | 3 | Materiali | **Apri la libreria materiali** + istruzione "clicca un oggetto, poi un materiale" | Stessa libreria della modalità Avanzata | |
 | 4 | Formato | **Orizzontale 16:9**, **Quadrato 1:1**, **Verticale 4:5**, **Storie 9:16** | Imposta la risoluzione (tabella 4) | |
 | 4 | Qualità | **Bozza**, **Bilanciata**, **Alta** | Imposta campioni, rimbalzi e denoiser (tabella 3) | |
-| 4 | Dispositivo | **Usa la scheda video (GPU)** (se disponibile) | CPU o GPU, come nella scheda Render | |
+| 4 | Dispositivo di calcolo | Due pulsanti: **Scheda video (GPU)** e **Processore (CPU)** | Predefinita la GPU appena risulta funzionante (una volta sola: poi vale la scelta dell'utente o di Claude). Senza GPU utilizzabile il pulsante è disattivato | |
 | 5 | Render | **Avvia render** (grande) con avanzamento | Come F5 | |
 | 5 | Render | **Salva immagine…** | Esporta PNG, come "Esporta PNG" | |
 
-**Non si vede nella Semplice** (resta tutto nella Avanzata, invariato): trasformazioni numeriche,
-gizmo, singole luci, HDRI, nebbia ed effetti, obiettivo e profondità di campo, campionamento
-adattivo, thread, seed, rimbalzi, Russian roulette, clamp, tone mapping, esposizione, qualità e
-CUDA del denoiser, regole di assegnazione dei materiali.
+**Non si vede nella Semplice** (resta tutto nella Avanzata): trasformazioni numeriche,
+gizmo, singole luci, HDRI, nebbia ed effetti, obiettivo e profondità di campo, thread, seed,
+rimbalzi, Russian roulette, clamp, tone mapping, esposizione, regole di assegnazione dei
+materiali.
+
+**Sempre attivi nella Semplice** (non si vedono, ma valgono sempre; in Avanzata sono nella
+scheda Render, e tornando in Semplice si riapplicano — `presets::apply_simple_base`):
+
+| Impostazione | Valore |
+|---|---|
+| Arresto a soglia di rumore | attivo, soglia 0,050, campioni minimi 32 |
+| Denoiser: modalità | Anteprima veloce + finale (ripulisce anche durante il render) |
+| Denoiser: CUDA | attivo (se la scheda non lo supporta, il denoiser usa da solo la CPU) |
+| Denoiser: qualità finale / anteprima | Alta / Veloce |
+| Denoiser: prima anteprima | a 8 campioni |
+| Denoiser: intensità | 90 % |
+| Denoiser: preserva i dettagli (albedo e normali) | sì |
+
+Nota sull'arresto a soglia di rumore: nella scena del cocktail (nebbia, scena scura) era più
+lento del render uniforme (`reports/2026-10-29_campionamento-adattivo/`); per le foto di prodotto
+su fondale chiaro di solito conviene. In Avanzata resta spento di default.
 
 ## 2. Aspetti: valori impostati (nascosti nella Semplice, visibili in Avanzata)
 
@@ -66,11 +83,11 @@ larghezza 7·e (almeno 6 m), curva 0,3·altezza, piede 0,35·e dietro il prodott
 |---|---|---|---|---|
 | Campioni per pixel | 64 | 256 | 1024 | |
 | Rimbalzi massimi | 8 | 12 | 16 | |
-| Denoiser | finale | finale | finale | |
+| Denoiser | anteprima + finale | anteprima + finale | anteprima + finale | |
 
-Restano come sono (si cambiano in Avanzata): qualità del denoiser (predefinita: alta), CUDA,
-campionamento adattivo (spento), thread (automatico), Russian roulette (dal rimbalzo 3),
-clamp indiretto (0), seed.
+Restano come sono (si cambiano in Avanzata): thread (automatico), Russian roulette (dal
+rimbalzo 3), clamp indiretto (0), seed. Denoiser e arresto a soglia di rumore: vedi "Sempre
+attivi nella Semplice" sopra.
 
 ## 4. Formati
 

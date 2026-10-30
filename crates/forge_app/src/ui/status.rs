@@ -18,6 +18,33 @@ fn fmt_dur(d: std::time::Duration) -> String {
     }
 }
 
+/// Utilizzo GPU e VRAM della scheda NVIDIA che fa il render (con il render su CPU, la prima).
+fn gpu_label(app: &ForgeApp, ui: &mut egui::Ui, p: &forge_render_core::Progress) {
+    use forge_telemetry::gpu;
+    if !app.monitor.nvml_available() {
+        ui.label(tr("GPU: lettura non disponibile")).on_hover_text(tr(
+            "Utilizzo GPU e VRAM si leggono con il driver NVIDIA (NVML): con schede AMD o Intel, o senza driver NVIDIA, non sono disponibili",
+        ));
+        return;
+    }
+    let device = if p.backend.starts_with("GPU") { p.device.as_str() } else { "" };
+    let Some(g) = gpu::matching(&app.monitor.gpus, device) else {
+        ui.label(tr("GPU: lettura non disponibile"))
+            .on_hover_text(tr("La scheda che fa il render non è NVIDIA: NVML legge solo le schede NVIDIA"));
+        return;
+    };
+    let usage = g.usage_percent.map(|u| format!("{u}%")).unwrap_or_else(|| "—".into());
+    let gb = |b: u64| format!("{:.1}", forge_telemetry::gib(b));
+    ui.label(tf(
+        "GPU: {} · VRAM {}/{} GB (libera {} GB)",
+        &[usage, gb(g.vram_used_bytes), gb(g.vram_total_bytes), gb(g.vram_free_bytes)],
+    ))
+    .on_hover_text(tf(
+        "{}: VRAM usata da tutti i programmi, letta dal driver NVIDIA ogni secondo",
+        std::slice::from_ref(&g.name),
+    ));
+}
+
 pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
     let p = app.session.progress();
     ui.add_space(4.0);
@@ -77,8 +104,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 format!("{:.1}", forge_telemetry::gib(app.system.total_ram_bytes)),
             ],
         ));
-        ui.label(tr("GPU: utilizzo non rilevato"))
-            .on_hover_text(tr("La lettura di utilizzo GPU e VRAM (NVML) non è ancora integrata"));
+        gpu_label(app, ui, &p);
         match (&app.denoiser_info, p.denoiser.is_empty()) {
             (Err(_), _) => ui.label(tr("Denoiser: OIDN non trovato")),
             (Ok(_), true) => ui.label(tr("Denoiser: inattivo")),

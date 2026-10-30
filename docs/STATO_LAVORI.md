@@ -106,6 +106,20 @@
   "Controllo IA" e l'indicatore "Controllato da IA". `render_status` per i render lunghi.
   Report `reports/2026-10-30_controllo-ia-ponte/`.
 
+## Fatto nella tredicesima parte (versione 0.6.0)
+- Modalità Semplice: valori di base sempre attivi (`presets::apply_simple_base`, applicata a ogni
+  frame in Semplice: soglia di rumore 0,05/32, denoiser in anteprima + finale con CUDA, qualità
+  alta/veloce, 8 campioni, 90 %, dettagli) e selettore GPU/CPU a due pulsanti (GPU predefinita
+  una volta sola, `simple_gpu_checked`). Valori in `docs/INTERFACCIA_SEMPLICE.md`.
+- Fondali larghi 12 volte il prodotto e alti 3,5 (niente bordi nelle inquadrature).
+- Statistiche: utilizzo GPU e VRAM usata/totale/libera via NVML (`forge_telemetry::gpu`,
+  caricata a runtime, solo NVIDIA). Da collaudare su una scheda NVIDIA.
+- Schermata di benvenuto dal mockup di Valerio: `assets/splash.png` (suo render) e
+  `assets/logo.png`, versione sotto il logo, licenze open source in piccolo sotto le informazioni.
+  "Mostra all'avvio" in Impostazioni → Informazioni.
+- Guide MCP con screenshot e render d'esempio puliti (denoiser), script in `tools/guida-mcp/`
+  (`scatta.py`, `annota.py`, `galleria.py`).
+
 ## Piano di sviluppo incrementale
 
 ### Fase 1 — Versione nella barra del titolo: fatta, in attesa di conferma

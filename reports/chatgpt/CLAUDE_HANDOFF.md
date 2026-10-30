@@ -996,3 +996,20 @@ separato**. Fatto:
 Ho anche riscritto `docs/MCP.md` e `docs/MCP.en.md` per il nuovo sistema, tenendo la tua regola
 dei percorsi generici. Restano da decidere con Valerio le domande sulla creazione di oggetti
 nuovi ("crea una sfera" ha riusato la sfera esistente invece di aggiungerne una).
+
+### Claude Code (cloud) — 30/10/2026: versione 0.6.0
+
+- **Semplice**: impostazioni di base fisse chieste da Valerio (arresto a soglia 0,05 / 32
+  campioni, denoiser "Anteprima veloce + finale" con CUDA, qualità alta e anteprima veloce, 8
+  campioni, 90 %, dettagli preservati) e selettore GPU/CPU a due pulsanti. Valori in
+  `docs/INTERFACCIA_SEMPLICE.md`.
+- **Statistiche GPU**: `forge_telemetry::gpu` legge con NVML utilizzo e VRAM della scheda che
+  fa il render; senza driver NVIDIA dice "lettura non disponibile". Non ancora provata su una
+  NVIDIA vera: se Valerio vede valori strani sulla Quadro, il punto da guardare è `matching`
+  (scelta della scheda per nome).
+- **Fondali** più larghi e alti (12× e 3,5× il prodotto): nelle viste tre quarti e isometrica
+  si vedevano i bordi.
+- **Schermata di benvenuto** rifatta sul mockup di Valerio (suo render del cocktail, logo,
+  versione sotto il logo, licenze open source in piccolo sotto le informazioni).
+- **Guide MCP** con screenshot del programma e render puliti con il denoiser; `galleria.py` non
+  tocca più `assets/splash.png`.

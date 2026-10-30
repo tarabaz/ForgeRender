@@ -17,7 +17,7 @@ os.makedirs(D, exist_ok=True)
 APP = os.path.join(ROOT, "target/debug/forgerender")
 BRIDGE = os.path.join(ROOT, "target/debug/forgerender-mcp")
 CONTACT = D + "/contatto.json"
-env = dict(os.environ, DISPLAY=":95", FORGE_MCP_FILE=CONTACT, FORGE_SETTINGS_FILE=D + "/prefs.json", FORGE_LIBRARY_DIR=D + "/lib")
+env = dict(os.environ, LD_LIBRARY_PATH=os.path.join(ROOT, "target/debug/oidn"), DISPLAY=":95", FORGE_MCP_FILE=CONTACT, FORGE_SETTINGS_FILE=D + "/prefs.json", FORGE_LIBRARY_DIR=D + "/lib")
 json.dump({"show_splash": False, "language": L, "ui_mode": "Simple"}, open(D + "/prefs.json", "w"))
 def shot(name):
     subprocess.run(["import", "-window", "root", "-display", ":95", D + "/" + name + ".png"], check=True)
@@ -50,11 +50,13 @@ b.stdin.write(json.dumps({"jsonrpc": "2.0", "id": 0, "method": "initialize", "pa
 call("prepare_studio", {"look": "studio"})
 call("add_light", {"type": "area", "side": "destra", "kelvin": 3200, "name": "Luce calda" if L == "it" else "Warm light"})
 call("apply_material", {"material": "acciaio-satinato", "targets": ["Sfera acciaio"]})
-call("set_render_settings", {"width": 960, "height": 540, "samples": 160, "device": "cpu", "denoise": False})
+info = json.loads(call("set_render_settings", {"width": 960, "height": 540, "samples": 512, "device": "cpu", "denoise": True, "denoise_preview": True})["result"]["content"][0]["text"])
+if not info.get("denoiser_installato"):
+    sys.exit("denoiser non installato: niente immagini sgranate nella guida")
 out = D + "/render.png"
 if os.path.exists(out): os.remove(out)
 call("render", {"output": out, "max_wait_s": 20}, wait=False)
-time.sleep(12); shot("03_collegato_render")
+time.sleep(45); shot("03_collegato_render")
 r = json.loads(b.stdout.readline()); print("render:", r["result"]["content"][0]["text"][:100].replace("\n", " "))
 while '"esito": "render finito' not in r["result"]["content"][0]["text"]:
     r = call("render_status", {"max_wait_s": 30, "preview_px": 0})

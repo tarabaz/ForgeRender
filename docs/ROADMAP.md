@@ -27,7 +27,7 @@ Complexity is a rough estimate of the effort and risk for this codebase:
 | 12 | DLSS Ray Reconstruction as fast interactive preview | Very high | NVIDIA SDK | RTX only, Vulkan interop with wgpu |
 | 13 | Hardware ray tracing (RT cores) | Very high | OptiX or Vulkan ray query | — |
 | 14 | Ivy generator: photorealistic climbing plants growing on objects | High | — | **To do later**, not scheduled now |
-| 15 | GPU usage / VRAM readout via NVML | Low | — | — |
+| 15 | GPU usage / VRAM readout via NVML | Low | ✅ 0.6.0 (NVIDIA only) | — |
 | 16 | Import OpenVDB volumes (smoke/fire simulated in Blender Mantaflow, EmberGen, Houdini) | Medium | fog renderer ✅ | Pure-Rust VDB reader; the renderer already handles density grids |
 
 Suggested order for what is left: 4 → 3 → 5, then the rest by need.
@@ -131,7 +131,7 @@ correct accumulation, PNG export.
   formulas, HDRI, textures, displacement, depth of field, statistical convergence to the CPU image
 - ✅ CPU/GPU selector in the UI and CLI, automatic fallback to CPU
 - ✅ Measurements on the RTX 5070 ([BENCHMARK.md](BENCHMARK.md)): 139 Msamples/s, 4.6× the 24-thread 9900X
-- ⏳ NVML, hardware ray tracing, hybrid CPU+GPU
+- ✅ NVML (usage and VRAM, NVIDIA cards) · ⏳ hardware ray tracing, hybrid CPU+GPU
 
 ## Phase 5 — CAD 🟡
 - ✅ glTF/GLB (recommended export from SolidWorks), OBJ, STL, Blender `.blend`

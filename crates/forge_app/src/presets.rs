@@ -10,7 +10,7 @@
 
 use crate::i18n::{tk, tr};
 use forge_math::{Aabb, Mat4, Vec3};
-use forge_render_core::{DenoiseMode, RenderSettings, ToneMapping};
+use forge_render_core::{DenoiseMode, DenoiseQuality, RenderSettings, ToneMapping};
 use forge_scene::{AddedKind, AddedRecord, ComponentId, Environment, Light, Material, MaterialId, Scene, UserTransform};
 
 /// Aspetto della foto prodotto.
@@ -172,14 +172,14 @@ impl Quality {
         let (spp, bounces) = self.values();
         s.target_samples = spp;
         s.max_bounces = bounces;
-        s.denoise.mode = DenoiseMode::Final;
+        s.denoise.mode = DenoiseMode::Progressive;
     }
 
     /// Qualità corrispondente alle impostazioni (se coincidono con un preset).
     pub fn matching(s: &RenderSettings) -> Option<Quality> {
         Quality::ALL.into_iter().find(|q| {
             let (spp, b) = q.values();
-            s.target_samples == spp && s.max_bounces == b && s.denoise.mode == DenoiseMode::Final
+            s.target_samples == spp && s.max_bounces == b && s.denoise.mode != DenoiseMode::Off
         })
     }
 }
@@ -257,15 +257,18 @@ pub fn backdrop_for(b: &Aabb, style: BackdropStyle) -> (AddedKind, Mat4) {
         let s = b.max - b.min;
         ((b.min + b.max) * 0.5, b.min.y, s.x.max(s.z).max(0.5), b.min.z)
     };
-    let height = (1.5 * e).max(2.0);
-    let radius = 0.25 * height;
+    // Largo e alto abbastanza da riempire anche le viste ruotate (tre quarti, isometrica) e quelle
+    // dall'alto: con 3 volte il prodotto i bordi del fondale entravano nell'immagine. Il raccordo
+    // resta quello di un fondale alto 2,5 volte il prodotto.
+    let height = (3.5 * e).max(3.5);
+    let radius = 0.25 * (2.5 * e).max(2.5);
     // La parete del fondale sta a z = -raggio rispetto all'origine della mesh.
     let wall = back - 0.3 * e + radius;
     // Il piano si estende davanti alla scena quanto basta a uscire dall'inquadratura.
     let depth = (c.z - wall) + 2.0 * e;
     (
         AddedKind::Backdrop {
-            width: (3.0 * e).max(3.0),
+            width: (12.0 * e).max(10.0),
             depth,
             height,
             radius,
@@ -286,15 +289,16 @@ fn sweep_for(b: &Aabb) -> (AddedKind, Mat4) {
         let s = b.max - b.min;
         ((b.min + b.max) * 0.5, b.min.y, s.x.max(s.z).max(0.5), b.min.z)
     };
-    // Largo e alto abbastanza da riempire anche un'inquadratura 16:9 o verticale.
-    let height = (2.5 * e).max(2.5);
-    let radius = 0.3 * height;
+    // Largo e alto abbastanza da riempire anche le viste ruotate a 45° e quelle dall'alto (a 7 volte
+    // il prodotto se ne vedeva il bordo). Il raccordo resta quello di un telo alto 2,5 volte.
+    let height = (3.5 * e).max(3.5);
+    let radius = 0.3 * (2.5 * e).max(2.5);
     // Il piede del raccordo sta dietro il prodotto; il telo poi sale e arretra.
     let foot = back - 0.35 * e;
     let depth = (c.z - foot) + 2.5 * e;
     (
         AddedKind::StudioSweep {
-            width: (7.0 * e).max(6.0),
+            width: (12.0 * e).max(10.0),
             depth,
             height,
             radius,
@@ -417,6 +421,25 @@ impl PresetBackup {
 
 /// Applica un aspetto: luci dimensionate sul prodotto, ambiente, tone mapping, esposizione e
 /// colore del fondale (se c'è). Non crea il fondale: lo fa [`prepare_scene`].
+/// Valori di base della modalità Semplice, applicati sempre (nel pannello Semplice non si vedono;
+/// in Avanzata sono nella scheda Render):
+/// - arresto a soglia di rumore 0,05 con almeno 32 campioni;
+/// - denoiser anche sull'anteprima durante il render, CUDA se la scheda lo permette (altrimenti
+///   il denoiser usa da solo la CPU), qualità finale alta e anteprima veloce, prima anteprima a 8
+///   campioni, intensità 90 %, dettagli preservati (albedo e normali).
+pub fn apply_simple_base(s: &mut RenderSettings) {
+    s.noise_threshold = 0.05;
+    s.adaptive_min_samples = 32;
+    let d = &mut s.denoise;
+    d.mode = DenoiseMode::Progressive;
+    d.use_cuda = true;
+    d.quality = DenoiseQuality::High;
+    d.preview_quality = DenoiseQuality::Fast;
+    d.first_preview_samples = 8;
+    d.strength = 0.9;
+    d.use_guides = true;
+}
+
 pub fn apply_look(scene: &mut Scene, s: &mut RenderSettings, look: Look) {
     let spec = look.spec();
     let b = product_bounds(scene);
@@ -641,6 +664,28 @@ mod tests {
         img.iter().map(|p| (p[0] + p[1] + p[2]) as f64 / 3.0).sum::<f64>() / img.len() as f64
     }
 
+    /// Modalità Semplice: i valori di base richiesti (adattivo, denoiser anche in anteprima,
+    /// CUDA, qualità) e la qualità scelta resta riconosciuta.
+    #[test]
+    fn simple_base_values() {
+        let mut s = RenderSettings::default();
+        Quality::High.apply(&mut s);
+        apply_simple_base(&mut s);
+        assert_eq!((s.noise_threshold, s.adaptive_min_samples), (0.05, 32));
+        let d = &s.denoise;
+        assert_eq!(d.mode, DenoiseMode::Progressive);
+        assert!(d.use_cuda && d.use_guides);
+        assert_eq!(
+            (d.quality, d.preview_quality, d.first_preview_samples),
+            (DenoiseQuality::High, DenoiseQuality::Fast, 8)
+        );
+        assert!((d.strength - 0.9).abs() < 1e-6);
+        assert_eq!(Quality::matching(&s), Some(Quality::High));
+        let before = s.clone();
+        apply_simple_base(&mut s);
+        assert_eq!(s, before, "applicarli di nuovo non cambia niente");
+    }
+
     #[test]
     fn prepare_scene_drops_adds_backdrop_and_configures() {
         let mut scene = product_scene();
@@ -816,8 +861,9 @@ mod tests {
         let AddedKind::Backdrop { width, height, .. } = kind else {
             panic!()
         };
-        assert_eq!(width, 3.0);
-        assert_eq!(height, 2.0);
+        // Prodotto largo 1 m: fondale largo 12 m e alto 3,5 m (riempie anche le viste ruotate).
+        assert_eq!(width, 12.0);
+        assert_eq!(height, 3.5);
         assert!(m.w_axis.z < b.min.z + 0.6, "dietro il prodotto");
     }
 }
