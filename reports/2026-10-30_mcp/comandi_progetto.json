@@ -1,0 +1,103 @@
+[
+ [
+  "import_model",
+  {
+   "path": "C:/RenderingEngine/samples/scene/cocktail-ghiaccio-secco/modelli/GlassHurricaneCandleHolder.glb",
+   "unit": "m"
+  }
+ ],
+ [
+  "prepare_studio",
+  {
+   "look": "scuro"
+  }
+ ],
+ [
+  "transform_objects",
+  {
+   "rotate_deg": [
+    0,
+    30,
+    0
+   ],
+   "drop_to_floor": true
+  }
+ ],
+ [
+  "set_environment",
+  {
+   "type": "uniforme",
+   "color": "#202838",
+   "intensity": 0.3,
+   "visible": true
+  }
+ ],
+ [
+  "add_light",
+  {
+   "type": "punto",
+   "side": "sinistra",
+   "kelvin": 7500,
+   "strength": 2
+  }
+ ],
+ [
+  "save_project",
+  {
+   "path": "C:/prove/prova.frproject"
+  }
+ ],
+ [
+  "save_project",
+  {
+   "path": "C:/prove/prova.frproject"
+  }
+ ],
+ [
+  "new_scene",
+  {
+   "kind": "vuota"
+  }
+ ],
+ [
+  "open_project",
+  {
+   "path": "C:/prove/prova.frproject"
+  }
+ ],
+ [
+  "scene_info",
+  {
+   "max_components": 3
+  }
+ ],
+ [
+  "import_model",
+  {
+   "path": "/non/esiste.glb"
+  }
+ ],
+ [
+  "set_camera",
+  {
+   "view": "frontale"
+  }
+ ],
+ [
+  "set_render_settings",
+  {
+   "format": "1:1",
+   "width": 400,
+   "height": 400,
+   "samples": 16,
+   "device": "cpu"
+  }
+ ],
+ [
+  "render",
+  {
+   "output": "C:/prove/r2.png",
+   "preview_px": 256
+  }
+ ]
+]

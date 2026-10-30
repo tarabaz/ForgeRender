@@ -90,6 +90,8 @@ pub struct StartupOptions {
     pub ui_mode: Option<crate::prefs::UiMode>,
     /// Vista isometrica all'avvio (test e screenshot).
     pub iso: bool,
+    /// Server MCP su stdin/stdout: l'assistente IA comanda la finestra (`docs/MCP.md`).
+    pub mcp: bool,
     /// Esegue "Prepara scena prodotto" all'avvio con l'aspetto indicato (test e screenshot).
     pub prepare: Option<crate::presets::Look>,
     /// Scheda dell'inspector: oggetto | materiali | luci | ambiente | camera | render.
@@ -244,6 +246,8 @@ pub struct ForgeApp {
     screenshot_requested: bool,
     screenshot_done: Arc<std::sync::atomic::AtomicBool>,
     frames: u64,
+    /// Collegamento con l'assistente IA (`--mcp`).
+    pub mcp: Option<crate::mcp::Bridge>,
 }
 
 impl ForgeApp {
@@ -336,6 +340,7 @@ impl ForgeApp {
             screenshot_requested: false,
             screenshot_done: Default::default(),
             frames: 0,
+            mcp: startup.mcp.then(|| crate::mcp::start(cc.egui_ctx.clone())),
         };
         // Prepara il backend GPU in background (creazione dispositivo e compilazione
         // dello shader da parte del driver), così è pronto quando serve.
@@ -360,7 +365,8 @@ impl ForgeApp {
             tracing::warn!("file di lingua non valido: {e}");
         }
         app.apply_prefs(prefs, true);
-        app.splash_open = app.prefs.show_splash;
+        // Comandato dall'assistente: niente schermata davanti alla scena.
+        app.splash_open = app.prefs.show_splash && app.mcp.is_none();
         // Cartelle della libreria (HDRI, materiali, texture).
         match forge_library::paths::ensure() {
             Ok(root) => tracing::info!("libreria: {}", root.display()),
@@ -1218,7 +1224,7 @@ impl ForgeApp {
     // Scena e progetto
     // ------------------------------------------------------------------
 
-    fn replace_scene(&mut self, scene: Scene, meta: ProjectMeta, settings: Option<RenderSettings>) {
+    pub fn replace_scene(&mut self, scene: Scene, meta: ProjectMeta, settings: Option<RenderSettings>) {
         self.session.cancel();
         self.job = None;
         self.scene = scene;
@@ -1342,7 +1348,9 @@ impl ForgeApp {
     pub fn frame_product(&mut self) {
         let b = crate::presets::product_bounds(&self.scene);
         if b.is_empty() {
-            return self.frame_all();
+            let b = self.scene.bounds();
+            self.orbit.frame(&b);
+            return self.commit_view();
         }
         self.orbit.frame(&b);
         // Formati verticali (4:5, 9:16): conta anche l'apertura orizzontale, più stretta.
@@ -1352,6 +1360,11 @@ impl ForgeApp {
             let half_h = (half_v.tan() * aspect).atan().max(1e-3);
             self.orbit.distance = b.radius().max(1e-4) / half_h.sin() * 1.1;
         }
+        self.commit_view();
+    }
+
+    /// La vista attuale diventa anche l'inquadratura del render (camera attiva compresa).
+    pub fn commit_view(&mut self) {
         self.scene.camera = self.orbit.camera();
         if let Some(c) = self.scene.active_camera.and_then(|i| self.scene.render_cameras.get_mut(i)) {
             c.camera = self.scene.camera.clone();
@@ -1854,6 +1867,7 @@ impl ForgeApp {
         if state == SessionState::Rendering || self.is_preparing() || self.pending.is_some() {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
+        crate::mcp::process(self, ctx);
         self.handle_screenshot(ctx);
         let title = tf(
             "{APP_TITLE} — {}{}",

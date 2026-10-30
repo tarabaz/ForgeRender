@@ -780,6 +780,9 @@
     "Tappeto basso da palco": "Low stage carpet",
     "Emettitore a 20–40 cm da terra (la bocca della macchina): tappeto basso e compatto che copre il pavimento.": "Emitter 20–40 cm above the ground (the machine nozzle): low, compact carpet covering the floor.",
     "Molto alta": "Very high",
-    "Ultra": "Ultra"
+    "Ultra": "Ultra",
+    "Server MCP attivo: un assistente (Claude Code) comanda la scena. Comandi eseguiti: {}, ultimo: {}": "MCP server active: an assistant (Claude Code) controls the scene. Commands run: {}, last: {}",
+    "IA collegata (MCP)": "AI connected (MCP)",
+    "IA scollegata": "AI disconnected"
   }
 }

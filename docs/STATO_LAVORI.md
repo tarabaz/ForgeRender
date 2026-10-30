@@ -94,6 +94,12 @@
   `lang/Lan_eng.json`.
 - Schermata di benvenuto (`crates/forge_app/src/ui/splash.rs`, immagine `assets/splash.png`).
 
+## Fatto nell'undicesima parte (versione 0.4.0)
+- Controllo da Claude con MCP: `forgerender --mcp`, codice in `crates/forge_app/src/mcp/`
+  (protocollo, ponte con la finestra, 24 strumenti, operazioni pure con test). Guida
+  `docs/MCP.md`, report `reports/2026-10-30_mcp/`. Ogni strumento nuovo: definizione in
+  `tools::list`, ramo in `dispatch`, test della parte pura in `ops.rs`.
+
 ## Piano di sviluppo incrementale
 
 ### Fase 1 — Versione nella barra del titolo: fatta, in attesa di conferma

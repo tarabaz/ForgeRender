@@ -23,6 +23,10 @@ per Windows 11 (sviluppato per Ryzen 9 9900X + RTX 5070) ma funzionante anche se
 - **Lingue**: italiano e inglese, cambio immediato di tutta l'interfaccia (in alto o in
   Impostazioni → Lingua). Le traduzioni sono file separati `lang/Lan_*.json`: se ne aggiungono
   altri copiando `Lan_eng.json`.
+- **Comandato da Claude (MCP)**: con `forgerender --mcp` un assistente IA imposta la scena e fa i
+  render su richiesta in italiano ("metti uno sfondo da studio, una luce calda a destra, il pezzo
+  in metallo satinato, render 4:5"): 24 comandi per scena, luci, materiali, camera, ambiente e
+  render, con l'anteprima che torna all'assistente. Guida: [docs/MCP.md](docs/MCP.md).
 - **Schermata di benvenuto** all'avvio con immagine (`assets/splash.png`), versione e commit;
   si chiude con "Chiudi" e si riapre da File.
 - **Path tracing** su CPU (tutti i core) e su GPU (compute shader wgpu, Vulkan/DX12) con accumulo
@@ -265,6 +269,8 @@ file di output e le immagini. Poi aggiungi una riga all'indice in `reports/READM
 
 - [CHANGELOG.md](CHANGELOG.md) — novità di ogni versione e regola per i numeri di versione
 - [reports/](reports/README.md) — report delle misure con dati grezzi, immagini e comandi per rifarle
+- [docs/MCP.md](docs/MCP.md) — comandare ForgeRender con Claude Code (MCP): installazione,
+  comandi, sicurezza
 - [docs/ROADMAP.it.md](docs/ROADMAP.it.md) — stato, prossimi passi con la complessità, piani tecnici
   ([English](docs/ROADMAP.md))
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architettura, scelte tecniche, rischi

@@ -217,7 +217,7 @@ impl LibraryUi {
         self.hdris = None;
     }
 
-    fn materials(&mut self) -> &[LibraryMaterial] {
+    pub fn materials(&mut self) -> &[LibraryMaterial] {
         self.items.get_or_insert_with(store::list)
     }
 

@@ -207,6 +207,14 @@ fn scenery_ids(scene: &Scene) -> Vec<ComponentId> {
     scene.added.iter().filter(|r| is_scenery(&r.kind)).map(|r| r.id.clone()).collect()
 }
 
+/// Il nodo appartiene alla scenografia (pavimento, fondale, parete aggiunti)?
+pub fn is_scenery_node(scene: &Scene, mut i: usize) -> bool {
+    while let Some(p) = scene.nodes[i].parent {
+        i = p;
+    }
+    scenery_ids(scene).contains(&scene.nodes[i].id)
+}
+
 /// Radici del prodotto: nodi di primo livello che non sono scenografia (pavimento, fondale, parete).
 pub fn product_roots(scene: &Scene) -> Vec<usize> {
     let scenery = scenery_ids(scene);

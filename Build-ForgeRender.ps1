@@ -147,6 +147,10 @@ $zip = Join-Path $dist "ForgeRender-$version-portable-x64.zip"
 if (-not (Test-Path $zip) -or (Get-Item $zip).LastWriteTime -lt $started) {
     Fail "il pacchetto portable $zip non è stato creato da questa esecuzione"
 }
+# Denoiser anche accanto a target\release\forgerender.exe: percorso fisso per Claude Code (MCP),
+# che non cambia a ogni versione come la cartella del portable (docs/MCP.md).
+$portableDir = Join-Path $dist "ForgeRender-$version-portable-x64"
+Get-ChildItem -Path $portableDir -Filter '*.dll' -ErrorAction SilentlyContinue | Copy-Item -Destination $bin -Force
 $setup = Join-Path $dist "ForgeRender-$version-setup-x64.exe"
 $setupNew = (Test-Path $setup) -and (Get-Item $setup).LastWriteTime -ge $started
 

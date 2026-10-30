@@ -1,5 +1,6 @@
 use crate::app::{ForgeApp, View};
-use crate::i18n::{tk, tr};
+use crate::i18n::{tf, tk, tr};
+use crate::ui::style;
 use eframe::egui;
 use forge_render_core::SessionState;
 
@@ -9,6 +10,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
         ui.separator();
         language_switch(app, ui);
         ui.separator();
+        mcp_badge(app, ui);
         ui.menu_button(tr("File"), |ui| {
             if ui.button(tr("Nuova scena vuota")).clicked() {
                 app.new_empty_scene();
@@ -153,6 +155,23 @@ pub const IMPORT_HINT: &str = tk(
     "Importa un modello (Ctrl+I): glTF/GLB, OBJ, STL, Blender .blend (con Blender installato), \
      STEP (con il convertitore forgerender-step), SolidWorks SLDPRT/SLDASM (su Windows, con SolidWorks installato)",
 );
+
+/// Indicatore del controllo da parte dell'assistente IA (`--mcp`).
+fn mcp_badge(app: &ForgeApp, ui: &mut egui::Ui) {
+    let Some(b) = &app.mcp else { return };
+    let on = b.connected.load(std::sync::atomic::Ordering::Acquire);
+    let (text, color) = if on {
+        (tr("IA collegata (MCP)"), style::ACCENT)
+    } else {
+        (tr("IA scollegata"), egui::Color32::GRAY)
+    };
+    let last = b.last.clone().unwrap_or_else(|| "—".into());
+    ui.label(egui::RichText::new(text).color(color).strong()).on_hover_text(tf(
+        "Server MCP attivo: un assistente (Claude Code) comanda la scena. Comandi eseguiti: {}, ultimo: {}",
+        &[b.calls.to_string(), last],
+    ));
+    ui.separator();
+}
 
 /// Lingua dell'interfaccia: cambia subito tutte le scritte e resta nelle Impostazioni.
 pub fn language_switch(app: &mut ForgeApp, ui: &mut egui::Ui) {

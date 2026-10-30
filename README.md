@@ -24,6 +24,11 @@ but also working without a dedicated GPU.
 - **Languages**: Italian and English, the whole interface switches immediately (at the top or in
   Settings → Language). Translations are separate `lang/Lan_*.json` files: copy `Lan_eng.json`
   to add more.
+- **Controlled by Claude (MCP)**: with `forgerender --mcp` an AI assistant sets up the scene and
+  renders on request in plain language ("add a studio backdrop, a warm light on the right, make
+  the part satin metal, 4:5 render"): 24 tools for scene, lights, materials, camera, environment
+  and rendering, with the preview sent back to the assistant. Guide (Italian):
+  [docs/MCP.md](docs/MCP.md).
 - **Welcome screen** at start-up with an image (`assets/splash.png`), version and commit; it
   closes with "Close" and reopens from File.
 - **Path tracing** on the CPU (all cores) and on the GPU (wgpu compute shaders, Vulkan/DX12)
@@ -262,6 +267,8 @@ Then add a row to the index in `reports/README.md`.
 
 - [CHANGELOG.md](CHANGELOG.md) — what changed in each version (Italian)
 - [reports/](reports/README.md) — measurement reports with raw data, images and the commands to reproduce them (Italian)
+- [docs/MCP.md](docs/MCP.md) — controlling ForgeRender from Claude Code (MCP): setup, tools,
+  safety (Italian)
 - [docs/ROADMAP.md](docs/ROADMAP.md) — status, next steps with complexity, technical plans
   ([italiano](docs/ROADMAP.it.md))
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architecture, technical choices, risks (Italian)

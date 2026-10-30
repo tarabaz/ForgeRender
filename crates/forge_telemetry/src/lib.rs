@@ -191,7 +191,8 @@ fn env_filter() -> EnvFilter {
     EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(DEFAULT_FILTER))
 }
 
-/// Inizializza il logging: console (filtrabile con `RUST_LOG`) e buffer per la UI.
+/// Inizializza il logging: console su stderr (filtrabile con `RUST_LOG`; stdout resta libero
+/// per i risultati della CLI e per il protocollo MCP) e buffer per la UI.
 pub fn init_logging() -> LogBuffer {
     init_logging_to(None)
 }
@@ -216,7 +217,12 @@ pub fn init_logging_to(dir: Option<&std::path::Path>) -> LogBuffer {
             .with_filter(env_filter())
     });
     let _ = tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer().with_target(false).with_filter(env_filter()))
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_target(false)
+                .with_writer(std::io::stderr)
+                .with_filter(env_filter()),
+        )
         .with(file_layer)
         .with(BufferLayer(buf.clone()))
         .try_init();

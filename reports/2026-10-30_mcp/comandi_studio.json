@@ -1,0 +1,106 @@
+[
+ [
+  "scene_info",
+  {
+   "max_components": 10
+  }
+ ],
+ [
+  "prepare_studio",
+  {
+   "look": "studio",
+   "quality": "bozza"
+  }
+ ],
+ [
+  "add_light",
+  {
+   "type": "area",
+   "side": "destra",
+   "kelvin": 3200,
+   "strength": 1.5,
+   "name": "Luce calda a destra"
+  }
+ ],
+ [
+  "add_light",
+  {
+   "type": "spot",
+   "side": "controluce",
+   "range_m": 2.5,
+   "range_softness": 0.5
+  }
+ ],
+ [
+  "edit_light",
+  {
+   "light": "Luce calda",
+   "strength": 0.8
+  }
+ ],
+ [
+  "list_materials",
+  {
+   "search": "acciaio",
+   "limit": 5
+  }
+ ],
+ [
+  "create_material",
+  {
+   "name": "Metallo satinato",
+   "color": "#c8c8cc",
+   "metallic": 1,
+   "roughness": 0.35,
+   "targets": [
+    "Toro rame"
+   ]
+  }
+ ],
+ [
+  "apply_material",
+  {
+   "material": "oro",
+   "targets": [
+    "Box plastica"
+   ]
+  }
+ ],
+ [
+  "set_camera",
+  {
+   "view": "tre_quarti",
+   "focal_mm": 85
+  }
+ ],
+ [
+  "set_render_settings",
+  {
+   "width": 640,
+   "height": 360,
+   "samples": 32,
+   "device": "cpu",
+   "denoise": false
+  }
+ ],
+ [
+  "render",
+  {
+   "output": "C:/prove/render_mcp2.png",
+   "overwrite": true,
+   "preview_px": 512
+  }
+ ],
+ [
+  "remove_light",
+  {
+   "light": 99
+  }
+ ],
+ [
+  "scene_info",
+  {
+   "max_components": 3
+  }
+ ]
+]

@@ -13,6 +13,7 @@
 
 mod app;
 mod i18n;
+mod mcp;
 mod prefs;
 mod presets;
 #[cfg(test)]
@@ -43,6 +44,7 @@ fn parse_args() -> StartupOptions {
             "--library" => o.library = true,
             "--settings" => o.settings = true,
             "--iso" => o.iso = true,
+            "--mcp" => o.mcp = true,
             "--prepara" => {
                 i += 1;
                 o.prepare = match args.get(i).map(String::as_str) {

@@ -11,6 +11,27 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.4.0 — 30/10/2026
+
+**Controllo da Claude (MCP)**
+- `forgerender --mcp`: la finestra si apre normalmente e un assistente IA (Claude Code, Claude
+  Desktop) la comanda con il Model Context Protocol. Guida e configurazione: `docs/MCP.md`.
+- 24 comandi: stato della scena, nuova scena, apri/salva progetto, importa modello, prepara
+  studio (4 aspetti, 3 qualità), adatta la scena, annulla preset, aggiungi oggetti, sposta/ruota/
+  scala, mostra/nascondi, aggiungi/modifica/elimina luci (per lato rispetto all'inquadratura,
+  Kelvin, intensità relativa, raggio d'azione), colore di tutte le luci, cerca/applica/crea
+  materiali, camera (viste, focale, ortografica, zoom, profondità di campo), ambiente,
+  impostazioni del render, render con anteprima restituita all'assistente, stop, salva immagine.
+- Sicurezza: niente codice eseguibile, argomenti controllati, nessuna sovrascrittura di file
+  senza `overwrite`, materiali della libreria non modificati.
+- Indicatore "IA collegata (MCP)" in alto; la verifica di `claude mcp list` apre e richiude la
+  finestra da sola.
+
+**Altro**
+- I log della console vanno su stderr (stdout resta per i risultati e per MCP).
+- `Build-ForgeRender.ps1` copia le DLL del denoiser anche in `target\release`, il percorso fisso
+  da dare a Claude Code.
+
 ## 0.3.0 — 29/10/2026
 
 **Foto prodotto**
