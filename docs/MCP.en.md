@@ -144,7 +144,18 @@ Grant MCP permissions carefully, based on the operations you want the assistant 
 **`claude mcp list` reports `failed`**
 - Check the absolute path stored in `$exe`.
 - Verify that the file exists with `Test-Path $exe`.
-- Try launching the executable manually with `--mcp` from its containing folder.
+- Test ForgeRender on its own, started the way Claude starts it (one line, with `$exe` set as above):
+
+  ```
+  $p = New-Object System.Diagnostics.Process; $p.StartInfo.FileName = $exe; $p.StartInfo.Arguments = "--mcp"; $p.StartInfo.UseShellExecute = $false; $p.StartInfo.RedirectStandardInput = $true; $p.StartInfo.RedirectStandardOutput = $true; $null = $p.Start(); $p.StandardInput.WriteLine('{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'); $t = $p.StandardOutput.ReadLineAsync(); if ($t.Wait(20000)) { $t.Result } else { "NO ANSWER within 20 seconds" }; $p.StandardInput.Close()
+  ```
+
+  It works if a line `{"id":1,"jsonrpc":"2.0","result":{...,"serverInfo":{"name":"forgerender",...}}}`
+  appears (accented letters may look garbled in PowerShell; Claude reads them correctly). The
+  window opens and closes by itself. Tested on Windows with the 0.4.0 portable on an external drive.
+- Launching `forgerender.exe --mcp` by hand, or piping text into it with `|`, is **not** a valid
+  test: PowerShell does not connect the input of a windowed program, so ForgeRender receives
+  nothing and closes immediately, as after a health check.
 
 **ForgeRender does not respond**
 - Keep the application window open and do not minimise it.

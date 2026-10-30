@@ -7,15 +7,14 @@ written in Rust. Physically based progressive path tracing on the CPU and on the
 desktop interface, designed for Windows 11 (developed for a Ryzen 9 9900X + RTX 5070)
 but also working without a dedicated GPU.
 
-> See [docs/ROADMAP.md](docs/ROADMAP.md) for what really works today, what comes next and
-> how complex each next step is.
-
 > **Control ForgeRender with AI — MCP**
 >
 > Ask Claude Code to prepare a scene, import a CAD model, position studio lights, assign materials, set the camera and render. ForgeRender exposes 24 tools, shows changes live and sends render previews back to the assistant.
 >
 > **[Set up Claude Code or Claude Desktop →](docs/MCP.en.md)** · [Italian guide](docs/MCP.md)
->
+
+> See [docs/ROADMAP.md](docs/ROADMAP.md) for what really works today, what comes next and
+> how complex each next step is.
 
 ## What it does today
 

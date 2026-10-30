@@ -6,15 +6,14 @@ Renderer fotorealistico per modelli CAD, assiemi meccanici e scene 3D in general
 Rust. Path tracing progressivo fisicamente basato su CPU e GPU, interfaccia desktop, pensato
 per Windows 11 (sviluppato per Ryzen 9 9900X + RTX 5070) ma funzionante anche senza GPU dedicata.
 
-> Vedi [docs/ROADMAP.it.md](docs/ROADMAP.it.md) per cosa funziona davvero oggi, cosa viene dopo
-> e quanto è complesso ogni passo.
-
 > **Controlla ForgeRender con l'IA — MCP**
 >
 > Chiedi a Claude Code di preparare la scena, importare un modello CAD, posizionare le luci da studio, assegnare i materiali, impostare la camera e lanciare il render. ForgeRender espone 24 strumenti, mostra le modifiche in tempo reale e restituisce all'assistente le anteprime dei render.
 >
 > **[Configura Claude Code o Claude Desktop →](docs/MCP.md)** · [English guide](docs/MCP.en.md)
->
+
+> Vedi [docs/ROADMAP.it.md](docs/ROADMAP.it.md) per cosa funziona davvero oggi, cosa viene dopo
+> e quanto è complesso ogni passo.
 
 ## Cosa fa oggi
 

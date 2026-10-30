@@ -142,10 +142,11 @@ in `renders` accanto ai log (portable: cartella del programma; installata:
   i clic, a ogni aggiornamento della finestra. Tienila aperta (non ridotta a icona) e senza
   finestre di dialogo davanti.
 - **`claude mcp list` dice "failed"**: controlla il percorso dell'eseguibile, poi prova
-  ForgeRender da solo, come lo avvia Claude. In PowerShell, una sola riga (metti il tuo percorso):
+  ForgeRender da solo, come lo avvia Claude. In PowerShell, con `$exe` impostato come sopra,
+  una sola riga:
 
   ```
-  $p = New-Object System.Diagnostics.Process; $p.StartInfo.FileName = "E:\ForgeRender-0.4.0-portable-x64\forgerender.exe"; $p.StartInfo.Arguments = "--mcp"; $p.StartInfo.UseShellExecute = $false; $p.StartInfo.RedirectStandardInput = $true; $p.StartInfo.RedirectStandardOutput = $true; $null = $p.Start(); $p.StandardInput.WriteLine('{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'); $t = $p.StandardOutput.ReadLineAsync(); if ($t.Wait(20000)) { $t.Result } else { "NESSUNA RISPOSTA in 20 secondi" }; $p.StandardInput.Close()
+  $p = New-Object System.Diagnostics.Process; $p.StartInfo.FileName = $exe; $p.StartInfo.Arguments = "--mcp"; $p.StartInfo.UseShellExecute = $false; $p.StartInfo.RedirectStandardInput = $true; $p.StartInfo.RedirectStandardOutput = $true; $null = $p.Start(); $p.StandardInput.WriteLine('{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'); $t = $p.StandardOutput.ReadLineAsync(); if ($t.Wait(20000)) { $t.Result } else { "NESSUNA RISPOSTA in 20 secondi" }; $p.StandardInput.Close()
   ```
 
   Funziona se compare una riga `{"id":1,"jsonrpc":"2.0","result":{...,"serverInfo":{"name":"forgerender",...}}}`

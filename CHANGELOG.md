@@ -5,7 +5,7 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 
 ## Regola per le versioni (0.x)
 
-- **0.X.0** (minore): un gruppo di funzioni nuove consegnato a Valerio. Si incrementa nel commit
+- **0.X.0** (minore): un gruppo di funzioni nuove consegnato. Si incrementa nel commit
   che chiude il gruppo, insieme a questa pagina.
 - **0.X.Y** (correzione): solo correzioni di difetti, senza funzioni nuove.
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
