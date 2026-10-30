@@ -18,14 +18,17 @@ use std::path::{Path, PathBuf};
 pub const MATERIAL_FILE: &str = "materiale.json";
 /// Anteprima renderizzata (v4: con gli EXR a un canale di Poly Haven letti; nella v3 rugosità,
 /// AO e height in EXR "Y" mancavano. Le vecchie si rifanno).
-pub const THUMBNAIL_FILE: &str = "anteprima-v4.png";
+pub const THUMBNAIL_FILE: &str = "anteprima-v5.png";
 /// Anteprime delle versioni precedenti: si eliminano quando si salva quella nuova.
-const LEGACY_THUMBNAIL_FILES: [&str; 5] = [
+const LEGACY_THUMBNAIL_FILES: [&str; 8] = [
     "anteprima.png",
     "anteprima-v2.png",
     "anteprima-v3.png",
     "anteprima-v3-256.png",
     "anteprima-v3-512.png",
+    "anteprima-v4.png",
+    "anteprima-v4-256.png",
+    "anteprima-v4-512.png",
 ];
 /// Versione di `materiale.json`. Nella 1 il displacement veniva acceso in automatico
 /// all'import (3 % del lato della texture): al caricamento si riporta a 0.
@@ -360,7 +363,7 @@ pub fn thumbnail_file(size: u32) -> String {
     if size <= THUMBNAIL_SIZES[0] {
         THUMBNAIL_FILE.to_string()
     } else {
-        format!("anteprima-v4-{size}.png")
+        format!("anteprima-v5-{size}.png")
     }
 }
 
@@ -369,6 +372,37 @@ pub fn remove_thumbnails(dir: &Path) {
     for s in THUMBNAIL_SIZES {
         let _ = std::fs::remove_file(dir.join(thumbnail_file(s)));
     }
+}
+
+/// Cartella della cache delle miniature dei materiali predefiniti (nella libreria).
+pub fn preset_thumbnail_dir() -> PathBuf {
+    crate::paths::root().join(".cache").join("anteprime-predefiniti")
+}
+
+/// Svuota la cache delle anteprime: miniature di tutti i materiali della libreria e dei
+/// predefiniti. Si rifanno alla prossima visualizzazione (con le impostazioni attuali).
+/// Restituisce quanti file sono stati eliminati.
+pub fn clear_thumbnail_cache() -> usize {
+    let mut n = 0;
+    let mut remove = |p: PathBuf| {
+        if std::fs::remove_file(&p).is_ok() {
+            n += 1;
+        }
+    };
+    for m in list() {
+        for s in THUMBNAIL_SIZES {
+            remove(m.dir.join(thumbnail_file(s)));
+        }
+        for old in LEGACY_THUMBNAIL_FILES {
+            remove(m.dir.join(old));
+        }
+    }
+    if let Ok(entries) = std::fs::read_dir(preset_thumbnail_dir()) {
+        for e in entries.flatten() {
+            remove(e.path());
+        }
+    }
+    n
 }
 
 /// Salva la miniatura (RGBA8) del materiale; il file dipende dal lato (`width`).

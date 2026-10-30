@@ -1172,3 +1172,21 @@ quelli con solo una parte procedurale (sporco, rumore) si importano con le immag
 - Specular, Opacity, "imperfection" non hanno slot in ForgeRender: elencate come non usate.
 - Scala: le UV di Blender non hanno misura reale; si stima dal Mapping (da regolare).
 - Prossima fase: anteprima isolata con il renderer vero (servono i modelli GLB di Valerio).
+
+## Claude Code — 31/10/2026: 0.12.0, anteprime sullo shader ball e pannello Materiali
+
+- Valerio ha fornito la scena delle anteprime (`dist\MCP\anteprimarendering.frproject`): USD
+  Shader Ball (Khronos glTF Sample Assets, **CC-BY 4.0**, attribuzione in
+  `assets/anteprima/LEGGIMI.md`), due luci ad area, camera, ambiente a gradiente. Copiata in
+  `assets/anteprima` con il percorso relativo del modello; nei pacchetti come `anteprima\`.
+- `forge_app::ui::central`: `preview_stage()` carica il progetto una volta (geometria già
+  compilata, si riusa con `compile_with_geometry`); `render_preview` mette il materiale su
+  `material_surface`. Sfera di riserva se la cartella manca.
+- Impostazioni: `preview_samples` (4–4096), `preview_resolution` (128/256/512), preset
+  Bassa/Media/Alta, "Svuota cache anteprime" (`store::clear_thumbnail_cache`). Miniature v5.
+- Pannello Materiali: solo i materiali della scena con miniatura (niente doppione della
+  Libreria).
+- Test: `previews_use_the_shader_ball` (carica la scena, renderizza 4 materiali); prefs con i
+  nuovi campi; traduzioni inglesi complete. Anteprime controllate a vista (rovere, acciaio
+  satinato, vetro, acciaio spazzolato BlenderKit).
+- Prossimo: fase 2 dell'importatore .blend (anteprima nella finestra con lo stesso shader ball).

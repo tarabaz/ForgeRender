@@ -34,6 +34,7 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
     let mut section: Section = ctx.data(|d| d.get_temp(id)).unwrap_or_default();
     let mut p = app.prefs.clone();
     let mut reset = false;
+    let mut clear_cache = false;
     let mut open = true;
     egui::Window::new(tr("Impostazioni"))
         .id(egui::Id::NULL.with("win-impostazioni"))
@@ -69,7 +70,7 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
                 ui.add_space(10.0);
                 ui.vertical(|ui| match section {
                     Section::Language => language(ui, &mut p, &app.languages, &app.language_errors),
-                    Section::Library => library(ui, &mut p),
+                    Section::Library => library(ui, &mut p, &mut clear_cache),
                     Section::Paths => paths(ui, &mut p),
                     Section::Rendering => rendering(ui, &mut p),
                     Section::About => about(ui, &mut p),
@@ -87,8 +88,25 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
     if reset {
         p = Preferences::default();
     }
+    let previews_changed = p.preview_samples != app.prefs.preview_samples || p.preview_resolution != app.prefs.preview_resolution;
     if p != app.prefs {
         app.apply_prefs(p, false);
+    }
+    if clear_cache {
+        let n = forge_library::store::clear_thumbnail_cache();
+        ctx.data_mut(|d| {
+            d.insert_temp(
+                egui::Id::NULL.with("settings-cache-msg"),
+                tf(
+                    "Cache svuotata: {} anteprime eliminate, si rifanno quando servono.",
+                    &[format!("{}", n)],
+                ),
+            )
+        });
+    }
+    if clear_cache || previews_changed {
+        app.library.forget_thumbnails();
+        app.preview.invalidate();
     }
 }
 
@@ -118,7 +136,7 @@ fn language(ui: &mut egui::Ui, p: &mut Preferences, langs: &[std::sync::Arc<crat
     }
 }
 
-fn library(ui: &mut egui::Ui, p: &mut Preferences) {
+fn library(ui: &mut egui::Ui, p: &mut Preferences, clear_cache: &mut bool) {
     ui.heading(tr("Libreria e import dei materiali"));
     egui::Grid::new("prefs-lib").num_columns(2).spacing([12.0, 8.0]).show(ui, |ui| {
         ui.label(tr("Risoluzione dei download"));
@@ -162,6 +180,58 @@ fn library(ui: &mut egui::Ui, p: &mut Preferences) {
         egui::RichText::new(tr(
             "Le mappe si importano così come sono: i cursori del materiale le moltiplicano (1 = valore della mappa). \
              Valgono per i prossimi import dall'app; la riga di comando usa i valori predefiniti.",
+        ))
+        .small()
+        .weak(),
+    );
+
+    ui.add_space(12.0);
+    ui.heading(tr("Anteprime dei materiali"));
+    egui::Grid::new("prefs-previews")
+        .num_columns(2)
+        .spacing([12.0, 8.0])
+        .show(ui, |ui| {
+            ui.label(tr("Qualità"));
+            ui.horizontal(|ui| {
+                for (label, samples, res) in [(tr("Bassa"), 32, 128), (tr("Media"), 128, 256), (tr("Alta"), 512, 512)] {
+                    let on = p.preview_samples == samples && p.preview_resolution == res;
+                    if ui.selectable_label(on, label).clicked() {
+                        p.preview_samples = samples;
+                        p.preview_resolution = res;
+                    }
+                }
+            });
+            ui.end_row();
+            ui.label(tr("Risoluzione minima"));
+            ui.horizontal(|ui| {
+                for res in [128u32, 256, 512] {
+                    ui.selectable_value(&mut p.preview_resolution, res, format!("{res} px"));
+                }
+            });
+            ui.end_row();
+            ui.label(tr("Campioni (passaggi)"));
+            ui.add(egui::DragValue::new(&mut p.preview_samples).range(4..=4096).speed(4.0))
+                .on_hover_text(tr("Più campioni = anteprime meno rumorose ma più lente da generare"));
+            ui.end_row();
+        });
+    ui.horizontal(|ui| {
+        if ui
+            .button(tr("Svuota cache anteprime"))
+            .on_hover_text(tr(
+                "Elimina le miniature salvate dei materiali (libreria e predefiniti): si rifanno con le impostazioni attuali",
+            ))
+            .clicked()
+        {
+            *clear_cache = true;
+        }
+        if let Some(msg) = ui.ctx().data(|d| d.get_temp::<String>(egui::Id::NULL.with("settings-cache-msg"))) {
+            ui.label(egui::RichText::new(msg).small());
+        }
+    });
+    ui.label(
+        egui::RichText::new(tr(
+            "Le anteprime si generano sullo shader ball con luci e camera da studio. Cambiando qualità le \
+             miniature dei predefiniti si rifanno da sole; per quelle già salvate nella libreria svuota la cache.",
         ))
         .small()
         .weak(),

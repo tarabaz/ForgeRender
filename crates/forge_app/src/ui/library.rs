@@ -66,6 +66,8 @@ pub struct LibraryUi {
     category: CategoryFilter,
     /// Lato delle anteprime della scheda "La mia libreria" (dalle impostazioni).
     card: f32,
+    /// Risoluzione minima delle miniature (Impostazioni → Anteprime dei materiali).
+    min_tier: u32,
     resolution: usize,
     items: Option<Vec<LibraryMaterial>>,
     /// Materiali predefiniti (libreria ufficiale), letti alla prima apertura.
@@ -103,6 +105,7 @@ impl Default for LibraryUi {
             my_query: String::new(),
             category: CategoryFilter::Official(None),
             card: CARD,
+            min_tier: 128,
             resolution: 1,
             items: None,
             presets: None,
@@ -215,6 +218,7 @@ impl LibraryUi {
     pub fn apply_prefs(&mut self, p: &crate::prefs::Preferences, library_changed: bool) {
         self.resolution = p.download_resolution.min(online::RESOLUTIONS.len() - 1);
         self.card = p.library_card_size as f32;
+        self.min_tier = p.preview_resolution;
         self.provider = if p.download_provider == "polyhaven" {
             Provider::PolyHaven
         } else {
@@ -225,6 +229,12 @@ impl LibraryUi {
             self.thumbs.retain(|k, _| k.starts_with("web:"));
             self.results.clear();
         }
+    }
+
+    /// Dimentica le miniature dei materiali caricate (dopo "Svuota cache anteprime" o un
+    /// cambio delle impostazioni): si ricaricano o si rifanno alla prossima visualizzazione.
+    pub fn forget_thumbnails(&mut self) {
+        self.thumbs.retain(|k, _| k.starts_with("web:") || k.starts_with("hdri:"));
     }
 
     pub fn refresh(&mut self) {
@@ -322,16 +332,15 @@ impl LibraryUi {
 
     /// Miniatura di un materiale predefinito: renderizzata la prima volta e salvata nella cache
     /// della libreria, con un'impronta dei valori (cambiando il materiale si rifà).
-    fn preset_thumb(&mut self, ctx: &egui::Context, m: &forge_scene::Material, size: u32) -> Option<egui::TextureHandle> {
+    pub(crate) fn preset_thumb(&mut self, ctx: &egui::Context, m: &forge_scene::Material, size: u32) -> Option<egui::TextureHandle> {
         use std::hash::{Hash, Hasher};
         let mut h = std::collections::hash_map::DefaultHasher::new();
         serde_json::to_string(m).unwrap_or_default().hash(&mut h);
+        // Anche i campioni: cambiandoli nelle impostazioni le anteprime si rifanno.
+        crate::ui::central::preview_samples().hash(&mut h);
         let hash = h.finish();
         let key = |s: u32| format!("preset:{}:{s}:{hash:016x}", m.id.0);
-        let file = forge_library::paths::root()
-            .join(".cache")
-            .join("anteprime-predefiniti")
-            .join(format!("{}-{size}-{hash:016x}.png", m.id.0));
+        let file = store::preset_thumbnail_dir().join(format!("{}-{size}-{hash:016x}.png", m.id.0));
         let mat = m.clone();
         let tex = self.thumb(ctx, &key(size), move || {
             if let Ok(img) = image::open(&file) {
@@ -761,7 +770,8 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
         .iter()
         .copied()
         .find(|s| *s as f32 >= need_px * 0.9)
-        .unwrap_or(store::THUMBNAIL_SIZES[store::THUMBNAIL_SIZES.len() - 1]);
+        .unwrap_or(store::THUMBNAIL_SIZES[store::THUMBNAIL_SIZES.len() - 1])
+        .max(app.library.min_tier);
     ui.horizontal_top(|ui| {
         ui.vertical(|ui| {
             ui.set_width(170.0);

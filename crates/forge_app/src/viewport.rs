@@ -7,7 +7,7 @@
 use eframe::egui;
 use eframe::egui_wgpu::{self, wgpu};
 use forge_math::{Mat4, Vec3};
-use forge_scene::{material::linear_to_srgb, Camera, Scene};
+use forge_scene::{Camera, Scene};
 use std::collections::BTreeSet;
 
 const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
@@ -394,12 +394,6 @@ fn is_descendant_or_self(scene: &Scene, mut node: usize, ancestor: usize) -> boo
             None => return false,
         }
     }
-}
-
-/// Colore di sfondo della viewport in sRGB per egui (dato un colore lineare).
-pub fn to_egui_color(c: Vec3) -> egui::Color32 {
-    let s = c.to_array().map(|v| (linear_to_srgb(v.clamp(0.0, 1.0)) * 255.0 + 0.5) as u8);
-    egui::Color32::from_rgb(s[0], s[1], s[2])
 }
 
 /// Proietta un punto 3D sullo schermo (rettangolo della viewport). `None` se dietro la camera.

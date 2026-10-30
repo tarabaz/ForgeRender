@@ -220,76 +220,48 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
         ));
     }
 
-    // Libreria raggruppata per categoria.
+    // Solo i materiali della scena (assegnati, predefinito, selezionato): tutti gli altri sono
+    // nella finestra Libreria, senza doppioni qui.
     ui.add_space(4.0);
+    let mut used: Vec<MaterialId> = app.scene.assignments.values().cloned().collect();
+    used.push(app.scene.default_material.clone());
+    used.push(app.selected_material.clone());
+    used.sort();
+    used.dedup();
+    let mut items: Vec<Material> = used.iter().filter_map(|id| app.scene.materials.get(id).cloned()).collect();
+    items.sort_by_key(|m| crate::i18n::tr_dyn(&m.name).to_lowercase());
     ui.horizontal(|ui| {
-        ui.strong(tf("Libreria materiali ({})", &[format!("{}", app.scene.materials.materials.len())]));
-        let id = egui::Id::NULL.with("matlib-search");
-        let mut q = ui.ctx().data(|d| d.get_temp::<String>(id).unwrap_or_default());
+        ui.strong(tf("Materiali della scena ({})", &[format!("{}", items.len())]));
         if ui
-            .add(egui::TextEdit::singleline(&mut q).hint_text(tr("cerca…")).desired_width(120.0))
-            .changed()
+            .button(tr("Libreria materiali…"))
+            .on_hover_text(tr("Tutti i materiali: libreria ufficiale e scaricati"))
+            .clicked()
         {
-            ui.ctx().data_mut(|d| d.insert_temp(id, q.clone()));
+            app.library.open = true;
         }
     });
-    let query = ui
-        .ctx()
-        .data(|d| d.get_temp::<String>(egui::Id::NULL.with("matlib-search")).unwrap_or_default())
-        .to_lowercase();
-    let mut categories: Vec<String> = app.scene.materials.materials.iter().map(|m| m.category.clone()).collect();
-    categories.sort();
-    categories.dedup();
-    egui::ScrollArea::vertical().id_salt("matlib").max_height(280.0).show(ui, |ui| {
-        for cat in &categories {
-            let items: Vec<&forge_scene::Material> = app
-                .scene
-                .materials
-                .materials
-                .iter()
-                .filter(|m| &m.category == cat)
-                .filter(|m| query.is_empty() || m.name.to_lowercase().contains(&query) || m.category.to_lowercase().contains(&query))
-                .collect();
-            if items.is_empty() {
-                continue;
+    let ctx = ui.ctx().clone();
+    let card = 64.0;
+    egui::ScrollArea::vertical().id_salt("scene-mats").max_height(260.0).show(ui, |ui| {
+        ui.horizontal_wrapped(|ui| {
+            for m in &items {
+                let usage = app.scene.assignments.values().filter(|v| **v == m.id).count();
+                let sub = if usage > 0 {
+                    tf("{} componenti", &[format!("{}", usage)])
+                } else if app.scene.default_material == m.id {
+                    tr("predefinito della scena").to_string()
+                } else {
+                    String::new()
+                };
+                let tex = app.library.preset_thumb(&ctx, m, 128);
+                let name = crate::i18n::tr_dyn(&m.name);
+                let r = crate::ui::library::thumb_card(ui, tex, egui::vec2(card, card), &name, &sub, app.selected_material == m.id);
+                if r.on_hover_text(name.clone()).clicked() {
+                    app.selected_material = m.id.clone();
+                }
             }
-            egui::CollapsingHeader::new(tf("{cat} ({})", &[cat.to_string(), format!("{}", items.len())]))
-                .id_salt(cat)
-                .default_open(!query.is_empty())
-                .show(ui, |ui| {
-                    for m in items {
-                        let usage = app.scene.assignments.values().filter(|v| **v == m.id).count();
-                        let label = if usage > 0 {
-                            tf("{}  ({usage})", &[m.name.to_string(), format!("{}", usage)])
-                        } else {
-                            m.name.clone()
-                        };
-                        ui.horizontal(|ui| {
-                            let (r, _) = ui.allocate_exact_size(egui::vec2(12.0, 12.0), egui::Sense::hover());
-                            let col = if m.is_emissive() {
-                                Vec3::from_array(m.emission)
-                            } else {
-                                Vec3::from_array(m.base_color)
-                            };
-                            ui.painter().rect_filled(r, 2.0, crate::viewport::to_egui_color(col));
-                            if ui.selectable_label(app.selected_material == m.id, label).clicked() {
-                                app.selected_material = m.id.clone();
-                            }
-                        });
-                    }
-                });
-        }
+        });
     });
-
-    if ui
-        .button(tr("Libreria con texture (ambientCG, Poly Haven)…"))
-        .on_hover_text(tr(
-            "Materiali PBR veri con tutte le mappe: la tua libreria, import da cartella/zip e download",
-        ))
-        .clicked()
-    {
-        app.library.open = true;
-    }
 
     // Assegnazione.
     ui.add_space(4.0);

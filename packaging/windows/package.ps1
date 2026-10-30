@@ -67,6 +67,8 @@ Copy-Item -Recurse (Join-Path $root "manuale") (Join-Path $staging "manuale")
 Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $staging "manuale\inventario.json"), (Join-Path $staging "manuale\INVENTARIO.md")
 # Mappe dei materiali predefiniti (assets\materiali\<id>\): accanto al programma.
 Copy-Item -Recurse (Join-Path $root "assets\materiali") (Join-Path $staging "materiali")
+# Scena delle anteprime dei materiali (USD Shader Ball, CC-BY 4.0: vedi assets\anteprima\LEGGIMI.md).
+Copy-Item -Recurse (Join-Path $root "assets\anteprima") (Join-Path $staging "anteprima")
 # Metalli BlenderKit (licenza Royalty Free: solo uso personale, vedi assets\materiali-blenderkit\LEGGIMI.md).
 $bk = Join-Path $root "assets\materiali-blenderkit"
 if (Test-Path $bk) { Copy-Item -Recurse $bk (Join-Path $staging "materiali-blenderkit") }

@@ -465,5 +465,17 @@
 - Prossimi: rivedere scale e nomi dei metalli BK; i predefiniti ufficiali da fonti CC0
   (ambientCG) per una versione distribuibile; migliorare gli altri predefiniti con mappe.
 
+### Importatore .blend fase 1 e 0.12.0: anteprime sullo shader ball (30–31/10/2026)
+- Importatore `.blend` nel programma, piano in 5 fasi approvato da Valerio. Fase 1 fatta
+  (`forge_library::blenderkit`): tutti i materiali, gruppi, immagini esterne, Mapping, normal
+  DirectX, Displacement, rapporto per parametro. Regola: interamente procedurale = non si
+  importa; parte procedurale = si importa con avviso. 38/38 file di prova importabili.
+- Anteprime dei materiali sullo shader ball scelto da Valerio (`assets/anteprima`, CC-BY 4.0),
+  impostazioni di qualità/campioni/risoluzione e "Svuota cache anteprime"; pannello Materiali
+  con i soli materiali della scena.
+- Valerio: i materiali BlenderKit attuali sono un'idea valida ma alcuni non gli piacciono; si
+  farà prima una libreria buona con l'importatore, poi si deciderà come integrarla.
+- Prossimo: fase 2 (anteprima nella finestra dell'importatore), poi fasi 3–5.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

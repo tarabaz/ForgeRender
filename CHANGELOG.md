@@ -11,6 +11,23 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.12.0 — 31/10/2026
+
+**Anteprime dei materiali sullo shader ball, materiali della scena**
+- Le miniature (Libreria, pannello Materiali) e l'anteprima del materiale si renderizzano sulla
+  scena scelta da Valerio: **USD Shader Ball** (Khronos glTF Sample Assets, CC-BY 4.0) con le
+  sue luci, camera e ambiente (`assets/anteprima`). Il materiale va sul pezzo
+  `material_surface`; senza la cartella si torna alla sfera.
+- **Impostazioni → Libreria e import → Anteprime dei materiali**: qualità Bassa / Media / Alta,
+  risoluzione minima (128, 256, 512 px), numero di campioni e **"Svuota cache anteprime"**. Le
+  miniature dei predefiniti si rifanno da sole cambiando i campioni; quelle salvate nella
+  libreria si rifanno svuotando la cache. Le miniature vecchie (sfera) si rifanno da sole.
+- **Pannello Materiali**: al posto dell'elenco completo (doppione della Libreria) solo i
+  materiali della scena (assegnati, predefinito, selezionato) con la miniatura; "Libreria
+  materiali…" apre la finestra con tutti.
+- **Importatore .blend, fase 1** (già nel commit precedente): tutti i materiali di un file,
+  gruppi di nodi, immagini esterne, Mapping, normal DirectX, rapporto dei parametri.
+
 ## 0.11.0 — 30/10/2026
 
 **Libreria unificata e metalli BlenderKit**

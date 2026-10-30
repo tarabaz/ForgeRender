@@ -798,6 +798,13 @@ pub struct MaterialPreview {
     texture: Option<egui::TextureHandle>,
 }
 
+impl MaterialPreview {
+    /// L'anteprima si rifà (impostazioni delle anteprime cambiate, cache svuotata).
+    pub fn invalidate(&mut self) {
+        self.shown_key = None;
+    }
+}
+
 const PREVIEW_SIZE: u32 = 128;
 
 pub fn material_preview(app: &mut ForgeApp, ui: &mut egui::Ui) {
@@ -845,20 +852,101 @@ pub fn material_preview(app: &mut ForgeApp, ui: &mut egui::Ui) {
     });
 }
 
-/// Anteprima del materiale su una sfera, `size` × `size` pixel (RGBA8). I campioni crescono
-/// con il lato (32 a 128 px, fino a 128 a 512 px) perché le anteprime grandi non siano rumorose.
+/// Campioni per pixel delle anteprime dei materiali (Impostazioni → Anteprime dei materiali).
+static PREVIEW_SAMPLES: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(64);
+
+pub fn set_preview_samples(n: u32) {
+    PREVIEW_SAMPLES.store(n.clamp(4, 4096), std::sync::atomic::Ordering::Relaxed);
+}
+
+pub fn preview_samples() -> u32 {
+    PREVIEW_SAMPLES.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Scena delle anteprime: il progetto `anteprima/anteprima.frproject` (shader ball, luci, camera
+/// e ambiente scelti da Valerio) accanto ai materiali predefiniti, con la geometria già pronta.
+/// Il materiale va sul pezzo `material_surface`.
+struct PreviewStage {
+    scene: Scene,
+    geometry: std::sync::Arc<forge_render_core::RenderGeometry>,
+    target: ComponentId,
+}
+
+fn preview_stage() -> Option<&'static PreviewStage> {
+    static STAGE: std::sync::OnceLock<Option<PreviewStage>> = std::sync::OnceLock::new();
+    STAGE
+        .get_or_init(|| {
+            let dir = forge_scene::material::builtin_textures_dir()?.parent()?.join("anteprima");
+            let project = dir.join("anteprima.frproject");
+            if !project.is_file() {
+                return None;
+            }
+            let loaded = match forge_project::load(&project) {
+                Ok(l) => l,
+                Err(e) => {
+                    tracing::warn!("scena delle anteprime non caricata ({e:#}): uso la sfera");
+                    return None;
+                }
+            };
+            let scene = loaded.scene;
+            let target = scene
+                .nodes
+                .iter()
+                .find(|n| n.mesh.is_some() && n.name.contains("material_surface"))?
+                .id
+                .clone();
+            let geometry = RenderScene::compile(&scene).geometry.clone();
+            tracing::info!("scena delle anteprime: {}", project.display());
+            Some(PreviewStage { scene, geometry, target })
+        })
+        .as_ref()
+}
+
+/// Anteprima del materiale, `size` × `size` pixel (RGBA8), con i campioni delle impostazioni:
+/// sullo shader ball del progetto delle anteprime, oppure (se manca) su una sfera.
 pub(crate) fn render_preview(mat: &Material, size: u32) -> Vec<u8> {
     let size = size.clamp(32, 1024);
-    let samples = (32 * size / PREVIEW_SIZE).clamp(32, 128);
+    let samples = preview_samples();
     // Le anteprime piccole usano 2 thread (se ne fanno tante insieme), le grandi metà dei core.
     let threads = if size <= PREVIEW_SIZE {
         2
     } else {
         std::thread::available_parallelism().map(|n| n.get() / 2).unwrap_or(2).max(2)
     };
-    let mut s = Scene::default();
     let mut m = mat.clone();
     m.id = forge_scene::MaterialId::new("__preview");
+    let rs = match preview_stage() {
+        Some(stage) => {
+            let mut s = stage.scene.clone();
+            s.materials.upsert(m);
+            s.assignments
+                .insert(stage.target.clone(), forge_scene::MaterialId::new("__preview"));
+            RenderScene::compile_with_geometry(&s, stage.geometry.clone())
+        }
+        None => RenderScene::compile(&sphere_scene(m)),
+    };
+    let settings = RenderSettings {
+        width: size,
+        height: size,
+        max_bounces: 8,
+        ..Default::default()
+    };
+    let mut acc = Accumulator::new(size, size);
+    let mut pass = vec![[0.0; 3]; acc.pixel_count()];
+    let cancel = std::sync::atomic::AtomicBool::new(false);
+    if let Ok(mut be) = forge_render_cpu::CpuBackend::new(threads) {
+        for i in 0..samples {
+            if let Ok(n @ 1..) = be.render_pass(&rs, &settings, i, 1, &mut pass, &cancel) {
+                acc.add_samples(&pass, n);
+            }
+        }
+    }
+    forge_render_core::tonemap_to_rgba8(&acc.resolve(), settings.tone_mapping, 0.0)
+}
+
+/// Scena di riserva: sfera alla scala della texture, piano e luce da studio.
+fn sphere_scene(m: Material) -> Scene {
+    let mut s = Scene::default();
     // Scena alla scala del materiale: con la proiezione box la sfera è grande quanto una
     // tessera della texture (come le miniature di ambientCG/Poly Haven), così rilievo e
     // displacement, che sono in millimetri reali, si vedono nella proporzione giusta.
@@ -897,22 +985,36 @@ pub(crate) fn render_preview(mat: &Material, size: u32) -> Vec<u8> {
         vfov_deg: 32.0,
         ..Default::default()
     };
-    let rs = RenderScene::compile(&s);
-    let settings = RenderSettings {
-        width: size,
-        height: size,
-        max_bounces: 8,
-        ..Default::default()
-    };
-    let mut acc = Accumulator::new(size, size);
-    let mut pass = vec![[0.0; 3]; acc.pixel_count()];
-    let cancel = std::sync::atomic::AtomicBool::new(false);
-    if let Ok(mut be) = forge_render_cpu::CpuBackend::new(threads) {
-        for i in 0..samples {
-            if let Ok(n @ 1..) = be.render_pass(&rs, &settings, i, 1, &mut pass, &cancel) {
-                acc.add_samples(&pass, n);
+    s
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Le anteprime usano lo shader ball del progetto in assets/anteprima (con il materiale sul
+    /// pezzo material_surface) e producono un'immagine; con `FORGE_TEST_OUT` le salva.
+    #[test]
+    fn previews_use_the_shader_ball() {
+        let stage = preview_stage().expect("assets/anteprima/anteprima.frproject");
+        assert!(stage.scene.nodes.iter().any(|n| n.id == stage.target));
+        set_preview_samples(8);
+        let presets = forge_scene::material::presets();
+        let ids = ["legno-rovere", "acciaio-satinato", "vetro", "bk-acciaio-spazzolato"];
+        for id in ids {
+            let Some(m) = presets.iter().find(|m| m.id.0 == id) else { continue };
+            let px = render_preview(m, 96);
+            assert_eq!(px.len(), 96 * 96 * 4);
+            assert!(px.chunks(4).any(|p| p[0] != px[0] || p[1] != px[1]), "{id}: immagine vuota");
+            if let Ok(dir) = std::env::var("FORGE_TEST_OUT") {
+                set_preview_samples(64);
+                let big = render_preview(m, 256);
+                image::RgbaImage::from_raw(256, 256, big)
+                    .unwrap()
+                    .save(std::path::Path::new(&dir).join(format!("anteprima_{id}.png")))
+                    .unwrap();
+                set_preview_samples(8);
             }
         }
     }
-    forge_render_core::tonemap_to_rgba8(&acc.resolve(), settings.tone_mapping, 0.0)
 }

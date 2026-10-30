@@ -40,6 +40,10 @@ pub struct Preferences {
     pub import_displacement: ImportDisplacement,
     /// Lato delle anteprime nella finestra Libreria (pixel dell'interfaccia, 64–512).
     pub library_card_size: u32,
+    /// Campioni per pixel delle anteprime dei materiali (4–4096).
+    pub preview_samples: u32,
+    /// Risoluzione minima delle anteprime dei materiali: 128 (bassa), 256 (media), 512 (alta).
+    pub preview_resolution: u32,
     // --- Percorsi ---
     /// Cartella della libreria scelta dall'utente (`None` = predefinita).
     pub library_dir: Option<PathBuf>,
@@ -80,6 +84,8 @@ impl Default for Preferences {
             download_provider: "ambientcg".into(),
             import_displacement: ImportDisplacement::Off,
             library_card_size: 112,
+            preview_samples: 64,
+            preview_resolution: 128,
             library_dir: None,
             new_backend: r.backend,
             new_samples: r.target_samples,
@@ -102,6 +108,12 @@ impl Preferences {
             self.download_provider = "ambientcg".into();
         }
         self.library_card_size = self.library_card_size.clamp(64, 512);
+        self.preview_samples = self.preview_samples.clamp(4, 4096);
+        self.preview_resolution = match self.preview_resolution {
+            0..=191 => 128,
+            192..=383 => 256,
+            _ => 512,
+        };
         self.new_samples = self.new_samples.min(1 << 20);
         self.new_threads = self.new_threads.min(1024);
         if self.library_dir.as_ref().is_some_and(|p| p.as_os_str().is_empty()) {
@@ -124,6 +136,7 @@ impl Preferences {
     pub fn apply_global(&self) {
         forge_library::paths::set_custom_root(self.library_dir.clone());
         forge_library::store::set_import_displacement(self.import_displacement);
+        crate::ui::central::set_preview_samples(self.preview_samples);
     }
 
     pub fn load_from(path: &Path) -> (Self, Option<String>) {
@@ -208,6 +221,8 @@ mod tests {
             download_provider: "polyhaven".into(),
             import_displacement: ImportDisplacement::FromMaterialX,
             library_card_size: 256,
+            preview_samples: 512,
+            preview_resolution: 512,
             library_dir: Some(PathBuf::from("/x/Libreria")),
             new_backend: BackendKind::Gpu,
             new_samples: 256,
@@ -234,12 +249,13 @@ mod tests {
         // Campi mancanti o sconosciuti, valori fuori intervallo.
         std::fs::write(
             &p,
-            r#"{"download_resolution": 99, "download_provider": "boh", "library_card_size": 5000, "campo_futuro": 1}"#,
+            r#"{"download_resolution": 99, "download_provider": "boh", "library_card_size": 5000, "preview_samples": 0, "preview_resolution": 300, "campo_futuro": 1}"#,
         )
         .unwrap();
         let (d, err) = Preferences::load_from(&p);
         assert!(err.is_none());
         assert_eq!(d.library_card_size, 512);
+        assert_eq!((d.preview_samples, d.preview_resolution), (4, 256));
         assert_eq!(d.download_resolution, forge_library::online::RESOLUTIONS.len() - 1);
         assert_eq!(d.download_provider, "ambientcg");
         assert!(d.auto_restart);
