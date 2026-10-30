@@ -151,13 +151,27 @@ if (-not $SkipStep) {
         $cmakeCandidates = @(
             "$env:ProgramFiles\CMake\bin\cmake.exe",
             "${env:ProgramFiles(x86)}\CMake\bin\cmake.exe"
-        ) + @(Get-ChildItem -Path "$env:ProgramFiles\Microsoft Visual Studio", "${env:ProgramFiles(x86)}\Microsoft Visual Studio" `
+        ) + @(Get-ChildItem -Path "$env:LOCALAPPDATA\Microsoft\WinGet\Packages", "$env:ProgramFiles\Microsoft Visual Studio", "${env:ProgramFiles(x86)}\Microsoft Visual Studio" `
                 -Filter cmake.exe -Recurse -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -like '*\CMake\bin\cmake.exe' } | ForEach-Object { $_.FullName })
+            Where-Object { $_.FullName -like '*\bin\cmake.exe' } | ForEach-Object { $_.FullName })
         $found = $cmakeCandidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
         if ($found) {
             $env:PATH = (Split-Path $found -Parent) + ';' + $env:PATH
             Write-Host "    CMake trovato in $found"
+        }
+    }
+    # winget installa CMake "portable" e lo raggiunge con un collegamento: avviato da lì CMake
+    # può non trovare i suoi moduli (CMAKE_ROOT). Si mette davanti la cartella vera.
+    $cmakeCmd = Get-Command cmake -ErrorAction SilentlyContinue
+    if ($cmakeCmd) {
+        $item = Get-Item $cmakeCmd.Source -ErrorAction SilentlyContinue
+        if ($item -and $item.LinkType -and $item.Target) {
+            $real = @($item.Target)[0]
+            if (-not [System.IO.Path]::IsPathRooted($real)) { $real = Join-Path (Split-Path $item.FullName -Parent) $real }
+            if (Test-Path $real) {
+                $env:PATH = (Split-Path $real -Parent) + ';' + $env:PATH
+                Write-Host "    CMake (collegamento di winget) in $real"
+            }
         }
     }
     if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
