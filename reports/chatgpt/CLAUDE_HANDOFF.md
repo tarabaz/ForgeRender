@@ -1051,3 +1051,17 @@ Valerio ha approvato il piano con le scelte consigliate. Fatto:
 - Pagine scritte: intro.benvenuto, mat.roughness, mat.ior, render.denoiser, keys.elenco (IT/EN).
   Prossimo: fase 4, i contenuti capitolo per capitolo con screenshot e immagini comparative.
 
+
+## Claude Code — 30/10/2026: Controllo IA provato con Claude Code vero
+
+- Prova di Valerio con la portable 0.8.2 e l'app desktop di Claude Code: con il ponte registrato
+  a livello utente Claude esegue una richiesta dopo l'altra, anche complesse.
+- Con il `.mcp.json` di cartella funzionava solo la prima risposta: i log di Claude Code mostrano
+  "Closing MCP server stdin" a fine risposta e nessun riavvio alla richiesta successiva. I server
+  registrati a livello utente restano collegati. Il ponte si chiude solo a fine stdin (corretto).
+- `docs/MCP.md` e `MCP.en.md`: metodo principale `claude mcp add --scope user forgerender -- "…"`,
+  `.mcp.json` come alternativa sconsigliata, nuova voce in "Se qualcosa non va".
+
+**Domanda per te**: il percorso registrato cambia a ogni nuova cartella portable
+(`ForgeRender-0.8.2-…`). Meglio un percorso fisso (copia del ponte in
+`%LOCALAPPDATA%\ForgeRender\` a ogni avvio dell'app) o lasciare la nuova registrazione a mano?

@@ -44,39 +44,57 @@ When Claude disconnects, "Controlled by AI" disappears and the bar goes back to 
   your computer.
 
 You need the full path of `forgerender-mcp.exe`: in File Explorer hold Shift, right-click the
-file → **"Copy as path"**. On an external drive the drive letter can change between computers;
+file → **"Copy as path"** (the copied path already has quotes: in the commands below paste it
+in place of the example path, quotes included). Prefer the path in a portable folder or in the
+installation over `target\release`: a new build cannot replace the bridge while Claude is using
+it. On an external drive the drive letter can change between computers;
 update it in the configuration (or give the drive a fixed letter in Disk Management).
 
 ## 2. Connect it to Claude (once)
 
-### Claude Code: a folder with a `.mcp.json` file
+### Claude Code: user-level registration (recommended)
 
-The simplest way, working with both the terminal and the desktop app: a working folder that
-contains a `.mcp.json` file. One command at a time in PowerShell (use your own path):
+A single PowerShell command, with your own path instead of the example. It works for the
+terminal and the desktop app, in any folder:
 
 ```powershell
-New-Item -ItemType Directory -Force "$HOME\ForgeRender-IA" | Out-Null
+claude mcp add --scope user forgerender -- "C:\REAL\PATH\TO\forgerender-mcp.exe"
+```
+
+Check: this command must list `forgerender` with your path.
+
+```powershell
+claude mcp list
+```
+
+Then open a **new** Claude Code session (sessions already open do not see a newly added
+server). The connection stays up for the whole session: Claude carries out one request after
+another. Only the "AI control" button decides whether commands reach ForgeRender.
+
+**New version in another folder** (for example a portable `ForgeRender-0.9.0-…`): the
+registered path still points to the old one. Remove it and register the new one:
+
+```powershell
+claude mcp remove --scope user forgerender
 ```
 
 ```powershell
-$bridge = (Resolve-Path "C:\REAL\PATH\TO\forgerender-mcp.exe").Path
+claude mcp add --scope user forgerender -- "C:\NEW\PATH\forgerender-mcp.exe"
 ```
 
-```powershell
-@{ mcpServers = @{ forgerender = @{ command = $bridge; args = @() } } } | ConvertTo-Json -Depth 5 | Set-Content -Encoding ascii "$HOME\ForgeRender-IA\.mcp.json"
+### Claude Code: a `.mcp.json` file in a folder (not recommended in the desktop app)
+
+A `.mcp.json` file in a working folder registers the bridge for that folder only:
+
+```json
+{ "mcpServers": { "forgerender": { "command": "C:\\REAL\\PATH\\TO\\forgerender-mcp.exe", "args": [] } } }
 ```
 
-Check: this command must show the file with `forgerender` and your path.
-
-```powershell
-Get-Content "$HOME\ForgeRender-IA\.mcp.json"
-```
-
-Then open Claude Code in that folder (desktop app: "Choose…" next to "This computer"; terminal:
-`Set-Location "$HOME\ForgeRender-IA"` then `claude`). The first time it asks whether to approve
-the `forgerender` server: answer yes.
-
-Alternatively, from the terminal inside the folder: `claude mcp add forgerender -- "$bridge"`.
+Tested on 30/10/2026 with the Claude Code desktop app on Windows: only the **first** reply
+works. At the end of the reply Claude Code closes the bridge ("Closing MCP server stdin" in its
+logs) and does not start it again for the next request; user-level servers stay connected.
+If you use the user-level registration, do not also keep a `.mcp.json` with a `forgerender`
+server in the session folder: rename it (for example `.mcp.json.old`).
 
 ### Claude Desktop
 
@@ -186,6 +204,10 @@ logs (portable: program folder; installed: `%LOCALAPPDATA%\ForgeRender\renders`)
 
 - **Claude says "ForgeRender is not connected"** (in Italian): open ForgeRender and turn on
   "AI control".
+- **Only the first command works, then Claude says the connection was lost**: the bridge is
+  registered through a folder `.mcp.json`. Register it at user level (section 2), rename the
+  `.mcp.json` and open a new session. The bridge never closes by itself: it stays up until
+  Claude closes it, even with "AI control" off or ForgeRender closed.
 - **"ForgeRender does not respond: the window is minimised…"**: commands run like clicks, at each
   window update. Keep the window open (not minimised) and without dialogs in front.
 - **Bridge test without Claude**: with ForgeRender open and "AI control" on, in PowerShell (with

@@ -46,41 +46,59 @@ stato "Acceso".
   raggiungere i programmi del tuo PC.
 
 Ti serve il percorso completo di `forgerender-mcp.exe`: in Esplora file tieni premuto Maiusc,
-clic destro sul file → **"Copia come percorso"**. Se il programma è su un disco esterno, la
+clic destro sul file → **"Copia come percorso"** (il percorso copiato ha già le virgolette: nei
+comandi qui sotto incollalo al posto del percorso d'esempio, virgolette comprese). Meglio
+quello di una cartella portable o dell'installazione che quello di `target\release`: una nuova
+compilazione non riesce a sostituire il ponte mentre Claude lo sta usando. Se il programma è su un disco esterno, la
 lettera del disco può cambiare da un PC all'altro: in quel caso va aggiornata nella
 configurazione (oppure assegna al disco una lettera fissa da Gestione disco).
 
 ## 2. Collegarlo a Claude (una volta)
 
-### Claude Code: cartella con il file `.mcp.json`
+### Claude Code: registrazione a livello utente (consigliata)
 
-Il modo più semplice, che funziona sia con il terminale sia con l'app desktop: una cartella di
-lavoro con dentro un file `.mcp.json`. Un comando alla volta in PowerShell (metti il tuo
-percorso al posto di quello d'esempio):
+Un solo comando in PowerShell, con il tuo percorso al posto di quello d'esempio. Vale per il
+terminale e per l'app desktop, in qualsiasi cartella:
 
 ```powershell
-New-Item -ItemType Directory -Force "$HOME\ForgeRender-IA" | Out-Null
+claude mcp add --scope user forgerender -- "C:\PERCORSO\REALE\forgerender-mcp.exe"
+```
+
+Controllo: questo comando deve elencare `forgerender` con il tuo percorso.
+
+```powershell
+claude mcp list
+```
+
+Poi apri una **sessione nuova** di Claude Code (le sessioni già aperte non vedono il server
+appena aggiunto). Il collegamento resta attivo per tutta la sessione: Claude esegue una
+richiesta dopo l'altra. A decidere se i comandi arrivano a ForgeRender è solo il pulsante
+"Controllo IA".
+
+**Nuova versione in un'altra cartella** (per esempio una portable `ForgeRender-0.9.0-…`): il
+percorso registrato punta ancora a quella vecchia. Toglilo e registra quello nuovo:
+
+```powershell
+claude mcp remove --scope user forgerender
 ```
 
 ```powershell
-$ponte = (Resolve-Path "C:\PERCORSO\REALE\forgerender-mcp.exe").Path
+claude mcp add --scope user forgerender -- "C:\NUOVO\PERCORSO\forgerender-mcp.exe"
 ```
 
-```powershell
-@{ mcpServers = @{ forgerender = @{ command = $ponte; args = @() } } } | ConvertTo-Json -Depth 5 | Set-Content -Encoding ascii "$HOME\ForgeRender-IA\.mcp.json"
+### Claude Code: file `.mcp.json` in una cartella (sconsigliato nell'app desktop)
+
+Un file `.mcp.json` dentro una cartella di lavoro registra il ponte solo per quella cartella:
+
+```json
+{ "mcpServers": { "forgerender": { "command": "C:\\PERCORSO\\REALE\\forgerender-mcp.exe", "args": [] } } }
 ```
 
-Controllo: questo comando deve mostrare il file con `forgerender` e il tuo percorso.
-
-```powershell
-Get-Content "$HOME\ForgeRender-IA\.mcp.json"
-```
-
-Poi apri Claude Code in quella cartella (nell'app desktop: "Scegli…" accanto a "Questo
-computer"; nel terminale: `Set-Location "$HOME\ForgeRender-IA"` e `claude`). La prima volta
-chiede se approvare il server `forgerender`: rispondi sì.
-
-In alternativa, dal terminale: `claude mcp add forgerender -- "$ponte"` dentro la cartella.
+Provato il 30/10/2026 con l'app desktop di Claude Code su Windows: funziona solo la **prima**
+risposta. A fine risposta Claude Code chiude il ponte ("Closing MCP server stdin" nei suoi
+log) e alla richiesta dopo non lo riavvia più; i server registrati a livello utente restano
+invece collegati. Se usi la registrazione utente, non tenere anche un `.mcp.json` con un server
+`forgerender` nella cartella della sessione: rinominalo (per esempio `.mcp.json.vecchio`).
 
 ### Claude Desktop
 
@@ -192,6 +210,10 @@ in `renders` accanto ai log (portable: cartella del programma; installata:
 ## 6. Se qualcosa non va
 
 - **Claude dice "ForgeRender non è collegato"**: apri ForgeRender e accendi "Controllo IA".
+- **Funziona solo il primo comando, poi Claude dice che il collegamento si è interrotto**: il
+  ponte è registrato con un `.mcp.json` di cartella. Registralo a livello utente (punto 2),
+  rinomina il `.mcp.json` e apri una sessione nuova. Il ponte da solo non si chiude mai: resta
+  acceso finché Claude non lo chiude, anche con "Controllo IA" spento o ForgeRender chiuso.
 - **"ForgeRender non risponde: la finestra è ridotta a icona…"**: i comandi si eseguono come
   i clic, a ogni aggiornamento della finestra. Tienila aperta (non ridotta a icona) e senza
   finestre di dialogo davanti.

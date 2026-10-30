@@ -386,5 +386,18 @@
   - 0.X.0 per un gruppo di funzioni consegnato;
   - 0.X.Y per sole correzioni.
 
+### Controllo IA provato con Claude Code vero (30/10/2026)
+- Con la portable 0.8.2 e l'app desktop di Claude Code su Windows funziona: Claude esegue una
+  richiesta dopo l'altra, anche complesse (luci, materiali, spostamenti, camera).
+- Con il ponte registrato in un `.mcp.json` di cartella funzionava solo la prima risposta: a
+  fine risposta Claude Code chiude il ponte ("Closing MCP server stdin" nei suoi log, in
+  `%LOCALAPPDATA%\claude-cli-nodejs\Cache\…\mcp-logs-forgerender`) e poi non lo riavvia. Il ponte
+  non c'entra: si chiude solo a fine stdin.
+- Soluzione: `claude mcp add --scope user forgerender -- "<percorso>\forgerender-mcp.exe"`.
+  `docs/MCP.md` e `MCP.en.md` la indicano ora come metodo principale, con il caso "funziona solo
+  il primo comando" in "Se qualcosa non va".
+- Da valutare: un percorso fisso per il ponte, perché il percorso registrato cambia a ogni nuova
+  cartella portable.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
