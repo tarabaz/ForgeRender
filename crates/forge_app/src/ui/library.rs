@@ -1,7 +1,8 @@
 //! Finestra "Libreria": materiali PBR con texture e HDRI.
 //!
-//! - **La mia libreria**: materiali in `Libreria/Materiali` con miniatura; un clic
-//!   li applica alla selezione. Import da cartella o da zip.
+//! - **Materiali**: in un solo elenco la **libreria ufficiale** (i materiali predefiniti del
+//!   programma, anche quelli con le mappe) e gli **scaricati** (`Libreria/Materiali`: ambientCG,
+//!   Poly Haven, cartelle e zip importati), con miniatura; un clic li applica alla selezione.
 //! - **Online**: ricerca su ambientCG e Poly Haven (CC0), miniature prima del
 //!   download, scelta della risoluzione; i materiali finiscono nella libreria e
 //!   le HDRI in `Libreria/HDRI`.
@@ -10,7 +11,7 @@
 //! HDRI) girano su thread separati e comunicano con un canale.
 
 use crate::app::ForgeApp;
-use crate::i18n::{tf, tr};
+use crate::i18n::{tf, tr, tr_dyn};
 use crate::ui::style;
 use eframe::egui;
 use forge_library::categories;
@@ -36,9 +37,12 @@ enum Msg {
     Progress(String),
 }
 
-/// Filtro per categoria della scheda "La mia libreria".
+/// Filtro per categoria della scheda "Materiali".
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum CategoryFilter {
+    /// Libreria ufficiale (materiali predefiniti): tutte le categorie o una.
+    Official(Option<String>),
+    /// Scaricati: tutti.
     All,
     /// Categoria del sito, com'è scritta in `materiale.json` (in minuscolo).
     Is(String),
@@ -64,6 +68,8 @@ pub struct LibraryUi {
     card: f32,
     resolution: usize,
     items: Option<Vec<LibraryMaterial>>,
+    /// Materiali predefiniti (libreria ufficiale), letti alla prima apertura.
+    presets: Option<Vec<forge_scene::Material>>,
     hdris: Option<Vec<PathBuf>>,
     results: Vec<OnlineAsset>,
     /// Il prossimo caricamento riscarica il catalogo dal sito invece di usare la cache.
@@ -95,10 +101,11 @@ impl Default for LibraryUi {
             kind: AssetKind::Material,
             query: String::new(),
             my_query: String::new(),
-            category: CategoryFilter::All,
+            category: CategoryFilter::Official(None),
             card: CARD,
             resolution: 1,
             items: None,
+            presets: None,
             hdris: None,
             results: Vec::new(),
             refresh_catalog: false,
@@ -308,6 +315,40 @@ impl LibraryUi {
         })
     }
 
+    /// Materiali predefiniti (libreria ufficiale), nell'ordine del programma.
+    fn presets(&mut self) -> &[forge_scene::Material] {
+        self.presets.get_or_insert_with(forge_scene::material::presets)
+    }
+
+    /// Miniatura di un materiale predefinito: renderizzata la prima volta e salvata nella cache
+    /// della libreria, con un'impronta dei valori (cambiando il materiale si rifà).
+    fn preset_thumb(&mut self, ctx: &egui::Context, m: &forge_scene::Material, size: u32) -> Option<egui::TextureHandle> {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        serde_json::to_string(m).unwrap_or_default().hash(&mut h);
+        let hash = h.finish();
+        let key = |s: u32| format!("preset:{}:{s}:{hash:016x}", m.id.0);
+        let file = forge_library::paths::root()
+            .join(".cache")
+            .join("anteprime-predefiniti")
+            .join(format!("{}-{size}-{hash:016x}.png", m.id.0));
+        let mat = m.clone();
+        let tex = self.thumb(ctx, &key(size), move || {
+            if let Ok(img) = image::open(&file) {
+                return Ok(to_color_image(img.to_rgba8()));
+            }
+            let _slot = render_slot();
+            let rgba = crate::ui::central::render_preview(&mat, size);
+            let side = ((rgba.len() / 4) as f64).sqrt() as u32;
+            if let (Some(dir), Some(img)) = (file.parent(), image::RgbaImage::from_raw(side, side, rgba.clone())) {
+                let _ = std::fs::create_dir_all(dir);
+                let _ = img.save(&file);
+            }
+            Ok(egui::ColorImage::from_rgba_unmultiplied([side as usize, side as usize], &rgba))
+        });
+        tex.or_else(|| store::THUMBNAIL_SIZES.iter().rev().find_map(|&s| self.ready_thumb(&key(s))))
+    }
+
     fn online_thumb(&mut self, ctx: &egui::Context, a: &OnlineAsset) -> Option<egui::TextureHandle> {
         let asset = a.clone();
         self.thumb(ctx, &format!("web:{:?}:{}", a.provider, a.id), move || {
@@ -504,7 +545,7 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
         .resizable(true)
         .show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.selectable_value(&mut app.library.tab, Tab::Mine, tr("La mia libreria"));
+                ui.selectable_value(&mut app.library.tab, Tab::Mine, tr("Materiali"));
                 ui.selectable_value(&mut app.library.tab, Tab::Online, tr("Online (ambientCG, Poly Haven)"));
                 ui.separator();
                 if ui
@@ -602,18 +643,6 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
         );
     });
     let all: Vec<LibraryMaterial> = app.library.materials().to_vec();
-    if all.is_empty() {
-        ui.add_space(20.0);
-        ui.label(tr(
-            "La libreria è vuota: scarica un materiale dalla scheda Online oppure importa una cartella o uno zip.",
-        ));
-        ui.label(
-            egui::RichText::new(forge_library::paths::materials_dir().display().to_string())
-                .weak()
-                .small(),
-        );
-        return;
-    }
     // Dimensione delle anteprime (salvata nelle impostazioni a fine trascinamento).
     let mut save_card = false;
     let needs_categories = all.iter().any(|m| {
@@ -690,10 +719,31 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
     let mut cats: Vec<(String, usize)> = counts.into_iter().collect();
     cats.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| cat_label(&a.0).cmp(&cat_label(&b.0))));
     let (secondary, primary): (Vec<_>, Vec<_>) = cats.into_iter().partition(|(c, _)| categories::is_secondary(c));
+    // Libreria ufficiale: predefiniti che rispondono alla ricerca, categorie nell'ordine del programma.
+    let presets: Vec<forge_scene::Material> = app.library.presets().to_vec();
+    let official: Vec<&forge_scene::Material> = presets
+        .iter()
+        .filter(|m| {
+            q.split_whitespace().all(|w| {
+                m.name.to_lowercase().contains(w)
+                    || tr_dyn(&m.name).to_lowercase().contains(w)
+                    || m.category.to_lowercase().contains(w)
+                    || tr_dyn(&m.category).to_lowercase().contains(w)
+            })
+        })
+        .collect();
+    let mut official_cats: Vec<(String, usize)> = Vec::new();
+    for m in &official {
+        match official_cats.iter_mut().find(|e| e.0 == m.category) {
+            Some(e) => e.1 += 1,
+            None => official_cats.push((m.category.clone(), 1)),
+        }
+    }
     let mut filter = app.library.category.clone();
     let shown: Vec<LibraryMaterial> = matched
         .iter()
         .filter(|m| match &filter {
+            CategoryFilter::Official(_) => false,
             CategoryFilter::All => true,
             CategoryFilter::None => m.categories.is_empty(),
             CategoryFilter::Is(c) => m.categories.iter().any(|x| x.trim().eq_ignore_ascii_case(c)),
@@ -702,6 +752,7 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
         .collect();
 
     let mut apply = None;
+    let mut apply_preset: Option<forge_scene::Material> = None;
     let mut delete = None;
     let card = app.library.card;
     // Miniatura abbastanza grande per i pixel reali dello schermo.
@@ -720,6 +771,27 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
                         filter = f;
                     }
                 };
+                ui.strong(tr("Libreria ufficiale"));
+                item(
+                    ui,
+                    CategoryFilter::Official(None),
+                    tf("Tutti i predefiniti ({})", &[format!("{}", official.len())]),
+                );
+                for (c, n) in &official_cats {
+                    item(ui, CategoryFilter::Official(Some(c.clone())), format!("{} ({n})", tr_dyn(c)));
+                }
+                ui.separator();
+                ui.strong(tr("Scaricati"));
+                if all.is_empty() {
+                    ui.label(
+                        egui::RichText::new(tr(
+                            "La libreria è vuota: scarica un materiale dalla scheda Online oppure importa una cartella o uno zip.",
+                        ))
+                        .weak()
+                        .small(),
+                    );
+                    return;
+                }
                 item(ui, CategoryFilter::All, tf("Tutti ({})", &[format!("{}", matched.len())]));
                 for (c, n) in &primary {
                     item(
@@ -750,6 +822,31 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
         });
         ui.separator();
         ui.vertical(|ui| {
+            if let CategoryFilter::Official(cat) = &filter {
+                let list: Vec<forge_scene::Material> = official
+                    .iter()
+                    .filter(|m| cat.as_ref().is_none_or(|c| &m.category == c))
+                    .map(|m| (*m).clone())
+                    .collect();
+                if list.is_empty() {
+                    ui.label(tr("Nessun materiale con questi filtri."));
+                    return;
+                }
+                let cols = grid_cols(ui, card);
+                let row_h = card + 34.0 + ui.spacing().item_spacing.y;
+                egui::ScrollArea::vertical()
+                    .id_salt("lib-official")
+                    .show_rows(ui, row_h, list.len().div_ceil(cols), |ui, range| {
+                        for row in range {
+                            ui.horizontal(|ui| {
+                                for m in &list[row * cols..((row + 1) * cols).min(list.len())] {
+                                    preset_card(app, &ctx, ui, m, card, tier, &mut apply_preset);
+                                }
+                            });
+                        }
+                    });
+                return;
+            }
             if shown.is_empty() {
                 ui.label(tr("Nessun materiale con questi filtri."));
                 return;
@@ -772,6 +869,18 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
         });
     });
     app.library.category = filter;
+    if let Some(m) = apply_preset {
+        // Come i pulsanti del pannello Materiali: si tiene la versione del progetto se c'è.
+        if app.scene.materials.get(&m.id).is_none() {
+            app.scene.materials.upsert(m.clone());
+        }
+        for &i in &app.selection {
+            app.scene.assignments.insert(app.scene.nodes[i].id.clone(), m.id.clone());
+        }
+        app.selected_material = m.id.clone();
+        app.appearance_changed();
+        app.library.status = Some((tf("«{}» applicato.", &[tr_dyn(&m.name).to_string()]), false));
+    }
     if let Some(m) = apply {
         let kept = app.scene.materials.get(&m.material.id).is_some_and(|p| *p != m.material);
         apply_material(app, &m);
@@ -909,6 +1018,31 @@ fn material_card(
             ui.close();
         }
     });
+}
+
+/// Tessera di un materiale della libreria ufficiale (predefinito): clic = applica.
+fn preset_card(
+    app: &mut ForgeApp,
+    ctx: &egui::Context,
+    ui: &mut egui::Ui,
+    m: &forge_scene::Material,
+    card: f32,
+    tier: u32,
+    apply: &mut Option<forge_scene::Material>,
+) {
+    let tex = app.library.preset_thumb(ctx, m, tier);
+    let maps = m.texture_slots().iter().filter(|s| s.is_some()).count();
+    let sub = if maps > 0 {
+        tf("{maps} mappe", &[format!("{}", maps)])
+    } else {
+        tr_dyn(&m.category)
+    };
+    let selected = app.selected_material == m.id;
+    let r = thumb_card(ui, tex, egui::vec2(card, card), &tr_dyn(&m.name), &sub, selected)
+        .on_hover_text(tf("{}\nMateriale predefinito di ForgeRender", &[tr_dyn(&m.category).to_string()]));
+    if r.clicked() {
+        *apply = Some(m.clone());
+    }
 }
 
 fn online_tab(app: &mut ForgeApp, ui: &mut egui::Ui) {

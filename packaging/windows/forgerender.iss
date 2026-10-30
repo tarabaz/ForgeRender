@@ -1,8 +1,8 @@
 ; Installer di ForgeRender (Inno Setup 6).
-; Compilazione:  ISCC.exe /DAppVersion=0.10.0 /DBinDir=..\..\target\release packaging\windows\forgerender.iss
+; Compilazione:  ISCC.exe /DAppVersion=0.11.0 /DBinDir=..\..\target\release packaging\windows\forgerender.iss
 
 #ifndef AppVersion
-  #define AppVersion "0.10.0"
+  #define AppVersion "0.11.0"
 #endif
 #ifndef BinDir
   #define BinDir "..\..\target\release"
@@ -56,6 +56,7 @@ Source: "LEGGIMI.txt"; DestDir: "{app}"; Flags: ignoreversion isreadme
 Source: "..\..\lang\*.json"; DestDir: "{app}\lang"; Flags: ignoreversion
 Source: "..\..\manuale\*"; DestDir: "{app}\manuale"; Excludes: "inventario.json,INVENTARIO.md"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\..\assets\materiali\*"; DestDir: "{app}\materiali"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\assets\materiali-blenderkit\*"; DestDir: "{app}\materiali-blenderkit"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
 
 [Icons]
 Name: "{group}\ForgeRender"; Filename: "{app}\forgerender.exe"

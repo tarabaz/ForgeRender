@@ -449,5 +449,21 @@
 - Prossimi: altri legni, pietre, tessuti da Poly Haven; generatore per spazzolati, sabbiati,
   goffrati, layer di stampa 3D, carbonio.
 
+### 0.11.0: libreria unificata, metalli BlenderKit (30/10/2026)
+- Valerio ha scaricato 43 materiali BlenderKit (cartella `dist\MCP\blender material\metal`):
+  tutti **Royalty Free** (licenza letta da `blenderkit_data\config`), 5 solo procedurali (tolti,
+  nel Cestino). Repository **privato**: va bene per uso personale; prima di distribuire,
+  togliere `assets/materiali-blenderkit` (LEGGIMI nella cartella).
+- `forge_library::blend` (lettore .blend: zstd a più frame, intestazione classica e Blender 5,
+  SDNA, campi per nome) e `forge_library::blenderkit` (dal Principled BSDF alle immagini;
+  valori degli slider dai nodi). CLI `libreria importa-blenderkit`. 37 convertiti in
+  predefiniti a dati con l'esempio `blenderkit_predefiniti` (1 senza Principled diretto).
+- Predefiniti a dati: `DATA_PRESET_DIRS`, `data_presets()`; relocate dei progetti e pacchetti.
+- Finestra Libreria: scheda "Materiali" con "Libreria ufficiale" (predefiniti, miniature in
+  `<libreria>\.cache\anteprime-predefiniti`) e "Scaricati". Verificata con uno screenshot.
+- Test traduzioni: normalizzati i CRLF (prima falliva su Windows).
+- Prossimi: rivedere scale e nomi dei metalli BK; i predefiniti ufficiali da fonti CC0
+  (ambientCG) per una versione distribuibile; migliorare gli altri predefiniti con mappe.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

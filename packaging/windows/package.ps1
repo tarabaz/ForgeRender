@@ -67,6 +67,9 @@ Copy-Item -Recurse (Join-Path $root "manuale") (Join-Path $staging "manuale")
 Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $staging "manuale\inventario.json"), (Join-Path $staging "manuale\INVENTARIO.md")
 # Mappe dei materiali predefiniti (assets\materiali\<id>\): accanto al programma.
 Copy-Item -Recurse (Join-Path $root "assets\materiali") (Join-Path $staging "materiali")
+# Metalli BlenderKit (licenza Royalty Free: solo uso personale, vedi assets\materiali-blenderkit\LEGGIMI.md).
+$bk = Join-Path $root "assets\materiali-blenderkit"
+if (Test-Path $bk) { Copy-Item -Recurse $bk (Join-Path $staging "materiali-blenderkit") }
 New-Item -ItemType Directory -Force -Path (Join-Path $staging "licenze") | Out-Null
 Copy-Item (Join-Path $root "packaging\licenses\*") (Join-Path $staging "licenze")
 foreach ($dll in $oidnDlls) { Copy-Item (Join-Path $OidnDir "bin\$dll") $staging }

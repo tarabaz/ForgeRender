@@ -87,12 +87,16 @@ fn sample_projects_open_from_another_folder() {
         );
         assert!(r.warnings.is_empty(), "{}: {:?}", path.display(), r.warnings);
         // Ogni texture usata esiste e viene dalla copia, non dalla cartella originale.
+        // Le mappe dei materiali predefiniti stanno nella cartella del programma.
         let root = std::fs::canonicalize(&tmp).unwrap();
+        let program = forge_scene::material::builtin_textures_dir()
+            .and_then(std::path::Path::parent)
+            .and_then(|p| std::fs::canonicalize(p).ok());
         for m in &p.scene.materials.materials {
             for t in m.texture_slots().into_iter().flatten() {
                 let real = std::fs::canonicalize(t).unwrap_or_else(|_| panic!("{}: texture mancante {}", path.display(), t.display()));
                 assert!(
-                    real.starts_with(&root),
+                    real.starts_with(&root) || program.as_ref().is_some_and(|p| real.starts_with(p)),
                     "{}: texture fuori dalla copia {}",
                     path.display(),
                     real.display()

@@ -11,6 +11,26 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.11.0 — 30/10/2026
+
+**Libreria unificata e metalli BlenderKit**
+- **Finestra Libreria, scheda "Materiali"**: in un solo elenco la **Libreria ufficiale** (tutti i
+  materiali predefiniti, per categoria, con la sfera di anteprima salvata in cache) e gli
+  **Scaricati** (ambientCG, Poly Haven, cartelle e zip importati). La ricerca vale per tutti;
+  un clic applica il materiale alla selezione.
+- **37 materiali BlenderKit predefiniti** (36 metalli: acciai satinati, spazzolati, inox,
+  zincati, ossidati, verniciati, dorati, ramati, titanio…; un rovere), convertiti dai `.blend`
+  senza Blender: mappe 1024 px e valori degli slider letti dai nodi del materiale. Cartella
+  `assets/materiali-blenderkit` (≈25 MB), categorie "Metalli BlenderKit" e "Legni BlenderKit".
+  **Licenza Royalty Free**: solo uso personale; prima di distribuire il programma la cartella va
+  tolta (vedi il suo LEGGIMI).
+- Predefiniti "a dati": `materiale.json` + mappe in una cartella, letti all'avvio
+  (`forge_scene::material::data_presets`); i progetti ne ritrovano le mappe anche spostati.
+- Strumenti: `forgerender-cli libreria importa-blenderkit CARTELLA [--solo-elenco]` (nella
+  libreria locale) ed esempio `blenderkit_predefiniti` (per i predefiniti). I materiali solo
+  procedurali (nodi di rumore e rampe) non hanno immagini e si saltano.
+- Il test delle traduzioni ora passa anche su Windows (fine riga CRLF dei sorgenti).
+
 ## 0.10.0 — 30/10/2026
 
 **Materiali predefiniti con mappe (primi tre)**

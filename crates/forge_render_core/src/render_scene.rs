@@ -539,11 +539,8 @@ impl RenderScene {
     /// già costruita (operazione economica: nessuna ricostruzione della BVH).
     pub fn compile_with_geometry(scene: &Scene, geometry: Arc<RenderGeometry>) -> RenderScene {
         let mut materials: Vec<RenderMaterial> = scene.materials.materials.iter().map(RenderMaterial::from_material).collect();
-        let mut material_textures: Vec<Option<Arc<MaterialTextures>>> =
-            scene.materials.materials.iter().map(MaterialTextures::load).collect();
         let fallback = materials.len() as u32;
         materials.push(RenderMaterial::from_material(&Material::default()));
-        material_textures.push(None);
         let node_material: Vec<u32> = (0..scene.nodes.len())
             .map(|i| {
                 scene
@@ -553,6 +550,22 @@ impl RenderScene {
                     .unwrap_or(fallback)
             })
             .collect();
+        // Texture solo dei materiali usati da qualche pezzo: la scena contiene tutti i
+        // predefiniti (decine con le mappe) e caricarli tutti superava i limiti dei buffer GPU.
+        let mut used = vec![false; materials.len()];
+        for (i, &m) in node_material.iter().enumerate() {
+            if scene.nodes[i].mesh.is_some() {
+                used[m as usize] = true;
+            }
+        }
+        let mut material_textures: Vec<Option<Arc<MaterialTextures>>> = scene
+            .materials
+            .materials
+            .iter()
+            .zip(&used)
+            .map(|(m, &u)| if u { MaterialTextures::load(m) } else { None })
+            .collect();
+        material_textures.push(None);
 
         let mut portals = Portals::default();
         for l in scene.lights.iter().filter(|l| l.enabled) {
@@ -790,6 +803,39 @@ fn build_emissive(geo: &RenderGeometry, node_material: &[u32], materials: &[Rend
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// La scena contiene tutti i predefiniti, molti con le mappe: si caricano solo le texture
+    /// dei materiali usati (prima tutte, e il renderer GPU superava i limiti dei buffer).
+    #[test]
+    fn loads_textures_only_of_used_materials() {
+        let mut s = Scene::default();
+        let mapped = s.materials.materials.iter().filter(|m| m.has_textures()).count();
+        let m = s.add_mesh(forge_scene::primitives::uv_sphere(0.05, 8, 4));
+        s.add_node(
+            None,
+            forge_scene::ComponentId("sfera".into()),
+            "Sfera",
+            forge_math::Mat4::IDENTITY,
+            Some(m),
+        );
+        s.assignments.insert(
+            forge_scene::ComponentId("sfera".into()),
+            forge_scene::MaterialId::new("legno-rovere"),
+        );
+        let rs = RenderScene::compile(&s);
+        let loaded: Vec<&str> = s
+            .materials
+            .materials
+            .iter()
+            .zip(&rs.material_textures)
+            .filter(|(_, t)| t.is_some())
+            .map(|(m, _)| m.id.0.as_str())
+            .collect();
+        assert!(loaded.len() <= 1, "texture caricate: {loaded:?} (predefiniti con mappe: {mapped})");
+        if mapped > 0 {
+            assert_eq!(loaded, ["legno-rovere"]);
+        }
+    }
 
     #[test]
     fn compile_test_scene() {

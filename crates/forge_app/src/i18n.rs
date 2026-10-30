@@ -278,7 +278,8 @@ mod tests {
         }
         let mut keys = std::collections::BTreeSet::new();
         for f in files {
-            let text = std::fs::read_to_string(&f).unwrap();
+            // Rust legge i letterali con i fine riga di Windows (CRLF) come LF: si fa lo stesso.
+            let text = std::fs::read_to_string(&f).unwrap().replace("\r\n", "\n");
             for marker in ["tr(", "tf(", "tk("] {
                 let mut rest = text.as_str();
                 while let Some(i) = rest.find(marker) {

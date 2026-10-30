@@ -659,8 +659,52 @@ pub fn presets() -> Vec<Material> {
         for m in &mut v {
             attach_builtin_maps(m, dir);
         }
+        // Predefiniti scritti come dati, nelle cartelle accanto a `materiali`.
+        if let Some(parent) = dir.parent() {
+            for extra in DATA_PRESET_DIRS {
+                for m in data_presets(&parent.join(extra)) {
+                    if !v.iter().any(|p| p.id == m.id) {
+                        v.push(m);
+                    }
+                }
+            }
+        }
     }
     v
+}
+
+/// Cartelle di predefiniti "a dati": una sottocartella per materiale con `materiale.json` e le
+/// mappe. `materiali-blenderkit`: metalli BlenderKit (licenza Royalty Free, solo uso personale;
+/// da togliere prima di distribuire il programma).
+pub const DATA_PRESET_DIRS: [&str; 1] = ["materiali-blenderkit"];
+
+/// Materiali di una cartella di predefiniti a dati (ordinati per cartella). Le mappe indicate
+/// con il solo nome del file si cercano nella cartella del materiale; un file non valido si salta.
+pub fn data_presets(dir: &std::path::Path) -> Vec<Material> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut dirs: Vec<PathBuf> = entries.flatten().map(|e| e.path()).filter(|p| p.is_dir()).collect();
+    dirs.sort();
+    let mut out = Vec::new();
+    for d in dirs {
+        let file = d.join("materiale.json");
+        let Ok(text) = std::fs::read_to_string(&file) else { continue };
+        let mut m: Material = match serde_json::from_str(&text) {
+            Ok(m) => m,
+            Err(e) => {
+                tracing::warn!("predefinito non valido {}: {e}", file.display());
+                continue;
+            }
+        };
+        for slot in m.texture_slots_mut().into_iter().flatten() {
+            if slot.is_relative() {
+                *slot = d.join(&*slot);
+            }
+        }
+        out.push(m.sanitized());
+    }
+    out
 }
 
 /// Materiali predefiniti con mappe (cartella `materiali/<id>/` del programma, preparate da
@@ -745,6 +789,35 @@ mod tests {
         ] {
             assert!(p.iter().any(|m| m.id.0 == id), "manca {id}");
         }
+    }
+
+    /// Predefiniti a dati (assets/materiali-blenderkit): letti con le mappe nella loro cartella,
+    /// senza id doppi. Se la cartella è stata tolta (versione da distribuire) non c'è niente.
+    #[test]
+    fn data_presets_load_with_their_maps() {
+        let Some(root) = builtin_textures_dir().and_then(std::path::Path::parent) else {
+            return;
+        };
+        let dir = root.join(DATA_PRESET_DIRS[0]);
+        if !dir.is_dir() {
+            return;
+        }
+        let data = data_presets(&dir);
+        assert!(!data.is_empty(), "nessun predefinito letto da {}", dir.display());
+        for m in &data {
+            let color = m.base_color_texture.as_ref().unwrap_or_else(|| panic!("{} senza colore", m.id.0));
+            assert!(color.is_file() && color.starts_with(&dir), "{}", color.display());
+        }
+        let all = presets();
+        let mut ids: Vec<_> = all.iter().map(|m| &m.id).collect();
+        let n = ids.len();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), n, "id doppi");
+        assert!(
+            data.iter().all(|d| all.iter().any(|m| m.id == d.id)),
+            "predefiniti a dati nell'elenco"
+        );
     }
 
     /// Le mappe dei predefiniti (assets/materiali) si trovano anche dai test e sono complete.

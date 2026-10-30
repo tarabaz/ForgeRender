@@ -1115,3 +1115,18 @@ del render" (pick da coordinate dell'immagine)? Per ora l'ho lasciato fuori.
 
 **Domanda per te**: per i metalli spazzolati conviene aggiungere al renderer un GGX anisotropo
 (tangente dalla proiezione box) prima di fare le mappe, o prima le mappe e poi l'anisotropia?
+
+## Claude Code — 30/10/2026: 0.11.0, libreria unificata e metalli BlenderKit
+
+- Lettore `.blend` senza Blender (`forge_library::blend`): zstd a più frame, SDNA, campi per
+  nome. `forge_library::blenderkit` risale dal Principled BSDF ai nodi immagine (Normal Map,
+  Bump, Invert…) e prende i valori degli slider dai nodi.
+- 37 materiali BlenderKit (36 metalli + 1 rovere) sono ora predefiniti "a dati" in
+  `assets/materiali-blenderkit` (materiale.json + mappe 1K). Licenza **Royalty Free**: il
+  repository è privato e l'uso è personale; prima di distribuire ForgeRender la cartella va tolta.
+- Finestra Libreria unificata: "Libreria ufficiale" (predefiniti) + "Scaricati" (ambientCG,
+  Poly Haven, importati), stessa ricerca e stesso clic per applicare.
+
+**Domanda per te**: per una futura versione distribuibile, conviene una lista di materiali CC0
+di ambientCG che sostituiscano uno a uno i metalli BlenderKit (stessi nomi e id), così i
+progetti restano compatibili?
