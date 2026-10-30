@@ -1244,8 +1244,7 @@ impl ForgeApp {
             job.adaptive = adaptive;
             self.session.set_adaptive(adaptive.0, adaptive.1);
         }
-        let state = self.session.progress().state;
-        if should_auto_restart(self.auto_restart, &state, self.view, self.render_is_stale(), self.is_preparing()) {
+        if should_auto_restart(self.auto_restart, self.render_is_stale(), self.is_preparing()) {
             self.start_render();
         }
     }
@@ -2113,18 +2112,15 @@ pub fn export_format_label(f: forge_image_io::ExportFormat) -> &'static str {
     }
 }
 
-/// Riavvio automatico del render quando la scena o la vista cambiano:
-/// - render in corso (o in pausa): sempre, per non accumulare campioni incompatibili;
-/// - render finito: solo se lo si sta guardando (vista Render), così muovendo la vista riparte
-///   da solo; nella Viewport non si riparte in sottofondo, si riparte tornando sulla vista Render.
+/// Riavvio automatico del render quando la scena o la vista cambiano (casella "Riavvio
+/// automatico"): acceso = riparte sempre, in qualunque vista e in qualunque stato (in corso,
+/// in pausa, finito, fermato); spento = non riparte mai. Serve un render già avviato almeno
+/// una volta (`stale` è falso finché non c'è).
 ///
 /// Con una camera di render attiva (senza "Pilota") muovere la vista non cambia l'inquadratura
 /// del render, quindi il render non diventa vecchio e non riparte.
-pub fn should_auto_restart(auto: bool, state: &SessionState, view: View, stale: bool, preparing: bool) -> bool {
-    if !auto || !stale || preparing {
-        return false;
-    }
-    state.is_active() || (matches!(state, SessionState::Completed) && view == View::Render)
+pub fn should_auto_restart(auto: bool, stale: bool, preparing: bool) -> bool {
+    auto && stale && !preparing
 }
 
 #[cfg(test)]
@@ -2132,29 +2128,10 @@ mod auto_restart_tests {
     use super::*;
 
     #[test]
-    fn finished_render_restarts_only_when_watched() {
-        let done = SessionState::Completed;
-        assert!(
-            should_auto_restart(true, &done, View::Render, true, false),
-            "finito e guardato: riparte"
-        );
-        assert!(
-            !should_auto_restart(true, &done, View::Viewport, true, false),
-            "finito, nella viewport: no"
-        );
-        assert!(
-            should_auto_restart(true, &SessionState::Rendering, View::Viewport, true, false),
-            "in corso: sempre"
-        );
-        assert!(
-            !should_auto_restart(true, &SessionState::Cancelled, View::Render, true, false),
-            "fermato con Stop: no"
-        );
-        assert!(
-            !should_auto_restart(false, &done, View::Render, true, false),
-            "riavvio automatico spento"
-        );
-        assert!(!should_auto_restart(true, &done, View::Render, false, false), "immagine aggiornata");
-        assert!(!should_auto_restart(true, &done, View::Render, true, true), "scena in preparazione");
+    fn auto_restart_is_on_or_off() {
+        assert!(should_auto_restart(true, true, false), "acceso: riparte sempre");
+        assert!(!should_auto_restart(false, true, false), "spento: mai");
+        assert!(!should_auto_restart(true, false, false), "immagine aggiornata");
+        assert!(!should_auto_restart(true, true, true), "scena in preparazione: si aspetta");
     }
 }
