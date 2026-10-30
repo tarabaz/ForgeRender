@@ -805,8 +805,10 @@ mod tests {
         let data = data_presets(&dir);
         assert!(!data.is_empty(), "nessun predefinito letto da {}", dir.display());
         for m in &data {
-            let color = m.base_color_texture.as_ref().unwrap_or_else(|| panic!("{} senza colore", m.id.0));
-            assert!(color.is_file() && color.starts_with(&dir), "{}", color.display());
+            assert!(m.has_textures(), "{} senza mappe", m.id.0);
+            for t in m.texture_slots().into_iter().flatten() {
+                assert!(t.is_file() && t.starts_with(&dir), "{}: {}", m.id.0, t.display());
+            }
         }
         let all = presets();
         let mut ids: Vec<_> = all.iter().map(|m| &m.id).collect();

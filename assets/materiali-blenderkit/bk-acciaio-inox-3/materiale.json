@@ -25,7 +25,7 @@
   "height_texture": null,
   "ao_texture": null,
   "opacity_texture": null,
-  "normal_directx": false,
+  "normal_directx": true,
   "roughness_is_gloss": false,
   "bump_mm": 1.0,
   "displacement_mm": 0.0,

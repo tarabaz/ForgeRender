@@ -615,12 +615,13 @@ fn import_blenderkit(args: &Args) -> anyhow::Result<()> {
                 Ok(x) => {
                     let slots: Vec<String> = x.images.iter().map(|i| format!("{:?}={}", i.slot, i.name)).collect();
                     println!(
-                        "{}: metallic {:.2} roughness {:.2}{} normal ×{:.2} scala {:.2} m | {}",
+                        "{}: metallic {:.2} roughness {:.2}{} normal ×{:.2}{} scala {:.2} m | {}",
                         x.name,
                         x.material.metallic,
                         x.material.roughness,
                         if x.material.roughness_is_gloss { " (glossiness)" } else { "" },
                         x.material.normal_strength,
+                        if x.material.normal_directx { " (DirectX)" } else { "" },
                         x.scale_m,
                         if slots.is_empty() {
                             "nessuna immagine".into()
@@ -628,8 +629,14 @@ fn import_blenderkit(args: &Args) -> anyhow::Result<()> {
                             slots.join(", ")
                         }
                     );
-                    for n in x.notes.iter().filter(|n| !n.starts_with("importato da")) {
+                    for n in &x.notes {
                         println!("    nota: {n}");
+                    }
+                    for p in x.params.iter().filter(|p| p.status != blenderkit::Status::Exact) {
+                        println!("    {:?} {}: {} → {} ({})", p.status, p.name, p.blender, p.forge, p.note);
+                    }
+                    if !x.unused_images.is_empty() {
+                        println!("    immagini non usate: {}", x.unused_images.join(", "));
                     }
                 }
                 Err(e) => failed.push(format!("{folder}: {e:#}")),
@@ -643,6 +650,7 @@ fn import_blenderkit(args: &Args) -> anyhow::Result<()> {
             }
             Ok(Outcome::AlreadyPresent(_)) => present += 1,
             Ok(Outcome::NoImages(name)) => no_images.push(name),
+            Ok(Outcome::Procedural(name, nodes)) => no_images.push(format!("{name} ({})", nodes.join(", "))),
             Err(e) => failed.push(format!("{folder}: {e:#}")),
         }
     }

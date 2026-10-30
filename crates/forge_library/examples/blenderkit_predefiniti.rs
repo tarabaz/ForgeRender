@@ -33,6 +33,10 @@ fn main() -> anyhow::Result<()> {
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_default();
         let x = match blenderkit::read(&f) {
+            Ok(x) if !x.is_importable() => {
+                println!("{folder}: {} procedurale ({}), saltato", x.name, x.procedural.join(", "));
+                continue;
+            }
             Ok(x) if x.has_images() => x,
             Ok(x) => {
                 println!("{folder}: {} senza immagini, saltato", x.name);
@@ -67,7 +71,7 @@ fn main() -> anyhow::Result<()> {
             ..TextureMapping::default()
         };
         for img in &x.images {
-            let decoded = match image::load_from_memory(&img.bytes) {
+            let decoded = match img.encoded().and_then(|(b, _)| Ok(image::load_from_memory(&b)?)) {
                 Ok(i) => i,
                 Err(e) => {
                     println!("{id}: «{}» non letta ({e}), saltata", img.name);
@@ -148,6 +152,7 @@ fn italian_name(en: &str) -> String {
         "black steel" => "Acciaio nero",
         "blue steel" => "Acciaio brunito blu",
         "brushed steel" => "Acciaio spazzolato",
+        "brushed stainless steel" => "Acciaio inox spazzolato",
         "galvanized steel" => "Acciaio zincato",
         "golden scratched painted steel" => "Acciaio verniciato oro graffiato",
         "heavily oxidized steel" => "Acciaio molto ossidato",

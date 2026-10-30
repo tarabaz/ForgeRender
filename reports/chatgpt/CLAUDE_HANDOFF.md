@@ -1130,3 +1130,45 @@ del render" (pick da coordinate dell'immagine)? Per ora l'ho lasciato fuori.
 **Domanda per te**: per una futura versione distribuibile, conviene una lista di materiali CC0
 di ambientCG che sostituiscano uno a uno i metalli BlenderKit (stessi nomi e id), così i
 progetti restano compatibili?
+
+## Claude Code — 30/10/2026: importatore .blend, fase 1 (estrazione completa)
+
+Richiesta di Valerio: "Importa materiale da Blender (.blend)" dentro ForgeRender (finestra con
+sorgente, parametri, anteprima vera, import nella libreria). Piano in 5 fasi approvato; questa è
+la fase 1. Regole di Valerio: i materiali **interamente** procedurali non si importano (avviso);
+quelli con solo una parte procedurale (sporco, rumore) si importano con le immagini e un avviso.
+
+**File modificati**
+- `crates/forge_library/src/blenderkit.rs` (riscritto): tutti i materiali del file (`read_all`);
+  shader dal Material Output (Principled o Metallic BSDF, anche dentro un gruppo); risalita dei
+  collegamenti con gruppi di nodi (Group Input/Output), Reroute, Normal Map, Bump, Displacement,
+  Invert, Separate/Combine (normal DirectX ricomposta → `normal_directx`), Value/RGB, Mix (si usa
+  l'immagine, il procedurale si scarta con avviso), nodi di calcolo (approssimati); Mapping
+  collegato all'immagine (anche con Scale da un nodo Value); immagini impacchettate **o esterne**
+  (`//percorso`, cartella `textures`); canale singolo salvato in grigio; controllo che una mappa
+  nello slot normal sia davvero una normal map. Rapporto `params` (valore Blender → ForgeRender,
+  stato Esatto/Approssimato/Non supportato, nota), `unused_images`, `procedural`.
+  `save_to_library` (salvataggio con le funzioni della libreria, non tocca la scena).
+- `crates/forge_library/src/blend.rs`: `fields()` per l'ispezione.
+- `crates/forge_library/examples/blend_nodi.rs` (nuovo): stampa nodi e collegamenti di un .blend.
+- `crates/forge_library/examples/blenderkit_predefiniti.rs`, `crates/forge_cli/src/main.rs`:
+  nuovo esito "procedurale", rapporto nel `--solo-elenco`, canali.
+- `assets/materiali-blenderkit/`: rigenerati con l'estrazione nuova (38 materiali, 28 MB;
+  aggiunti Acciaio inox spazzolato, 3 normal DirectX recuperate, mappe di displacement nello slot
+  rilievo con rilievo spento).
+
+**Test eseguiti davvero**
+- `cargo test -p forge_library`: tutti verdi (unitari: firma delle immagini, canale in grigio,
+  lettore .blend su file costruito a mano).
+- `blend_real_files` (ignorato, con `FORGE_BLENDERKIT_DIR` sui 38 file di Valerio): 38
+  importabili, 0 falliti; Brushed Stainless Steel con colore dal nodo (parte procedurale scartata).
+- `forgerender-cli libreria importa-blenderkit … --solo-elenco`: 0 errori; restano "non
+  supportati" solo Alpha collegato (2 materiali) e una falsa normal scartata.
+- clippy `-D warnings` pulito; suite completa del workspace (vedi commit).
+
+**Limiti residui**
+- Formato Blender 5 supportato nel codice ma non provato su un file vero.
+- Mix, Math, ColorRamp: si segue un solo ingresso (dichiarato "approssimato" nel rapporto).
+- Specular, Opacity, "imperfection" non hanno slot in ForgeRender: elencate come non usate.
+- Scala: le UV di Blender non hanno misura reale; si stima dal Mapping (da regolare).
+- Prossima fase: anteprima isolata con il renderer vero (servono i modelli GLB di Valerio).

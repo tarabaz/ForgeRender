@@ -11,6 +11,7 @@ prima di distribuire il programma questa cartella va tolta o sostituita con mate
 | `bk-acciaio-nero` | Acciaio nero | Black steel | `black-steel_8537447e-136d-4d12-8090-c9fc46b7e52b` |
 | `bk-acciaio-nero-2` | Acciaio nero 2 | Black steel | `black-steel_85f78705-9362-4b01-be81-bab2f60dab4d` |
 | `bk-acciaio-brunito-blu` | Acciaio brunito blu | Blue Steel | `blue-steel_61e9e8f3-9d2c-4526-967f-7684d6f9eddf` |
+| `bk-acciaio-inox-spazzolato` | Acciaio inox spazzolato | Brushed Stainless Steel | `brushed-stainles_4a8d9d25-d6be-4b29-b1ef-d5c5d967c6ee` |
 | `bk-acciaio-spazzolato` | Acciaio spazzolato | Brushed Steel | `brushed-steel_964b2e89-39e3-4c59-9400-2dd81cab1592` |
 | `bk-acciaio-zincato` | Acciaio zincato | Galvanized Steel | `galvanized-steel_065f59f5-9efa-4296-9b5a-0d64deba7ba8` |
 | `bk-acciaio-zincato-2` | Acciaio zincato 2 | Galvanized steel | `galvanized-steel_7be17151-334b-4157-89ac-5b4d1f9ec04f` |

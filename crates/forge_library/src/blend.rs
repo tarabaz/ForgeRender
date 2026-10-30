@@ -159,6 +159,11 @@ impl Blend {
         &self.data[b.start..b.start + b.len]
     }
 
+    /// Campi di una struttura (vuoto se il tipo non esiste).
+    pub fn fields(&self, ty: &str) -> &[Field] {
+        self.struct_index.get(ty).map(|&s| self.structs[s].1.as_slice()).unwrap_or(&[])
+    }
+
     /// Campo di una struttura (nome senza `*` né `[n]`).
     pub fn field(&self, ty: &str, name: &str) -> Option<&Field> {
         let s = self.struct_index.get(ty)?;
