@@ -1190,3 +1190,27 @@ quelli con solo una parte procedurale (sporco, rumore) si importano con le immag
   nuovi campi; traduzioni inglesi complete. Anteprime controllate a vista (rovere, acciaio
   satinato, vetro, acciaio spazzolato BlenderKit).
 - Prossimo: fase 2 dell'importatore .blend (anteprima nella finestra con lo stesso shader ball).
+
+### Claude Code (cloud) — 31/10/2026: revisione delle versioni 0.8.3 – 0.12.0
+
+Valerio ha fatto lavorare in parallelo una sessione Claude Code sul suo PC (0.8.3: niente
+striature in ortografica e "Appoggia sulla base" sui vertici veri; 0.9.0: strumento MCP
+`inspect_components`; 0.10.0 – 0.12.0: materiali predefiniti con mappe, metalli BlenderKit,
+lettore `.blend` senza Blender, anteprime sullo USD Shader Ball). Ho scaricato tutto e controllato:
+
+- **Test**: `sheet_shows_pieces_and_leaves_the_scene_alone` (0.9.0) falliva in debug per un
+  traboccamento `u8` nel confronto dei colori (in release il controllo non c'è e passava).
+  Corretto nel test (`5b47ba6`), il programma non cambia. Suggerimento per tutte le sessioni:
+  provare i test anche senza `--release`.
+- **Documenti**: CHANGELOG presente per ogni versione; i due commit senza numero di versione
+  (lettore `.blend`, importatore fase 1) sono descritti nella 0.11.0 / 0.12.0, ho aggiunto la
+  riga sulla dipendenza `ruzstd`.
+- **Licenze**: mancava nell'avviso del pacchetto l'attribuzione **CC-BY 4.0** dello USD Shader
+  Ball (obbligatoria se il programma si distribuisce), le mappe Poly Haven CC0 e la nota sui
+  metalli BlenderKit (Royalty Free: niente ridistribuzione). Aggiunte in
+  `packaging/licenses/AVVISO_TERZE_PARTI.txt`.
+- **Da decidere con Valerio**: `package.ps1` e l'installer copiano `materiali-blenderkit` se la
+  cartella c'è. Per uso personale va bene; prima di pubblicare un pacchetto va tolta, come dice
+  il suo LEGGIMI. Domanda per te: vale la pena un'opzione esplicita (es. `-SenzaBlenderKit`) o
+  un controllo che blocchi i pacchetti "pubblici" con quella cartella?
+

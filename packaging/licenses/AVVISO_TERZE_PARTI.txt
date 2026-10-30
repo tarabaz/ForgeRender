@@ -16,7 +16,28 @@ l'applicazione funziona senza riduzione del rumore.
 
 L'applicazione utilizza inoltre librerie Rust con licenze permissive (MIT,
 Apache-2.0, BSD, Zlib), tra cui egui/eframe, wgpu, glam, rayon, serde, image,
-tobj, stl_io, sysinfo, rfd.
+tobj, stl_io, sysinfo, rfd, pulldown-cmark (manuale interno), ruzstd (lettura dei
+file .blend compressi).
 
 Le icone dell'interfaccia usano il carattere Phosphor Icons (https://phosphoricons.com),
 licenza MIT (vedi Phosphor_LICENSE.txt), compreso nel programma.
+
+Contenuti compresi nel programma
+--------------------------------
+
+Scena delle anteprime dei materiali (cartella anteprima): "USD Shader Ball for glTF",
+Khronos glTF Sample Assets, licenza Creative Commons Attribution 4.0 (CC-BY 4.0,
+https://creativecommons.org/licenses/by/4.0/). Geometria e texture: Chris Rydalch;
+specifica originale e validazione: André Mazzone; scena originale, ispirazione e
+consulenza: Thomas Anagnostou; conversione glTF: Eric Chadwick. Testo completo in
+anteprima\LICENSE-USDShaderBall.md. Il materiale del pezzo "material_surface" viene
+sostituito da ForgeRender per mostrare il materiale scelto.
+
+Mappe dei materiali predefiniti (cartella materiali): Rovere da "Oak Veneer 01" e Pelle
+nera da "Leather White" di Poly Haven (https://polyhaven.com), licenza CC0 (pubblico
+dominio); Marmo bianco lucido generato da ForgeRender.
+
+Metalli BlenderKit (cartella materiali-blenderkit, se presente): licenza Royalty Free di
+BlenderKit (https://www.blenderkit.com), usabili nei propri render ma non ridistribuibili.
+Valgono solo per l'uso personale di questa copia; prima di distribuire il programma la
+cartella va tolta (vedi materiali-blenderkit\LEGGIMI.md).

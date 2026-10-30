@@ -47,6 +47,12 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
   libreria locale) ed esempio `blenderkit_predefiniti` (per i predefiniti). I materiali solo
   procedurali (nodi di rumore e rampe) non hanno immagini e si saltano.
 - Il test delle traduzioni ora passa anche su Windows (fine riga CRLF dei sorgenti).
+- Lettore dei file `.blend` senza Blender (`forge_library::blend`: file compressi zstd, anche
+  Blender 5, catalogo SDNA) e lettura dei nodi del materiale (`forge_library::blenderkit`).
+  Nuova dipendenza `ruzstd` (Rust puro, MIT).
+- Avviso delle licenze (`licenze\AVVISO_TERZE_PARTI.txt`) completato dopo la revisione del
+  31/10: attribuzione CC-BY dello USD Shader Ball (0.12.0), mappe Poly Haven CC0 (0.10.0),
+  limiti della licenza BlenderKit, `ruzstd` e `pulldown-cmark`.
 
 ## 0.10.0 — 30/10/2026
 
