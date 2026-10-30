@@ -24,6 +24,16 @@ everything stays on your computer.
 - If ForgeRender is closed or AI control is off, Claude is told to ask you to open ForgeRender and
   turn on AI control.
 
+The three states of the top bar:
+
+| State | Bar |
+|---|---|
+| **Off**: no assistant can control ForgeRender (this is how it starts) | ![AI control off](img/mcp/en/barra_spento.png) |
+| **On**: Claude can connect | ![AI control on](img/mcp/en/barra_acceso.png) |
+| **Controlled by AI**: Claude is connected right now | ![Controlled by AI](img/mcp/en/barra_controllato.png) |
+
+When Claude disconnects, "Controlled by AI" disappears and the bar goes back to the "On" state.
+
 ## 1. Requirements
 
 - ForgeRender **0.5.0 or later**: the program folder contains `forgerender.exe` and
@@ -56,6 +66,12 @@ $bridge = (Resolve-Path "C:\REAL\PATH\TO\forgerender-mcp.exe").Path
 @{ mcpServers = @{ forgerender = @{ command = $bridge; args = @() } } } | ConvertTo-Json -Depth 5 | Set-Content -Encoding ascii "$HOME\ForgeRender-IA\.mcp.json"
 ```
 
+Check: this command must show the file with `forgerender` and your path.
+
+```powershell
+Get-Content "$HOME\ForgeRender-IA\.mcp.json"
+```
+
 Then open Claude Code in that folder (desktop app: "Choose…" next to "This computer"; terminal:
 `Set-Location "$HOME\ForgeRender-IA"` then `claude`). The first time it asks whether to approve
 the `forgerender` server: answer yes.
@@ -85,6 +101,22 @@ Then restart Claude Desktop.
 2. Click **"AI control"** in the top bar: it turns orange.
 3. Tell Claude what you want. At the first command **"Controlled by AI"** appears at the top.
 4. When you are done, turn "AI control" off (or close Claude): ForgeRender stays open.
+
+This is the window while Claude works (here it prepared the studio, added a warm light on the
+right, made the sphere satin steel and started the render):
+
+![ForgeRender controlled by Claude](img/mcp/en/finestra_comandata.jpg)
+
+1. **AI control** on: you allowed it.
+2. **Controlled by AI**: Claude is connected now.
+3. The light Claude added appears in the list like the ones you create by hand (you can edit or
+   delete it).
+4. The render started by Claude, with the sample progress.
+5. The image updating while the render runs; when it is finished Claude receives the preview.
+
+The finished result, saved as PNG:
+
+![Render made by Claude](img/mcp/render_esempio.jpg)
 
 Example requests:
 
@@ -168,8 +200,10 @@ logs (portable: program folder; installed: `%LOCALAPPDATA%\ForgeRender\renders`)
   to turn it on.
 - **Slow renders**: for tests ask for few samples (32–64) and low resolution; for the final image
   use the GPU (`set_render_settings` with device gpu).
-- Received commands are logged by ForgeRender ("controllo IA: …" lines), visible at the bottom of
-  the window and in `forgerender.log`.
+- Received commands are logged by ForgeRender ("controllo IA: …" lines, always in Italian),
+  visible at the bottom of the window and in `forgerender.log`:
+
+  ![Command log](img/mcp/en/registro.png)
 
 ## 7. Developer notes
 
@@ -187,3 +221,5 @@ logs (portable: program folder; installed: `%LOCALAPPDATA%\ForgeRender\renders`)
   moves the contact file.
 - To add a tool: definition in `forge_mcp::tools::list`, branch in `dispatch` of
   `forge_app::mcp::tools` (a test checks every name has a branch).
+- The images in this guide are regenerated with `tools/guida-mcp/scatta.py` and `annota.py`
+  (instructions at the top of the script) when the interface changes.

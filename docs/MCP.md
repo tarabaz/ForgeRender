@@ -25,6 +25,17 @@ sul tuo PC.
 - Se ForgeRender è chiuso o il controllo è spento, Claude riceve il messaggio "apri ForgeRender
   e accendi Controllo IA" e te lo chiede.
 
+I tre stati della barra in alto:
+
+| Stato | Barra |
+|---|---|
+| **Spento**: nessun assistente può comandare (così parte ForgeRender) | ![Controllo IA spento](img/mcp/it/barra_spento.png) |
+| **Acceso**: Claude può collegarsi | ![Controllo IA acceso](img/mcp/it/barra_acceso.png) |
+| **Controllato da IA**: Claude è collegato in questo momento | ![Controllato da IA](img/mcp/it/barra_controllato.png) |
+
+Quando Claude si scollega la scritta "Controllato da IA" sparisce e la barra torna come nello
+stato "Acceso".
+
 ## 1. Cosa serve
 
 - ForgeRender **0.5.0 o successivo**: nella cartella del programma ci sono `forgerender.exe` e
@@ -59,6 +70,12 @@ $ponte = (Resolve-Path "C:\PERCORSO\REALE\forgerender-mcp.exe").Path
 @{ mcpServers = @{ forgerender = @{ command = $ponte; args = @() } } } | ConvertTo-Json -Depth 5 | Set-Content -Encoding ascii "$HOME\ForgeRender-IA\.mcp.json"
 ```
 
+Controllo: questo comando deve mostrare il file con `forgerender` e il tuo percorso.
+
+```powershell
+Get-Content "$HOME\ForgeRender-IA\.mcp.json"
+```
+
 Poi apri Claude Code in quella cartella (nell'app desktop: "Scegli…" accanto a "Questo
 computer"; nel terminale: `Set-Location "$HOME\ForgeRender-IA"` e `claude`). La prima volta
 chiede se approvare il server `forgerender`: rispondi sì.
@@ -89,6 +106,22 @@ Poi riavvia Claude Desktop.
 2. Clicca **"Controllo IA"** in alto: diventa arancione.
 3. Scrivi a Claude cosa vuoi. Al primo comando in alto compare **"Controllato da IA"**.
 4. Quando hai finito, spegni "Controllo IA" (o chiudi Claude): ForgeRender resta aperto.
+
+Così si presenta la finestra mentre Claude lavora (qui ha preparato lo studio, aggiunto una luce
+calda a destra, messo la sfera in acciaio satinato e lanciato il render):
+
+![ForgeRender comandato da Claude](img/mcp/it/finestra_comandata.jpg)
+
+1. **Controllo IA** acceso: sei tu ad averlo permesso.
+2. **Controllato da IA**: Claude è collegato adesso.
+3. La luce che Claude ha aggiunto compare nell'elenco come quelle create a mano (si può
+   modificare o eliminare).
+4. Il render avviato da Claude, con l'avanzamento dei campioni.
+5. L'immagine che si aggiorna mentre il render procede; a fine render Claude riceve l'anteprima.
+
+Il risultato finito, salvato come PNG:
+
+![Render fatto da Claude](img/mcp/render_esempio.jpg)
 
 Esempi di richieste:
 
@@ -175,7 +208,9 @@ in `renders` accanto ai log (portable: cartella del programma; installata:
 - **Render lento**: per le prove chiedi pochi campioni (32–64) e risoluzione bassa; per il finale
   la GPU (`set_render_settings` con device gpu).
 - Il registro dei comandi ricevuti è nel log di ForgeRender (righe "controllo IA: …"), visibile
-  in basso nella finestra e in `forgerender.log`.
+  in basso nella finestra e in `forgerender.log`:
+
+  ![Registro dei comandi](img/mcp/it/registro.png)
 
 ## 7. Per sviluppatori
 
@@ -193,3 +228,5 @@ in `renders` accanto ai log (portable: cartella del programma; installata:
   `FORGE_MCP_FILE` sposta il file di contatto (prove con più istanze).
 - Per aggiungere uno strumento: definizione in `forge_mcp::tools::list`, ramo in `dispatch` di
   `forge_app::mcp::tools` (un test controlla che ogni nome abbia il suo ramo).
+- Le immagini di questa guida si rifanno con `tools/guida-mcp/scatta.py` e `annota.py`
+  (istruzioni in testa allo script) quando l'interfaccia cambia.

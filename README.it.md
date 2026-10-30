@@ -10,6 +10,8 @@ per Windows 11 (sviluppato per Ryzen 9 9900X + RTX 5070) ma funzionante anche se
 >
 > Apri ForgeRender, accendi **Controllo IA** e chiedi a Claude di preparare la scena, importare un modello CAD, posizionare le luci da studio, assegnare i materiali, impostare la camera e lanciare il render. 25 comandi, modifiche visibili in tempo reale e anteprime dei render restituite all'assistente. Decidi tu quando l'IA può comandare: quando si scollega, ForgeRender resta aperto con il tuo lavoro.
 >
+> ![Controllo IA acceso e Claude collegato](docs/img/mcp/it/barra_controllato.png)
+>
 > **[Configura Claude Code o Claude Desktop →](docs/MCP.md)** · [English guide](docs/MCP.en.md)
 
 > Vedi [docs/ROADMAP.it.md](docs/ROADMAP.it.md) per cosa funziona davvero oggi, cosa viene dopo
