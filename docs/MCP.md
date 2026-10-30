@@ -10,6 +10,8 @@ Il collegamento usa il **Model Context Protocol** (MCP), lo standard con cui Cla
 Claude Desktop parlano con i programmi esterni. ForgeRender non ha bisogno di internet né di
 chiavi: è Claude Code ad avviarlo sul tuo PC con l'opzione `--mcp`.
 
+🇬🇧 [English version](MCP.en.md) · [Torna al README](../README.it.md)
+
 ## 1. Cosa serve
 
 - ForgeRender **0.4.0 o successivo** compilato (`Build-ForgeRender.ps1`).
@@ -31,16 +33,14 @@ Claude Code avvia i programmi MCP quando parte, quindi conviene una **cartella d
 finestra di ForgeRender si apre solo quando lavori lì, non in ogni progetto. Un comando alla
 volta in PowerShell:
 
-```
-mkdir C:\Users\valer\ForgeRender-IA
-```
-
-```
-cd C:\Users\valer\ForgeRender-IA
+```powershell
+New-Item -ItemType Directory -Force "$HOME\ForgeRender-IA" | Out-Null
+Set-Location "$HOME\ForgeRender-IA"
 ```
 
-```
-claude mcp add forgerender -- "C:\Users\valer\Dev\RenderingEngine\RenderingEngine_pulito\target\release\forgerender.exe" --mcp
+```powershell
+$exe = (Resolve-Path "C:\PERCORSO\REALE\forgerender.exe").Path
+claude mcp add forgerender -- "$exe" --mcp
 ```
 
 - Senza `--scope` il collegamento vale solo per questa cartella.
@@ -65,7 +65,7 @@ Impostazioni → Sviluppatore → Modifica configurazione; nel file `claude_desk
 {
   "mcpServers": {
     "forgerender": {
-      "command": "<percorso-completo>\\forgerender.exe",
+      "command": "C:\\\\PERCORSO\\\\REALE\\\\forgerender.exe",
       "args": ["--mcp"]
     }
   }
@@ -76,7 +76,7 @@ Poi riavvia Claude Desktop.
 
 ## 3. Come si usa
 
-Apri Claude Code nella cartella `ForgeRender-IA` (`cd C:\Users\valer\ForgeRender-IA`, poi
+Apri Claude Code nella cartella dedicata (`Set-Location "$HOME\ForgeRender-IA"`, poi
 `claude`): si apre anche la finestra di ForgeRender, e in alto compare **"IA collegata (MCP)"**. La prima volta Claude
 Code chiede il permesso per ogni strumento: puoi rispondere "sì, sempre" per quelli di
 ForgeRender.
