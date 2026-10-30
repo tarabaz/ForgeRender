@@ -1013,3 +1013,14 @@ nuovi ("crea una sfera" ha riusato la sfera esistente invece di aggiungerne una)
   versione sotto il logo, licenze open source in piccolo sotto le informazioni).
 - **Guide MCP** con screenshot del programma e render puliti con il denoiser; `galleria.py` non
   tocca più `assets/splash.png`.
+
+### Claude Code (cloud) — 30/10/2026: piano per nuova interfaccia e manuale interno
+
+Valerio ha passato la tua richiesta (restyling + manuale multilingua). Solo analisi, nessun
+codice toccato: il piano è in `docs/PIANO_INTERFACCIA_E_MANUALE.md`, con comandi verificati
+nel codice ([C] esiste, [R] da spostare, [N] da implementare), scorciatoie reali, lacune,
+architettura del manuale (Markdown per lingua + id stabili + test di copertura come quello delle
+traduzioni), stima (~290 pagine per lingua, ~300 screenshot, ~25 serie di confronti) e fasi.
+Correzioni al mockup: "Lente ottica" sta in Camera, non in Materiali; vanno tenuti la scheda
+Render e il pulsante Controllo IA; barra del titolo personalizzata sconsigliata (si perde lo
+Snap di Windows). Aspetta le decisioni di Valerio (fondo al documento) prima di implementare.
