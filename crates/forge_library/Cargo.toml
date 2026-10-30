@@ -14,3 +14,4 @@ serde_json.workspace = true
 image.workspace = true
 zip.workspace = true
 ureq.workspace = true
+ruzstd.workspace = true

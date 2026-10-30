@@ -93,6 +93,9 @@ fn print_help() {
              nei download (non si cancella niente). Già in libreria: saltati.\n  \
          libreria aggiorna-categorie   aggiunge categorie e tag dei cataloghi ai materiali scaricati che\n    \
              non li hanno  [--aggiorna-catalogo]\n  \
+         libreria importa-blenderkit CARTELLA   importa i materiali BlenderKit scaricati (cartelle con il\n    \
+             .blend, es. blenderkit_data\\materials): mappe impacchettate e valori dei nodi, senza Blender.\n    \
+             Solo uso personale (licenza Royalty Free). Già importati: saltati.  --solo-elenco\n  \
          Per tutti i comandi libreria: --libreria CARTELLA (radice della libreria; FORGE_LIBRARY_DIR ha la precedenza)",
         env!("CARGO_PKG_VERSION")
     );
@@ -591,6 +594,74 @@ fn import_polyhaven(args: &Args) -> anyhow::Result<()> {
 }
 
 /// Aggiunge categorie e tag dei cataloghi ai materiali scaricati che non li hanno.
+fn import_blenderkit(args: &Args) -> anyhow::Result<()> {
+    use forge_library::blenderkit::{self, Outcome};
+    let Some(dir) = args.0.get(1).filter(|a| !a.starts_with("--")) else {
+        bail!("indica la cartella dei materiali BlenderKit (es. %USERPROFILE%\\blenderkit_data\\materials)");
+    };
+    let files = blenderkit::scan(&PathBuf::from(dir));
+    let dry = args.flag("--solo-elenco");
+    println!("Libreria: {}", forge_library::paths::root().display());
+    println!("File .blend: {}{}", files.len(), if dry { "  (solo elenco)" } else { "" });
+    let (mut imported, mut present, mut no_images, mut failed) = (0, 0, Vec::new(), Vec::new());
+    for f in &files {
+        let folder = f
+            .parent()
+            .and_then(|p| p.file_name())
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        if dry {
+            match blenderkit::read(f) {
+                Ok(x) => {
+                    let slots: Vec<String> = x.images.iter().map(|i| format!("{:?}={}", i.slot, i.name)).collect();
+                    println!(
+                        "{}: metallic {:.2} roughness {:.2}{} normal ×{:.2} scala {:.2} m | {}",
+                        x.name,
+                        x.material.metallic,
+                        x.material.roughness,
+                        if x.material.roughness_is_gloss { " (glossiness)" } else { "" },
+                        x.material.normal_strength,
+                        x.scale_m,
+                        if slots.is_empty() {
+                            "nessuna immagine".into()
+                        } else {
+                            slots.join(", ")
+                        }
+                    );
+                    for n in x.notes.iter().filter(|n| !n.starts_with("importato da")) {
+                        println!("    nota: {n}");
+                    }
+                }
+                Err(e) => failed.push(format!("{folder}: {e:#}")),
+            }
+            continue;
+        }
+        match blenderkit::import(f) {
+            Ok(Outcome::Imported(m)) => {
+                imported += 1;
+                println!("{folder}: importato in {}", m.dir.display());
+            }
+            Ok(Outcome::AlreadyPresent(_)) => present += 1,
+            Ok(Outcome::NoImages(name)) => no_images.push(name),
+            Err(e) => failed.push(format!("{folder}: {e:#}")),
+        }
+    }
+    if !dry {
+        println!(
+            "\nimportati: {imported}, già in libreria: {present}, senza immagini (procedurali): {}",
+            no_images.len()
+        );
+        for n in &no_images {
+            println!("    {n}");
+        }
+    }
+    println!("errori: {}", failed.len());
+    for e in &failed {
+        println!("    {e}");
+    }
+    Ok(())
+}
+
 fn fill_categories(args: &Args) -> anyhow::Result<()> {
     use forge_library::online::{self, AssetKind, Provider};
     println!("Libreria: {}", forge_library::paths::root().display());
@@ -674,6 +745,7 @@ fn library(args: &Args) -> anyhow::Result<()> {
         Some("scarica-tutto") => download_all(args),
         Some("importa-polyhaven") => import_polyhaven(args),
         Some("aggiorna-categorie") => fill_categories(args),
+        Some("importa-blenderkit") => import_blenderkit(args),
         Some(other) => {
             bail!("comando libreria sconosciuto: {other} (elenco | importa | scarica-tutto | importa-polyhaven | aggiorna-categorie)")
         }
