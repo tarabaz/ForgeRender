@@ -6,8 +6,11 @@
     1. Controlla di essere nel repository ForgeRender, sul branch giusto, senza modifiche
        locali non committate (se ce ne sono si ferma e non tocca nulla).
     2. git pull --ff-only dal branch di sviluppo (se fallisce si ferma: niente build obsolete).
-    3. cargo build --release -p forge_app -p forge_cli -p forge_mcp_bridge (cache Cargo riutilizzata; forge_step escluso).
-    4. Pacchetto portable con packaging\windows\package.ps1 -SkipBuild (nessuna seconda build).
+    3. cargo build --release -p forge_app -p forge_cli -p forge_mcp_bridge (cache Cargo riutilizzata).
+    4. Convertitore STEP: cargo build --release -p forge_step (Open CASCADE; serve CMake). La prima
+       volta richiede decine di minuti, poi resta nella cache. Se CMake manca o la compilazione
+       fallisce, il resto prosegue e il riepilogo spiega cosa fare. -SkipStep lo salta.
+    5. Pacchetto portable con packaging\windows\package.ps1 -SkipBuild (nessuna seconda build).
 
     Non usa GitHub Actions, non scarica artefatti, non fa commit, push, reset o stash.
 
@@ -15,6 +18,8 @@
     .\Build-ForgeRender.ps1
 .EXAMPLE
     .\Build-ForgeRender.ps1 -SkipInstaller      # solo portable, senza Inno Setup
+.EXAMPLE
+    .\Build-ForgeRender.ps1 -SkipStep          # senza convertitore STEP (più veloce)
 .EXAMPLE
     .\Build-ForgeRender.cmd                    # se Windows blocca gli script (Execution Policy)
 
@@ -29,6 +34,8 @@
 param(
     # Crea solo il pacchetto portable (l'installer richiede Inno Setup 6).
     [switch]$SkipInstaller,
+    # Non compilare il convertitore STEP (import di STEP e SolidWorks).
+    [switch]$SkipStep,
     # Non aprire la cartella dist al termine.
     [switch]$NoOpen
 )
@@ -133,13 +140,50 @@ foreach ($exe in 'forgerender.exe', 'forgerender-cli.exe', 'forgerender-mcp.exe'
     if (-not (Test-Path (Join-Path $bin $exe))) { Fail "dopo la compilazione manca target\release\$exe" }
 }
 
-# ------------------------------------------------------------------ 4. Pacchetto
+# ------------------------------------------------------------------ 4. Convertitore STEP
+# Facoltativo: se non si compila, ForgeRender funziona lo stesso ma non importa STEP/SolidWorks.
+$stepExe = Join-Path $bin 'forgerender-step.exe'
+$stepSummary = 'non incluso (-SkipStep)'
+if (-not $SkipStep) {
+    # CMake installato ma non nel PATH (installazione appena fatta, o quello di Visual Studio):
+    # lo si aggiunge al PATH solo per questo script.
+    if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
+        $cmakeCandidates = @(
+            "$env:ProgramFiles\CMake\bin\cmake.exe",
+            "${env:ProgramFiles(x86)}\CMake\bin\cmake.exe"
+        ) + @(Get-ChildItem -Path "$env:ProgramFiles\Microsoft Visual Studio", "${env:ProgramFiles(x86)}\Microsoft Visual Studio" `
+                -Filter cmake.exe -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -like '*\CMake\bin\cmake.exe' } | ForEach-Object { $_.FullName })
+        $found = $cmakeCandidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+        if ($found) {
+            $env:PATH = (Split-Path $found -Parent) + ';' + $env:PATH
+            Write-Host "    CMake trovato in $found"
+        }
+    }
+    if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
+        $stepSummary = 'NON incluso: manca CMake. Installalo con  winget install Kitware.CMake  poi riapri PowerShell e rilancia lo script'
+        Write-Host "`n    $stepSummary" -ForegroundColor Yellow
+    } else {
+        Step 'cargo build --release -p forge_step  (convertitore STEP: la prima volta decine di minuti)'
+        cargo build --release -p forge_step
+        if ($LASTEXITCODE -eq 0 -and (Test-Path $stepExe)) {
+            $stepSummary = "$stepExe"
+        } else {
+            $stepSummary = "NON incluso: compilazione fallita (codice $LASTEXITCODE), vedi i messaggi sopra"
+            Write-Host "`n    $stepSummary" -ForegroundColor Yellow
+        }
+    }
+}
+$withStep = $stepSummary -eq "$stepExe"
+
+# ------------------------------------------------------------------ 5. Pacchetto
 Step 'Pacchetto portable (packaging\windows\package.ps1 -SkipBuild)'
 $pkg = Join-Path $Root 'packaging\windows\package.ps1'
 # Processo PowerShell separato: il pacchetto non eredita le impostazioni di questo script e
 # l'esito si legge dal codice di uscita. Bypass vale solo per quel processo.
 $pkgArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $pkg, '-SkipBuild')
 if ($SkipInstaller) { $pkgArgs += '-SkipInstaller' }
+if ($withStep) { $pkgArgs += '-WithStep' }
 & powershell.exe @pkgArgs
 if ($LASTEXITCODE -ne 0) { Fail "creazione del pacchetto fallita (codice di uscita $LASTEXITCODE)" }
 $dist = Join-Path $Root 'dist'
@@ -162,6 +206,7 @@ Write-Host 'Build:       riuscita'
 Write-Host "Eseguibili:  $bin\forgerender.exe"
 Write-Host "             $bin\forgerender-cli.exe"
 Write-Host "             $bin\forgerender-mcp.exe  (ponte per Claude, docs\MCP.md)"
+Write-Host "STEP:        $stepSummary"
 Write-Host "Portable:    $zip"
 Write-Host "Cartella:    $(Join-Path $dist "ForgeRender-$version-portable-x64")"
 if ($setupNew) { Write-Host "Installer:   $setup" }

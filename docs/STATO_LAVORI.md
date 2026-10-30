@@ -138,6 +138,7 @@
 - Come aggiungere una pagina: file `manuale/<lingua>/<capitolo>/<id>.md` in **tutte** le lingue,
   id in `manuale/indice.json`, collegamento dal controllo con `.help("<id>")`; `cargo test`
   controlla il resto.
+- `Build-ForgeRender.ps1` ora compila anche `forge_step` (serve CMake; `-SkipStep` per saltarlo).
 - F1 e la ricerca non si possono provare con tasti simulati sotto Xvfb (winit non riceve il
   testo): provati il clic sull'icona e la navigazione, la ricerca con i test.
 

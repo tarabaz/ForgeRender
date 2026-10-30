@@ -32,6 +32,12 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Prime pagine in italiano e inglese: Benvenuto, Roughness, IOR, Denoiser, Scorciatoie (valori
   presi dal codice). Guida → Scorciatoie da tastiera apre la pagina del manuale.
 
+**Compilazione**
+- `Build-ForgeRender.ps1` compila e include anche il **convertitore STEP** (`forgerender-step.exe`,
+  Open CASCADE): la prima volta richiede decine di minuti, poi resta nella cache. Serve CMake: se
+  non è nel PATH lo script lo cerca (anche quello di Visual Studio); se manca o la compilazione
+  fallisce, il resto prosegue e il riepilogo dice cosa fare. `-SkipStep` lo salta.
+
 **Correzioni**
 - Il simbolo "→" non è nel carattere dell'interfaccia e si vedeva un quadratino: tolto dai
   testi (un test lo controlla); nel manuale diventa la freccia delle icone.

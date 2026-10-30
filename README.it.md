@@ -61,7 +61,8 @@ per Windows 11 (sviluppato per Ryzen 9 9900X + RTX 5070) ma funzionante anche se
   viewport (icone accanto al navigatore, tasto 5 del tastierino) e nella camera di render.
 - **Import**: glTF/GLB (esportazione consigliata da SolidWorks), OBJ (con .mtl), STL, Blender
   `.blend` (tramite Blender installato); STEP con Open CASCADE e SolidWorks SLDPRT/SLDASM sono
-  sperimentali.
+  sperimentali. Il convertitore STEP (`forgerender-step.exe`) lo compila `Build-ForgeRender.ps1`;
+  serve CMake (`winget install Kitware.CMake`).
 - **Modifica**: gizmo sposta/ruota/scala con snap (anche per le luci, con le maniglie del cono
   dello spot, e per l'emettitore della nebbia), snap a contatto per oggetto, annulla/ripeti, nascondi (H), duplica, appoggio
   esatto sul pavimento, navigatore degli assi stile Blender, albero dei componenti, assegnazione

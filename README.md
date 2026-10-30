@@ -61,7 +61,8 @@ but also working without a dedicated GPU.
   to the navigator, numpad 5) and in the render camera.
 - **Import**: glTF/GLB (recommended export from SolidWorks), OBJ (with .mtl), STL, Blender
   `.blend` (through an installed Blender); STEP via Open CASCADE and SolidWorks SLDPRT/SLDASM
-  are experimental.
+  are experimental. The STEP converter (`forgerender-step.exe`) is built by `Build-ForgeRender.ps1`;
+  it needs CMake (`winget install Kitware.CMake`).
 - **Editing**: move/rotate/scale gizmo with snapping (also for lights, spot cone handles and fog
   emitters), per-object contact snap, undo/redo, hide (H), duplicate,
   exact drop to floor, Blender-style axis navigator, component tree, persistent material
