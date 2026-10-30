@@ -141,8 +141,19 @@ in `renders` accanto ai log (portable: cartella del programma; installata:
 - **"ForgeRender non risponde: la finestra è ridotta a icona…"**: i comandi si eseguono come
   i clic, a ogni aggiornamento della finestra. Tienila aperta (non ridotta a icona) e senza
   finestre di dialogo davanti.
-- **`claude mcp list` dice "failed"**: controlla il percorso dell'eseguibile; prova a lanciare
-  a mano `forgerender.exe --mcp` (si apre la finestra e aspetta comandi: chiudila).
+- **`claude mcp list` dice "failed"**: controlla il percorso dell'eseguibile, poi prova
+  ForgeRender da solo, come lo avvia Claude. In PowerShell, una sola riga (metti il tuo percorso):
+
+  ```
+  $p = New-Object System.Diagnostics.Process; $p.StartInfo.FileName = "E:\ForgeRender-0.4.0-portable-x64\forgerender.exe"; $p.StartInfo.Arguments = "--mcp"; $p.StartInfo.UseShellExecute = $false; $p.StartInfo.RedirectStandardInput = $true; $p.StartInfo.RedirectStandardOutput = $true; $null = $p.Start(); $p.StandardInput.WriteLine('{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'); $t = $p.StandardOutput.ReadLineAsync(); if ($t.Wait(20000)) { $t.Result } else { "NESSUNA RISPOSTA in 20 secondi" }; $p.StandardInput.Close()
+  ```
+
+  Funziona se compare una riga `{"id":1,"jsonrpc":"2.0","result":{...,"serverInfo":{"name":"forgerender",...}}}`
+  (gli accenti si vedono storti in PowerShell, Claude li legge giusti); la finestra si apre e si
+  richiude. Provato su Windows con la portable 0.4.0 su un disco esterno.
+  - Lanciare a mano `forgerender.exe --mcp`, o passargli il testo con `|`, **non** è una prova
+    valida: PowerShell non collega l'ingresso di un programma a finestra, ForgeRender non riceve
+    niente e si richiude subito come dopo una verifica.
 - **Render lento**: per le prove chiedi pochi campioni (32–64) e risoluzione bassa; per il finale
   la GPU (`set_render_settings` con device gpu).
 - Il registro dei comandi ricevuti è nel log di ForgeRender (righe "MCP: …"), visibile in basso
