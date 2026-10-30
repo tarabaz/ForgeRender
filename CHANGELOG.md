@@ -11,6 +11,16 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.8.1 — 30/10/2026
+
+**Correzioni**
+- **Riavvio automatico anche a render finito**: se il render è completato e lo stai guardando
+  (vista Render), muovendo la vista o cambiando la scena riparte da solo; prima ripartiva solo
+  mentre era ancora in corso e a render finito restava "Immagine non aggiornata". Nella Viewport
+  non riparte in sottofondo (riparte tornando sulla vista Render); dopo Stop non riparte.
+  Con una camera di render attiva (senza "Pilota") la vista si muove liberamente e il render
+  resta sull'inquadratura della camera, come prima. Regola in `should_auto_restart` (test).
+
 ## 0.8.0 — 30/10/2026
 
 **Manuale interno** (fase 3 di `docs/PIANO_INTERFACCIA_E_MANUALE.md`)
