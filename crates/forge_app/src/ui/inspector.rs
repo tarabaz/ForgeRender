@@ -1,5 +1,6 @@
 use crate::app::{ForgeApp, InspectorTab, NewLight, RenderView};
 use crate::i18n::{tf, tr};
+use crate::ui::manual::{help_button, HelpExt};
 use crate::ui::style;
 use eframe::egui;
 use forge_math::Vec3;
@@ -444,9 +445,15 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
             from_map(ui, &m.metallic_texture);
         });
         ui.end_row();
-        ui.label(tr("Roughness"));
         ui.horizontal(|ui| {
-            changed |= ui.add(egui::Slider::new(&mut m.roughness, 0.0..=1.0)).changed();
+            ui.label(tr("Roughness"));
+            help_button(ui, "mat.roughness");
+        });
+        ui.horizontal(|ui| {
+            changed |= ui
+                .add(egui::Slider::new(&mut m.roughness, 0.0..=1.0))
+                .help("mat.roughness")
+                .changed();
             from_map(ui, &m.roughness_texture);
         });
         ui.end_row();
@@ -456,8 +463,11 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
             .on_hover_text(tr("0.5 = riflesso fisico derivato dall'IOR"))
             .changed();
         ui.end_row();
-        ui.label("IOR");
-        changed |= ui.add(egui::Slider::new(&mut m.ior, 1.0..=3.0)).changed();
+        ui.horizontal(|ui| {
+            ui.label("IOR");
+            help_button(ui, "mat.ior");
+        });
+        changed |= ui.add(egui::Slider::new(&mut m.ior, 1.0..=3.0)).help("mat.ior").changed();
         ui.end_row();
         ui.label(tr("Transmission"));
         changed |= ui
@@ -489,7 +499,7 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 .add(egui::DragValue::new(&mut m.priority).range(-100..=100))
                 .on_hover_text(tr("Liquido in un bicchiere: modella il liquido un filo più grande della cavità \
                      (che entri nello spessore del vetro) e dagli priorità più alta del vetro. \
-                     Il motore usa allora l'interfaccia vetro→liquido giusta (IOR 1,5 → 1,33)."))
+                     Il motore usa allora l'interfaccia vetro-liquido giusta (IOR da 1,5 a 1,33)."))
                 .changed();
             ui.end_row();
         }
@@ -1924,7 +1934,10 @@ fn render(app: &mut ForgeApp, ui: &mut egui::Ui) {
 fn denoiser(app: &mut ForgeApp, ui: &mut egui::Ui) -> bool {
     use forge_render_core::{DenoiseMode, DenoiseQuality};
     let mut changed = false;
-    ui.strong(tr("Riduzione del rumore (denoiser)"));
+    ui.horizontal(|ui| {
+        ui.strong(tr("Riduzione del rumore (denoiser)")).help("render.denoiser");
+        help_button(ui, "render.denoiser");
+    });
     let info = app.denoiser_info.clone();
     match &info {
         Ok(v) => {

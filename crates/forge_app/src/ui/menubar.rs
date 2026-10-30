@@ -38,10 +38,8 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             }
         });
         ui.menu_button(tr("Guida"), |ui| {
-            if ui.button(format!("{}  {}", icons::KEYS, tr("Scorciatoie da tastiera"))).clicked() {
-                app.info = Some(commands::shortcuts_text(ui.ctx()));
-                ui.close();
-            }
+            item(app, ui, Cmd::Manual);
+            item(app, ui, Cmd::Shortcuts);
             ui.separator();
             item(app, ui, Cmd::Welcome);
         });

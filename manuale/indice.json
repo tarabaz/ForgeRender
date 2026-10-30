@@ -1,0 +1,24 @@
+{
+  "capitoli": [
+    {
+      "id": "01-introduzione",
+      "titolo": { "it": "Introduzione", "en": "Introduction" },
+      "pagine": ["intro.benvenuto"]
+    },
+    {
+      "id": "05-materiali",
+      "titolo": { "it": "Materiali", "en": "Materials" },
+      "pagine": ["mat.roughness", "mat.ior"]
+    },
+    {
+      "id": "09-rendering",
+      "titolo": { "it": "Rendering", "en": "Rendering" },
+      "pagine": ["render.denoiser"]
+    },
+    {
+      "id": "13-scorciatoie",
+      "titolo": { "it": "Scorciatoie da tastiera", "en": "Keyboard shortcuts" },
+      "pagine": ["keys.elenco"]
+    }
+  ]
+}

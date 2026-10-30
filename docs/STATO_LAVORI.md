@@ -131,6 +131,16 @@
 - Prossimo: fase 3 (finestra del manuale, ricerca, F1, "?", test di copertura). Gli screenshot
   della guida MCP vanno rifatti con la nuova barra (`tools/guida-mcp/scatta.py`, `annota.py`).
 
+## Fatto nella quindicesima parte (versione 0.8.0)
+- Fase 3 del manuale: crate `forge_manual` (pagine, Markdown, ricerca, `check_all`),
+  finestra `ui/manual.rs` (indice, ricerca, Home/Indietro/Avanti, lingua), F1 e icona "?"
+  (`HelpExt::help`, `help_button`), cartella `manuale/` nei pacchetti.
+- Come aggiungere una pagina: file `manuale/<lingua>/<capitolo>/<id>.md` in **tutte** le lingue,
+  id in `manuale/indice.json`, collegamento dal controllo con `.help("<id>")`; `cargo test`
+  controlla il resto.
+- F1 e la ricerca non si possono provare con tasti simulati sotto Xvfb (winit non riceve il
+  testo): provati il clic sull'icona e la navigazione, la ricerca con i test.
+
 ## Piano di sviluppo incrementale
 
 ### Fase 1 — Versione nella barra del titolo: fatta, in attesa di conferma

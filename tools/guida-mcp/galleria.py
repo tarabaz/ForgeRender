@@ -60,8 +60,11 @@ def render(name, w, h, spp):
     return path
 
 
-def save(src, dst, width=None):
+def save(src, dst, width=None, crop=None):
     im = Image.open(src).convert("RGB")
+    if crop:  # ritaglio centrale (w, h): toglie i bordi della scena visti di sbieco
+        x, y = (im.width - crop[0]) // 2, (im.height - crop[1]) // 2
+        im = im.crop((x, y, x + crop[0], y + crop[1]))
     if width and im.width > width:
         im = im.resize((width, round(im.height * width / im.width)), Image.LANCZOS)
     im.save(os.path.join(DEST, dst), quality=88, optimize=True)
@@ -78,7 +81,11 @@ ZOOM = 0.72  # inquadratura più stretta di quella automatica: il prodotto riemp
 
 
 # Viste ruotate: più strette, altrimenti a 45° si vede oltre il bordo del fondale.
-VIEW_ZOOM = {"tre_quarti": 0.47, "isometrica": 0.44}
+VIEW_ZOOM = {"tre_quarti": 0.47, "isometrica": 0.40}
+# Aspetto per vista: nell'isometrica la piega del fondale curvo attraversa la foto, la tela no.
+VIEW_LOOK = {"isometrica": "studio"}
+# Solo alcune viste: VISTE=isometrica python3 galleria.py viste
+ONLY_VIEWS = [v for v in os.environ.get("VISTE", "").split(",") if v]
 # Gruppi da rifare (argomenti dello script); nessuno = tutti.
 GROUPS = set(sys.argv[1:]) or {"aspetti", "viste", "luce", "materiali"}
 
@@ -99,8 +106,14 @@ for look in ("studio", "chiaro", "scuro", "scenografico") if "aspetti" in GROUPS
 # Viste della camera.
 # Sfondo chiaro: fondale bianco su ambiente bianco, i bordi visti di sbieco non si notano.
 for view in ("frontale", "tre_quarti", "isometrica") if "viste" in GROUPS else ():
-    studio("chiaro", view=view)
-    save(render(f"vista_{view}", W, H, SPP), f"vista_{view}.jpg")
+    if ONLY_VIEWS and view not in ONLY_VIEWS:
+        continue
+    studio(VIEW_LOOK.get(view, "chiaro"), view=view)
+    if view == "isometrica":
+        # 10 % più grande e ritagliata: il filo della tela nell'angolo resta fuori.
+        save(render(f"vista_{view}", W * 11 // 10, H * 11 // 10, SPP), f"vista_{view}.jpg", crop=(W, H))
+    else:
+        save(render(f"vista_{view}", W, H, SPP), f"vista_{view}.jpg")
 
 # Luce calda a destra: prima e dopo.
 if "luce" in GROUPS:

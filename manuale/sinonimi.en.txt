@@ -1,0 +1,7 @@
+# One line per group: words the search treats as equivalent.
+roughness = rough, matte, glossy, satin
+ior = refraction, index
+denoiser = noise, grain, grainy, clean, oidn
+move = translate, shift
+shortcuts = keys, keyboard, hotkeys
+hdri = environment, sky, ambient lighting

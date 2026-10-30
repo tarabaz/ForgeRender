@@ -1,0 +1,7 @@
+# Una riga per gruppo: parole che la ricerca considera equivalenti.
+roughness = rugosità, ruvidità, opaco, lucido, satinato
+ior = rifrazione, indice
+denoiser = rumore, grana, sgranato, pulizia, oidn
+sposta = muovi, trasla, spostare
+scorciatoie = tasti, tastiera, shortcut
+hdri = ambiente, cielo, illuminazione ambientale

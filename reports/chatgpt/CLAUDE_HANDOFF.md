@@ -1040,3 +1040,14 @@ Valerio ha approvato il piano con le scelte consigliate. Fatto:
 - Inventario per il manuale: `manuale/INVENTARIO.md` (366 controlli). Prossimo passo: fase 3,
   visualizzatore del manuale.
 
+### Claude Code (cloud) — 30/10/2026: versione 0.8.0, manuale interno (fase 3)
+
+- Crate `forge_manual`: pagine Markdown per lingua in `manuale/<lingua>/<capitolo>/<id>.md`,
+  indice `manuale/indice.json`, sinonimi `manuale/sinonimi.<lingua>.txt`, ricerca offline
+  (pesi titolo > id/parole > controlli > testo, prefissi, un errore di battitura), `check_all`
+  per i controlli di completezza.
+- Finestra Guida → Manuale (F1) e icona "?" accanto ai controlli; ogni `.help("id")` nel codice
+  deve avere la pagina in tutte le lingue (test).
+- Pagine scritte: intro.benvenuto, mat.roughness, mat.ior, render.denoiser, keys.elenco (IT/EN).
+  Prossimo: fase 4, i contenuti capitolo per capitolo con screenshot e immagini comparative.
+

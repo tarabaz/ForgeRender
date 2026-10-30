@@ -9,6 +9,7 @@ pub mod gizmo;
 pub mod icons;
 pub(crate) mod inspector;
 pub mod library;
+pub mod manual;
 pub mod menubar;
 pub mod navigator;
 mod quickbar;
@@ -37,6 +38,7 @@ impl eframe::App for ForgeApp {
         self.tick(&ctx);
         self.handle_dropped_files(&ctx);
         self.handle_shortcuts(&ctx);
+        manual::begin_frame(&ctx);
 
         self.handle_close_request(&ctx);
         egui::Panel::top("menubar").show(ui, |ui| menubar::show(self, ui));
@@ -247,6 +249,7 @@ impl ForgeApp {
         self.confirm_discard_window(ctx);
         self.toast_area(ctx);
         crate::ui::library::window(self, ctx);
+        crate::ui::manual::window(self, ctx);
         crate::ui::settings::window(self, ctx);
         crate::ui::splash::show(self, ctx);
         if self.show_import_options {

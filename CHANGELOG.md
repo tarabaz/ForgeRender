@@ -11,6 +11,31 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.8.0 — 30/10/2026
+
+**Manuale interno** (fase 3 di `docs/PIANO_INTERFACCIA_E_MANUALE.md`)
+- **Guida → Manuale** (F1): finestra con indice per capitoli, pagina al centro, Home,
+  Indietro/Avanti, "Vedi anche" e lingua del manuale (segue quella dell'interfaccia).
+- **Ricerca offline**: titoli, parole chiave, sinonimi (`manuale/sinonimi.<lingua>.txt`), id e
+  testo; ignora maiuscole e accenti, accetta prefissi ("rugos") e un errore di battitura
+  ("rougness"). Tutte le parole cercate devono comparire nella pagina.
+- **Aiuto contestuale**: F1 col mouse sopra un controllo apre la sua pagina (altrimenti quella
+  della scheda attiva); icona del manuale accanto a Roughness, IOR e denoiser.
+- Contenuti fuori dal programma, in `manuale/` (Markdown, una pagina per funzione, cartelle per
+  lingua, immagini in `manuale/img/`): si aggiornano senza ricompilare. Compresa nel portable e
+  nell'installer.
+- Nuovo crate `forge_manual` (pagine, Markdown con `pulldown-cmark`, ricerca, controlli).
+- **Controlli automatici** (test): pagine mancanti, collegamenti e immagini rotti, id ripetuti,
+  pagine fuori indice, lingue incomplete, casi di ricerca del piano ("IOR", "rugosità", "grana",
+  "denoiser"…), e ogni collegamento dell'interfaccia al manuale deve avere la sua pagina in
+  tutte le lingue.
+- Prime pagine in italiano e inglese: Benvenuto, Roughness, IOR, Denoiser, Scorciatoie (valori
+  presi dal codice). Guida → Scorciatoie da tastiera apre la pagina del manuale.
+
+**Correzioni**
+- Il simbolo "→" non è nel carattere dell'interfaccia e si vedeva un quadratino: tolto dai
+  testi (un test lo controlla); nel manuale diventa la freccia delle icone.
+
 ## 0.7.0 — 30/10/2026
 
 **Nuova interfaccia: barra dei menu e toolbar separate** (fase 2 di

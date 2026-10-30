@@ -192,6 +192,8 @@ pub struct ForgeApp {
     pub exit_confirmed: bool,
     /// Avviso breve in basso nella finestra (testo, quando è comparso).
     pub toast: Option<(String, std::time::Instant)>,
+    /// Finestra del manuale (Guida → Manuale, F1).
+    pub manual: crate::ui::manual::ManualUi,
     pub error: Option<String>,
     pub info: Option<String>,
     pub rule_pattern: String,
@@ -324,6 +326,7 @@ impl ForgeApp {
             confirm_discard: None,
             exit_confirmed: false,
             toast: None,
+            manual: Default::default(),
             error: None,
             info: None,
             rule_pattern: String::new(),

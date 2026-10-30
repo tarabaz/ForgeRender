@@ -82,7 +82,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 20,
+  "riga": 21,
   "funzione": "show",
   "pannello": "Avanzata",
   "tipo": "scelta",
@@ -91,7 +91,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 43,
+  "riga": 44,
   "funzione": "vec3_edit",
   "pannello": "Avanzata",
   "tipo": "campo numerico",
@@ -100,7 +100,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 71,
+  "riga": 72,
   "funzione": "library_save_controls",
   "pannello": "Avanzata · Materiali",
   "tipo": "pulsante",
@@ -109,7 +109,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 92,
+  "riga": 93,
   "funzione": "library_save_controls",
   "pannello": "Avanzata · Materiali",
   "tipo": "pulsante",
@@ -118,7 +118,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 106,
+  "riga": 107,
   "funzione": "library_save_controls",
   "pannello": "Avanzata · Materiali",
   "tipo": "pulsante",
@@ -127,7 +127,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 123,
+  "riga": 124,
   "funzione": "library_save_controls",
   "pannello": "Avanzata · Materiali",
   "tipo": "campo di testo",
@@ -136,7 +136,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 125,
+  "riga": 126,
   "funzione": "library_save_controls",
   "pannello": "Avanzata · Materiali",
   "tipo": "pulsante",
@@ -145,7 +145,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 163,
+  "riga": 164,
   "funzione": "library_save_controls",
   "pannello": "Avanzata · Materiali",
   "tipo": "pulsante",
@@ -154,7 +154,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 229,
+  "riga": 230,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "campo di testo",
@@ -163,7 +163,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 274,
+  "riga": 275,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "scelta",
@@ -172,7 +172,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 284,
+  "riga": 285,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "pulsante",
@@ -181,7 +181,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 296,
+  "riga": 297,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "pulsante",
@@ -190,7 +190,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 305,
+  "riga": 306,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "pulsante",
@@ -199,7 +199,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 317,
+  "riga": 318,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "campo di testo",
@@ -208,7 +208,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 329,
+  "riga": 330,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "pulsante",
@@ -217,7 +217,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 346,
+  "riga": 347,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "pulsante",
@@ -226,7 +226,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 355,
+  "riga": 356,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "pulsante",
@@ -235,7 +235,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 366,
+  "riga": 367,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "pulsante",
@@ -244,7 +244,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 381,
+  "riga": 382,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "pulsante",
@@ -253,7 +253,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 412,
+  "riga": 413,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "campo di testo",
@@ -262,7 +262,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 437,
+  "riga": 438,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "colore",
@@ -271,7 +271,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 443,
+  "riga": 444,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "cursore",
@@ -280,7 +280,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 449,
+  "riga": 454,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "cursore",
@@ -289,7 +289,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 455,
+  "riga": 462,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "cursore",
@@ -298,7 +298,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 460,
+  "riga": 470,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "cursore",
@@ -307,7 +307,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 464,
+  "riga": 474,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "cursore",
@@ -316,7 +316,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 471,
+  "riga": 481,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "colore",
@@ -325,7 +325,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 480,
+  "riga": 490,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "campo numerico",
@@ -334,7 +334,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 489,
+  "riga": 499,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "campo numerico",
@@ -343,7 +343,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 497,
+  "riga": 507,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "colore",
@@ -352,7 +352,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 501,
+  "riga": 511,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "campo numerico",
@@ -361,7 +361,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 505,
+  "riga": 515,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "campo di testo",
@@ -370,7 +370,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 530,
+  "riga": 540,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "casella",
@@ -379,7 +379,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 551,
+  "riga": 561,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "casella",
@@ -388,7 +388,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 567,
+  "riga": 577,
   "funzione": "materials",
   "pannello": "Avanzata · Materiali",
   "tipo": "cursore",
@@ -397,7 +397,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 591,
+  "riga": 601,
   "funzione": "mapping_controls",
   "pannello": "Avanzata · Materiali",
   "tipo": "scelta",
@@ -406,7 +406,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 595,
+  "riga": 605,
   "funzione": "mapping_controls",
   "pannello": "Avanzata · Materiali",
   "tipo": "scelta",
@@ -415,7 +415,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 607,
+  "riga": 617,
   "funzione": "mapping_controls",
   "pannello": "Avanzata · Materiali",
   "tipo": "cursore",
@@ -424,7 +424,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 635,
+  "riga": 645,
   "funzione": "mapping_controls",
   "pannello": "Avanzata · Materiali",
   "tipo": "campo numerico",
@@ -433,7 +433,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 652,
+  "riga": 662,
   "funzione": "mapping_controls",
   "pannello": "Avanzata · Materiali",
   "tipo": "cursore",
@@ -442,7 +442,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 661,
+  "riga": 671,
   "funzione": "mapping_controls",
   "pannello": "Avanzata · Materiali",
   "tipo": "cursore",
@@ -451,7 +451,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 667,
+  "riga": 677,
   "funzione": "mapping_controls",
   "pannello": "Avanzata · Materiali",
   "tipo": "campo numerico",
@@ -460,7 +460,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 670,
+  "riga": 680,
   "funzione": "mapping_controls",
   "pannello": "Avanzata · Materiali",
   "tipo": "campo numerico",
@@ -469,7 +469,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 724,
+  "riga": 734,
   "funzione": "mtlx_values",
   "pannello": "Avanzata · Materiali",
   "tipo": "pulsante",
@@ -478,7 +478,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 744,
+  "riga": 754,
   "funzione": "relief_controls",
   "pannello": "Avanzata · Materiali",
   "tipo": "cursore",
@@ -487,7 +487,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 752,
+  "riga": 762,
   "funzione": "relief_controls",
   "pannello": "Avanzata · Materiali",
   "tipo": "cursore",
@@ -496,7 +496,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 760,
+  "riga": 770,
   "funzione": "relief_controls",
   "pannello": "Avanzata · Materiali",
   "tipo": "cursore",
@@ -505,7 +505,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 784,
+  "riga": 794,
   "funzione": "relief_controls",
   "pannello": "Avanzata · Materiali",
   "tipo": "cursore",
@@ -514,7 +514,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 871,
+  "riga": 881,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "pulsante",
@@ -523,7 +523,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 884,
+  "riga": 894,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "pulsante",
@@ -532,7 +532,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 908,
+  "riga": 918,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "campo di testo",
@@ -541,7 +541,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 918,
+  "riga": 928,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "elenco a tendina",
@@ -550,7 +550,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 921,
+  "riga": 931,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "scelta",
@@ -559,7 +559,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 922,
+  "riga": 932,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "scelta",
@@ -568,7 +568,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 923,
+  "riga": 933,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "scelta",
@@ -577,7 +577,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 924,
+  "riga": 934,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "scelta",
@@ -586,7 +586,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 925,
+  "riga": 935,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "scelta",
@@ -595,7 +595,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 941,
+  "riga": 951,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "casella",
@@ -604,7 +604,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 956,
+  "riga": 966,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "campo numerico",
@@ -613,7 +613,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 959,
+  "riga": 969,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "campo numerico",
@@ -622,7 +622,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 965,
+  "riga": 975,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "colore",
@@ -631,7 +631,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 984,
+  "riga": 994,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "campo numerico",
@@ -640,7 +640,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 990,
+  "riga": 1000,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "campo numerico",
@@ -649,7 +649,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 993,
+  "riga": 1003,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "campo numerico",
@@ -658,7 +658,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1009,
+  "riga": 1019,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "cursore",
@@ -667,7 +667,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1021,
+  "riga": 1031,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "cursore",
@@ -676,7 +676,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1037,
+  "riga": 1047,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "casella",
@@ -685,7 +685,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1055,
+  "riga": 1065,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "campo numerico",
@@ -694,7 +694,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1065,
+  "riga": 1075,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "cursore",
@@ -703,7 +703,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1087,
+  "riga": 1097,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "casella",
@@ -712,7 +712,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1090,
+  "riga": 1100,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "casella",
@@ -721,7 +721,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1093,
+  "riga": 1103,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "pulsante",
@@ -730,7 +730,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1094,
+  "riga": 1104,
   "funzione": "lights",
   "pannello": "Avanzata · Luci",
   "tipo": "pulsante",
@@ -739,7 +739,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1127,
+  "riga": 1137,
   "funzione": "environment",
   "pannello": "Avanzata · Ambiente",
   "tipo": "scelta",
@@ -748,7 +748,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1128,
+  "riga": 1138,
   "funzione": "environment",
   "pannello": "Avanzata · Ambiente",
   "tipo": "scelta",
@@ -757,7 +757,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1129,
+  "riga": 1139,
   "funzione": "environment",
   "pannello": "Avanzata · Ambiente",
   "tipo": "scelta",
@@ -766,7 +766,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1154,
+  "riga": 1164,
   "funzione": "environment",
   "pannello": "Avanzata · Ambiente",
   "tipo": "colore",
@@ -775,7 +775,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1157,
+  "riga": 1167,
   "funzione": "environment",
   "pannello": "Avanzata · Ambiente",
   "tipo": "cursore",
@@ -784,7 +784,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1167,
+  "riga": 1177,
   "funzione": "environment",
   "pannello": "Avanzata · Ambiente",
   "tipo": "colore",
@@ -793,7 +793,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1170,
+  "riga": 1180,
   "funzione": "environment",
   "pannello": "Avanzata · Ambiente",
   "tipo": "colore",
@@ -802,7 +802,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1173,
+  "riga": 1183,
   "funzione": "environment",
   "pannello": "Avanzata · Ambiente",
   "tipo": "colore",
@@ -811,7 +811,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1176,
+  "riga": 1186,
   "funzione": "environment",
   "pannello": "Avanzata · Ambiente",
   "tipo": "cursore",
@@ -820,7 +820,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1192,
+  "riga": 1202,
   "funzione": "environment",
   "pannello": "Avanzata · Ambiente",
   "tipo": "cursore",
@@ -829,7 +829,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1195,
+  "riga": 1205,
   "funzione": "environment",
   "pannello": "Avanzata · Ambiente",
   "tipo": "cursore",
@@ -838,7 +838,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1207,
+  "riga": 1217,
   "funzione": "environment",
   "pannello": "Avanzata · Ambiente",
   "tipo": "casella",
@@ -847,7 +847,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1241,
+  "riga": 1251,
   "funzione": "effects",
   "pannello": "Avanzata · Effetti",
   "tipo": "pulsante",
@@ -856,7 +856,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1267,
+  "riga": 1277,
   "funzione": "effects",
   "pannello": "Avanzata · Effetti",
   "tipo": "pulsante",
@@ -865,7 +865,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1301,
+  "riga": 1311,
   "funzione": "effects",
   "pannello": "Avanzata · Effetti",
   "tipo": "casella",
@@ -874,7 +874,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1305,
+  "riga": 1315,
   "funzione": "effects",
   "pannello": "Avanzata · Effetti",
   "tipo": "scelta",
@@ -883,7 +883,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1319,
+  "riga": 1329,
   "funzione": "effects",
   "pannello": "Avanzata · Effetti",
   "tipo": "campo di testo",
@@ -892,7 +892,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1335,
+  "riga": 1345,
   "funzione": "effects",
   "pannello": "Avanzata · Effetti",
   "tipo": "scelta",
@@ -901,7 +901,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1385,
+  "riga": 1395,
   "funzione": "effects",
   "pannello": "Avanzata · Effetti",
   "tipo": "campo numerico",
@@ -910,7 +910,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1398,
+  "riga": 1408,
   "funzione": "effects",
   "pannello": "Avanzata · Effetti",
   "tipo": "cursore",
@@ -919,7 +919,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1405,
+  "riga": 1415,
   "funzione": "effects",
   "pannello": "Avanzata · Effetti",
   "tipo": "cursore",
@@ -928,7 +928,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1409,
+  "riga": 1419,
   "funzione": "effects",
   "pannello": "Avanzata · Effetti",
   "tipo": "cursore",
@@ -937,7 +937,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1414,
+  "riga": 1424,
   "funzione": "effects",
   "pannello": "Avanzata · Effetti",
   "tipo": "cursore",
@@ -946,7 +946,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1420,
+  "riga": 1430,
   "funzione": "effects",
   "pannello": "Avanzata · Effetti",
   "tipo": "cursore",
@@ -955,7 +955,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1425,
+  "riga": 1435,
   "funzione": "effects",
   "pannello": "Avanzata · Effetti",
   "tipo": "cursore",
@@ -964,7 +964,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1429,
+  "riga": 1439,
   "funzione": "effects",
   "pannello": "Avanzata · Effetti",
   "tipo": "cursore",
@@ -973,7 +973,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1436,
+  "riga": 1446,
   "funzione": "effects",
   "pannello": "Avanzata · Effetti",
   "tipo": "cursore",
@@ -982,7 +982,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1441,
+  "riga": 1451,
   "funzione": "effects",
   "pannello": "Avanzata · Effetti",
   "tipo": "colore",
@@ -991,7 +991,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1446,
+  "riga": 1456,
   "funzione": "effects",
   "pannello": "Avanzata · Effetti",
   "tipo": "cursore",
@@ -1000,7 +1000,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1460,
+  "riga": 1470,
   "funzione": "effects",
   "pannello": "Avanzata · Effetti",
   "tipo": "cursore",
@@ -1009,7 +1009,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1466,
+  "riga": 1476,
   "funzione": "effects",
   "pannello": "Avanzata · Effetti",
   "tipo": "casella",
@@ -1018,7 +1018,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1480,
+  "riga": 1490,
   "funzione": "effects",
   "pannello": "Avanzata · Effetti",
   "tipo": "scelta",
@@ -1027,7 +1027,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1490,
+  "riga": 1500,
   "funzione": "effects",
   "pannello": "Avanzata · Effetti",
   "tipo": "cursore",
@@ -1036,7 +1036,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1624,
+  "riga": 1634,
   "funzione": "camera",
   "pannello": "Avanzata · Camera",
   "tipo": "scelta",
@@ -1045,7 +1045,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1686,
+  "riga": 1696,
   "funzione": "camera",
   "pannello": "Avanzata · Camera",
   "tipo": "pulsante",
@@ -1054,7 +1054,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1698,
+  "riga": 1708,
   "funzione": "camera",
   "pannello": "Avanzata · Camera",
   "tipo": "pulsante",
@@ -1063,7 +1063,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1701,
+  "riga": 1711,
   "funzione": "camera",
   "pannello": "Avanzata · Camera",
   "tipo": "pulsante",
@@ -1072,7 +1072,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1725,
+  "riga": 1735,
   "funzione": "render",
   "pannello": "Avanzata · Render",
   "tipo": "elenco a tendina",
@@ -1081,7 +1081,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1729,
+  "riga": 1739,
   "funzione": "render",
   "pannello": "Avanzata · Render",
   "tipo": "scelta",
@@ -1090,7 +1090,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1757,
+  "riga": 1767,
   "funzione": "render",
   "pannello": "Avanzata · Render",
   "tipo": "cursore",
@@ -1099,7 +1099,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1776,
+  "riga": 1786,
   "funzione": "render",
   "pannello": "Avanzata · Render",
   "tipo": "scelta",
@@ -1108,7 +1108,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1785,
+  "riga": 1795,
   "funzione": "render",
   "pannello": "Avanzata · Render",
   "tipo": "campo numerico",
@@ -1117,7 +1117,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1789,
+  "riga": 1799,
   "funzione": "render",
   "pannello": "Avanzata · Render",
   "tipo": "campo numerico",
@@ -1126,7 +1126,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1797,
+  "riga": 1807,
   "funzione": "render",
   "pannello": "Avanzata · Render",
   "tipo": "scelta",
@@ -1135,7 +1135,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1803,
+  "riga": 1813,
   "funzione": "render",
   "pannello": "Avanzata · Render",
   "tipo": "scelta",
@@ -1144,7 +1144,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1808,
+  "riga": 1818,
   "funzione": "render",
   "pannello": "Avanzata · Render",
   "tipo": "scelta",
@@ -1153,7 +1153,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1820,
+  "riga": 1830,
   "funzione": "render",
   "pannello": "Avanzata · Render",
   "tipo": "campo numerico",
@@ -1162,7 +1162,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1838,
+  "riga": 1848,
   "funzione": "render",
   "pannello": "Avanzata · Render",
   "tipo": "casella",
@@ -1171,7 +1171,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1855,
+  "riga": 1865,
   "funzione": "render",
   "pannello": "Avanzata · Render",
   "tipo": "cursore",
@@ -1180,7 +1180,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1868,
+  "riga": 1878,
   "funzione": "render",
   "pannello": "Avanzata · Render",
   "tipo": "campo numerico",
@@ -1189,7 +1189,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1881,
+  "riga": 1891,
   "funzione": "render",
   "pannello": "Avanzata · Render",
   "tipo": "cursore",
@@ -1198,7 +1198,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1884,
+  "riga": 1894,
   "funzione": "render",
   "pannello": "Avanzata · Render",
   "tipo": "cursore",
@@ -1207,7 +1207,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1888,
+  "riga": 1898,
   "funzione": "render",
   "pannello": "Avanzata · Render",
   "tipo": "campo numerico",
@@ -1216,7 +1216,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1895,
+  "riga": 1905,
   "funzione": "render",
   "pannello": "Avanzata · Render",
   "tipo": "campo numerico",
@@ -1225,7 +1225,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1901,
+  "riga": 1911,
   "funzione": "render",
   "pannello": "Avanzata · Render",
   "tipo": "elenco a tendina",
@@ -1234,7 +1234,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1905,
+  "riga": 1915,
   "funzione": "render",
   "pannello": "Avanzata · Render",
   "tipo": "scelta",
@@ -1243,7 +1243,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1909,
+  "riga": 1919,
   "funzione": "render",
   "pannello": "Avanzata · Render",
   "tipo": "cursore",
@@ -1252,7 +1252,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1944,
+  "riga": 1957,
   "funzione": "denoiser",
   "pannello": "Avanzata · Render",
   "tipo": "elenco a tendina",
@@ -1261,7 +1261,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1948,
+  "riga": 1961,
   "funzione": "denoiser",
   "pannello": "Avanzata · Render",
   "tipo": "scelta",
@@ -1270,7 +1270,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1960,
+  "riga": 1973,
   "funzione": "denoiser",
   "pannello": "Avanzata · Render",
   "tipo": "casella",
@@ -1279,7 +1279,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1973,
+  "riga": 1986,
   "funzione": "denoiser",
   "pannello": "Avanzata · Render",
   "tipo": "elenco a tendina",
@@ -1288,7 +1288,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1975,
+  "riga": 1988,
   "funzione": "denoiser",
   "pannello": "Avanzata · Render",
   "tipo": "scelta",
@@ -1297,7 +1297,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 1990,
+  "riga": 2003,
   "funzione": "denoiser",
   "pannello": "Avanzata · Render",
   "tipo": "campo numerico",
@@ -1306,7 +1306,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2001,
+  "riga": 2014,
   "funzione": "denoiser",
   "pannello": "Avanzata · Render",
   "tipo": "cursore",
@@ -1315,7 +1315,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2013,
+  "riga": 2026,
   "funzione": "denoiser",
   "pannello": "Avanzata · Render",
   "tipo": "casella",
@@ -1324,7 +1324,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2021,
+  "riga": 2034,
   "funzione": "denoiser",
   "pannello": "Avanzata · Render",
   "tipo": "scelta",
@@ -1333,7 +1333,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2060,
+  "riga": 2073,
   "funzione": "render_cameras",
   "pannello": "Avanzata · Camera",
   "tipo": "campo di testo",
@@ -1342,7 +1342,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2107,
+  "riga": 2120,
   "funzione": "render_cameras",
   "pannello": "Avanzata · Camera",
   "tipo": "pulsante",
@@ -1351,7 +1351,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2114,
+  "riga": 2127,
   "funzione": "render_cameras",
   "pannello": "Avanzata · Camera",
   "tipo": "casella",
@@ -1360,7 +1360,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2137,
+  "riga": 2150,
   "funzione": "camera_picker",
   "pannello": "Avanzata",
   "tipo": "elenco a tendina",
@@ -1369,7 +1369,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2142,
+  "riga": 2155,
   "funzione": "camera_picker",
   "pannello": "Avanzata",
   "tipo": "scelta",
@@ -1378,7 +1378,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2148,
+  "riga": 2161,
   "funzione": "camera_picker",
   "pannello": "Avanzata",
   "tipo": "scelta",
@@ -1387,7 +1387,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2182,
+  "riga": 2195,
   "funzione": "lens_controls",
   "pannello": "Avanzata · Camera",
   "tipo": "scelta",
@@ -1396,7 +1396,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2186,
+  "riga": 2199,
   "funzione": "lens_controls",
   "pannello": "Avanzata · Camera",
   "tipo": "scelta",
@@ -1405,7 +1405,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2198,
+  "riga": 2211,
   "funzione": "lens_controls",
   "pannello": "Avanzata · Camera",
   "tipo": "casella",
@@ -1414,7 +1414,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2208,
+  "riga": 2221,
   "funzione": "lens_controls",
   "pannello": "Avanzata · Camera",
   "tipo": "campo numerico",
@@ -1423,7 +1423,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2223,
+  "riga": 2236,
   "funzione": "lens_controls",
   "pannello": "Avanzata · Camera",
   "tipo": "campo numerico",
@@ -1432,7 +1432,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2254,
+  "riga": 2267,
   "funzione": "lens_controls",
   "pannello": "Avanzata · Camera",
   "tipo": "casella",
@@ -1441,7 +1441,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2263,
+  "riga": 2276,
   "funzione": "lens_controls",
   "pannello": "Avanzata · Camera",
   "tipo": "elenco a tendina",
@@ -1450,7 +1450,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2269,
+  "riga": 2282,
   "funzione": "lens_controls",
   "pannello": "Avanzata · Camera",
   "tipo": "scelta",
@@ -1459,7 +1459,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2281,
+  "riga": 2294,
   "funzione": "lens_controls",
   "pannello": "Avanzata · Camera",
   "tipo": "campo numerico",
@@ -1468,7 +1468,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2294,
+  "riga": 2307,
   "funzione": "lens_controls",
   "pannello": "Avanzata · Camera",
   "tipo": "campo numerico",
@@ -1477,7 +1477,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2302,
+  "riga": 2315,
   "funzione": "lens_controls",
   "pannello": "Avanzata · Camera",
   "tipo": "scelta",
@@ -1486,7 +1486,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2310,
+  "riga": 2323,
   "funzione": "lens_controls",
   "pannello": "Avanzata · Camera",
   "tipo": "pulsante",
@@ -1495,7 +1495,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2347,
+  "riga": 2360,
   "funzione": "lens_controls",
   "pannello": "Avanzata · Camera",
   "tipo": "elenco a tendina",
@@ -1504,7 +1504,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2355,
+  "riga": 2368,
   "funzione": "lens_controls",
   "pannello": "Avanzata · Camera",
   "tipo": "scelta",
@@ -1513,7 +1513,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2358,
+  "riga": 2371,
   "funzione": "lens_controls",
   "pannello": "Avanzata · Camera",
   "tipo": "scelta",
@@ -1522,7 +1522,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2367,
+  "riga": 2380,
   "funzione": "lens_controls",
   "pannello": "Avanzata · Camera",
   "tipo": "campo numerico",
@@ -1531,7 +1531,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2382,
+  "riga": 2395,
   "funzione": "lens_controls",
   "pannello": "Avanzata · Camera",
   "tipo": "campo numerico",
@@ -1540,7 +1540,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/inspector.rs",
-  "riga": 2389,
+  "riga": 2402,
   "funzione": "lens_controls",
   "pannello": "Avanzata · Camera",
   "tipo": "campo numerico",
@@ -1728,6 +1728,87 @@
   "id": "libreria.online_tab_4"
  },
  {
+  "file": "crates/forge_app/src/ui/manual.rs",
+  "riga": 126,
+  "funzione": "help_button",
+  "pannello": "manual.rs",
+  "tipo": "pulsante",
+  "testo": "Apri la pagina del manuale (F1)",
+  "id": "manual_rs.apri_la_pagina_del_manuale_f1"
+ },
+ {
+  "file": "crates/forge_app/src/ui/manual.rs",
+  "riga": 187,
+  "funzione": "contents",
+  "pannello": "manual.rs",
+  "tipo": "pulsante",
+  "testo": "Home",
+  "id": "manual_rs.home"
+ },
+ {
+  "file": "crates/forge_app/src/ui/manual.rs",
+  "riga": 194,
+  "funzione": "contents",
+  "pannello": "manual.rs",
+  "tipo": "pulsante",
+  "testo": "Indietro",
+  "id": "manual_rs.indietro"
+ },
+ {
+  "file": "crates/forge_app/src/ui/manual.rs",
+  "riga": 202,
+  "funzione": "contents",
+  "pannello": "manual.rs",
+  "tipo": "pulsante",
+  "testo": "Avanti",
+  "id": "manual_rs.avanti"
+ },
+ {
+  "file": "crates/forge_app/src/ui/manual.rs",
+  "riga": 210,
+  "funzione": "contents",
+  "pannello": "manual.rs",
+  "tipo": "campo di testo",
+  "testo": "Cerca nel manuale…",
+  "id": "manual_rs.cerca_nel_manuale"
+ },
+ {
+  "file": "crates/forge_app/src/ui/manual.rs",
+  "riga": 218,
+  "funzione": "contents",
+  "pannello": "manual.rs",
+  "tipo": "elenco a tendina",
+  "testo": "(variabile)",
+  "id": "manual_rs.contents"
+ },
+ {
+  "file": "crates/forge_app/src/ui/manual.rs",
+  "riga": 223,
+  "funzione": "contents",
+  "pannello": "manual.rs",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "manual_rs.contents_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/manual.rs",
+  "riga": 260,
+  "funzione": "contents",
+  "pannello": "manual.rs",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "manual_rs.contents_3"
+ },
+ {
+  "file": "crates/forge_app/src/ui/manual.rs",
+  "riga": 280,
+  "funzione": "contents",
+  "pannello": "manual.rs",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "manual_rs.contents_4"
+ },
+ {
   "file": "crates/forge_app/src/ui/menubar.rs",
   "riga": 17,
   "funzione": "show",
@@ -1796,8 +1877,8 @@
   "funzione": "show",
   "pannello": "Barra dei menu",
   "tipo": "comando",
-  "testo": "La mia libreria",
-  "id": "barra_dei_menu.la_mia_libreria"
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.show"
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
@@ -1805,8 +1886,8 @@
   "funzione": "show",
   "pannello": "Barra dei menu",
   "tipo": "comando",
-  "testo": "Scarica da ambientCG / Poly Haven…",
-  "id": "barra_dei_menu.scarica_da_ambientcg_poly_haven"
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.show_2"
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
@@ -1833,7 +1914,7 @@
   "pannello": "Barra dei menu",
   "tipo": "casella",
   "testo": "(variabile)",
-  "id": "barra_dei_menu.show"
+  "id": "barra_dei_menu.show_3"
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
@@ -1849,13 +1930,22 @@
   "riga": 41,
   "funzione": "show",
   "pannello": "Barra dei menu",
-  "tipo": "pulsante",
+  "tipo": "comando",
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.show_4"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 42,
+  "funzione": "show",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
   "testo": "Scorciatoie da tastiera",
   "id": "barra_dei_menu.scorciatoie_da_tastiera"
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 46,
+  "riga": 44,
   "funzione": "show",
   "pannello": "Barra dei menu",
   "tipo": "comando",
@@ -1864,7 +1954,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 65,
+  "riga": 67,
   "funzione": "item_with",
   "pannello": "Barra dei menu",
   "tipo": "pulsante",
@@ -1873,7 +1963,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 86,
+  "riga": 88,
   "funzione": "tab_item",
   "pannello": "Barra dei menu",
   "tipo": "comando",
@@ -1882,25 +1972,25 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 90,
+  "riga": 92,
   "funzione": "file_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
-  "testo": "Nuova scena vuota",
-  "id": "barra_dei_menu.nuova_scena_vuota"
- },
- {
-  "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 91,
-  "funzione": "file_menu",
-  "pannello": "Barra dei menu",
-  "tipo": "comando",
-  "testo": "Nuova scena di test",
-  "id": "barra_dei_menu.nuova_scena_di_test"
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.file_menu"
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
   "riga": 93,
+  "funzione": "file_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.file_menu_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 95,
   "funzione": "file_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
@@ -1909,7 +1999,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 95,
+  "riga": 97,
   "funzione": "file_menu",
   "pannello": "Barra dei menu",
   "tipo": "menu",
@@ -1918,34 +2008,34 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 101,
+  "riga": 103,
   "funzione": "file_menu",
   "pannello": "Barra dei menu",
   "tipo": "pulsante",
   "testo": "(variabile)",
-  "id": "barra_dei_menu.file_menu"
+  "id": "barra_dei_menu.file_menu_3"
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 108,
+  "riga": 110,
   "funzione": "file_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
-  "testo": "Salva progetto",
-  "id": "barra_dei_menu.salva_progetto"
- },
- {
-  "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 109,
-  "funzione": "file_menu",
-  "pannello": "Barra dei menu",
-  "tipo": "comando",
-  "testo": "Salva progetto con nome…",
-  "id": "barra_dei_menu.salva_progetto_con_nome"
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.file_menu_4"
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
   "riga": 111,
+  "funzione": "file_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.file_menu_5"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 113,
   "funzione": "file_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
@@ -1954,39 +2044,30 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 112,
-  "funzione": "file_menu",
-  "pannello": "Barra dei menu",
-  "tipo": "comando",
-  "testo": "Esporta immagine…",
-  "id": "barra_dei_menu.esporta_immagine"
- },
- {
-  "file": "crates/forge_app/src/ui/menubar.rs",
   "riga": 114,
   "funzione": "file_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
-  "testo": "Esci",
-  "id": "barra_dei_menu.esci"
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.file_menu_6"
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 118,
-  "funzione": "edit_menu",
+  "riga": 116,
+  "funzione": "file_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
-  "testo": "Annulla",
-  "id": "barra_dei_menu.annulla"
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.file_menu_7"
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 119,
+  "riga": 120,
   "funzione": "edit_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
-  "testo": "Ripeti",
-  "id": "barra_dei_menu.ripeti"
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.edit_menu"
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
@@ -1994,21 +2075,30 @@
   "funzione": "edit_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
-  "testo": "Duplica",
-  "id": "barra_dei_menu.duplica"
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.edit_menu_2"
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 122,
+  "riga": 123,
   "funzione": "edit_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
-  "testo": "Elimina",
-  "id": "barra_dei_menu.elimina"
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.edit_menu_3"
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
   "riga": 124,
+  "funzione": "edit_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.edit_menu_4"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 126,
   "funzione": "edit_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
@@ -2017,16 +2107,16 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 125,
+  "riga": 127,
   "funzione": "edit_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
-  "testo": "Nascondi tutto il resto",
-  "id": "barra_dei_menu.nascondi_tutto_il_resto"
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.edit_menu_5"
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 126,
+  "riga": 128,
   "funzione": "edit_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
@@ -2035,34 +2125,34 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 128,
+  "riga": 130,
   "funzione": "edit_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
-  "testo": "Impostazioni…",
-  "id": "barra_dei_menu.impostazioni"
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.edit_menu_6"
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 129,
+  "riga": 131,
   "funzione": "edit_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
-  "testo": "Ripristina impostazioni predefinite",
-  "id": "barra_dei_menu.ripristina_impostazioni_predefinite"
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.edit_menu_7"
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 133,
+  "riga": 135,
   "funzione": "scene_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
-  "testo": "Prepara scena prodotto",
-  "id": "barra_dei_menu.prepara_scena_prodotto"
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.scene_menu"
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 134,
+  "riga": 136,
   "funzione": "scene_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
@@ -2071,7 +2161,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 135,
+  "riga": 137,
   "funzione": "scene_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
@@ -2080,7 +2170,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 137,
+  "riga": 139,
   "funzione": "scene_menu",
   "pannello": "Barra dei menu",
   "tipo": "menu",
@@ -2089,16 +2179,16 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 141,
+  "riga": 143,
   "funzione": "scene_menu",
   "pannello": "Barra dei menu",
   "tipo": "pulsante",
   "testo": "(variabile)",
-  "id": "barra_dei_menu.scene_menu"
+  "id": "barra_dei_menu.scene_menu_2"
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 150,
+  "riga": 152,
   "funzione": "scene_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
@@ -2107,7 +2197,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 151,
+  "riga": 153,
   "funzione": "scene_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
@@ -2116,7 +2206,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 153,
+  "riga": 155,
   "funzione": "scene_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
@@ -2125,7 +2215,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 154,
+  "riga": 156,
   "funzione": "scene_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
@@ -2134,7 +2224,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 159,
+  "riga": 161,
   "funzione": "objects_menu",
   "pannello": "Barra dei menu",
   "tipo": "pulsante",
@@ -2143,7 +2233,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 165,
+  "riga": 167,
   "funzione": "objects_menu",
   "pannello": "Barra dei menu",
   "tipo": "menu",
@@ -2152,7 +2242,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 167,
+  "riga": 169,
   "funzione": "objects_menu",
   "pannello": "Barra dei menu",
   "tipo": "pulsante",
@@ -2161,7 +2251,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 174,
+  "riga": 176,
   "funzione": "objects_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
@@ -2170,7 +2260,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 175,
+  "riga": 177,
   "funzione": "objects_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
@@ -2179,7 +2269,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 176,
+  "riga": 178,
   "funzione": "objects_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
@@ -2188,7 +2278,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 180,
+  "riga": 182,
   "funzione": "view_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
@@ -2197,16 +2287,16 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 181,
+  "riga": 183,
   "funzione": "view_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
-  "testo": "Inquadra selezione",
-  "id": "barra_dei_menu.inquadra_selezione"
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.view_menu"
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 183,
+  "riga": 185,
   "funzione": "view_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
@@ -2215,7 +2305,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 184,
+  "riga": 186,
   "funzione": "view_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
@@ -2224,7 +2314,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 185,
+  "riga": 187,
   "funzione": "view_menu",
   "pannello": "Barra dei menu",
   "tipo": "menu",
@@ -2233,16 +2323,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 187,
-  "funzione": "view_menu",
-  "pannello": "Barra dei menu",
-  "tipo": "pulsante",
-  "testo": "(variabile)",
-  "id": "barra_dei_menu.view_menu"
- },
- {
-  "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 197,
+  "riga": 189,
   "funzione": "view_menu",
   "pannello": "Barra dei menu",
   "tipo": "pulsante",
@@ -2251,7 +2332,16 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 206,
+  "riga": 199,
+  "funzione": "view_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.view_menu_3"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 208,
   "funzione": "view_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
@@ -2260,16 +2350,16 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 210,
+  "riga": 212,
   "funzione": "render_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
-  "testo": "Avvia render",
-  "id": "barra_dei_menu.avvia_render"
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.render_menu"
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 211,
+  "riga": 213,
   "funzione": "render_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
@@ -2278,7 +2368,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 212,
+  "riga": 214,
   "funzione": "render_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
@@ -2287,7 +2377,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 214,
+  "riga": 216,
   "funzione": "render_menu",
   "pannello": "Barra dei menu",
   "tipo": "menu",
@@ -2296,7 +2386,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 218,
+  "riga": 220,
   "funzione": "render_menu",
   "pannello": "Barra dei menu",
   "tipo": "scelta",
@@ -2305,7 +2395,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 221,
+  "riga": 223,
   "funzione": "render_menu",
   "pannello": "Barra dei menu",
   "tipo": "scelta",
@@ -2314,7 +2404,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 228,
+  "riga": 230,
   "funzione": "render_menu",
   "pannello": "Barra dei menu",
   "tipo": "menu",
@@ -2323,7 +2413,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 233,
+  "riga": 235,
   "funzione": "render_menu",
   "pannello": "Barra dei menu",
   "tipo": "pulsante",
@@ -2332,7 +2422,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 242,
+  "riga": 244,
   "funzione": "render_menu",
   "pannello": "Barra dei menu",
   "tipo": "menu",
@@ -2341,25 +2431,25 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 246,
+  "riga": 248,
   "funzione": "render_menu",
   "pannello": "Barra dei menu",
   "tipo": "pulsante",
-  "testo": "(variabile)",
-  "id": "barra_dei_menu.render_menu"
- },
- {
-  "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 259,
-  "funzione": "render_menu",
-  "pannello": "Barra dei menu",
-  "tipo": "casella",
   "testo": "(variabile)",
   "id": "barra_dei_menu.render_menu_2"
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 263,
+  "riga": 261,
+  "funzione": "render_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "casella",
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.render_menu_3"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 265,
   "funzione": "render_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
@@ -2368,16 +2458,16 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 265,
+  "riga": 267,
   "funzione": "render_menu",
   "pannello": "Barra dei menu",
   "tipo": "comando",
-  "testo": "Esporta immagine…",
-  "id": "barra_dei_menu.esporta_immagine_2"
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.render_menu_4"
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 278,
+  "riga": 280,
   "funzione": "ai_control",
   "pannello": "Barra dei menu",
   "tipo": "scelta",
@@ -2386,7 +2476,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 300,
+  "riga": 302,
   "funzione": "language_switch",
   "pannello": "Barra dei menu",
   "tipo": "elenco a tendina",
@@ -2395,7 +2485,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 305,
+  "riga": 307,
   "funzione": "language_switch",
   "pannello": "Barra dei menu",
   "tipo": "scelta",
@@ -2404,7 +2494,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 324,
+  "riga": 326,
   "funzione": "mode_switch",
   "pannello": "Barra dei menu",
   "tipo": "scelta",
@@ -2413,7 +2503,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/menubar.rs",
-  "riga": 326,
+  "riga": 328,
   "funzione": "mode_switch",
   "pannello": "Barra dei menu",
   "tipo": "scelta",
@@ -2422,7 +2512,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/mod.rs",
-  "riga": 95,
+  "riga": 97,
   "funzione": "import_options_window",
   "pannello": "Finestre di dialogo",
   "tipo": "elenco a tendina",
@@ -2431,7 +2521,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/mod.rs",
-  "riga": 99,
+  "riga": 101,
   "funzione": "import_options_window",
   "pannello": "Finestre di dialogo",
   "tipo": "scelta",
@@ -2440,7 +2530,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/mod.rs",
-  "riga": 104,
+  "riga": 106,
   "funzione": "import_options_window",
   "pannello": "Finestre di dialogo",
   "tipo": "elenco a tendina",
@@ -2449,7 +2539,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/mod.rs",
-  "riga": 108,
+  "riga": 110,
   "funzione": "import_options_window",
   "pannello": "Finestre di dialogo",
   "tipo": "scelta",
@@ -2458,7 +2548,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/mod.rs",
-  "riga": 116,
+  "riga": 118,
   "funzione": "import_options_window",
   "pannello": "Finestre di dialogo",
   "tipo": "scelta",
@@ -2467,7 +2557,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/mod.rs",
-  "riga": 117,
+  "riga": 119,
   "funzione": "import_options_window",
   "pannello": "Finestre di dialogo",
   "tipo": "scelta",
@@ -2476,7 +2566,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/mod.rs",
-  "riga": 118,
+  "riga": 120,
   "funzione": "import_options_window",
   "pannello": "Finestre di dialogo",
   "tipo": "scelta",
@@ -2485,7 +2575,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/mod.rs",
-  "riga": 122,
+  "riga": 124,
   "funzione": "import_options_window",
   "pannello": "Finestre di dialogo",
   "tipo": "casella",
@@ -2494,7 +2584,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/mod.rs",
-  "riga": 125,
+  "riga": 127,
   "funzione": "import_options_window",
   "pannello": "Finestre di dialogo",
   "tipo": "cursore",
@@ -2503,7 +2593,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/mod.rs",
-  "riga": 140,
+  "riga": 142,
   "funzione": "import_options_window",
   "pannello": "Finestre di dialogo",
   "tipo": "pulsante",
@@ -2512,7 +2602,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/mod.rs",
-  "riga": 141,
+  "riga": 143,
   "funzione": "import_options_window",
   "pannello": "Finestre di dialogo",
   "tipo": "pulsante",
@@ -2521,7 +2611,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/mod.rs",
-  "riga": 195,
+  "riga": 198,
   "funzione": "confirm_discard_window",
   "pannello": "Finestre di dialogo",
   "tipo": "pulsante",
@@ -2530,7 +2620,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/mod.rs",
-  "riga": 198,
+  "riga": 203,
   "funzione": "confirm_discard_window",
   "pannello": "Finestre di dialogo",
   "tipo": "pulsante",
@@ -2539,7 +2629,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/mod.rs",
-  "riga": 201,
+  "riga": 206,
   "funzione": "confirm_discard_window",
   "pannello": "Finestre di dialogo",
   "tipo": "pulsante",
@@ -2548,7 +2638,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/mod.rs",
-  "riga": 280,
+  "riga": 286,
   "funzione": "dialogs",
   "pannello": "Finestre di dialogo",
   "tipo": "pulsante",
@@ -2557,7 +2647,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/mod.rs",
-  "riga": 297,
+  "riga": 303,
   "funzione": "dialogs",
   "pannello": "Finestre di dialogo",
   "tipo": "pulsante",
@@ -2701,7 +2791,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/quickbar.rs",
-  "riga": 103,
+  "riga": 104,
   "funzione": "show",
   "pannello": "Toolbar",
   "tipo": "scelta",
@@ -2710,7 +2800,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/quickbar.rs",
-  "riga": 145,
+  "riga": 147,
   "funzione": "cmd_button",
   "pannello": "Toolbar",
   "tipo": "pulsante",
@@ -2719,7 +2809,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/quickbar.rs",
-  "riga": 148,
+  "riga": 150,
   "funzione": "cmd_button",
   "pannello": "Toolbar",
   "tipo": "pulsante",
@@ -2728,7 +2818,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/quickbar.rs",
-  "riga": 160,
+  "riga": 162,
   "funzione": "render_button",
   "pannello": "Toolbar",
   "tipo": "pulsante",
@@ -2737,7 +2827,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/quickbar.rs",
-  "riga": 169,
+  "riga": 171,
   "funzione": "dropdown",
   "pannello": "Toolbar",
   "tipo": "pulsante",
@@ -2746,7 +2836,7 @@
  },
  {
   "file": "crates/forge_app/src/ui/quickbar.rs",
-  "riga": 175,
+  "riga": 177,
   "funzione": "tool_button",
   "pannello": "Toolbar",
   "tipo": "pulsante",

@@ -66,6 +66,8 @@ pub enum Cmd {
     // Pannelli della modalità Avanzata
     Tab(InspectorTab),
     // Guida
+    Manual,
+    Shortcuts,
     Welcome,
 }
 
@@ -340,6 +342,14 @@ pub fn spec(cmd: Cmd) -> Spec {
             tk("Permette a Claude di comandare questa finestra (tramite forgerender-mcp)"),
         ),
         Cmd::Tab(t) => s(tab_id(t), tab_label(t), tab_icon(t), None, ""),
+        Cmd::Manual => s(
+            "help.manual",
+            tk("Manuale"),
+            icons::HELP,
+            key(NONE, Key::F1),
+            tk("Il manuale di ForgeRender. F1 sopra un controllo apre la sua pagina"),
+        ),
+        Cmd::Shortcuts => s("help.shortcuts", tk("Scorciatoie da tastiera"), icons::KEYS, None, ""),
         Cmd::Welcome => s("help.welcome", tk("Benvenuto e informazioni…"), icons::INFO, None, ""),
     }
 }
@@ -401,6 +411,7 @@ const SHORTCUTS: &[(Modifiers, Key, Cmd)] = &[
     (NONE, Key::F, Cmd::FrameSelection),
     (NONE, Key::F5, Cmd::RenderToggle),
     (NONE, Key::Num5, Cmd::ToggleOrtho),
+    (NONE, Key::F1, Cmd::Manual),
 ];
 
 /// Tasti del gizmo: solo quando non si sta trascinando.
@@ -558,6 +569,18 @@ pub fn run_confirmed(app: &mut ForgeApp, ctx: &egui::Context, cmd: Cmd) {
             crate::mcp::set_enabled(app, ctx, !on);
         }
         Cmd::Tab(t) => open_tab(app, t),
+        Cmd::Manual => {
+            let target = crate::ui::manual::context_target(app, ctx);
+            app.manual.open_at(Some(&target));
+        }
+        Cmd::Shortcuts => {
+            // La pagina del manuale se c'è, altrimenti l'elenco generato dalle tabelle.
+            if crate::ui::manual::root().is_some() {
+                app.manual.open_at(Some("keys.elenco"));
+            } else {
+                app.info = Some(shortcuts_text(ctx));
+            }
+        }
         Cmd::Welcome => app.splash_open = true,
     }
     // In Avanzata il messaggio dei preset non ha un pannello: lo si mostra come avviso.
@@ -650,6 +673,8 @@ mod tests {
             Cmd::LibraryOnline,
             Cmd::LibraryFolder,
             Cmd::AiControl,
+            Cmd::Manual,
+            Cmd::Shortcuts,
             Cmd::Welcome,
         ];
         let mut ids: Vec<&str> = all.iter().map(|c| spec(*c).id).collect();

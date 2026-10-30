@@ -1,0 +1,12 @@
+[package]
+name = "forge_manual"
+description = "Manuale interno: pagine Markdown per lingua, indice, ricerca offline e controlli di completezza."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+pulldown-cmark.workspace = true
+serde.workspace = true
+serde_json.workspace = true

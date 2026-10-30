@@ -50,6 +50,11 @@ pub const FRAME: &str = "\u{ED0A}"; // cube-focus
 pub const VIEWS: &str = "\u{EBE6}"; // perspective
 pub const SCENE: &str = "\u{E6A2}"; // sparkle
 pub const AI: &str = "\u{E762}"; // robot
+pub const HELP: &str = "\u{E0E6}"; // book-open
+pub const HOME: &str = "\u{E2C2}"; // house
+pub const BACK: &str = "\u{E058}"; // arrow-left
+pub const FORWARD: &str = "\u{E06C}"; // arrow-right
+pub const SEARCH: &str = "\u{E30C}"; // magnifying-glass
 pub const KEYS: &str = "\u{E2D8}"; // keyboard
 pub const INFO: &str = "\u{E2CE}"; // info
 pub const VIEWPORT: &str = "\u{E1DA}"; // cube
@@ -68,5 +73,15 @@ mod tests {
     /// Controllo minimo senza dipendenze: intestazione TrueType e dimensione plausibile.
     fn ttf_parser_free_check(b: &[u8]) -> bool {
         b.len() > 100_000 && (b.starts_with(&[0, 1, 0, 0]) || b.starts_with(b"OTTO") || b.starts_with(b"true"))
+    }
+}
+
+#[cfg(test)]
+mod glyph_tests {
+    /// "→" non è nei caratteri dell'interfaccia (si vedrebbe un quadratino): mai nei testi.
+    #[test]
+    fn no_missing_arrow_glyph_in_interface_texts() {
+        let lang = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../lang/Lan_eng.json")).unwrap();
+        assert!(!lang.contains('→'), "Lan_eng.json contiene →");
     }
 }

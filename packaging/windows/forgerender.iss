@@ -1,8 +1,8 @@
 ; Installer di ForgeRender (Inno Setup 6).
-; Compilazione:  ISCC.exe /DAppVersion=0.7.0 /DBinDir=..\..\target\release packaging\windows\forgerender.iss
+; Compilazione:  ISCC.exe /DAppVersion=0.8.0 /DBinDir=..\..\target\release packaging\windows\forgerender.iss
 
 #ifndef AppVersion
-  #define AppVersion "0.7.0"
+  #define AppVersion "0.8.0"
 #endif
 #ifndef BinDir
   #define BinDir "..\..\target\release"
@@ -54,6 +54,7 @@ Source: "{#OidnDir}\doc\LICENSE.txt"; DestDir: "{app}\licenze\OpenImageDenoise";
 Source: "{#OidnDir}\doc\third-party-programs*.txt"; DestDir: "{app}\licenze\OpenImageDenoise"; Flags: ignoreversion
 Source: "LEGGIMI.txt"; DestDir: "{app}"; Flags: ignoreversion isreadme
 Source: "..\..\lang\*.json"; DestDir: "{app}\lang"; Flags: ignoreversion
+Source: "..\..\manuale\*"; DestDir: "{app}\manuale"; Excludes: "inventario.json,INVENTARIO.md"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\ForgeRender"; Filename: "{app}\forgerender.exe"

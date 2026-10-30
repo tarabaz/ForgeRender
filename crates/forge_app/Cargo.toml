@@ -10,6 +10,7 @@ name = "forgerender"
 path = "src/main.rs"
 
 [dependencies]
+forge_manual = { path = "../forge_manual" }
 forge_math.workspace = true
 forge_scene.workspace = true
 forge_import.workspace = true

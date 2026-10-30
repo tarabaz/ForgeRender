@@ -207,7 +207,6 @@
     "Profondità colore": "Color depth",
     " cm": " cm",
     "Priorità volume": "Volume priority",
-    "Liquido in un bicchiere: modella il liquido un filo più grande della cavità (che entri nello spessore del vetro) e dagli priorità più alta del vetro. Il motore usa allora l'interfaccia vetro→liquido giusta (IOR 1,5 → 1,33).": "Liquid in a glass: model the liquid slightly larger than the cavity (so it enters the glass thickness) and give it a higher priority than the glass. The engine then uses the correct glass→liquid interface (IOR 1.5 → 1.33).",
     "Emissione": "Emission",
     "Intensità emissione": "Emission strength",
     "Categoria": "Category",
@@ -773,7 +772,6 @@
     "GPU: {} · VRAM {}/{} GB (libera {} GB)": "GPU: {} · VRAM {}/{} GB ({} GB free)",
     "{}: VRAM usata da tutti i programmi, letta dal driver NVIDIA ogni secondo": "{}: VRAM used by all programs, read from the NVIDIA driver every second",
     "ForgeRender usa componenti open source: Intel Open Image Denoise (licenza Apache 2.0, con oneTBB e oneDNN); egui, wgpu e altre librerie Rust (MIT / Apache 2.0); Open CASCADE (LGPL 2.1, solo nel convertitore STEP). Testi completi nella cartella licenze del programma.": "ForgeRender uses open source components: Intel Open Image Denoise (Apache 2.0 license, with oneTBB and oneDNN); egui, wgpu and other Rust libraries (MIT / Apache 2.0); Open CASCADE (LGPL 2.1, STEP converter only). Full texts in the program's licenze folder.",
-    "Schermata di benvenuto all'avvio (si riapre da File → Benvenuto e informazioni…)": "Welcome screen at startup (reopen it from File → Welcome and information…)",
     "Alt + trascina": "Alt + drag",
     "Ambiente e HDRI…": "Environment and HDRI…",
     "Annulla il trascinamento in corso": "Cancels the current drag",
@@ -849,6 +847,21 @@
     "TIFF 16 bit (per il fotoritocco)": "16-bit TIFF (for photo editing)",
     "Toglie dal progetto gli oggetti selezionati (il file importato non viene toccato; Ctrl+Z li riporta)": "Removes the selected objects from the project (the imported file is not touched; Ctrl+Z brings them back)",
     "Vista di lavoro in tempo reale": "Real-time working view",
-    "Viste standard": "Standard views"
+    "Viste standard": "Standard views",
+    "Apri la pagina del manuale (F1)": "Open the manual page (F1)",
+    "Avanti": "Forward",
+    "Cartella \"manuale\" non trovata accanto al programma.": "\"manuale\" folder not found next to the program.",
+    "Cerca nel manuale…": "Search the manual…",
+    "Home": "Home",
+    "Il manuale di ForgeRender. F1 sopra un controllo apre la sua pagina": "The ForgeRender manual. F1 over a control opens its page",
+    "Immagine mancante: {}": "Missing image: {}",
+    "Indietro": "Back",
+    "Lingua del manuale (di solito segue quella dell'interfaccia)": "Manual language (usually follows the interface language)",
+    "Manuale": "Manual",
+    "Pagina non trovata.": "Page not found.",
+    "Vedi anche:": "See also:",
+    "{} risultati": "{} results",
+    "Liquido in un bicchiere: modella il liquido un filo più grande della cavità (che entri nello spessore del vetro) e dagli priorità più alta del vetro. Il motore usa allora l'interfaccia vetro-liquido giusta (IOR da 1,5 a 1,33).": "Liquid in a glass: model the liquid slightly larger than the cavity (so it enters the glass thickness) and give it a higher priority than the glass. The engine then uses the correct glass-liquid interface (IOR 1.5 - 1.33).",
+    "Schermata di benvenuto all'avvio (si riapre da Guida, Benvenuto e informazioni…)": "Welcome screen at startup (reopen it from Help, Welcome and information…)"
   }
 }

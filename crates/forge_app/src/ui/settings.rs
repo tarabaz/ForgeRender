@@ -238,7 +238,7 @@ fn about(ui: &mut egui::Ui, p: &mut Preferences) {
     ui.heading(tr("Informazioni"));
     ui.label(crate::app::APP_TITLE);
     ui.checkbox(&mut p.show_splash, tr("Mostra all'avvio")).on_hover_text(tr(
-        "Schermata di benvenuto all'avvio (si riapre da File → Benvenuto e informazioni…)",
+        "Schermata di benvenuto all'avvio (si riapre da Guida, Benvenuto e informazioni…)",
     ));
     egui::Grid::new("prefs-about").num_columns(2).spacing([12.0, 6.0]).show(ui, |ui| {
         ui.label(tr("Libreria"));

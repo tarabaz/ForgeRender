@@ -2,7 +2,10 @@
 
 Stato: **approvato da Valerio il 30/10/2026** con tutte le scelte consigliate; per
 l'esportazione un solo comando "Esporta…" con la scelta del formato nella finestra.
-Fase 1 (inventario) e fase 2 (menu, toolbar, lacune) fatte nella versione 0.7.0.
+Fase 1 (inventario) e fase 2 (menu, toolbar, lacune) fatte nella versione 0.7.0; fase 3
+(finestra del manuale, ricerca, F1, controlli automatici, prime pagine) nella 0.8.0.
+L'indice è in `manuale/indice.json` (JSON invece di TOML: niente dipendenze nuove), i sinonimi
+in `manuale/sinonimi.<lingua>.txt`, l'intestazione delle pagine tra righe `---`.
 Il crate `egui-phosphor` è fermo a egui 0.36: si è usato il piano B, il file del carattere
 Phosphor incorporato direttamente.
 Base dell'analisi: commit `770234c` (versione 0.6.0), branch `claude/festive-heisenberg-d2ow6z` = `main`.
