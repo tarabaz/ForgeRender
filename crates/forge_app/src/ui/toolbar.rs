@@ -10,7 +10,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
         ui.separator();
         language_switch(app, ui);
         ui.separator();
-        mcp_badge(app, ui);
+        ai_control(app, ui);
         ui.menu_button(tr("File"), |ui| {
             if ui.button(tr("Nuova scena vuota")).clicked() {
                 app.new_empty_scene();
@@ -156,20 +156,24 @@ pub const IMPORT_HINT: &str = tk(
      STEP (con il convertitore forgerender-step), SolidWorks SLDPRT/SLDASM (su Windows, con SolidWorks installato)",
 );
 
-/// Indicatore del controllo da parte dell'assistente IA (`--mcp`).
-fn mcp_badge(app: &ForgeApp, ui: &mut egui::Ui) {
-    let Some(b) = &app.mcp else { return };
-    let on = b.connected.load(std::sync::atomic::Ordering::Acquire);
-    let (text, color) = if on {
-        (tr("IA collegata (MCP)"), style::ACCENT)
+/// "Controllo IA": l'utente decide quando un assistente (Claude, tramite `forgerender-mcp`)
+/// può comandare questa finestra. "Controllato da IA" compare solo mentre è collegato.
+fn ai_control(app: &mut ForgeApp, ui: &mut egui::Ui) {
+    let on = app.mcp.is_some();
+    let hint = if on {
+        tr("Acceso: Claude può comandare questa finestra (tramite forgerender-mcp). Clic per spegnere.")
     } else {
-        (tr("IA scollegata"), egui::Color32::GRAY)
+        tr("Spento: nessun assistente può comandare ForgeRender. Clic per permettere a Claude di collegarsi.")
     };
-    let last = b.last.clone().unwrap_or_else(|| "—".into());
-    ui.label(egui::RichText::new(text).color(color).strong()).on_hover_text(tf(
-        "Server MCP attivo: un assistente (Claude Code) comanda la scena. Comandi eseguiti: {}, ultimo: {}",
-        &[b.calls.to_string(), last],
-    ));
+    if ui.selectable_label(on, tr("Controllo IA")).on_hover_text(hint).clicked() {
+        let ctx = ui.ctx().clone();
+        crate::mcp::set_enabled(app, &ctx, !on);
+    }
+    if let Some(s) = app.mcp.as_ref().filter(|s| s.connected()) {
+        let last = s.last.clone().unwrap_or_else(|| "—".into());
+        ui.label(egui::RichText::new(tr("Controllato da IA")).color(style::ACCENT).strong())
+            .on_hover_text(tf("Comandi eseguiti: {}, ultimo: {}", &[s.calls.to_string(), last]));
+    }
     ui.separator();
 }
 

@@ -9,7 +9,7 @@ but also working without a dedicated GPU.
 
 > **Control ForgeRender with AI — MCP**
 >
-> Ask Claude Code to prepare a scene, import a CAD model, position studio lights, assign materials, set the camera and render. ForgeRender exposes 24 tools, shows changes live and sends render previews back to the assistant.
+> Open ForgeRender, turn on **AI control** and ask Claude to prepare a scene, import a CAD model, position studio lights, assign materials, set the camera and render. 25 tools, live changes and render previews sent back to the assistant. You decide when the AI may take control: when it disconnects, ForgeRender stays open with your work.
 >
 > **[Set up Claude Code or Claude Desktop →](docs/MCP.en.md)** · [Italian guide](docs/MCP.md)
 
@@ -30,7 +30,7 @@ but also working without a dedicated GPU.
 - **Languages**: Italian and English, the whole interface switches immediately (at the top or in
   Settings → Language). Translations are separate `lang/Lan_*.json` files: copy `Lan_eng.json`
   to add more.
-- **AI control (MCP)**: control ForgeRender in natural language through Claude Code. See the [MCP setup guide](docs/MCP.en.md) for installation, examples, available tools and safety.
+- **AI control (MCP)**: control ForgeRender in natural language through Claude Code or Claude Desktop, with the `forgerender-mcp.exe` bridge and the "AI control" switch in the top bar. See the [MCP setup guide](docs/MCP.en.md) for installation, examples, available tools and safety.
 - **Welcome screen** at start-up with an image (`assets/splash.png`), version and commit; it
   closes with "Close" and reopens from File.
 - **Path tracing** on the CPU (all cores) and on the GPU (wgpu compute shaders, Vulkan/DX12)

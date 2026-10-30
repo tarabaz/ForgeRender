@@ -20,7 +20,7 @@ $version = (Select-String -Path "Cargo.toml" -Pattern '^version\s*=\s*"([^"]+)"'
 Write-Host "ForgeRender $version"
 
 if (-not $SkipBuild) {
-    cargo build --release -p forge_app -p forge_cli
+    cargo build --release -p forge_app -p forge_cli -p forge_mcp_bridge
     if ($LASTEXITCODE -ne 0) { throw "compilazione fallita" }
     if ($WithStep) {
         # Convertitore STEP (Open CASCADE): la prima compilazione richiede decine di minuti.
@@ -54,6 +54,8 @@ if (Test-Path $staging) { Remove-Item -Recurse -Force $staging }
 New-Item -ItemType Directory -Path $staging | Out-Null
 Copy-Item (Join-Path $bin "forgerender.exe") $staging
 Copy-Item (Join-Path $bin "forgerender-cli.exe") $staging
+# Ponte per Claude (MCP): lo avvia l'assistente, comanda la finestra aperta (docs/MCP.md).
+Copy-Item (Join-Path $bin "forgerender-mcp.exe") $staging
 $stepExe = Join-Path $bin "forgerender-step.exe"
 # Solo se richiesto: un forgerender-step.exe rimasto da una compilazione precedente non entra nel pacchetto.
 if ($WithStep -and (Test-Path $stepExe)) { Copy-Item $stepExe $staging } else { Write-Host "Pacchetto senza convertitore STEP (usa -WithStep per includerlo)" }

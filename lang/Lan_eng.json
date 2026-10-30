@@ -781,8 +781,10 @@
     "Emettitore a 20–40 cm da terra (la bocca della macchina): tappeto basso e compatto che copre il pavimento.": "Emitter 20–40 cm above the ground (the machine nozzle): low, compact carpet covering the floor.",
     "Molto alta": "Very high",
     "Ultra": "Ultra",
-    "Server MCP attivo: un assistente (Claude Code) comanda la scena. Comandi eseguiti: {}, ultimo: {}": "MCP server active: an assistant (Claude Code) controls the scene. Commands run: {}, last: {}",
-    "IA collegata (MCP)": "AI connected (MCP)",
-    "IA scollegata": "AI disconnected"
+    "Controllo IA": "AI control",
+    "Controllato da IA": "Controlled by AI",
+    "Acceso: Claude può comandare questa finestra (tramite forgerender-mcp). Clic per spegnere.": "On: Claude can control this window (through forgerender-mcp). Click to turn off.",
+    "Spento: nessun assistente può comandare ForgeRender. Clic per permettere a Claude di collegarsi.": "Off: no assistant can control ForgeRender. Click to let Claude connect.",
+    "Comandi eseguiti: {}, ultimo: {}": "Commands run: {}, last: {}"
   }
 }

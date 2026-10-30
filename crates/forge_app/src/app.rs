@@ -90,7 +90,7 @@ pub struct StartupOptions {
     pub ui_mode: Option<crate::prefs::UiMode>,
     /// Vista isometrica all'avvio (test e screenshot).
     pub iso: bool,
-    /// Server MCP su stdin/stdout: l'assistente IA comanda la finestra (`docs/MCP.md`).
+    /// "Controllo IA" acceso all'avvio (`--controllo-ia`, prove automatiche).
     pub mcp: bool,
     /// Esegue "Prepara scena prodotto" all'avvio con l'aspetto indicato (test e screenshot).
     pub prepare: Option<crate::presets::Look>,
@@ -246,8 +246,10 @@ pub struct ForgeApp {
     screenshot_requested: bool,
     screenshot_done: Arc<std::sync::atomic::AtomicBool>,
     frames: u64,
-    /// Collegamento con l'assistente IA (`--mcp`).
-    pub mcp: Option<crate::mcp::Bridge>,
+    /// "Controllo IA" acceso: Claude può comandare la finestra (`docs/MCP.md`).
+    pub mcp: Option<crate::mcp::Server>,
+    /// Ultimo render avviato dall'assistente (salvato appena finisce).
+    pub mcp_render: Option<crate::mcp::tools::RenderJob>,
 }
 
 impl ForgeApp {
@@ -340,7 +342,8 @@ impl ForgeApp {
             screenshot_requested: false,
             screenshot_done: Default::default(),
             frames: 0,
-            mcp: startup.mcp.then(|| crate::mcp::start(cc.egui_ctx.clone())),
+            mcp: None,
+            mcp_render: None,
         };
         // Prepara il backend GPU in background (creazione dispositivo e compilazione
         // dello shader da parte del driver), così è pronto quando serve.
@@ -365,8 +368,11 @@ impl ForgeApp {
             tracing::warn!("file di lingua non valido: {e}");
         }
         app.apply_prefs(prefs, true);
-        // Comandato dall'assistente: niente schermata davanti alla scena.
-        app.splash_open = app.prefs.show_splash && app.mcp.is_none();
+        // Avviato già comandato dall'assistente (prove automatiche): niente schermata davanti.
+        app.splash_open = app.prefs.show_splash && !startup.mcp;
+        if startup.mcp {
+            crate::mcp::set_enabled(&mut app, &cc.egui_ctx, true);
+        }
         // Cartelle della libreria (HDRI, materiali, texture).
         match forge_library::paths::ensure() {
             Ok(root) => tracing::info!("libreria: {}", root.display()),

@@ -1,68 +1,81 @@
 # Comandare ForgeRender con Claude (MCP)
 
-Da ForgeRender 0.4.0 un assistente IA può impostare la scena e fare i render al posto tuo:
-gli scrivi in italiano «metti uno sfondo da studio, aggiungi una luce calda a destra, fai il
-pezzo in metallo satinato e fammi un render quadrato», e lui usa i comandi del programma.
-Vedi ogni modifica nella finestra di ForgeRender mentre la fa, e lui vede il render che ottiene
-(così può correggere luci e inquadratura da solo).
+Un assistente IA può impostare la scena e fare i render al posto tuo: gli scrivi in italiano
+«metti uno sfondo da studio, aggiungi una luce calda a destra, fai il pezzo in metallo satinato
+e fammi un render quadrato», e lui usa i comandi del programma. Vedi ogni modifica nella
+finestra di ForgeRender mentre la fa, e lui vede il render che ottiene (così può correggere luci
+e inquadratura da solo).
 
 Il collegamento usa il **Model Context Protocol** (MCP), lo standard con cui Claude Code e
-Claude Desktop parlano con i programmi esterni. ForgeRender non ha bisogno di internet né di
-chiavi: è Claude Code ad avviarlo sul tuo PC con l'opzione `--mcp`.
+Claude Desktop parlano con i programmi esterni. Non serve internet né una chiave: tutto resta
+sul tuo PC.
 
 🇬🇧 [English version](MCP.en.md) · [Torna al README](../README.it.md)
 
+## Come funziona (dalla versione 0.5.0)
+
+- **ForgeRender lo apri tu**, come sempre, e resta aperto finché lo chiudi tu.
+- **Decidi tu quando l'IA può comandarlo**: pulsante **"Controllo IA"** nella barra in alto.
+  Spento (all'avvio è sempre spento) nessun assistente può toccare la scena.
+- Claude avvia un piccolo programma separato, **`forgerender-mcp.exe`** (il "ponte"), che sta
+  nella stessa cartella di `forgerender.exe`. Il ponte inoltra i comandi alla finestra aperta.
+- Mentre Claude è collegato, accanto al pulsante compare **"Controllato da IA"**; quando si
+  scollega sparisce. La finestra e il tuo lavoro restano: puoi continuare a mano o ricollegare
+  Claude più tardi sulla stessa scena.
+- Se ForgeRender è chiuso o il controllo è spento, Claude riceve il messaggio "apri ForgeRender
+  e accendi Controllo IA" e te lo chiede.
+
 ## 1. Cosa serve
 
-- ForgeRender **0.4.0 o successivo** compilato (`Build-ForgeRender.ps1`).
-- **Claude Code** installato su Windows (il comando `claude` nel terminale).
+- ForgeRender **0.5.0 o successivo**: nella cartella del programma ci sono `forgerender.exe` e
+  `forgerender-mcp.exe` (pacchetto portable, installazione, oppure `target\release` della build
+  locale con `Build-ForgeRender.ps1`).
+- **Claude Code** (terminale o app desktop, sessione "Questo computer") oppure **Claude
+  Desktop**, installato sul PC dove gira ForgeRender. La versione web di claude.ai non può
+  raggiungere i programmi del tuo PC.
 
-Individua `forgerender.exe` nella cartella del pacchetto portable estratto, in `target\release`
-della build locale oppure nella directory dell'installazione. Usa il percorso completo del file:
+Ti serve il percorso completo di `forgerender-mcp.exe`: in Esplora file tieni premuto Maiusc,
+clic destro sul file → **"Copia come percorso"**. Se il programma è su un disco esterno, la
+lettera del disco può cambiare da un PC all'altro: in quel caso va aggiornata nella
+configurazione (oppure assegna al disco una lettera fissa da Gestione disco).
 
-Le DLL distribuite con ForgeRender, comprese quelle del denoiser, devono rimanere accanto
-all'eseguibile. Il percorso varia in base a dove hai installato o estratto il programma.
+## 2. Collegarlo a Claude (una volta)
 
-## 2. Collegarlo a Claude Code (una volta)
+### Claude Code: cartella con il file `.mcp.json`
 
-Claude Code avvia i programmi MCP quando parte, quindi conviene una **cartella dedicata**: la
-finestra di ForgeRender si apre solo quando lavori lì, non in ogni progetto. Un comando alla
-volta in PowerShell:
+Il modo più semplice, che funziona sia con il terminale sia con l'app desktop: una cartella di
+lavoro con dentro un file `.mcp.json`. Un comando alla volta in PowerShell (metti il tuo
+percorso al posto di quello d'esempio):
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\ForgeRender-IA" | Out-Null
-Set-Location "$HOME\ForgeRender-IA"
 ```
 
 ```powershell
-$exe = (Resolve-Path "C:\PERCORSO\REALE\forgerender.exe").Path
-claude mcp add forgerender -- "$exe" --mcp
+$ponte = (Resolve-Path "C:\PERCORSO\REALE\forgerender-mcp.exe").Path
 ```
 
-- Senza `--scope` il collegamento vale solo per questa cartella.
-- Tutto quello che viene dopo `--` è il comando che Claude Code lancia.
-
-Controllo (apre e richiude ForgeRender per verificare che risponda):
-
-```
-claude mcp list
+```powershell
+@{ mcpServers = @{ forgerender = @{ command = $ponte; args = @() } } } | ConvertTo-Json -Depth 5 | Set-Content -Encoding ascii "$HOME\ForgeRender-IA\.mcp.json"
 ```
 
-Deve comparire `forgerender` come connesso. Dentro Claude Code il comando `/mcp` mostra gli
-strumenti di ForgeRender.
+Poi apri Claude Code in quella cartella (nell'app desktop: "Scegli…" accanto a "Questo
+computer"; nel terminale: `Set-Location "$HOME\ForgeRender-IA"` e `claude`). La prima volta
+chiede se approvare il server `forgerender`: rispondi sì.
 
-Per toglierlo: `claude mcp remove forgerender` (dalla stessa cartella).
+In alternativa, dal terminale: `claude mcp add forgerender -- "$ponte"` dentro la cartella.
 
-### Claude Desktop (alternativa)
+### Claude Desktop
 
-Impostazioni → Sviluppatore → Modifica configurazione; nel file `claude_desktop_config.json`:
+Impostazioni → Sviluppatore → Modifica configurazione; nel file `claude_desktop_config.json`
+(doppie barre nel percorso):
 
 ```json
 {
   "mcpServers": {
     "forgerender": {
-      "command": "C:\\\\PERCORSO\\\\REALE\\\\forgerender.exe",
-      "args": ["--mcp"]
+      "command": "C:\\PERCORSO\\REALE\\forgerender-mcp.exe",
+      "args": []
     }
   }
 }
@@ -72,26 +85,27 @@ Poi riavvia Claude Desktop.
 
 ## 3. Come si usa
 
-Apri Claude Code nella cartella dedicata (`Set-Location "$HOME\ForgeRender-IA"`, poi
-`claude`): si apre anche la finestra di ForgeRender, e in alto compare **"IA collegata (MCP)"**. La prima volta Claude
-Code chiede il permesso per ogni strumento: puoi rispondere "sì, sempre" per quelli di
-ForgeRender.
+1. Apri ForgeRender (doppio clic, come sempre).
+2. Clicca **"Controllo IA"** in alto: diventa arancione.
+3. Scrivi a Claude cosa vuoi. Al primo comando in alto compare **"Controllato da IA"**.
+4. Quando hai finito, spegni "Controllo IA" (o chiudi Claude): ForgeRender resta aperto.
 
 Esempi di richieste:
 
-- «Apri `D:\Stampe\drago.stl` (è in millimetri) e prepara uno studio fotografico.»
+- «Importa il modello che ti indico (è in millimetri) e prepara uno studio fotografico.»
 - «Metti uno sfondo da studio scuro e una luce calda a destra, più un controluce freddo.»
-- «Fai il drago in metallo satinato color bronzo, la base in plastica nera opaca.»
+- «Fai il pezzo in metallo satinato color bronzo, la base in plastica nera opaca.»
 - «Inquadratura tre quarti con un 85 mm, formato 4:5 per Instagram.»
 - «Fammi un render di prova veloce e dimmi cosa miglioreresti.»
 - «La luce a destra è troppo forte: dimezzala e rifai il render a 512 campioni.»
-- «Salva il progetto in `D:\Stampe\drago.frproject` e il render finale in `D:\Stampe\drago.png`.»
+- «Salva il progetto e il render finale nella cartella che ti indico.»
 
-Claude guarda l'anteprima di ogni render (gli arriva l'immagine) e può correggere da solo.
-Puoi sempre intervenire a mano nella finestra: lui legge lo stato con `scene_info` prima di
-modificare.
+Claude guarda l'anteprima di ogni render e può correggere da solo. Puoi intervenire a mano in
+qualsiasi momento: lui rilegge la scena con `scene_info` prima di modificare.
 
-Quando chiudi Claude Code la finestra resta aperta con "IA scollegata": il lavoro non si perde.
+**Render lunghi**: Claude aspetta al massimo circa 45 secondi. Se il render dura di più, gli
+risponde "in corso" e ForgeRender lo finisce e lo salva da solo; Claude poi chiede
+`render_status` e riceve l'immagine.
 
 ## 4. I comandi disponibili
 
@@ -119,7 +133,8 @@ all'inquadratura del render.
 | `set_camera` | Vista (frontale, tre quarti, isometrica…), angoli, focale, ortografica, zoom, profondità di campo |
 | `set_environment` | Ambiente uniforme, gradiente, HDRI o nero; visibile o no |
 | `set_render_settings` | Formato (16:9, 1:1, 4:5, 9:16), risoluzione, campioni, qualità, CPU/GPU, denoiser, esposizione |
-| `render` | Render, attesa della fine, PNG salvato e anteprima restituita a Claude |
+| `render` | Avvia il render, aspetta fino a ~45 s, salva il PNG e restituisce l'anteprima a Claude |
+| `render_status` | Avanzamento del render; a render finito file salvato e anteprima |
 | `stop_render` / `save_image` | Ferma il render; salva l'ultima immagine |
 
 Dove finiscono i render senza un percorso: nella cartella `render` accanto al progetto, oppure
@@ -128,6 +143,11 @@ in `renders` accanto ai log (portable: cartella del programma; installata:
 
 ## 5. Sicurezza
 
+- Nessuno può comandare ForgeRender finché non accendi "Controllo IA"; spegnendolo, i
+  collegamenti si chiudono subito.
+- Il collegamento tra ponte e finestra resta dentro il PC (`127.0.0.1`) e richiede una chiave
+  segreta nuova a ogni accensione, scritta in un file della tua cartella utente
+  (`%LOCALAPPDATA%\ForgeRender\controllo-ia.json`, tolto allo spegnimento).
 - Claude non può eseguire codice nel programma: solo i comandi della tabella, con gli argomenti
   controllati (numeri nei limiti, percorsi assoluti).
 - Un file esistente **non viene sovrascritto** senza `overwrite: true`, che Claude deve usare
@@ -138,42 +158,38 @@ in `renders` accanto ai log (portable: cartella del programma; installata:
 
 ## 6. Se qualcosa non va
 
+- **Claude dice "ForgeRender non è collegato"**: apri ForgeRender e accendi "Controllo IA".
 - **"ForgeRender non risponde: la finestra è ridotta a icona…"**: i comandi si eseguono come
   i clic, a ogni aggiornamento della finestra. Tienila aperta (non ridotta a icona) e senza
   finestre di dialogo davanti.
-- **`claude mcp list` dice "failed"**: controlla il percorso dell'eseguibile, poi prova
-  ForgeRender da solo, come lo avvia Claude. In PowerShell, con `$exe` impostato come sopra,
-  una sola riga:
+- **Prova del ponte senza Claude**: con ForgeRender aperto e "Controllo IA" acceso, in
+  PowerShell (con `$ponte` impostato come sopra):
 
-  ```
-  $p = New-Object System.Diagnostics.Process; $p.StartInfo.FileName = $exe; $p.StartInfo.Arguments = "--mcp"; $p.StartInfo.UseShellExecute = $false; $p.StartInfo.RedirectStandardInput = $true; $p.StartInfo.RedirectStandardOutput = $true; $null = $p.Start(); $p.StandardInput.WriteLine('{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'); $t = $p.StandardOutput.ReadLineAsync(); if ($t.Wait(20000)) { $t.Result } else { "NESSUNA RISPOSTA in 20 secondi" }; $p.StandardInput.Close()
+  ```powershell
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}', '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"scene_info","arguments":{}}}' | & $ponte
   ```
 
-  Funziona se compare una riga `{"id":1,"jsonrpc":"2.0","result":{...,"serverInfo":{"name":"forgerender",...}}}`
-  (gli accenti si vedono storti in PowerShell, Claude li legge giusti); la finestra si apre e si
-  richiude. Provato su Windows con la portable 0.4.0 su un disco esterno.
-  - Lanciare a mano `forgerender.exe --mcp`, o passargli il testo con `|`, **non** è una prova
-    valida: PowerShell non collega l'ingresso di un programma a finestra, ForgeRender non riceve
-    niente e si richiude subito come dopo una verifica.
+  Funziona se compaiono due righe JSON: la seconda descrive la scena (gli accenti si vedono
+  storti in PowerShell, Claude li legge giusti). Con "Controllo IA" spento la seconda riga dice
+  di accenderlo.
 - **Render lento**: per le prove chiedi pochi campioni (32–64) e risoluzione bassa; per il finale
   la GPU (`set_render_settings` con device gpu).
-- Il registro dei comandi ricevuti è nel log di ForgeRender (righe "MCP: …"), visibile in basso
-  nella finestra e in `forgerender.log`.
+- Il registro dei comandi ricevuti è nel log di ForgeRender (righe "controllo IA: …"), visibile
+  in basso nella finestra e in `forgerender.log`.
 
 ## 7. Per sviluppatori
 
-- `forgerender --mcp`: `crates/forge_app/src/mcp/`.
-  - `rpc.rs`: JSON-RPC 2.0 su stdin/stdout, una riga per messaggio (protocollo 2025-06-18,
-    accetta anche 2025-03-26 e 2024-11-05); `initialize`, `tools/list`, `tools/call`, `ping`.
-  - `mod.rs`: un thread legge stdin; `tools/call` passa alla finestra con un canale e si
-    esegue in `ForgeApp::tick`, quindi nessun accesso concorrente alla scena. Import, apertura
-    dei progetti e render completano nei fotogrammi successivi (`tools::Waiter`).
-  - `tools.rs`: schema e implementazione degli strumenti, che chiamano le stesse funzioni dei
-    pulsanti (`simple_prepare_scene`, `import_path`, `start_render`…).
-  - `ops.rs`: parti senza finestra (argomenti, lati delle luci, ricerca di luci, componenti e
-    materiali, stato della scena), con test.
-- I log vanno su **stderr** (stdout è riservato al protocollo).
-- Per aggiungere uno strumento: definizione in `tools::list`, ramo in `dispatch` (un test
-  controlla che ogni nome abbia il suo ramo), test della parte pura in `ops.rs`.
-- Prova completa senza Claude: uno script che lancia `forgerender --mcp` e scrive le richieste
-  su stdin (esempio nel report `reports/2026-10-30_mcp/`).
+- `crates/forge_mcp`: protocollo MCP (`rpc.rs`, JSON-RPC 2.0, protocollo 2025-06-18, accetta
+  anche 2025-03-26 e 2024-11-05), elenco degli strumenti (`tools.rs`), collegamento locale
+  ponte ↔ finestra (`link.rs`: file di contatto con porta e chiave, una riga JSON per messaggio).
+- `crates/forge_mcp_bridge`: `forgerender-mcp`, il server MCP su stdin/stdout. Risponde da solo
+  a `initialize` e `tools/list` (anche con la finestra chiusa) e inoltra `tools/call`. Non
+  rimanda mai un comando già consegnato.
+- `crates/forge_app/src/mcp/`: lato finestra. `mod.rs` ascolta su `127.0.0.1` solo con
+  "Controllo IA" acceso; ogni chiamata passa alla finestra con un canale e si esegue in
+  `ForgeApp::tick` (nessun accesso concorrente alla scena). `tools.rs` esegue gli strumenti con
+  le stesse funzioni dei pulsanti; `ops.rs` contiene le parti senza finestra, con test.
+- `forgerender --controllo-ia` accende il controllo all'avvio (prove automatiche);
+  `FORGE_MCP_FILE` sposta il file di contatto (prove con più istanze).
+- Per aggiungere uno strumento: definizione in `forge_mcp::tools::list`, ramo in `dispatch` di
+  `forge_app::mcp::tools` (un test controlla che ogni nome abbia il suo ramo).

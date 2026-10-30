@@ -100,6 +100,12 @@
   `docs/MCP.md`, report `reports/2026-10-30_mcp/`. Ogni strumento nuovo: definizione in
   `tools::list`, ramo in `dispatch`, test della parte pura in `ops.rs`.
 
+## Fatto nella dodicesima parte (versione 0.5.0)
+- Controllo IA separato: crate `forge_mcp` (protocollo, strumenti, collegamento locale) e
+  `forge_mcp_bridge` (`forgerender-mcp.exe`, avviato da Claude); nella finestra l'interruttore
+  "Controllo IA" e l'indicatore "Controllato da IA". `render_status` per i render lunghi.
+  Report `reports/2026-10-30_controllo-ia-ponte/`.
+
 ## Piano di sviluppo incrementale
 
 ### Fase 1 — Versione nella barra del titolo: fatta, in attesa di conferma

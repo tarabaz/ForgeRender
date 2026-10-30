@@ -45,3 +45,6 @@ python3 client_mcp.py <forgerender> <cartella_uscita> comandi_studio.json [opzio
 
 Su Windows basta: `python client_mcp.py ...\forgerender.exe C:\prove comandi_studio.json`
 (dopo aver tolto `xvfb-run` dalla riga `Popen` dello script).
+
+> **Superato dalla 0.5.0**: Claude non avvia più `forgerender --mcp` ma il ponte `forgerender-mcp`;
+> `client_mcp.py` vale solo per la 0.4.0. Vedi [`../2026-10-30_controllo-ia-ponte/REPORT.md`](../2026-10-30_controllo-ia-ponte/REPORT.md).

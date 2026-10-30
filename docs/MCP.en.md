@@ -1,180 +1,189 @@
 # Control ForgeRender with Claude (MCP)
 
-> **ForgeRender 0.4.0 or later · Claude Code · Windows**
->
-> Ask an AI assistant to import a model, prepare a studio, place lights, assign materials, set the camera and render. Changes appear in the ForgeRender window, and the assistant receives render previews so it can iterate.
+An AI assistant can set up the scene and render for you: tell it "add a studio backdrop, a warm
+light on the right, make the part satin metal and render a square image", and it uses
+ForgeRender's tools. You see every change live in the ForgeRender window, and the assistant
+receives the render preview so it can iterate.
 
-ForgeRender includes a local **Model Context Protocol (MCP)** server. No API key or network port is needed: Claude Code starts ForgeRender on your computer and communicates over standard input/output (stdio).
+The connection uses the **Model Context Protocol** (MCP), the standard Claude Code and Claude
+Desktop use to talk to external programs. No internet connection or API key is needed:
+everything stays on your computer.
 
 🇮🇹 [Versione italiana](MCP.md) · [Back to README](../README.md)
 
+## How it works (from version 0.5.0)
+
+- **You open ForgeRender** as usual; it stays open until you close it.
+- **You decide when the AI may control it**: the **"AI control"** button in the top bar. While it
+  is off (always off at start-up) no assistant can touch the scene.
+- Claude starts a small separate program, **`forgerender-mcp.exe`** (the "bridge"), which sits in
+  the same folder as `forgerender.exe` and forwards commands to the open window.
+- While Claude is connected, **"Controlled by AI"** appears next to the button; it disappears when
+  Claude disconnects. The window and your work stay: continue by hand or reconnect Claude later
+  on the same scene.
+- If ForgeRender is closed or AI control is off, Claude is told to ask you to open ForgeRender and
+  turn on AI control.
+
 ## 1. Requirements
 
-- ForgeRender **0.4.0 or later**.
-- Claude Code installed and available from PowerShell as the `claude` command.
-- A Windows build of ForgeRender (portable ZIP, installer or local build).
+- ForgeRender **0.5.0 or later**: the program folder contains `forgerender.exe` and
+  `forgerender-mcp.exe` (portable package, installer, or `target\release` of a local build made
+  with `Build-ForgeRender.ps1`).
+- **Claude Code** (terminal or desktop app, "This computer" session) or **Claude Desktop**,
+  installed on the computer that runs ForgeRender. The claude.ai web app cannot reach programs on
+  your computer.
 
-This guide follows the currently distributed Windows packages. Do not copy example paths literally: each computer may have a different installation folder.
+You need the full path of `forgerender-mcp.exe`: in File Explorer hold Shift, right-click the
+file → **"Copy as path"**. On an external drive the drive letter can change between computers;
+update it in the configuration (or give the drive a fixed letter in Disk Management).
 
-## 2. Locate the executable
+## 2. Connect it to Claude (once)
 
-Find `forgerender.exe` in the extracted portable folder, in `target\release` for a local build, or in the installed application directory. Use the full path to the executable, not just its containing folder. Keep the DLLs shipped with ForgeRender, including the denoiser libraries, beside the executable.
+### Claude Code: a folder with a `.mcp.json` file
 
-## 3. Register the MCP server in Claude Code
+The simplest way, working with both the terminal and the desktop app: a working folder that
+contains a `.mcp.json` file. One command at a time in PowerShell (use your own path):
 
-A dedicated working folder is recommended so ForgeRender is not launched whenever you open Claude Code in an unrelated project.
-
-Create the folder and move into it:
-
-~~~powershell
+```powershell
 New-Item -ItemType Directory -Force "$HOME\ForgeRender-IA" | Out-Null
-Set-Location "$HOME\ForgeRender-IA"
-~~~
+```
 
-Set the path to your own executable. Replace the example path with the real one:
+```powershell
+$bridge = (Resolve-Path "C:\REAL\PATH\TO\forgerender-mcp.exe").Path
+```
 
-~~~powershell
-$exe = (Resolve-Path "C:\REAL\PATH\TO\forgerender.exe").Path
-~~~
+```powershell
+@{ mcpServers = @{ forgerender = @{ command = $bridge; args = @() } } } | ConvertTo-Json -Depth 5 | Set-Content -Encoding ascii "$HOME\ForgeRender-IA\.mcp.json"
+```
 
-Register the server:
+Then open Claude Code in that folder (desktop app: "Choose…" next to "This computer"; terminal:
+`Set-Location "$HOME\ForgeRender-IA"` then `claude`). The first time it asks whether to approve
+the `forgerender` server: answer yes.
 
-~~~powershell
-claude mcp add forgerender -- "$exe" --mcp
-~~~
-
-Without `--scope`, the registration is limited to the current folder. Check it with:
-
-~~~powershell
-claude mcp list
-~~~
-
-The `forgerender` server should appear in the list. Inside Claude Code, use `/mcp` to inspect its tools.
-
-To remove the registration, run this from the same folder:
-
-~~~powershell
-claude mcp remove forgerender
-~~~
+Alternatively, from the terminal inside the folder: `claude mcp add forgerender -- "$bridge"`.
 
 ### Claude Desktop
 
-Open **Settings → Developer → Edit configuration** and edit `claude_desktop_config.json`. Replace the placeholder with the absolute path to your executable:
+Settings → Developer → Edit config; in `claude_desktop_config.json` (double backslashes):
 
-~~~json
+```json
 {
   "mcpServers": {
     "forgerender": {
-      "command": "C:\\\\REAL\\\\PATH\\\\TO\\\\forgerender.exe",
-      "args": ["--mcp"]
+      "command": "C:\\REAL\\PATH\\TO\\forgerender-mcp.exe",
+      "args": []
     }
   }
 }
-~~~
+```
 
-Windows backslashes must be doubled in JSON. Save the file and restart Claude Desktop.
+Then restart Claude Desktop.
 
-## 4. Use ForgeRender with Claude
+## 3. Use
 
-Open Claude Code from the dedicated folder:
+1. Open ForgeRender (double-click, as usual).
+2. Click **"AI control"** in the top bar: it turns orange.
+3. Tell Claude what you want. At the first command **"Controlled by AI"** appears at the top.
+4. When you are done, turn "AI control" off (or close Claude): ForgeRender stays open.
 
-~~~powershell
-claude
-~~~
+Example requests:
 
-Claude Code also starts ForgeRender. The application window displays **AI connected (MCP)**. On first use, Claude may ask permission to call individual tools.
+- "Import the model I point you to (it is in millimetres) and prepare a photo studio."
+- "Use a dark studio backdrop, a warm light on the right and a cool rim light."
+- "Make the part bronze satin metal and the base matte black plastic."
+- "Three-quarter view with an 85 mm lens, 4:5 format for Instagram."
+- "Make a quick test render and tell me what you would improve."
+- "The right light is too strong: halve it and render again at 512 samples."
+- "Save the project and the final render in the folder I give you."
 
-Example prompts:
+Claude looks at every render preview and can correct things itself. You can edit by hand at any
+time: it reads the scene again with `scene_info` before changing it.
 
-- “Import my STL model; its dimensions are in millimetres, then prepare a photo studio.”
-- “Set an anthracite background, a warm key light on the right and a cool rim light.”
-- “Apply satin bronze metal to the body and matte black plastic to the base.”
-- “Set a three-quarter view with an 85 mm lens and a 4:5 aspect ratio.”
-- “Make a quick preview render and tell me what you would improve.”
-- “The right light is too strong: halve its intensity and render again at 512 samples.”
-- “Save the project and final image to the folder I specify.”
+**Long renders**: Claude waits at most about 45 seconds. If the render takes longer it is told
+"in progress", ForgeRender finishes and saves it by itself, and Claude then calls
+`render_status` to get the image.
 
-The assistant can inspect the scene before changing it. You can also edit manually in ForgeRender; later assistant operations use the updated scene. When Claude Code closes, the ForgeRender window may remain open and show **AI disconnected**. Your work is not lost.
+## 4. Available tools
 
-## 5. Available tools
+Measurements in **metres**, y up. "Right", "left", "front" are relative to the render framing.
 
-Measurements use **metres**, with Y pointing up. Directions such as right, left and front are relative to the render camera.
-
-| Tool | Function |
+| Tool | What it does |
 |---|---|
-| `scene_info` | Reads scene, product, components, materials, lights, camera, environment, settings and render state |
-| `new_scene` | Creates an empty or demonstration scene |
-| `open_project` / `save_project` | Opens or saves a `.frproject` |
-| `import_model` | Imports a supported model and sets units/axis when needed |
-| `prepare_studio` | Prepares the photo studio or another available look |
-| `fit_scene_to_product` | Fits backdrop and lights to product dimensions |
-| `undo_preset` | Reverts the last applied preset |
-| `add_object` | Adds a floor, backdrop, wall or primitive |
-| `transform_objects` | Moves, rotates, scales or grounds objects |
-| `set_visibility` | Shows or hides components |
-| `add_light` | Adds area, point, spot or directional lights |
-| `edit_light` / `remove_light` | Edits or removes a light |
-| `set_all_lights_color` | Sets the colour temperature of all lights |
-| `list_materials` | Searches built-in and library materials |
-| `apply_material` | Applies a material to components or the whole product |
-| `create_material` | Creates and applies a new project material |
-| `set_camera` | Sets framing, focal length, projection and depth of field |
-| `set_environment` | Sets a uniform, gradient, HDRI or black environment |
-| `set_render_settings` | Sets aspect ratio, resolution, samples, CPU/GPU and denoiser |
-| `render` | Renders and returns the preview to the assistant |
-| `stop_render` / `save_image` | Stops rendering or saves the latest image |
+| `scene_info` | Scene state: product (centre and size), components with material, lights, camera, environment, settings and render state |
+| `new_scene` | New scene: studio demo or empty |
+| `open_project` / `save_project` | Open or save a `.frproject` |
+| `import_model` | Import glTF/GLB, OBJ, STL, STEP, Blender, SolidWorks (unit and up axis for STL/OBJ) |
+| `prepare_studio` | Complete look: photo studio, light, dark, dramatic; quality |
+| `fit_scene_to_product` | Rebuild backdrop and lights to the product size |
+| `undo_preset` | Undo the last `prepare_studio` / `fit_scene_to_product` |
+| `add_object` | Floor, backdrop, photo backdrop, wall, cube, sphere, cylinder, cup |
+| `transform_objects` | Move, rotate, scale, drop to the floor (undo with Ctrl+Z) |
+| `set_visibility` | Show or hide components |
+| `add_light` | Area (softbox), point, spot, directional light; by side (right, left, top, front, back, rim…), Kelvin colour, relative strength, range |
+| `edit_light` / `remove_light` | Edit or delete a light (by index or name) |
+| `set_all_lights_color` | Colour temperature of all lights |
+| `list_materials` | Search the ~120 ready-made materials and the downloaded library |
+| `apply_material` | Apply an existing material to components or to the whole product |
+| `create_material` | Create a material from parameters (colour, metallic, roughness, glass, emission) and apply it |
+| `set_camera` | View (front, three-quarter, isometric…), angles, focal length, orthographic, zoom, depth of field |
+| `set_environment` | Uniform, gradient, HDRI or black environment; visible or not |
+| `set_render_settings` | Format (16:9, 1:1, 4:5, 9:16), resolution, samples, quality, CPU/GPU, denoiser, exposure |
+| `render` | Start the render, wait up to ~45 s, save the PNG and send the preview to Claude |
+| `render_status` | Render progress; when finished, saved file and preview |
+| `stop_render` / `save_image` | Stop the render; save the last image |
 
-## 6. Output and saved renders
+Renders without a path go to a `render` folder next to the project, or to `renders` next to the
+logs (portable: program folder; installed: `%LOCALAPPDATA%\ForgeRender\renders`).
 
-If no output path is specified, ForgeRender uses the output folder associated with the project or installation. You can ask the assistant to save the result to a specific absolute path.
+## 5. Security
 
-## 7. Security
+- Nobody can control ForgeRender until you turn "AI control" on; turning it off closes the
+  connections immediately.
+- The bridge ↔ window connection stays on the computer (`127.0.0.1`) and requires a secret key,
+  new every time control is turned on, stored in a file in your user folder
+  (`%LOCALAPPDATA%\ForgeRender\controllo-ia.json`, removed when control is turned off).
+- Claude cannot run code inside the program: only the tools above, with validated arguments
+  (bounded numbers, absolute paths).
+- An existing file is **never overwritten** without `overwrite: true`, which Claude should only
+  use when you ask. The open project can be saved again to its own file.
+- Library materials are not modified: `create_material` creates a new project material
+  (id `ia-…`).
+- Transforms and presets can be undone like manual ones (Ctrl+Z, "Undo preset").
 
-- MCP exposes the tools listed above; it is not a console for running arbitrary code inside ForgeRender.
-- Arguments are validated and bounded; file paths must be absolute.
-- An existing file is not overwritten without the explicit `overwrite: true` parameter.
-- Library materials are not modified: `create_material` creates a new material in the project.
-- Transformations can be undone with Ctrl+Z; presets have a dedicated undo command.
-- The stdio transport does not open a TCP port listening on the network.
+## 6. Troubleshooting
 
-Grant MCP permissions carefully, based on the operations you want the assistant to perform.
+- **Claude says "ForgeRender is not connected"** (in Italian): open ForgeRender and turn on
+  "AI control".
+- **"ForgeRender does not respond: the window is minimised…"**: commands run like clicks, at each
+  window update. Keep the window open (not minimised) and without dialogs in front.
+- **Bridge test without Claude**: with ForgeRender open and "AI control" on, in PowerShell (with
+  `$bridge` set as above):
 
-## 8. Troubleshooting
-
-**`claude mcp list` reports `failed`**
-- Check the absolute path stored in `$exe`.
-- Verify that the file exists with `Test-Path $exe`.
-- Test ForgeRender on its own, started the way Claude starts it (one line, with `$exe` set as above):
-
+  ```powershell
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}', '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"scene_info","arguments":{}}}' | & $bridge
   ```
-  $p = New-Object System.Diagnostics.Process; $p.StartInfo.FileName = $exe; $p.StartInfo.Arguments = "--mcp"; $p.StartInfo.UseShellExecute = $false; $p.StartInfo.RedirectStandardInput = $true; $p.StartInfo.RedirectStandardOutput = $true; $null = $p.Start(); $p.StandardInput.WriteLine('{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'); $t = $p.StandardOutput.ReadLineAsync(); if ($t.Wait(20000)) { $t.Result } else { "NO ANSWER within 20 seconds" }; $p.StandardInput.Close()
-  ```
 
-  It works if a line `{"id":1,"jsonrpc":"2.0","result":{...,"serverInfo":{"name":"forgerender",...}}}`
-  appears (accented letters may look garbled in PowerShell; Claude reads them correctly). The
-  window opens and closes by itself. Tested on Windows with the 0.4.0 portable on an external drive.
-- Launching `forgerender.exe --mcp` by hand, or piping text into it with `|`, is **not** a valid
-  test: PowerShell does not connect the input of a windowed program, so ForgeRender receives
-  nothing and closes immediately, as after a health check.
+  It works if two JSON lines appear and the second describes the scene (accented letters may look
+  garbled in PowerShell; Claude reads them correctly). With "AI control" off the second line asks
+  to turn it on.
+- **Slow renders**: for tests ask for few samples (32–64) and low resolution; for the final image
+  use the GPU (`set_render_settings` with device gpu).
+- Received commands are logged by ForgeRender ("controllo IA: …" lines), visible at the bottom of
+  the window and in `forgerender.log`.
 
-**ForgeRender does not respond**
-- Keep the application window open and do not minimise it.
-- Make sure no modal dialog is blocking the application.
-- If a command times out, retry once the window is responsive again.
+## 7. Developer notes
 
-**Rendering is slow**
-- For previews, request 32–64 samples and a smaller resolution.
-- For final renders, select the GPU if available and enable the denoiser when appropriate.
-
-Received MCP commands are recorded in the ForgeRender log (lines beginning with `MCP: …`).
-
-## 9. Developer notes
-
-The server is implemented inside the GUI executable: `forgerender --mcp`. Its code is in `crates/forge_app/src/mcp/`.
-
-- `rpc.rs`: JSON-RPC 2.0 over stdin/stdout, one line per message.
-- `mod.rs`: reads the protocol on a dedicated thread and forwards calls to the application window.
-- `tools.rs`: tool schemas and implementations, reusing application functions.
-- `ops.rs`: window-independent operations and their tests.
-
-Logs must go to **stderr**: stdout is reserved for the MCP protocol. For implementation details and verification, see [the MCP report](../reports/2026-10-30_mcp/REPORT.md).
+- `crates/forge_mcp`: MCP protocol (`rpc.rs`, JSON-RPC 2.0, protocol 2025-06-18, also accepts
+  2025-03-26 and 2024-11-05), tool list (`tools.rs`), local bridge ↔ window link (`link.rs`:
+  contact file with port and key, one JSON line per message).
+- `crates/forge_mcp_bridge`: `forgerender-mcp`, the stdio MCP server. It answers `initialize` and
+  `tools/list` itself (even with the window closed) and forwards `tools/call`. A delivered command
+  is never sent twice.
+- `crates/forge_app/src/mcp/`: window side. `mod.rs` listens on `127.0.0.1` only while "AI
+  control" is on; each call is passed to the window through a channel and runs in
+  `ForgeApp::tick` (no concurrent scene access). `tools.rs` runs the tools with the same functions
+  as the buttons; `ops.rs` holds the window-free parts, with tests.
+- `forgerender --controllo-ia` turns control on at start-up (automated tests); `FORGE_MCP_FILE`
+  moves the contact file.
+- To add a tool: definition in `forge_mcp::tools::list`, branch in `dispatch` of
+  `forge_app::mcp::tools` (a test checks every name has a branch).

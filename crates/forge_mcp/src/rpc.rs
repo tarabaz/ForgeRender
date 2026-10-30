@@ -1,5 +1,5 @@
 //! Protocollo MCP (Model Context Protocol) su stdin/stdout: JSON-RPC 2.0, un messaggio per
-//! riga. Qui solo il protocollo; gli strumenti li esegue la finestra (vedi `mcp::tools`).
+//! riga. Qui solo il protocollo; gli strumenti li esegue la finestra di ForgeRender.
 
 use serde_json::{json, Value};
 
@@ -31,7 +31,8 @@ impl ToolOutput {
         }
     }
 
-    fn to_json(&self) -> Value {
+    /// Risultato MCP di `tools/call` (contenuti testo e immagine).
+    pub fn to_json(&self) -> Value {
         let mut content = vec![json!({"type": "text", "text": self.text})];
         if let Some(png) = &self.png {
             content.push(json!({"type": "image", "data": base64(png), "mimeType": "image/png"}));
@@ -62,11 +63,13 @@ Flusso tipico: import_model → prepare_studio (aspetto 'studio') → add_light 
 apply_material o create_material → set_camera → set_render_settings → render (restituisce \
 l'immagine: guardala e correggi). \"Destra\", \"sinistra\", \"davanti\" sono rispetto \
 all'inquadratura attuale. Ogni modifica si vede subito nella finestra di ForgeRender. \
-Non sovrascrivere file esistenti senza che l'utente lo chieda (overwrite).";
+Non sovrascrivere file esistenti senza che l'utente lo chieda (overwrite). \
+ForgeRender lo apre l'utente e decide lui quando accettare comandi (\"Controllo IA\" nella \
+barra in alto): se un comando risponde che non è collegato, chiedigli di aprirlo e di attivarlo.";
 
 /// Gestisce una riga ricevuta. Restituisce la risposta da scrivere (nessuna per le notifiche).
-/// `call` esegue uno strumento.
-pub fn handle_line(line: &str, tools: &Value, call: &mut dyn FnMut(&str, &Value) -> ToolOutput) -> Option<String> {
+/// `call` esegue uno strumento e restituisce il risultato MCP (vedi [`ToolOutput::to_json`]).
+pub fn handle_line(line: &str, tools: &Value, call: &mut dyn FnMut(&str, &Value) -> Value) -> Option<String> {
     let msg: Value = match serde_json::from_str(line) {
         Ok(v) => v,
         Err(e) => return Some(error_response(Value::Null, -32700, &format!("JSON non valido: {e}"))),
@@ -100,7 +103,7 @@ pub fn handle_line(line: &str, tools: &Value, call: &mut dyn FnMut(&str, &Value)
                 return Some(error_response(id, -32602, &format!("strumento sconosciuto: {name}")));
             }
             let args = params.get("arguments").cloned().unwrap_or_else(|| json!({}));
-            call(name, &args).to_json()
+            call(name, &args)
         }
         _ => return Some(error_response(id, -32601, &format!("metodo non supportato: {method}"))),
     };
@@ -142,7 +145,7 @@ mod tests {
         let mut calls = Vec::new();
         let mut call = |n: &str, a: &Value| {
             calls.push((n.to_string(), a.clone()));
-            ToolOutput::ok(json!({"ok": true}))
+            ToolOutput::ok(json!({"ok": true})).to_json()
         };
         let r = handle_line(
             r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{}}}"#,
@@ -173,7 +176,7 @@ mod tests {
     #[test]
     fn errors_are_reported() {
         let t = tools();
-        let mut call = |_: &str, _: &Value| ToolOutput::error("no");
+        let mut call = |_: &str, _: &Value| ToolOutput::error("no").to_json();
         let v: Value = serde_json::from_str(&handle_line("{rotto", &t, &mut call).unwrap()).unwrap();
         assert_eq!(v["error"]["code"], -32700);
         let v: Value = serde_json::from_str(&handle_line(r#"{"jsonrpc":"2.0","id":3,"method":"boh"}"#, &t, &mut call).unwrap()).unwrap();

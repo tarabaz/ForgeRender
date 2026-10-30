@@ -108,20 +108,7 @@ pub fn to_hex(c: [f32; 3]) -> String {
     format!("#{:02x}{:02x}{:02x}", b[0], b[1], b[2])
 }
 
-/// Lati in cui mettere una luce, rispetto all'inquadratura attuale.
-pub const SIDES: [&str; 11] = [
-    "destra",
-    "sinistra",
-    "alto",
-    "davanti",
-    "dietro",
-    "davanti_destra",
-    "davanti_sinistra",
-    "dietro_destra",
-    "dietro_sinistra",
-    "controluce",
-    "basso",
-];
+pub use forge_mcp::tools::SIDES;
 
 /// Direzione (dal centro del prodotto) di un lato, con la base della camera: "destra" è la
 /// destra dell'inquadratura, "davanti" verso la camera. Accetta anche i nomi inglesi.

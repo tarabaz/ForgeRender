@@ -1,0 +1,10 @@
+[package]
+name = "forge_mcp"
+description = "Controllo di ForgeRender da un assistente IA (MCP): protocollo, elenco degli strumenti, collegamento tra il ponte forgerender-mcp e la finestra."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true

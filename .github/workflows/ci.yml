@@ -65,7 +65,7 @@ jobs:
       - name: Test
         run: cargo test --workspace --exclude forge_step --release
       - name: Compilazione
-        run: cargo build --release -p forge_app -p forge_cli
+        run: cargo build --release -p forge_app -p forge_cli -p forge_mcp_bridge
       - name: Benchmark (runner GitHub, solo indicativo)
         run: target\release\forgerender-cli.exe bench --spp 8 --json bench-windows-runner.json
       - name: Inno Setup
@@ -81,7 +81,7 @@ jobs:
           $zip = Get-ChildItem dist\*-portable-x64.zip | Select-Object -First 1
           $dir = Join-Path $env:RUNNER_TEMP "portable-check"
           Expand-Archive -Path $zip.FullName -DestinationPath $dir -Force
-          foreach ($f in @("forgerender.exe", "forgerender-cli.exe", "LEGGIMI.txt",
+          foreach ($f in @("forgerender.exe", "forgerender-cli.exe", "forgerender-mcp.exe", "LEGGIMI.txt",
                            "samples\scene\cocktail-ghiaccio-secco\bench_ad.frproject",
                            "samples\scene\cocktail-ghiaccio-secco\bench_intera.frproject",
                            "samples\scene\cocktail-ghiaccio-secco\bench_vicina.frproject",

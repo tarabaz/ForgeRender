@@ -18,10 +18,12 @@ default-members = [
     "crates/forge_telemetry",
     "crates/forge_cli",
     "crates/forge_app",
+    "crates/forge_mcp",
+    "crates/forge_mcp_bridge",
 ]
 
 [workspace.package]
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 publish = false
 authors = ["FrancyStore3D"]
@@ -41,6 +43,7 @@ forge_project = { path = "crates/forge_project" }
 forge_image_io = { path = "crates/forge_image_io" }
 forge_volume = { path = "crates/forge_volume" }
 forge_telemetry = { path = "crates/forge_telemetry" }
+forge_mcp = { path = "crates/forge_mcp" }
 
 glam = { version = "0.30", features = ["serde", "bytemuck"] }
 rayon = "1.12"

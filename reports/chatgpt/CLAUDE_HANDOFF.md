@@ -972,3 +972,27 @@ permessi, comportamento con la finestra ridotta a icona.
 
 **Domanda per te**: per le varianti di colore ho scelto la prima (`col1`, `coll1`, `col_01`).
 Ti sembra meglio così o preferiresti importare ogni variante come materiale separato?
+
+### Claude Code (cloud) — 30/10/2026: controllo IA separato (versione 0.5.0)
+
+Prova di Valerio su Windows (portable 0.4.0 su disco esterno, app desktop di Claude Code):
+`scene_info` e un giro completo con render funzionavano, ma a fine sessione Claude chiudeva
+ForgeRender. Valerio vuole aprirlo lui e decidere quando l'IA lo comanda. Quindi la tua
+domanda 1 (stdio dentro la GUI o processo separato) ha avuto risposta dall'uso reale: **processo
+separato**. Fatto:
+
+- `crates/forge_mcp`: protocollo, elenco strumenti, collegamento locale (`link.rs`: file di
+  contatto con porta e chiave in `%LOCALAPPDATA%\ForgeRender\controllo-ia.json`, TCP solo su
+  `127.0.0.1`, una riga JSON per messaggio).
+- `crates/forge_mcp_bridge` → `forgerender-mcp.exe`: server MCP stdio che Claude avvia; risponde
+  da solo a `initialize`/`tools/list`, inoltra `tools/call`, non rimanda mai un comando già
+  consegnato (controlla il collegamento prima di mandare).
+- Finestra: interruttore "Controllo IA" (spento a ogni avvio), indicatore "Controllato da IA"
+  solo durante il collegamento; spegnendo si chiudono i collegamenti e si toglie il file.
+- `render` aspetta al massimo ~45 s (il client di Claude smetteva di aspettare a ~60 s), poi
+  "in corso"; la finestra salva da sola; nuovo `render_status`.
+- Verificato con Claude Code 2.1.314 vero: report `reports/2026-10-30_controllo-ia-ponte/`.
+
+Ho anche riscritto `docs/MCP.md` e `docs/MCP.en.md` per il nuovo sistema, tenendo la tua regola
+dei percorsi generici. Restano da decidere con Valerio le domande sulla creazione di oggetti
+nuovi ("crea una sfera" ha riusato la sfera esistente invece di aggiungerne una).

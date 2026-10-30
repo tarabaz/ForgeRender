@@ -1,8 +1,8 @@
 ; Installer di ForgeRender (Inno Setup 6).
-; Compilazione:  ISCC.exe /DAppVersion=0.4.0 /DBinDir=..\..\target\release packaging\windows\forgerender.iss
+; Compilazione:  ISCC.exe /DAppVersion=0.5.0 /DBinDir=..\..\target\release packaging\windows\forgerender.iss
 
 #ifndef AppVersion
-  #define AppVersion "0.4.0"
+  #define AppVersion "0.5.0"
 #endif
 #ifndef BinDir
   #define BinDir "..\..\target\release"
@@ -41,6 +41,7 @@ Name: "assoc"; Description: "Apri i file .frproject con ForgeRender"; GroupDescr
 [Files]
 Source: "{#BinDir}\forgerender.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#BinDir}\forgerender-cli.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BinDir}\forgerender-mcp.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#BinDir}\forgerender-step.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "..\licenses\*"; DestDir: "{app}\licenze"; Flags: ignoreversion
 ; Open Image Denoise: CPU e GPU NVIDIA (CUDA). I moduli HIP/SYCL (AMD/Intel GPU) non sono inclusi.

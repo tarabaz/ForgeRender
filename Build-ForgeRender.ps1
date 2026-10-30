@@ -6,7 +6,7 @@
     1. Controlla di essere nel repository ForgeRender, sul branch giusto, senza modifiche
        locali non committate (se ce ne sono si ferma e non tocca nulla).
     2. git pull --ff-only dal branch di sviluppo (se fallisce si ferma: niente build obsolete).
-    3. cargo build --release -p forge_app -p forge_cli (cache Cargo riutilizzata; forge_step escluso).
+    3. cargo build --release -p forge_app -p forge_cli -p forge_mcp_bridge (cache Cargo riutilizzata; forge_step escluso).
     4. Pacchetto portable con packaging\windows\package.ps1 -SkipBuild (nessuna seconda build).
 
     Non usa GitHub Actions, non scarica artefatti, non fa commit, push, reset o stash.
@@ -124,12 +124,12 @@ if ($before -eq $after) {
 # ------------------------------------------------------------------ 3. Compilazione
 $version = (Select-String -Path (Join-Path $Root 'Cargo.toml') -Pattern '^version\s*=\s*"([^"]+)"' |
     Select-Object -First 1).Matches[0].Groups[1].Value
-Step "cargo build --release -p forge_app -p forge_cli  (ForgeRender v$version, commit $after)"
+Step "cargo build --release -p forge_app -p forge_cli -p forge_mcp_bridge  (ForgeRender v$version, commit $after)"
 # Output di cargo a schermo in diretta (la compilazione può durare minuti).
-cargo build --release -p forge_app -p forge_cli
+cargo build --release -p forge_app -p forge_cli -p forge_mcp_bridge
 if ($LASTEXITCODE -ne 0) { Fail "compilazione fallita (codice di uscita $LASTEXITCODE)" }
 $bin = Join-Path $Root 'target\release'
-foreach ($exe in 'forgerender.exe', 'forgerender-cli.exe') {
+foreach ($exe in 'forgerender.exe', 'forgerender-cli.exe', 'forgerender-mcp.exe') {
     if (-not (Test-Path (Join-Path $bin $exe))) { Fail "dopo la compilazione manca target\release\$exe" }
 }
 
@@ -161,6 +161,7 @@ Write-Host "Pull:        $pullSummary"
 Write-Host 'Build:       riuscita'
 Write-Host "Eseguibili:  $bin\forgerender.exe"
 Write-Host "             $bin\forgerender-cli.exe"
+Write-Host "             $bin\forgerender-mcp.exe  (ponte per Claude, docs\MCP.md)"
 Write-Host "Portable:    $zip"
 Write-Host "Cartella:    $(Join-Path $dist "ForgeRender-$version-portable-x64")"
 if ($setupNew) { Write-Host "Installer:   $setup" }

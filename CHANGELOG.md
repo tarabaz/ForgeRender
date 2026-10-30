@@ -11,6 +11,24 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.5.0 — 30/10/2026
+
+**Controllo IA separato dal programma**
+- ForgeRender lo apre l'utente e resta aperto: Claude non lo avvia e non lo chiude più.
+- Pulsante **"Controllo IA"** nella barra in alto (spento a ogni avvio): solo quando è acceso un
+  assistente può comandare la finestra. **"Controllato da IA"** compare mentre è collegato.
+- Nuovo eseguibile **`forgerender-mcp.exe`** (crate `forge_mcp_bridge`): è il server MCP che
+  Claude avvia; inoltra i comandi alla finestra aperta su `127.0.0.1` con una chiave segreta
+  nuova a ogni accensione. Con la finestra chiusa o il controllo spento risponde con un errore
+  che spiega cosa fare. Compilato da `Build-ForgeRender.ps1` e incluso nei pacchetti.
+- Render lunghi: `render` aspetta al massimo ~45 s, poi risponde "in corso"; la finestra finisce
+  e salva da sola. Nuovo comando `render_status` (25 comandi).
+- `forgerender --mcp` ora accende solo il controllo all'avvio (come `--controllo-ia`): la
+  configurazione di Claude va aggiornata con il percorso di `forgerender-mcp.exe`
+  (`docs/MCP.md`).
+- Provato con Claude Code vero: due sessioni di seguito sulla stessa finestra (la seconda trova
+  le modifiche della prima), finestra aperta dopo lo scollegamento, render di 77 s completato.
+
 ## 0.4.0 — 30/10/2026
 
 **Controllo da Claude (MCP)**

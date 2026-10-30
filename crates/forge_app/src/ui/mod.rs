@@ -22,6 +22,13 @@ use crate::i18n::{tf, tr};
 use eframe::egui;
 
 impl eframe::App for ForgeApp {
+    /// Chiudendo il programma il controllo IA si spegne (file di contatto tolto).
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        if let Some(s) = self.mcp.take() {
+            s.shutdown();
+        }
+    }
+
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         self.tick(&ctx);

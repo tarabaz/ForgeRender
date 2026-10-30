@@ -24,6 +24,7 @@ forge_library.workspace = true
 image.workspace = true
 forge_image_io.workspace = true
 forge_telemetry.workspace = true
+forge_mcp.workspace = true
 eframe.workspace = true
 rfd.workspace = true
 bytemuck.workspace = true

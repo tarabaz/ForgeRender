@@ -3,10 +3,10 @@
 //! quindi fa esattamente quello che farebbe l'utente con i pulsanti.
 
 use super::ops::{self, Args, FoundMaterial};
-use super::rpc::ToolOutput;
 use crate::app::{AddKind, ForgeApp};
 use crate::presets::{self, Look, Quality};
 use forge_math::Vec3;
+use forge_mcp::rpc::ToolOutput;
 use forge_render_core::{BackendKind, DenoiseMode, SessionState};
 use forge_scene::{Environment, Light, LightKind, Material};
 use serde_json::{json, Value};
@@ -32,167 +32,6 @@ type R = Result<Step, String>;
 
 fn done(v: Value) -> R {
     Ok(Step::Done(ToolOutput::ok(v)))
-}
-
-/// Definizioni degli strumenti (nome, descrizione, schema JSON degli argomenti).
-pub fn list() -> Value {
-    let targets = json!({
-        "description": "Componenti: nome o id (anche parte del nome), una lista di nomi, oppure \"prodotto\" (predefinito: tutto tranne pavimento/fondale), \"selezione\", \"tutto\".",
-        "anyOf": [{"type": "string"}, {"type": "array", "items": {"type": "string"}}]
-    });
-    let light_ref =
-        json!({"description": "Luce: indice (da 0) o nome, come in scene_info.", "anyOf": [{"type": "integer"}, {"type": "string"}]});
-    let color = json!({"description": "Colore \"#rrggbb\" oppure [r, g, b] da 0 a 1.", "anyOf": [{"type": "string"}, {"type": "array", "items": {"type": "number"}}]});
-    let vec3 = json!({"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3});
-    let sides = json!({"type": "string", "enum": ops::SIDES, "description": "Lato rispetto all'inquadratura attuale."});
-    let tools = vec![
-        tool("scene_info", "Stato della scena: prodotto (centro e misure in metri), componenti con materiale, luci (indice, tipo, posizione, colore, intensità), camera, ambiente, impostazioni e stato del render. Chiamalo prima di modificare.",
-            json!({"max_components": {"type": "integer", "description": "Massimo di componenti elencati (predefinito 80)."}}), &[]),
-        tool("new_scene", "Nuova scena: \"studio\" (studio fotografico dimostrativo, sostituito dal primo modello importato) o \"vuota\". Le modifiche non salvate si perdono.",
-            json!({"kind": {"type": "string", "enum": ["studio", "vuota"]}}), &["kind"]),
-        tool("open_project", "Apre un progetto .frproject.", json!({"path": {"type": "string", "description": "Percorso assoluto del file."}}), &["path"]),
-        tool("save_project", "Salva il progetto. Senza path salva sul file già aperto.",
-            json!({"path": {"type": "string", "description": "Percorso assoluto .frproject."}, "overwrite": {"type": "boolean", "description": "Sovrascrive un file esistente diverso da quello aperto (solo se l'utente lo chiede)."}}), &[]),
-        tool("import_model", "Importa un modello 3D (glTF/GLB, OBJ, STL, STEP, Blender .blend, SolidWorks su Windows). Il primo import sostituisce la scena dimostrativa.",
-            json!({
-                "path": {"type": "string", "description": "Percorso assoluto del file."},
-                "unit": {"type": "string", "enum": ["mm", "cm", "m", "in"], "description": "Unità di STL/OBJ (predefinito mm)."},
-                "up_axis": {"type": "string", "enum": ["auto", "y", "z"]},
-                "drop_to_floor": {"type": "boolean", "description": "Appoggia a terra dopo l'import (predefinito sì)."}
-            }), &["path"]),
-        tool("prepare_studio", "Prepara la scena prodotto in un colpo: appoggia il prodotto sulla base, mette il fondale, applica l'aspetto (luci, ambiente, colore del fondale) e la qualità, inquadra. Annullabile con undo_preset.",
-            json!({
-                "look": {"type": "string", "enum": ["studio", "chiaro", "scuro", "scenografico"], "description": "studio = fondale in tela inclinato + 4 luci da studio; chiaro = fondale bianco e luce morbida (e-commerce); scuro = fondale nero lucido, tre punti luce; scenografico = luce calda di taglio e controluce fredda."},
-                "quality": {"type": "string", "enum": ["bozza", "bilanciata", "alta"]}
-            }), &[]),
-        tool("fit_scene_to_product", "Dopo aver spostato o scalato il prodotto: rifà fondale e luci sulle sue misure (tiene materiale del fondale e colori delle luci) e inquadra.", json!({}), &[]),
-        tool("undo_preset", "Annulla l'ultimo prepare_studio / fit_scene_to_product (luci, ambiente, qualità, fondale e posizione come prima).", json!({}), &[]),
-        tool("add_object", "Aggiunge un oggetto vicino al prodotto: pavimento, fondale curvo, fondale fotografico (tela inclinata), parete o forme semplici.",
-            json!({"kind": {"type": "string", "enum": ["pavimento", "fondale", "fondale_fotografico", "parete", "cubo", "sfera", "cilindro", "tazza"]}}), &["kind"]),
-        tool("transform_objects", "Sposta, ruota o scala componenti (predefinito: il prodotto). Annullabile con Ctrl+Z nella finestra.",
-            json!({
-                "targets": targets,
-                "move_m": {"description": "Spostamento [x, y, z] in metri (x destra del mondo, y alto, z verso la vista frontale).", "type": "array", "items": {"type": "number"}},
-                "rotate_deg": {"description": "Rotazione aggiunta [x, y, z] in gradi (y = giro sul piano).", "type": "array", "items": {"type": "number"}},
-                "scale": {"type": "number", "description": "Fattore di scala uniforme (2 = doppio)."},
-                "drop_to_floor": {"type": "boolean", "description": "Appoggia a quota 0 dopo la trasformazione."}
-            }), &[]),
-        tool("set_visibility", "Mostra o nasconde componenti.", json!({"targets": targets, "visible": {"type": "boolean"}}), &["targets", "visible"]),
-        tool("add_light", "Aggiunge una luce puntata sul prodotto. Esempi: \"luce a destra\" → side destra; \"controluce\" → side controluce. Intensità: usa strength (1 = normale, 2 = doppia) se non conosci le unità.",
-            json!({
-                "type": {"type": "string", "enum": ["area", "punto", "spot", "direzionale"], "description": "area = softbox (predefinita), punto = lampadina, spot = faretto a cono, direzionale = sole."},
-                "side": sides,
-                "position": vec3.clone(),
-                "target": vec3.clone(),
-                "strength": {"type": "number", "description": "Moltiplicatore dell'intensità tipica (predefinito 1)."},
-                "intensity": {"type": "number", "description": "Valore assoluto: radianza per area (tipico 2–10), W/sr per punto/spot, W/m² per direzionale."},
-                "kelvin": {"type": "number", "description": "Temperatura colore (3200 calda, 5500 neutra, 7500 fredda)."},
-                "color": color.clone(),
-                "size_m": {"type": "number", "description": "Lato della softbox (area) in metri."},
-                "cone_deg": {"type": "number", "description": "Apertura dello spot in gradi."},
-                "range_m": {"type": "number", "description": "Punto/spot: distanza massima raggiunta dalla luce (0 = illimitata)."},
-                "range_softness": {"type": "number", "description": "Sfumatura del bordo del raggio, 0–1."},
-                "name": {"type": "string"},
-                "shadows": {"type": "boolean"}
-            }), &[]),
-        tool("edit_light", "Modifica una luce esistente: intensità, colore, posizione (anche per lato), dimensioni, cono, raggio d'azione, accesa/spenta.",
-            json!({
-                "light": light_ref.clone(),
-                "strength": {"type": "number", "description": "Moltiplica l'intensità attuale (0.5 = metà)."},
-                "intensity": {"type": "number"},
-                "kelvin": {"type": "number"},
-                "color": color.clone(),
-                "side": sides,
-                "position": vec3.clone(),
-                "target": vec3,
-                "aim_at_product": {"type": "boolean"},
-                "size_m": {"description": "Area: lato o [larghezza, altezza] in metri.", "anyOf": [{"type": "number"}, {"type": "array", "items": {"type": "number"}}]},
-                "cone_deg": {"type": "number"},
-                "cone_softness_pct": {"type": "number"},
-                "range_m": {"type": "number"},
-                "range_softness": {"type": "number"},
-                "enabled": {"type": "boolean"},
-                "shadows": {"type": "boolean"},
-                "name": {"type": "string"}
-            }), &["light"]),
-        tool("remove_light", "Elimina una luce (o tutte con light = \"tutte\").", json!({"light": light_ref}), &["light"]),
-        tool("set_all_lights_color", "Colore di tutte le luci da una temperatura in Kelvin.", json!({"kelvin": {"type": "number"}}), &["kelvin"]),
-        tool("list_materials", "Cerca materiali: quelli pronti del progetto (~120: metalli, plastiche, vetri, legni…) e la libreria su disco (texture PBR scaricate).",
-            json!({
-                "search": {"type": "string", "description": "Parole da cercare nel nome o nella categoria (italiano per i pronti, inglese per la libreria scaricata)."},
-                "source": {"type": "string", "enum": ["tutti", "progetto", "libreria"]},
-                "limit": {"type": "integer"}
-            }), &[]),
-        tool("apply_material", "Applica un materiale esistente (id o nome, anche parziale) ai componenti (predefinito: tutto il prodotto).",
-            json!({"material": {"type": "string"}, "targets": targets.clone()}), &["material"]),
-        tool("create_material", "Crea (o aggiorna, stesso nome) un materiale con parametri PBR e lo applica. Esempi: metallo satinato = metallic 1, roughness 0.35; plastica lucida = metallic 0, roughness 0.15; vetro = transmission 1, roughness 0.",
-            json!({
-                "name": {"type": "string"},
-                "base": {"type": "string", "description": "Materiale di partenza da copiare (texture comprese)."},
-                "color": color.clone(),
-                "metallic": {"type": "number"},
-                "roughness": {"type": "number"},
-                "transmission": {"type": "number"},
-                "ior": {"type": "number"},
-                "specular": {"type": "number"},
-                "emission_color": color,
-                "emission_strength": {"type": "number"},
-                "targets": targets
-            }), &["name"]),
-        tool("set_camera", "Inquadratura del render: vista predefinita o angoli, focale, ortografica, zoom, profondità di campo.",
-            json!({
-                "view": {"type": "string", "enum": ["frontale", "retro", "sinistra", "destra", "alto", "tre_quarti", "isometrica"]},
-                "yaw_deg": {"type": "number", "description": "Giro attorno al prodotto (0 = frontale, 90 = da destra)."},
-                "pitch_deg": {"type": "number", "description": "Elevazione (0 = altezza prodotto, 90 = dall'alto)."},
-                "focal_mm": {"type": "number", "description": "Focale equivalente full frame (50 normale, 85–100 ritratto prodotto)."},
-                "orthographic": {"type": "boolean"},
-                "frame": {"type": "string", "enum": ["prodotto", "tutto", "nessuno"], "description": "Inquadra dopo aver girato (predefinito prodotto)."},
-                "zoom": {"type": "number", "description": "Fattore di distanza dopo l'inquadratura (>1 più lontano, <1 più vicino)."},
-                "depth_of_field": {"type": "boolean"},
-                "f_stop": {"type": "number"}
-            }), &[]),
-        tool("set_environment", "Ambiente (luce e sfondo intorno alla scena): uniforme, gradiente, HDRI o nero.",
-            json!({
-                "type": {"type": "string", "enum": ["uniforme", "gradiente", "hdri", "nero"]},
-                "color": color,
-                "intensity": {"type": "number"},
-                "hdri_path": {"type": "string"},
-                "rotation_deg": {"type": "number"},
-                "visible": {"type": "boolean", "description": "Ambiente visibile come sfondo nell'immagine."}
-            }), &[]),
-        tool("set_render_settings", "Formato e qualità del render.",
-            json!({
-                "format": {"type": "string", "enum": ["16:9", "1:1", "4:5", "9:16"]},
-                "width": {"type": "integer"},
-                "height": {"type": "integer"},
-                "samples": {"type": "integer", "description": "Campioni per pixel (64 bozza, 256 buona, 1024 finale)."},
-                "quality": {"type": "string", "enum": ["bozza", "bilanciata", "alta"]},
-                "device": {"type": "string", "enum": ["cpu", "gpu"]},
-                "denoise": {"type": "boolean"},
-                "exposure_ev": {"type": "number"}
-            }), &[]),
-        tool("render", "Avvia il render, aspetta la fine, salva il PNG e restituisce l'anteprima da guardare.",
-            json!({
-                "samples": {"type": "integer", "description": "Campioni per pixel (predefinito quelli impostati; per una prova veloce 32–64)."},
-                "output": {"type": "string", "description": "Percorso assoluto del PNG (predefinito: cartella renders)."},
-                "overwrite": {"type": "boolean"},
-                "wait": {"type": "boolean", "description": "Aspetta la fine (predefinito sì)."},
-                "timeout_s": {"type": "number", "description": "Attesa massima (predefinito 900)."},
-                "preview_px": {"type": "integer", "description": "Lato massimo dell'anteprima restituita (predefinito 768, 0 = nessuna)."}
-            }), &[]),
-        tool("stop_render", "Ferma il render in corso (l'immagine resta).", json!({}), &[]),
-        tool("save_image", "Salva come PNG l'ultima immagine renderizzata.",
-            json!({"path": {"type": "string"}, "overwrite": {"type": "boolean"}}), &["path"]),
-    ];
-    Value::Array(tools)
-}
-
-fn tool(name: &str, description: &str, props: Value, required: &[&str]) -> Value {
-    json!({
-        "name": name,
-        "description": description,
-        "inputSchema": {"type": "object", "properties": props, "required": required},
-    })
 }
 
 /// Esegue uno strumento. Errori e avvisi che l'interfaccia mostrerebbe in finestra tornano
@@ -264,6 +103,7 @@ fn dispatch(app: &mut ForgeApp, name: &str, v: &Value) -> R {
         "set_environment" => set_environment(app, &a),
         "set_render_settings" => set_render_settings(app, &a),
         "render" => render(app, &a),
+        "render_status" => render_status(app, &a),
         "stop_render" => {
             app.stop_render();
             done(json!({"esito": "render fermato"}))
@@ -1087,12 +927,103 @@ fn preview_png(path: &Path, px: u32) -> Option<Vec<u8>> {
     Some(out.into_inner())
 }
 
+/// Render avviato dall'assistente: la finestra lo salva appena finisce, anche se nessuno
+/// aspetta più la risposta (render più lunghi dell'attesa del client).
+pub struct RenderJob {
+    path: PathBuf,
+    before: u64,
+    started: Instant,
+    /// Esito finale (file salvato o errore), senza anteprima: si aggiunge alla richiesta.
+    result: Option<ToolOutput>,
+}
+
+/// Fa avanzare il render dell'assistente: a render finito salva il PNG (una volta sola).
+/// Chiamata a ogni fotogramma da `mcp::process`.
+pub fn advance_render_job(app: &mut ForgeApp) {
+    let Some(job) = app.mcp_render.as_ref() else { return };
+    if job.result.is_some() {
+        return;
+    }
+    let result = if app.error.is_some() && job.started.elapsed() < Duration::from_secs(2) {
+        Some(ToolOutput::error(format!(
+            "render non avviato: {}",
+            app.error.take().unwrap_or_default()
+        )))
+    } else {
+        let p = app.session.progress();
+        if p.job_id == job.before || app.is_preparing() || app.is_baking_fog() {
+            None
+        } else {
+            match &p.state {
+                SessionState::Completed if !app.render_is_stale() => Some(match save_frame(app, &job.path) {
+                    Ok(samples) => ToolOutput::ok(json!({
+                        "esito": "render finito e salvato",
+                        "file": job.path.display().to_string(),
+                        "campioni": samples,
+                        "larghezza": p.width,
+                        "altezza": p.height,
+                        "tempo_render_s": p.elapsed.as_secs_f32(),
+                        "tempo_totale_s": job.started.elapsed().as_secs_f32(),
+                        "dispositivo": p.backend,
+                    })),
+                    Err(e) => ToolOutput::error(e),
+                }),
+                SessionState::Failed(e) => Some(ToolOutput::error(format!("render fallito: {e}"))),
+                SessionState::Cancelled => Some(ToolOutput::error("render interrotto")),
+                _ => None,
+            }
+        }
+    };
+    if let (Some(r), Some(job)) = (result, app.mcp_render.as_mut()) {
+        tracing::info!("controllo IA: render salvato in {}", job.path.display());
+        job.result = Some(r);
+    }
+}
+
+/// Risposta sul render dell'assistente: finito (con anteprima) o avanzamento.
+fn render_report(app: &ForgeApp, preview: u32) -> ToolOutput {
+    let Some(job) = app.mcp_render.as_ref() else {
+        return ToolOutput::error("nessun render avviato con lo strumento render");
+    };
+    if let Some(r) = &job.result {
+        let mut out = r.clone();
+        if !out.is_error && preview > 0 {
+            out.png = preview_png(&job.path, preview);
+        }
+        return out;
+    }
+    let p = app.session.progress();
+    let phase = if app.is_preparing() || app.is_baking_fog() || p.job_id == job.before {
+        "preparazione della scena".to_string()
+    } else {
+        format!("{} di {} campioni", p.samples, p.target)
+    };
+    ToolOutput::ok(json!({
+        "esito": "render in corso: la finestra lo finisce e lo salva da sola. Chiama render_status per sapere quando è pronto.",
+        "avanzamento": phase,
+        "file": job.path.display().to_string(),
+        "secondi_trascorsi": job.started.elapsed().as_secs_f32(),
+    }))
+}
+
+/// Aspetta (al massimo `max_wait`) che il render dell'assistente finisca, poi risponde.
+fn wait_render(max_wait: f32, preview: u32) -> R {
+    let until = Instant::now() + Duration::from_secs_f32(max_wait);
+    Ok(Step::Wait(Waiter {
+        deadline: until + Duration::from_secs(5),
+        poll: Box::new(move |app| {
+            advance_render_job(app);
+            let finished = app.mcp_render.as_ref().is_some_and(|j| j.result.is_some());
+            (finished || Instant::now() >= until).then(|| render_report(app, preview))
+        }),
+    }))
+}
+
 fn render(app: &mut ForgeApp, a: &Args) -> R {
     if let Some(s) = a.u32("samples")? {
         app.settings.target_samples = s.clamp(1, 1 << 20);
     }
-    let wait = a.bool("wait")?.unwrap_or(true);
-    if wait && app.settings.target_samples == 0 {
+    if app.settings.target_samples == 0 {
         return Err("i campioni sono illimitati: indica \"samples\" per sapere quando finire".into());
     }
     let dir = renders_dir(app);
@@ -1103,46 +1034,25 @@ fn render(app: &mut ForgeApp, a: &Args) -> R {
     let out = a.str("output")?.unwrap_or_else(|| format!("render_{stamp}.png"));
     let path = output_path(&out, "png", a.bool("overwrite")?.unwrap_or(false), Some(&dir))?;
     let preview = a.u32("preview_px")?.unwrap_or(768).min(2048);
-    let timeout = a.f32("timeout_s")?.unwrap_or(900.0).clamp(5.0, 6.0 * 3600.0);
+    let max_wait = a.f32("max_wait_s")?.unwrap_or(45.0).clamp(0.0, 600.0);
     let before = app.session.progress().job_id;
     app.start_render();
-    if !wait {
-        return done(json!({"esito": "render avviato", "campioni": app.settings.target_samples}));
+    app.mcp_render = Some(RenderJob {
+        path,
+        before,
+        started: Instant::now(),
+        result: None,
+    });
+    wait_render(max_wait, preview)
+}
+
+fn render_status(app: &mut ForgeApp, a: &Args) -> R {
+    if app.mcp_render.is_none() {
+        return Err("nessun render avviato con lo strumento render".into());
     }
-    let started = Instant::now();
-    Ok(Step::Wait(Waiter {
-        deadline: Instant::now() + Duration::from_secs_f32(timeout),
-        poll: Box::new(move |app| {
-            if app.error.is_some() {
-                return Some(ToolOutput::error("render non avviato"));
-            }
-            let p = app.session.progress();
-            if p.job_id == before || app.is_preparing() || app.is_baking_fog() {
-                return None;
-            }
-            match &p.state {
-                SessionState::Completed if !app.render_is_stale() => {}
-                SessionState::Failed(e) => return Some(ToolOutput::error(format!("render fallito: {e}"))),
-                SessionState::Cancelled => return Some(ToolOutput::error("render interrotto")),
-                _ => return None,
-            }
-            Some(match save_frame(app, &path) {
-                Ok(samples) => ToolOutput {
-                    png: (preview > 0).then(|| preview_png(&path, preview)).flatten(),
-                    ..ToolOutput::ok(json!({
-                        "file": path.display().to_string(),
-                        "campioni": samples,
-                        "larghezza": p.width,
-                        "altezza": p.height,
-                        "tempo_render_s": (p.elapsed.as_secs_f32() * 10.0).round() / 10.0,
-                        "tempo_totale_s": (started.elapsed().as_secs_f32() * 10.0).round() / 10.0,
-                        "dispositivo": p.backend,
-                    }))
-                },
-                Err(e) => ToolOutput::error(e),
-            })
-        }),
-    }))
+    let preview = a.u32("preview_px")?.unwrap_or(768).min(2048);
+    let max_wait = a.f32("max_wait_s")?.unwrap_or(45.0).clamp(0.0, 600.0);
+    wait_render(max_wait, preview)
 }
 
 #[cfg(test)]
@@ -1151,7 +1061,7 @@ mod tests {
 
     #[test]
     fn every_tool_has_a_valid_schema_and_handler() {
-        let tools = list();
+        let tools = forge_mcp::tools::list();
         let tools = tools.as_array().unwrap();
         assert!(tools.len() >= 20);
         let mut names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();

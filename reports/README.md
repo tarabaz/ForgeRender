@@ -34,6 +34,7 @@ Servono Python 3 con `numpy` e `pillow` (`py -m pip install numpy pillow` su Win
 | 2026-10-29 | [Interfaccia Semplice / Avanzata](2026-10-29_interfaccia-semplice/REPORT.md) | Pannello in 5 passi, 3 aspetti, 3 qualità, Prepara scena; stessi dati dell'Avanzata; screenshot |
 | 2026-10-29 | [Versione 0.3.0](2026-10-29_versione-0.3.0/REPORT.md) | Studio fotografico, ortografica GPU=CPU, raggio delle luci GPU=CPU, 779 testi in inglese, benvenuto; screenshot |
 | 2026-10-30 | [Controllo da Claude con MCP](2026-10-30_mcp/REPORT.md) | 24 strumenti; due giri completi sul programma vero (studio, import/salva/riapri/render); verifica di collegamento che si chiude da sola |
+| 2026-10-30 | [Controllo IA separato (ponte)](2026-10-30_controllo-ia-ponte/REPORT.md) | La finestra resta aperta; interruttore "Controllo IA"; due sessioni di Claude Code vero sulla stessa scena; render lungo con render_status |
 
 ## Macchine
 
