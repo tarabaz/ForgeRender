@@ -432,5 +432,22 @@
 - **Da verificare da Valerio**: una sessione Claude vera che usa lo strumento e applica i
   materiali della libreria.
 
+### 0.10.0: materiali predefiniti con mappe, primi tre (30/10/2026)
+- Richiesta di Valerio: predefiniti "veri" con mappe, prendendo alcune mappe dalla libreria
+  Poly Haven scaricata (non la libreria in sé). Poly Haven copre legni, pelli, tessuti, pietre;
+  non ha metalli satinati, plastiche, carbonio (da generare). Il renderer non ha anisotropia né
+  vernice trasparente (fasi a parte, per spazzolati e laccati).
+- Fatti Rovere (Oak Veneer 01), Pelle nera (Leather White resa grigia, tinta 0,06) e Marmo
+  bianco lucido (generato). `MAPPED` in `forge_scene::material`, `builtin_textures_dir()`
+  (`FORGE_MATERIALS_DIR`, `materiali\` accanto all'exe, `assets/materiali` risalendo);
+  `forge_project::load` ritrova le mappe dei predefiniti spostati; pacchetti aggiornati.
+- Esempi: `forge_render_core` `materiali_predefiniti` (mappe 1K JPEG, marmo generato),
+  `forge_render_cpu` `confronto_materiali` (prima/dopo), `forge_scene` `elenco_predefiniti`
+  (elenco e schede `impostazioni.json`).
+- Cartella di lavoro di Valerio: `dist\MCP\nuova libreria` (11 categorie numerate, 123
+  cartelle con scheda; le tre fatte hanno anche le mappe). Mappe da altre fonti solo CC0.
+- Prossimi: altri legni, pietre, tessuti da Poly Haven; generatore per spazzolati, sabbiati,
+  goffrati, layer di stampa 3D, carbonio.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

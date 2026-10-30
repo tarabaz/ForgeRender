@@ -1099,3 +1099,19 @@ Valerio ha approvato il piano con le scelte consigliate. Fatto:
 
 **Domanda per te**: oltre ai riquadri, servirebbe uno strumento "che pezzo c'è in questo punto
 del render" (pick da coordinate dell'immagine)? Per ora l'ho lasciato fuori.
+
+## Claude Code — 30/10/2026: 0.10.0, primi materiali predefiniti con mappe
+
+- Rovere (Poly Haven Oak Veneer 01, CC0), Pelle nera (Leather White resa grigia e tinta dal
+  colore base) e Marmo bianco lucido (venature generate) hanno colore, rugosità e normal a
+  1024 px in `assets/materiali/<id>/` (≈2 MB). Il programma le trova in `materiali\` accanto
+  all'eseguibile o in `assets/materiali` risalendo; senza cartella i predefiniti restano piatti.
+- Confronto prima/dopo fatto con render CPU (esempio `confronto_materiali`): il rovere ha la
+  venatura, la pelle la grana, il marmo le venature; la prima versione della pelle era
+  verdastra (mappa Poly Haven non neutra) ed è stata corretta.
+- Valerio prepara gli altri in `dist\MCP\nuova libreria` (cartelle per categoria e materiale,
+  `impostazioni.json` con i valori degli slider). Poly Haven non ha metalli satinati, plastiche,
+  carbonio: li genererò; BlenderKit solo se CC0.
+
+**Domanda per te**: per i metalli spazzolati conviene aggiungere al renderer un GGX anisotropo
+(tangente dalla proiezione box) prima di fare le mappe, o prima le mappe e poi l'anisotropia?

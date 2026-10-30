@@ -655,7 +655,65 @@ pub fn presets() -> Vec<Material> {
     add("led-blu", "LED blu", c, &emit([0.02, 0.1, 1.0], 25.0));
     add("led-verde", "LED verde", c, &emit([0.05, 1.0, 0.1], 25.0));
     add("display", "Display acceso (bianco)", c, &emit([1.0; 3], 3.0));
+    if let Some(dir) = builtin_textures_dir() {
+        for m in &mut v {
+            attach_builtin_maps(m, dir);
+        }
+    }
     v
+}
+
+/// Materiali predefiniti con mappe (cartella `materiali/<id>/` del programma, preparate da
+/// `forge_render_core/examples/materiali_predefiniti.rs`): id, lato della ripetizione in metri,
+/// colore base e rugosità (moltiplicano le mappe; senza mappa di rugosità vale il numero).
+const MAPPED: [(&str, f32, [f32; 3], f32); 3] = [
+    // Poly Haven Oak Veneer 01 (CC0). Venatura un po' più fitta del foglio vero (1,83 m):
+    // a 1024 px resta nitida anche sui prodotti piccoli.
+    ("legno-rovere", 0.6, [1.0; 3], 0.8),
+    // Poly Haven Leather White (CC0), tinta nera dal colore base.
+    ("pelle-nera", 0.3, [0.06; 3], 1.0),
+    // Generato (venature su fondo bianco), lucidato: rugosità costante.
+    ("marmo-bianco", 0.35, [1.0; 3], 0.12),
+];
+
+/// Cartella delle mappe dei materiali predefiniti: `FORGE_MATERIALS_DIR`, oppure `materiali`
+/// accanto al programma (pacchetti), oppure `assets/materiali` risalendo dal programma
+/// (compilazione locale e test). `None` se non c'è: i predefiniti restano senza mappe.
+pub fn builtin_textures_dir() -> Option<&'static std::path::Path> {
+    static DIR: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
+    DIR.get_or_init(|| {
+        if let Some(d) = std::env::var_os("FORGE_MATERIALS_DIR") {
+            return Some(PathBuf::from(d));
+        }
+        let exe = std::env::current_exe().ok()?;
+        let dir = exe.parent()?;
+        if dir.join("materiali").is_dir() {
+            return Some(dir.join("materiali"));
+        }
+        dir.ancestors().map(|a| a.join("assets").join("materiali")).find(|d| d.is_dir())
+    })
+    .as_deref()
+}
+
+/// Collega colore, rugosità e normal dalla cartella del materiale, se ci sono.
+fn attach_builtin_maps(m: &mut Material, dir: &std::path::Path) {
+    let Some(&(_, scale, color, roughness)) = MAPPED.iter().find(|e| e.0 == m.id.0) else {
+        return;
+    };
+    let file = |name: &str| Some(dir.join(&m.id.0).join(name)).filter(|p| p.is_file());
+    m.base_color_texture = file("colore.jpg");
+    m.roughness_texture = file("rugosita.jpg");
+    m.normal_texture = file("normal.jpg");
+    if !m.has_textures() {
+        return;
+    }
+    m.base_color = color;
+    m.roughness = roughness;
+    m.mapping = TextureMapping {
+        projection: Projection::Box,
+        scale,
+        ..TextureMapping::default()
+    };
 }
 
 #[cfg(test)]
@@ -687,5 +745,22 @@ mod tests {
         ] {
             assert!(p.iter().any(|m| m.id.0 == id), "manca {id}");
         }
+    }
+
+    /// Le mappe dei predefiniti (assets/materiali) si trovano anche dai test e sono complete.
+    #[test]
+    fn builtin_maps_are_attached() {
+        let dir = builtin_textures_dir().expect("assets/materiali");
+        let p = presets();
+        for (id, scale, ..) in MAPPED {
+            let m = p.iter().find(|m| m.id.0 == id).unwrap_or_else(|| panic!("manca {id}"));
+            let color = m.base_color_texture.as_ref().unwrap_or_else(|| panic!("{id} senza colore"));
+            assert!(color.starts_with(dir) && color.is_file());
+            assert_eq!(m.mapping.scale, scale);
+        }
+        let rovere = p.iter().find(|m| m.id.0 == "legno-rovere").unwrap();
+        assert!(rovere.roughness_texture.is_some() && rovere.normal_texture.is_some());
+        // Gli altri restano senza mappe.
+        assert!(!p.iter().find(|m| m.id.0 == "acciaio-lucidato").unwrap().has_textures());
     }
 }

@@ -11,6 +11,22 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.10.0 — 30/10/2026
+
+**Materiali predefiniti con mappe (primi tre)**
+- **Rovere** (venatura vera, Poly Haven Oak Veneer 01, CC0), **Pelle nera** (grana di Poly
+  Haven Leather White resa neutra, tinta nera dal materiale) e **Marmo bianco lucido**
+  (venature generate, ripetibili senza giunture) hanno colore, rugosità e normal a 1024 px.
+  Gli altri predefiniti non cambiano.
+- Mappe in `assets/materiali/<id>/` (circa 2 MB in tutto), copiate in `materiali\` accanto al
+  programma nella portable e nell'installer; si rifanno con l'esempio `materiali_predefiniti`.
+  Se la cartella manca, i predefiniti restano senza mappe.
+- I progetti salvati con un'altra installazione ritrovano le mappe nella cartella del programma
+  in uso.
+- Per preparare gli altri: `elenco_predefiniti --cartelle <radice>` crea una cartella per
+  categoria e materiale con `impostazioni.json` (valori degli slider dell'editor, stessi nomi
+  e ordine) da regolare; `confronto_materiali` fa i render prima/dopo.
+
 ## 0.9.0 — 30/10/2026
 
 **Controllo IA: Claude guarda i pezzi e capisce che cosa sono**

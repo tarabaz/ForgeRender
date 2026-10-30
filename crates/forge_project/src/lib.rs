@@ -313,9 +313,16 @@ pub fn load(path: &Path) -> anyhow::Result<LoadedProject> {
     if let forge_scene::Environment::Hdri { path: hdri, .. } = &mut scene.environment {
         relocate_asset(hdri, project_dir, &["hdri"], &source_dirs, &mut report);
     }
+    // Mappe dei materiali predefiniti (`materiali/<id>/…` del programma): si ritrovano anche
+    // se il programma è in un'altra cartella (portable spostata, nuova versione).
+    let texture_dirs: Vec<PathBuf> = source_dirs
+        .iter()
+        .cloned()
+        .chain(forge_scene::material::builtin_textures_dir().map(Path::to_path_buf))
+        .collect();
     for m in &mut scene.materials.materials {
         for slot in m.texture_slots_mut().into_iter().flatten() {
-            relocate_asset(slot, project_dir, &["textures", "texture"], &source_dirs, &mut report);
+            relocate_asset(slot, project_dir, &["textures", "texture"], &texture_dirs, &mut report);
         }
     }
     scene.camera = pf.camera;
@@ -522,6 +529,31 @@ mod tests {
         relocate_asset(&mut path, Some(&dir), &["textures"], &[dir.join("modelli")], &mut report);
         assert_eq!(path, tex.join("colore_3.png"));
         assert!(report.warnings.is_empty());
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    /// Progetto salvato con un'altra installazione (portable in un'altra cartella): le mappe dei
+    /// materiali predefiniti si ritrovano in quella del programma in uso.
+    #[test]
+    fn builtin_material_maps_follow_the_program() {
+        let builtin = forge_scene::material::builtin_textures_dir().expect("assets/materiali");
+        let dir = tmpdir();
+        let path = dir.join("p.frproject");
+        let scene = Scene::default();
+        save(&path, &scene, &ProjectMeta::default(), &RenderSettings::default()).unwrap();
+        let moved = std::fs::read_to_string(&path).unwrap().replace(
+            &serde_json::to_string(builtin).unwrap()[1..].trim_end_matches('"').to_string(),
+            "/vecchia/portable/materiali",
+        );
+        assert!(moved.contains("/vecchia/portable/materiali"), "percorso salvato da spostare");
+        std::fs::write(&path, moved).unwrap();
+        let loaded = load(&path).unwrap();
+        let m = loaded.scene.materials.get(&MaterialId::new("legno-rovere")).unwrap();
+        assert_eq!(
+            m.base_color_texture.as_deref(),
+            Some(builtin.join("legno-rovere").join("colore.jpg").as_path())
+        );
+        assert!(loaded.report.warnings.is_empty(), "{:?}", loaded.report.warnings);
         std::fs::remove_dir_all(dir).ok();
     }
 
