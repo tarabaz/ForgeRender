@@ -31,7 +31,7 @@ spiega cosa fa.
 | 4 | Qualità | **Bozza**, **Bilanciata**, **Alta** | Imposta campioni, rimbalzi e denoiser (tabella 3) | |
 | 4 | Dispositivo di calcolo | Due pulsanti: **Scheda video (GPU)** e **Processore (CPU)** | Predefinita la GPU appena risulta funzionante (una volta sola: poi vale la scelta dell'utente o di Claude). Senza GPU utilizzabile il pulsante è disattivato | |
 | 5 | Render | **Avvia render** (grande) con avanzamento | Come F5 | |
-| 5 | Render | **Salva immagine…** | Esporta PNG, come "Esporta PNG" | |
+| 5 | Render | **Salva immagine…** | PNG, JPG, TIFF 16 bit o EXR (si sceglie nella finestra), come File → Esporta immagine… | |
 
 **Non si vede nella Semplice** (resta tutto nella Avanzata): trasformazioni numeriche,
 gizmo, singole luci, HDRI, nebbia ed effetti, obiettivo e profondità di campo, thread, seed,
@@ -103,7 +103,7 @@ attivi nella Semplice" sopra.
 1. Salva i valori che sta per cambiare (per "Annulla preset").
 2. Appoggia il prodotto sulla base (quota 0), senza spostarlo in orizzontale.
 3. Se non c'è un fondale, ne aggiunge uno dimensionato sul prodotto (stessa regola di
-   Aggiungi → Fondale da studio). Se c'è già, lo riusa.
+   Oggetti → Fondale da studio). Se c'è già, lo riusa.
 4. Applica l'aspetto scelto (tabella 2) e la qualità scelta (tabella 3).
 5. Inquadra il prodotto.
 

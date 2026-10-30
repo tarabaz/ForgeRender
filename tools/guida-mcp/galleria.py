@@ -78,7 +78,7 @@ ZOOM = 0.72  # inquadratura più stretta di quella automatica: il prodotto riemp
 
 
 # Viste ruotate: più strette, altrimenti a 45° si vede oltre il bordo del fondale.
-VIEW_ZOOM = {"tre_quarti": 0.58, "isometrica": 0.52}
+VIEW_ZOOM = {"tre_quarti": 0.47, "isometrica": 0.44}
 # Gruppi da rifare (argomenti dello script); nessuno = tutti.
 GROUPS = set(sys.argv[1:]) or {"aspetti", "viste", "luce", "materiali"}
 
@@ -97,8 +97,9 @@ for look in ("studio", "chiaro", "scuro", "scenografico") if "aspetti" in GROUPS
     save(render(f"aspetto_{look}", W, H, SPP), f"aspetto_{look}.jpg")
 
 # Viste della camera.
+# Sfondo chiaro: fondale bianco su ambiente bianco, i bordi visti di sbieco non si notano.
 for view in ("frontale", "tre_quarti", "isometrica") if "viste" in GROUPS else ():
-    studio(view=view)
+    studio("chiaro", view=view)
     save(render(f"vista_{view}", W, H, SPP), f"vista_{view}.jpg")
 
 # Luce calda a destra: prima e dopo.

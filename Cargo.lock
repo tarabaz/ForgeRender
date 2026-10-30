@@ -899,7 +899,7 @@ checksum = "aa9a19cbb55df58761df49b23516a86d432839add4af60fc256da840f66ed35b"
 
 [[package]]
 name = "forge_accel"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "bytemuck",
  "forge_math",
@@ -909,7 +909,7 @@ dependencies = [
 
 [[package]]
 name = "forge_app"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -937,7 +937,7 @@ dependencies = [
 
 [[package]]
 name = "forge_cli"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "forge_denoise",
@@ -958,7 +958,7 @@ dependencies = [
 
 [[package]]
 name = "forge_denoise"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "forge_math",
@@ -971,7 +971,7 @@ dependencies = [
 
 [[package]]
 name = "forge_image_io"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "forge_render_core",
@@ -980,7 +980,7 @@ dependencies = [
 
 [[package]]
 name = "forge_import"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "forge_math",
@@ -997,7 +997,7 @@ dependencies = [
 
 [[package]]
 name = "forge_library"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "forge_scene",
@@ -1011,7 +1011,7 @@ dependencies = [
 
 [[package]]
 name = "forge_math"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "bytemuck",
  "glam",
@@ -1020,7 +1020,7 @@ dependencies = [
 
 [[package]]
 name = "forge_mcp"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1028,7 +1028,7 @@ dependencies = [
 
 [[package]]
 name = "forge_mcp_bridge"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "forge_mcp",
  "serde_json",
@@ -1036,7 +1036,7 @@ dependencies = [
 
 [[package]]
 name = "forge_project"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "forge_import",
@@ -1050,7 +1050,7 @@ dependencies = [
 
 [[package]]
 name = "forge_render_core"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "exr",
@@ -1066,7 +1066,7 @@ dependencies = [
 
 [[package]]
 name = "forge_render_cpu"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "forge_accel",
@@ -1081,7 +1081,7 @@ dependencies = [
 
 [[package]]
 name = "forge_render_gpu"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -1098,7 +1098,7 @@ dependencies = [
 
 [[package]]
 name = "forge_scene"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "forge_math",
  "serde",
@@ -1107,7 +1107,7 @@ dependencies = [
 
 [[package]]
 name = "forge_step"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "cc",
@@ -1120,7 +1120,7 @@ dependencies = [
 
 [[package]]
 name = "forge_telemetry"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "libloading",
  "sysinfo",
@@ -1130,7 +1130,7 @@ dependencies = [
 
 [[package]]
 name = "forge_volume"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "forge_math",
  "forge_scene",

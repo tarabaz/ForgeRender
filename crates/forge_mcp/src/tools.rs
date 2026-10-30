@@ -171,7 +171,7 @@ pub fn list() -> Value {
                 "preview_px": {"type": "integer", "description": "Lato massimo dell'anteprima (predefinito 768)."}
             }), &[]),
         tool("stop_render", "Ferma il render in corso (l'immagine resta).", json!({}), &[]),
-        tool("save_image", "Salva come PNG l'ultima immagine renderizzata.",
+        tool("save_image", "Salva l'ultima immagine renderizzata. Il formato segue l'estensione: .png (predefinito), .jpg (leggero, per web), .tif (16 bit, per il fotoritocco), .exr (valori lineari, per il compositing).",
             json!({"path": {"type": "string"}, "overwrite": {"type": "boolean"}}), &["path"]),
     ];
     Value::Array(tools)

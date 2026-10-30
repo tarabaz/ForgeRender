@@ -1,6 +1,10 @@
 # Piano: nuova interfaccia e manuale interno (da approvare)
 
-Stato: **proposta**. Nessuna riga di codice è stata cambiata per questo piano.
+Stato: **approvato da Valerio il 30/10/2026** con tutte le scelte consigliate; per
+l'esportazione un solo comando "Esporta…" con la scelta del formato nella finestra.
+Fase 1 (inventario) e fase 2 (menu, toolbar, lacune) fatte nella versione 0.7.0.
+Il crate `egui-phosphor` è fermo a egui 0.36: si è usato il piano B, il file del carattere
+Phosphor incorporato direttamente.
 Base dell'analisi: commit `770234c` (versione 0.6.0), branch `claude/festive-heisenberg-d2ow6z` = `main`.
 
 Legenda usata in tutto il documento:

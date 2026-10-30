@@ -109,7 +109,15 @@ fn dispatch(app: &mut ForgeApp, name: &str, v: &Value) -> R {
             done(json!({"esito": "render fermato"}))
         }
         "save_image" => {
-            let path = output_path(&a.req_str("path")?, "png", a.bool("overwrite")?.unwrap_or(false), None)?;
+            // Formato dall'estensione (png, jpg, tif, exr); senza estensione nota, PNG.
+            let req = a.req_str("path")?;
+            let ext = std::path::Path::new(&req)
+                .extension()
+                .and_then(|e| e.to_str())
+                .filter(|_| forge_image_io::ExportFormat::from_path(std::path::Path::new(&req)).is_some())
+                .unwrap_or("png")
+                .to_string();
+            let path = output_path(&req, &ext, a.bool("overwrite")?.unwrap_or(false), None)?;
             let s = save_frame(app, &path)?;
             done(json!({"file": path.display().to_string(), "campioni": s}))
         }
@@ -921,8 +929,10 @@ fn save_frame(app: &ForgeApp, path: &Path) -> Result<u32, String> {
     if let Some(d) = path.parent() {
         std::fs::create_dir_all(d).map_err(|e| format!("cartella {} non creata: {e}", d.display()))?;
     }
-    forge_image_io::save_frame_png(
+    let format = forge_image_io::ExportFormat::from_path(path).unwrap_or(forge_image_io::ExportFormat::Png);
+    forge_image_io::save_frame(
         path,
+        format,
         &frame,
         app.settings.tone_mapping,
         app.settings.exposure_ev,

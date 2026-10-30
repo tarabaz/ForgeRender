@@ -11,7 +11,7 @@
 | `forge_render_cpu` | Backend CPU: BSDF, campionamento luci, integratore path tracing, pool Rayon dedicato |
 | `forge_import` | Import OBJ/STL, validazione mesh, normali con angolo di piega, conversione unità e Z-up → Y-up |
 | `forge_project` | Formato `.frproject`, versionamento schema, salvataggio atomico, report componenti/file mancanti |
-| `forge_image_io` | Export PNG con scrittura atomica |
+| `forge_image_io` | Export PNG, JPG, TIFF 16 bit ed EXR con scrittura atomica |
 | `forge_telemetry` | Rilevamento hardware (sysinfo), monitor CPU/RAM, log `tracing` con buffer per la UI |
 | `forge_cli` | `forgerender-cli`: render headless, benchmark scalabilità thread |
 | `forge_app` | `forgerender`: GUI egui/eframe, viewport wgpu fuori schermo, orchestrazione |

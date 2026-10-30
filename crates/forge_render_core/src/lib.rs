@@ -29,4 +29,4 @@ pub use render_scene::{
 };
 pub use session::{AdaptiveDiag, Frame, Progress, RenderSession, SessionState};
 pub use settings::{BackendKind, DenoiseMode, DenoiseQuality, DenoiseSettings, RenderSettings, SamplesPreset, ToneMapping};
-pub use tonemap::{tonemap_pixel, tonemap_to_rgba8};
+pub use tonemap::{tonemap_pixel, tonemap_to_rgb16, tonemap_to_rgba8, tonemap_unit};

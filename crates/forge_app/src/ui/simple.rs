@@ -83,7 +83,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
 fn product(app: &mut ForgeApp, ui: &mut egui::Ui) {
     step(ui, 1, tr("Prodotto"));
     if big_button(ui, tr("Importa modello…"), false)
-        .on_hover_text(tr(crate::ui::toolbar::IMPORT_HINT))
+        .on_hover_text(tr(crate::commands::IMPORT_HINT))
         .clicked()
     {
         app.import_dialog();
@@ -342,10 +342,10 @@ fn render(app: &mut ForgeApp, ui: &mut egui::Ui) {
         });
     }
     if big_button(ui, tr("Salva immagine…"), false)
-        .on_hover_text(tr("Salva il render come PNG"))
+        .on_hover_text(tr("Salva il render: PNG, JPG, TIFF 16 bit o EXR (si sceglie nella finestra)"))
         .clicked()
     {
-        app.export_png_dialog();
+        app.export_dialog();
     }
 }
 

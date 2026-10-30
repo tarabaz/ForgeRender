@@ -11,6 +11,46 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.7.0 — 30/10/2026
+
+**Nuova interfaccia: barra dei menu e toolbar separate** (fase 2 di
+`docs/PIANO_INTERFACCIA_E_MANUALE.md`)
+- **Barra dei menu**: File, Modifica, Scena, Oggetti, Vista, Rendering, Libreria, Strumenti, Guida,
+  con icone e scorciatoie scritte a destra. Modalità Semplice/Avanzata e lingua restano sempre a
+  sinistra.
+- **Toolbar delle azioni rapide** sotto i menu: Nuovo, Apri, Salva, Importa · Libreria,
+  Aggiungi ▾, Luci ▾, Camera ▾, Ambiente ▾, Materiale ▾ · **Avvia render** (arancione), Stop,
+  Riavvia, Esporta · a destra Controllo IA, Viewport | Render, Riavvio automatico.
+- Icone dal carattere **Phosphor** (MIT, compreso nel programma, nessuna dipendenza nuova).
+- **Elenco unico dei comandi** (`commands.rs`): menu, toolbar e tastiera usano gli stessi
+  comandi, testi e scorciatoie; un test controlla che le scorciatoie scritte siano quelle vere.
+- Le voci che aprono un pannello dell'Avanzata (Ambiente, Effetti, Camera…) dalla Semplice
+  passano da sole all'Avanzata, con un avviso.
+
+**Funzioni nuove**
+- **Esporta immagine…** (Ctrl+E): un solo comando, il formato si sceglie nella finestra di
+  salvataggio: PNG, JPG (qualità 92), TIFF 16 bit (per il fotoritocco), EXR (valori lineari, per
+  il compositing). Anche "Salva immagine…" della Semplice e `save_image` del Controllo IA.
+- **Progetti recenti** (File), gli ultimi 10, salvati nelle impostazioni; un progetto sparito
+  viene tolto dall'elenco con un messaggio.
+- **Esci** (File) e **conferma delle modifiche non salvate** (Salva / Non salvare / Annulla)
+  prima di Nuova scena, Apri, Progetti recenti, Esci e chiusura della finestra.
+- **Viste standard** (Vista e Camera ▾): frontale, retro, destra, sinistra, alto, basso;
+  Isometrica e Prospettica/ortografica anche da menu.
+- **Luci da menu** (Oggetti → Luce, Luci ▾): area, punto, spot, direzionale, portale.
+- Scorciatoie nuove: Ctrl+N nuova scena vuota, Ctrl+Maiusc+S salva con nome, Ctrl+E esporta.
+  Guida → Scorciatoie da tastiera mostra l'elenco vero.
+
+**Correzioni**
+- Maiusc+H (nascondi il resto) e Alt+H (mostra tutto) facevano la stessa cosa di H: egui ignora
+  Maiusc e Alt in più, e H veniva controllato per primo. Ora le combinazioni più specifiche
+  vengono lette prima (test).
+- F5 ora avvia, mette in pausa e riprende come il pulsante (prima ripartiva da zero).
+
+**Manuale (fase 1)**
+- `tools/manuale/inventario.py` → `manuale/inventario.json` e `manuale/INVENTARIO.md`: i 366
+  controlli dell'interfaccia trovati nei sorgenti, per zona, con un id proposto.
+
 ## 0.6.0 — 30/10/2026
 
 **Modalità Semplice**

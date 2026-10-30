@@ -104,7 +104,7 @@ correct accumulation, PNG export.
 | 7 | Progressive improvement with samples | ✅ |
 | 8 | Change the maximum sample count | ✅ also while rendering |
 | 9 | Stop and see the current result | ✅ |
-| 10 | Export PNG | ✅ |
+| 10 | Export PNG, JPG, TIFF 16 bit, EXR | ✅ |
 | 11 | Save and reopen a project | ✅ |
 | 12 | Automated engine tests | ✅ |
 

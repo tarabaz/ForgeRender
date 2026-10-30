@@ -168,7 +168,7 @@ all'inquadratura del render.
 | `set_render_settings` | Formato (16:9, 1:1, 4:5, 9:16), risoluzione, campioni, qualità, CPU/GPU, denoiser, esposizione |
 | `render` | Avvia il render, aspetta fino a ~45 s, salva il PNG e restituisce l'anteprima a Claude |
 | `render_status` | Avanzamento del render; a render finito file salvato e anteprima |
-| `stop_render` / `save_image` | Ferma il render; salva l'ultima immagine |
+| `stop_render` / `save_image` | Ferma il render; salva l'ultima immagine (PNG, JPG, TIFF 16 bit o EXR secondo l'estensione) |
 
 Dove finiscono i render senza un percorso: nella cartella `render` accanto al progetto, oppure
 in `renders` accanto ai log (portable: cartella del programma; installata:

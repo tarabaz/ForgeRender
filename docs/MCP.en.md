@@ -162,7 +162,7 @@ Measurements in **metres**, y up. "Right", "left", "front" are relative to the r
 | `set_render_settings` | Format (16:9, 1:1, 4:5, 9:16), resolution, samples, quality, CPU/GPU, denoiser, exposure |
 | `render` | Start the render, wait up to ~45 s, save the PNG and send the preview to Claude |
 | `render_status` | Render progress; when finished, saved file and preview |
-| `stop_render` / `save_image` | Stop the render; save the last image |
+| `stop_render` / `save_image` | Stop the render; save the last image (PNG, JPG, 16-bit TIFF or EXR by extension) |
 
 Renders without a path go to a `render` folder next to the project, or to `renders` next to the
 logs (portable: program folder; installed: `%LOCALAPPDATA%\ForgeRender\renders`).

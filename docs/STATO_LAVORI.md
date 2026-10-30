@@ -120,6 +120,17 @@
 - Guide MCP con screenshot e render d'esempio puliti (denoiser), script in `tools/guida-mcp/`
   (`scatta.py`, `annota.py`, `galleria.py`).
 
+## Fatto nella quattordicesima parte (versione 0.7.0)
+- Piano interfaccia + manuale approvato (`docs/PIANO_INTERFACCIA_E_MANUALE.md`).
+- Fase 1: inventario automatico `tools/manuale/inventario.py` → `manuale/` (366 controlli).
+- Fase 2: `commands.rs` (elenco unico dei comandi con id, testo, icona, scorciatoia, azione),
+  `ui/menubar.rs`, `ui/quickbar.rs`, `ui/icons.rs` (carattere Phosphor), tolto `ui/toolbar.rs`.
+  Esportazione PNG/JPG/TIFF 16/EXR (`forge_image_io::save_frame`), progetti recenti, Esci e
+  conferma delle modifiche non salvate, viste standard, luci da menu (`ForgeApp::add_light`).
+  Corretto Maiusc+H/Alt+H. Screenshot in `reports/2026-10-30_nuova-interfaccia/`.
+- Prossimo: fase 3 (finestra del manuale, ricerca, F1, "?", test di copertura). Gli screenshot
+  della guida MCP vanno rifatti con la nuova barra (`tools/guida-mcp/scatta.py`, `annota.py`).
+
 ## Piano di sviluppo incrementale
 
 ### Fase 1 — Versione nella barra del titolo: fatta, in attesa di conferma

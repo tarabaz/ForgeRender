@@ -90,6 +90,37 @@ fn yaw_pitch(d: Vec3, current_yaw: f32) -> (f32, f32) {
     }
 }
 
+/// Vista standard: la camera guarda il bersaglio dalla direzione `dir` (animata).
+/// Usata dal navigatore e dal menu Vista → Viste standard.
+pub fn look_from(app: &mut ForgeApp, dir: Vec3) {
+    app.nav_anim = Some(NavAnim {
+        from: (app.orbit.yaw, app.orbit.pitch),
+        to: yaw_pitch(dir, app.orbit.yaw),
+        start: Instant::now(),
+    });
+}
+
+/// Vista isometrica: ortografica, 45° di lato e dall'alto.
+pub fn isometric(app: &mut ForgeApp) {
+    app.orbit.lens.ortho = true;
+    app.nav_anim = Some(NavAnim {
+        from: (app.orbit.yaw, app.orbit.pitch),
+        to: (std::f32::consts::FRAC_PI_4, ISO_PITCH),
+        start: Instant::now(),
+    });
+    app.camera_changed();
+}
+
+/// Le sei viste standard (nome, direzione), nello stesso ordine del menu.
+pub const STANDARD_VIEWS: [(&str, Vec3); 6] = [
+    (crate::i18n::tk("Frontale"), Vec3::Z),
+    (crate::i18n::tk("Retro"), Vec3::NEG_Z),
+    (crate::i18n::tk("Destra"), Vec3::X),
+    (crate::i18n::tk("Sinistra"), Vec3::NEG_X),
+    (crate::i18n::tk("Alto"), Vec3::Y),
+    (crate::i18n::tk("Basso"), Vec3::NEG_Y),
+];
+
 /// Avanza l'animazione in corso (da chiamare a ogni frame della viewport).
 pub fn tick(app: &mut ForgeApp, ctx: &egui::Context) {
     let Some(a) = &app.nav_anim else { return };
@@ -167,12 +198,7 @@ pub fn show(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, painter: &egui:
 
     if resp.clicked() {
         if let Some((dir, _)) = hover {
-            let to = yaw_pitch(dir, app.orbit.yaw);
-            app.nav_anim = Some(NavAnim {
-                from: (app.orbit.yaw, app.orbit.pitch),
-                to,
-                start: Instant::now(),
-            });
+            look_from(app, dir);
             ui.ctx().request_repaint();
         }
     }
@@ -247,13 +273,7 @@ fn projection_buttons(app: &mut ForgeApp, ui: &egui::Ui, center: egui::Pos2, pai
         app.toggle_ortho();
     }
     if iso.clicked() {
-        app.orbit.lens.ortho = true;
-        app.nav_anim = Some(NavAnim {
-            from: (app.orbit.yaw, app.orbit.pitch),
-            to: (std::f32::consts::FRAC_PI_4, ISO_PITCH),
-            start: Instant::now(),
-        });
-        app.camera_changed();
+        isometric(app);
         ui.ctx().request_repaint();
     }
     proj.hovered() || iso.hovered() || proj.clicked() || iso.clicked()

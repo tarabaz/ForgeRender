@@ -20,6 +20,12 @@ enum Section {
     About,
 }
 
+/// Apre le Impostazioni sulla sezione Percorsi (menu Libreria → Cartella della libreria).
+pub fn open_paths(app: &mut ForgeApp, ctx: &egui::Context) {
+    app.prefs_open = true;
+    ctx.data_mut(|d| d.insert_temp(egui::Id::NULL.with("settings-section"), Section::Paths));
+}
+
 pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
     if !app.prefs_open {
         return;

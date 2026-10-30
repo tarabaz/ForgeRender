@@ -17,3 +17,6 @@ l'applicazione funziona senza riduzione del rumore.
 L'applicazione utilizza inoltre librerie Rust con licenze permissive (MIT,
 Apache-2.0, BSD, Zlib), tra cui egui/eframe, wgpu, glam, rayon, serde, image,
 tobj, stl_io, sysinfo, rfd.
+
+Le icone dell'interfaccia usano il carattere Phosphor Icons (https://phosphoricons.com),
+licenza MIT (vedi Phosphor_LICENSE.txt), compreso nel programma.

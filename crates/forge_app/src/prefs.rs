@@ -51,6 +51,22 @@ pub struct Preferences {
     pub new_threads: usize,
     /// Riavvio automatico del render quando cambia la scena.
     pub auto_restart: bool,
+    /// Ultimi progetti aperti o salvati (il più recente per primo, al massimo [`MAX_RECENT`]).
+    pub recent_projects: Vec<PathBuf>,
+}
+
+/// Quanti progetti tiene File → Progetti recenti.
+pub const MAX_RECENT: usize = 10;
+
+impl Preferences {
+    /// Mette `path` in cima ai recenti (senza doppioni). Vero se l'elenco è cambiato.
+    pub fn push_recent(&mut self, path: &Path) -> bool {
+        let before = self.recent_projects.clone();
+        self.recent_projects.retain(|p| p != path);
+        self.recent_projects.insert(0, path.to_path_buf());
+        self.recent_projects.truncate(MAX_RECENT);
+        self.recent_projects != before
+    }
 }
 
 impl Default for Preferences {
@@ -69,6 +85,7 @@ impl Default for Preferences {
             new_samples: r.target_samples,
             new_threads: r.threads,
             auto_restart: true,
+            recent_projects: Vec::new(),
         }
     }
 }
@@ -196,6 +213,7 @@ mod tests {
             new_samples: 256,
             new_threads: 8,
             auto_restart: false,
+            recent_projects: vec![PathBuf::from("/x/a.frproject")],
         };
         custom.save_to(&p).unwrap();
         let (back, err) = Preferences::load_from(&p);
@@ -225,5 +243,19 @@ mod tests {
         assert_eq!(d.download_resolution, forge_library::online::RESOLUTIONS.len() - 1);
         assert_eq!(d.download_provider, "ambientcg");
         assert!(d.auto_restart);
+    }
+
+    #[test]
+    fn recent_projects_keep_order_without_duplicates() {
+        let mut p = Preferences::default();
+        for i in 0..12 {
+            p.push_recent(Path::new(&format!("/p/{i}.frproject")));
+        }
+        assert_eq!(p.recent_projects.len(), MAX_RECENT);
+        assert_eq!(p.recent_projects[0], Path::new("/p/11.frproject"));
+        assert!(p.push_recent(Path::new("/p/5.frproject")));
+        assert_eq!(p.recent_projects[0], Path::new("/p/5.frproject"));
+        assert_eq!(p.recent_projects.iter().filter(|x| x.ends_with("5.frproject")).count(), 1);
+        assert!(!p.push_recent(Path::new("/p/5.frproject")), "già in cima: niente da salvare");
     }
 }

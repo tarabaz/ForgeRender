@@ -1,0 +1,3296 @@
+[
+ {
+  "file": "crates/forge_app/src/ui/gizmo.rs",
+  "riga": 1059,
+  "funzione": "toolbar",
+  "pannello": "Viewport · strumenti",
+  "tipo": "scelta",
+  "testo": "Globale",
+  "id": "viewport_strumenti.globale"
+ },
+ {
+  "file": "crates/forge_app/src/ui/gizmo.rs",
+  "riga": 1062,
+  "funzione": "toolbar",
+  "pannello": "Viewport · strumenti",
+  "tipo": "scelta",
+  "testo": "Globale",
+  "id": "viewport_strumenti.globale_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/gizmo.rs",
+  "riga": 1064,
+  "funzione": "toolbar",
+  "pannello": "Viewport · strumenti",
+  "tipo": "scelta",
+  "testo": "Locale",
+  "id": "viewport_strumenti.locale"
+ },
+ {
+  "file": "crates/forge_app/src/ui/gizmo.rs",
+  "riga": 1067,
+  "funzione": "toolbar",
+  "pannello": "Viewport · strumenti",
+  "tipo": "menu",
+  "testo": "Snap (Ctrl)",
+  "id": "viewport_strumenti.snap_ctrl"
+ },
+ {
+  "file": "crates/forge_app/src/ui/gizmo.rs",
+  "riga": 1070,
+  "funzione": "toolbar",
+  "pannello": "Viewport · strumenti",
+  "tipo": "campo numerico",
+  "testo": "Spostamento: ",
+  "id": "viewport_strumenti.spostamento"
+ },
+ {
+  "file": "crates/forge_app/src/ui/gizmo.rs",
+  "riga": 1076,
+  "funzione": "toolbar",
+  "pannello": "Viewport · strumenti",
+  "tipo": "campo numerico",
+  "testo": "Rotazione: ",
+  "id": "viewport_strumenti.rotazione"
+ },
+ {
+  "file": "crates/forge_app/src/ui/gizmo.rs",
+  "riga": 1082,
+  "funzione": "toolbar",
+  "pannello": "Viewport · strumenti",
+  "tipo": "campo numerico",
+  "testo": "Scala: ×",
+  "id": "viewport_strumenti.scala"
+ },
+ {
+  "file": "crates/forge_app/src/ui/gizmo.rs",
+  "riga": 1090,
+  "funzione": "toolbar",
+  "pannello": "Viewport · strumenti",
+  "tipo": "pulsante",
+  "testo": "Annulla",
+  "id": "viewport_strumenti.annulla"
+ },
+ {
+  "file": "crates/forge_app/src/ui/gizmo.rs",
+  "riga": 1097,
+  "funzione": "toolbar",
+  "pannello": "Viewport · strumenti",
+  "tipo": "pulsante",
+  "testo": "Ripeti",
+  "id": "viewport_strumenti.ripeti"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 20,
+  "funzione": "show",
+  "pannello": "Avanzata",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "avanzata.show"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 43,
+  "funzione": "vec3_edit",
+  "pannello": "Avanzata",
+  "tipo": "campo numerico",
+  "testo": "(variabile)",
+  "id": "avanzata.vec3_edit"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 71,
+  "funzione": "library_save_controls",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "pulsante",
+  "testo": "Salva",
+  "id": "avanzata_materiali.salva"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 92,
+  "funzione": "library_save_controls",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "avanzata_materiali.library_save_controls"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 106,
+  "funzione": "library_save_controls",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "pulsante",
+  "testo": "Ripristina",
+  "id": "avanzata_materiali.ripristina"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 123,
+  "funzione": "library_save_controls",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "campo di testo",
+  "testo": "Salva",
+  "id": "avanzata_materiali.salva_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 125,
+  "funzione": "library_save_controls",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "pulsante",
+  "testo": "Salva",
+  "id": "avanzata_materiali.salva_3"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 163,
+  "funzione": "library_save_controls",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "pulsante",
+  "testo": "Annulla",
+  "id": "avanzata_materiali.annulla"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 229,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "campo di testo",
+  "testo": "cerca…",
+  "id": "avanzata_materiali.cerca"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 274,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "avanzata_materiali.materials"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 284,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "pulsante",
+  "testo": "Libreria con texture (ambientCG, Poly Haven)…",
+  "id": "avanzata_materiali.libreria_con_texture_ambientcg_poly_have"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 296,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "pulsante",
+  "testo": "Assegna alla selezione",
+  "id": "avanzata_materiali.assegna_alla_selezione"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 305,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "pulsante",
+  "testo": "Rimuovi assegnazione",
+  "id": "avanzata_materiali.rimuovi_assegnazione"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 317,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "campo di testo",
+  "testo": "(variabile)",
+  "id": "avanzata_materiali.materials_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 329,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "pulsante",
+  "testo": "Assegna ({})",
+  "id": "avanzata_materiali.assegna"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 346,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "pulsante",
+  "testo": "Usa come predefinito per i componenti senza assegnazione",
+  "id": "avanzata_materiali.usa_come_predefinito_per_i_componenti_se"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 355,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "pulsante",
+  "testo": "Nuovo",
+  "id": "avanzata_materiali.nuovo"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 366,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "pulsante",
+  "testo": "Duplica",
+  "id": "avanzata_materiali.duplica"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 381,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "pulsante",
+  "testo": "Elimina",
+  "id": "avanzata_materiali.elimina"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 412,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "campo di testo",
+  "testo": "Scala e posizionamento texture",
+  "id": "avanzata_materiali.scala_e_posizionamento_texture"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 437,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "colore",
+  "testo": "(variabile)",
+  "id": "avanzata_materiali.materials_3"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 443,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "cursore",
+  "testo": "(variabile)",
+  "id": "avanzata_materiali.materials_4"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 449,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "cursore",
+  "testo": "(variabile)",
+  "id": "avanzata_materiali.materials_5"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 455,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "cursore",
+  "testo": "0.5 = riflesso fisico derivato dall'IOR",
+  "id": "avanzata_materiali.0_5_riflesso_fisico_derivato_dall_ior"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 460,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "cursore",
+  "testo": "Transmission",
+  "id": "avanzata_materiali.transmission"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 464,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "cursore",
+  "testo": "Trasparenza dielettrica (vetro, liquidi)",
+  "id": "avanzata_materiali.trasparenza_dielettrica_vetro_liquidi"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 471,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "colore",
+  "testo": "(variabile)",
+  "id": "avanzata_materiali.materials_6"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 480,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "campo numerico",
+  "testo": " cm",
+  "id": "avanzata_materiali.cm"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 489,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "campo numerico",
+  "testo": "(variabile)",
+  "id": "avanzata_materiali.materials_7"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 497,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "colore",
+  "testo": "Intensità emissione",
+  "id": "avanzata_materiali.intensita_emissione"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 501,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "campo numerico",
+  "testo": "Categoria",
+  "id": "avanzata_materiali.categoria"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 505,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "campo di testo",
+  "testo": "(variabile)",
+  "id": "avanzata_materiali.materials_8"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 530,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "casella",
+  "testo": "È una mappa di lucidità (gloss)",
+  "id": "avanzata_materiali.e_una_mappa_di_lucidita_gloss"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 551,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "casella",
+  "testo": "Formato DirectX",
+  "id": "avanzata_materiali.formato_directx"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 567,
+  "funzione": "materials",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "cursore",
+  "testo": "(variabile)",
+  "id": "avanzata_materiali.materials_9"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 591,
+  "funzione": "mapping_controls",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "scelta",
+  "testo": "Box (CAD)",
+  "id": "avanzata_materiali.box_cad"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 595,
+  "funzione": "mapping_controls",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "scelta",
+  "testo": "UV della mesh",
+  "id": "avanzata_materiali.uv_della_mesh"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 607,
+  "funzione": "mapping_controls",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "cursore",
+  "testo": "(variabile)",
+  "id": "avanzata_materiali.mapping_controls"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 635,
+  "funzione": "mapping_controls",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "campo numerico",
+  "testo": "(variabile)",
+  "id": "avanzata_materiali.mapping_controls_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 652,
+  "funzione": "mapping_controls",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "cursore",
+  "testo": "Quante volte la texture si ripete sull'intervallo UV 0–1 del modello",
+  "id": "avanzata_materiali.quante_volte_la_texture_si_ripete_sull_i"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 661,
+  "funzione": "mapping_controls",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "cursore",
+  "testo": "(variabile)",
+  "id": "avanzata_materiali.mapping_controls_3"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 667,
+  "funzione": "mapping_controls",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "campo numerico",
+  "testo": "U ",
+  "id": "avanzata_materiali.u"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 670,
+  "funzione": "mapping_controls",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "campo numerico",
+  "testo": "V ",
+  "id": "avanzata_materiali.v"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 724,
+  "funzione": "mtlx_values",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "pulsante",
+  "testo": "Usa la scala del displacement del file ({mm:.1} mm)",
+  "id": "avanzata_materiali.usa_la_scala_del_displacement_del_file_m"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 744,
+  "funzione": "relief_controls",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "cursore",
+  "testo": "Dettaglio fine dell'ombreggiatura (non cambia la sagoma)",
+  "id": "avanzata_materiali.dettaglio_fine_dell_ombreggiatura_non_ca"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 752,
+  "funzione": "relief_controls",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "cursore",
+  "testo": "(variabile)",
+  "id": "avanzata_materiali.relief_controls"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 760,
+  "funzione": "relief_controls",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "cursore",
+  "testo": "(variabile)",
+  "id": "avanzata_materiali.relief_controls_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 784,
+  "funzione": "relief_controls",
+  "pannello": "Avanzata · Materiali",
+  "tipo": "cursore",
+  "testo": "(variabile)",
+  "id": "avanzata_materiali.relief_controls_3"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 871,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "pulsante",
+  "testo": "Sostituisce tutte le luci, adattandole alle dimensioni della scena",
+  "id": "avanzata_luci.sostituisce_tutte_le_luci_adattandole_al"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 884,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "avanzata_luci.lights"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 908,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "campo di testo",
+  "testo": "(variabile)",
+  "id": "avanzata_luci.lights_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 918,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "elenco a tendina",
+  "testo": "Tipo",
+  "id": "avanzata_luci.tipo"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 921,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "scelta",
+  "testo": "Area (rettangolare)",
+  "id": "avanzata_luci.area_rettangolare"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 922,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "scelta",
+  "testo": "Puntiforme",
+  "id": "avanzata_luci.puntiforme"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 923,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "scelta",
+  "testo": "Spot",
+  "id": "avanzata_luci.spot"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 924,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "scelta",
+  "testo": "Direzionale",
+  "id": "avanzata_luci.direzionale"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 925,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "scelta",
+  "testo": "Portale (finestra)",
+  "id": "avanzata_luci.portale_finestra"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 941,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "casella",
+  "testo": "Accesa",
+  "id": "avanzata_luci.accesa"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 956,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "campo numerico",
+  "testo": "Altezza (m)",
+  "id": "avanzata_luci.altezza_m"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 959,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "campo numerico",
+  "testo": "(variabile)",
+  "id": "avanzata_luci.lights_3"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 965,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "colore",
+  "testo": "Temperatura",
+  "id": "avanzata_luci.temperatura"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 984,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "campo numerico",
+  "testo": "(variabile)",
+  "id": "avanzata_luci.lights_4"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 990,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "campo numerico",
+  "testo": "Altezza (m)",
+  "id": "avanzata_luci.altezza_m_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 993,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "campo numerico",
+  "testo": "(variabile)",
+  "id": "avanzata_luci.lights_5"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1009,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "cursore",
+  "testo": "(variabile)",
+  "id": "avanzata_luci.lights_6"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1021,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "cursore",
+  "testo": "0 % = bordo netto, 100 % = sfuma dal centro (maniglia vuota nella viewport)",
+  "id": "avanzata_luci.0_bordo_netto_100_sfuma_dal_centro_manig"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1037,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "casella",
+  "testo": "Limitato",
+  "id": "avanzata_luci.limitato"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1055,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "campo numerico",
+  "testo": "(variabile)",
+  "id": "avanzata_luci.lights_7"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1065,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "cursore",
+  "testo": "(variabile)",
+  "id": "avanzata_luci.lights_8"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1087,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "casella",
+  "testo": "Proietta ombre",
+  "id": "avanzata_luci.proietta_ombre"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1090,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "casella",
+  "testo": "Visibile alla camera",
+  "id": "avanzata_luci.visibile_alla_camera"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1093,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "pulsante",
+  "testo": "Duplica",
+  "id": "avanzata_luci.duplica"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1094,
+  "funzione": "lights",
+  "pannello": "Avanzata · Luci",
+  "tipo": "pulsante",
+  "testo": "Elimina",
+  "id": "avanzata_luci.elimina"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1127,
+  "funzione": "environment",
+  "pannello": "Avanzata · Ambiente",
+  "tipo": "scelta",
+  "testo": "Uniforme",
+  "id": "avanzata_ambiente.uniforme"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1128,
+  "funzione": "environment",
+  "pannello": "Avanzata · Ambiente",
+  "tipo": "scelta",
+  "testo": "Cielo a gradiente",
+  "id": "avanzata_ambiente.cielo_a_gradiente"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1129,
+  "funzione": "environment",
+  "pannello": "Avanzata · Ambiente",
+  "tipo": "scelta",
+  "testo": "Mappa HDRI",
+  "id": "avanzata_ambiente.mappa_hdri"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1154,
+  "funzione": "environment",
+  "pannello": "Avanzata · Ambiente",
+  "tipo": "colore",
+  "testo": "Intensità",
+  "id": "avanzata_ambiente.intensita"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1157,
+  "funzione": "environment",
+  "pannello": "Avanzata · Ambiente",
+  "tipo": "cursore",
+  "testo": "(variabile)",
+  "id": "avanzata_ambiente.environment"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1167,
+  "funzione": "environment",
+  "pannello": "Avanzata · Ambiente",
+  "tipo": "colore",
+  "testo": "Orizzonte",
+  "id": "avanzata_ambiente.orizzonte"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1170,
+  "funzione": "environment",
+  "pannello": "Avanzata · Ambiente",
+  "tipo": "colore",
+  "testo": "Suolo",
+  "id": "avanzata_ambiente.suolo"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1173,
+  "funzione": "environment",
+  "pannello": "Avanzata · Ambiente",
+  "tipo": "colore",
+  "testo": "Intensità",
+  "id": "avanzata_ambiente.intensita_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1176,
+  "funzione": "environment",
+  "pannello": "Avanzata · Ambiente",
+  "tipo": "cursore",
+  "testo": "(variabile)",
+  "id": "avanzata_ambiente.environment_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1192,
+  "funzione": "environment",
+  "pannello": "Avanzata · Ambiente",
+  "tipo": "cursore",
+  "testo": "Rotazione (°)",
+  "id": "avanzata_ambiente.rotazione"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1195,
+  "funzione": "environment",
+  "pannello": "Avanzata · Ambiente",
+  "tipo": "cursore",
+  "testo": "(variabile)",
+  "id": "avanzata_ambiente.environment_3"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1207,
+  "funzione": "environment",
+  "pannello": "Avanzata · Ambiente",
+  "tipo": "casella",
+  "testo": "Ambiente visibile come sfondo",
+  "id": "avanzata_ambiente.ambiente_visibile_come_sfondo"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1241,
+  "funzione": "effects",
+  "pannello": "Avanzata · Effetti",
+  "tipo": "pulsante",
+  "testo": "Ghiaccio secco",
+  "id": "avanzata_effetti.ghiaccio_secco"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1267,
+  "funzione": "effects",
+  "pannello": "Avanzata · Effetti",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "avanzata_effetti.effects"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1301,
+  "funzione": "effects",
+  "pannello": "Avanzata · Effetti",
+  "tipo": "casella",
+  "testo": "Attivo nel render (togliendo la spunta resta nella scena, spento)",
+  "id": "avanzata_effetti.attivo_nel_render_togliendo_la_spunta_re"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1305,
+  "funzione": "effects",
+  "pannello": "Avanzata · Effetti",
+  "tipo": "scelta",
+  "testo": "Seleziona: il gizmo sposta l'emettitore",
+  "id": "avanzata_effetti.seleziona_il_gizmo_sposta_l_emettitore"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1319,
+  "funzione": "effects",
+  "pannello": "Avanzata · Effetti",
+  "tipo": "campo di testo",
+  "testo": "Il gizmo sposta",
+  "id": "avanzata_effetti.il_gizmo_sposta"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1335,
+  "funzione": "effects",
+  "pannello": "Avanzata · Effetti",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "avanzata_effetti.effects_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1385,
+  "funzione": "effects",
+  "pannello": "Avanzata · Effetti",
+  "tipo": "campo numerico",
+  "testo": "Nuovo",
+  "id": "avanzata_effetti.nuovo"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1398,
+  "funzione": "effects",
+  "pannello": "Avanzata · Effetti",
+  "tipo": "cursore",
+  "testo": "(variabile)",
+  "id": "avanzata_effetti.effects_3"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1405,
+  "funzione": "effects",
+  "pannello": "Avanzata · Effetti",
+  "tipo": "cursore",
+  "testo": "Raggio sorgente (m)",
+  "id": "avanzata_effetti.raggio_sorgente_m"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1409,
+  "funzione": "effects",
+  "pannello": "Avanzata · Effetti",
+  "tipo": "cursore",
+  "testo": "Densità",
+  "id": "avanzata_effetti.densita"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1414,
+  "funzione": "effects",
+  "pannello": "Avanzata · Effetti",
+  "tipo": "cursore",
+  "testo": "Coefficiente di estinzione della nebbia piena (1/m): più alto = più opaca",
+  "id": "avanzata_effetti.coefficiente_di_estinzione_della_nebbia_"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1420,
+  "funzione": "effects",
+  "pannello": "Avanzata · Effetti",
+  "tipo": "cursore",
+  "testo": "Dimensione di sbuffi, filamenti e vortici",
+  "id": "avanzata_effetti.dimensione_di_sbuffi_filamenti_e_vortici"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1425,
+  "funzione": "effects",
+  "pannello": "Avanzata · Effetti",
+  "tipo": "cursore",
+  "testo": "Risalita",
+  "id": "avanzata_effetti.risalita"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1429,
+  "funzione": "effects",
+  "pannello": "Avanzata · Effetti",
+  "tipo": "cursore",
+  "testo": "(variabile)",
+  "id": "avanzata_effetti.effects_4"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1436,
+  "funzione": "effects",
+  "pannello": "Avanzata · Effetti",
+  "tipo": "cursore",
+  "testo": "Velocità con cui la nebbia si dissolve nell'aria (0 = mai)",
+  "id": "avanzata_effetti.velocita_con_cui_la_nebbia_si_dissolve_n"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1441,
+  "funzione": "effects",
+  "pannello": "Avanzata · Effetti",
+  "tipo": "colore",
+  "testo": "Intensità scattering",
+  "id": "avanzata_effetti.intensita_scattering"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1446,
+  "funzione": "effects",
+  "pannello": "Avanzata · Effetti",
+  "tipo": "cursore",
+  "testo": "Quanta luce la nebbia diffonde invece di assorbire (1 = bianca, 0 = fumo nero)",
+  "id": "avanzata_effetti.quanta_luce_la_nebbia_diffonde_invece_di"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1460,
+  "funzione": "effects",
+  "pannello": "Avanzata · Effetti",
+  "tipo": "cursore",
+  "testo": "0 = diffusione uniforme; positiva = più luminosa in controluce",
+  "id": "avanzata_effetti.0_diffusione_uniforme_positiva_piu_lumin"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1466,
+  "funzione": "effects",
+  "pannello": "Avanzata · Effetti",
+  "tipo": "casella",
+  "testo": "Non attraversa gli oggetti",
+  "id": "avanzata_effetti.non_attraversa_gli_oggetti"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1480,
+  "funzione": "effects",
+  "pannello": "Avanzata · Effetti",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "avanzata_effetti.effects_5"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1490,
+  "funzione": "effects",
+  "pannello": "Avanzata · Effetti",
+  "tipo": "cursore",
+  "testo": "(variabile)",
+  "id": "avanzata_effetti.effects_6"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1624,
+  "funzione": "camera",
+  "pannello": "Avanzata · Camera",
+  "tipo": "scelta",
+  "testo": "Punta su oggetto",
+  "id": "avanzata_camera.punta_su_oggetto"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1686,
+  "funzione": "camera",
+  "pannello": "Avanzata · Camera",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "avanzata_camera.camera"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1698,
+  "funzione": "camera",
+  "pannello": "Avanzata · Camera",
+  "tipo": "pulsante",
+  "testo": "Inquadra tutto",
+  "id": "avanzata_camera.inquadra_tutto"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1701,
+  "funzione": "camera",
+  "pannello": "Avanzata · Camera",
+  "tipo": "pulsante",
+  "testo": "Inquadra selezione",
+  "id": "avanzata_camera.inquadra_selezione"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1725,
+  "funzione": "render",
+  "pannello": "Avanzata · Render",
+  "tipo": "elenco a tendina",
+  "testo": "Dispositivo",
+  "id": "avanzata_render.dispositivo"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1729,
+  "funzione": "render",
+  "pannello": "Avanzata · Render",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "avanzata_render.render"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1757,
+  "funzione": "render",
+  "pannello": "Avanzata · Render",
+  "tipo": "cursore",
+  "testo": "0 = automatico (thread logici − 1, per lasciare reattiva l'interfaccia)",
+  "id": "avanzata_render.0_automatico_thread_logici_1_per_lasciar"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1776,
+  "funzione": "render",
+  "pannello": "Avanzata · Render",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "avanzata_render.render_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1785,
+  "funzione": "render",
+  "pannello": "Avanzata · Render",
+  "tipo": "campo numerico",
+  "testo": " px",
+  "id": "avanzata_render.px"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1789,
+  "funzione": "render",
+  "pannello": "Avanzata · Render",
+  "tipo": "campo numerico",
+  "testo": " px",
+  "id": "avanzata_render.px_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1797,
+  "funzione": "render",
+  "pannello": "Avanzata · Render",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "avanzata_render.render_3"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1803,
+  "funzione": "render",
+  "pannello": "Avanzata · Render",
+  "tipo": "scelta",
+  "testo": "Personalizzato",
+  "id": "avanzata_render.personalizzato"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1808,
+  "funzione": "render",
+  "pannello": "Avanzata · Render",
+  "tipo": "scelta",
+  "testo": "Illimitato",
+  "id": "avanzata_render.illimitato"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1820,
+  "funzione": "render",
+  "pannello": "Avanzata · Render",
+  "tipo": "campo numerico",
+  "testo": "campioni: ",
+  "id": "avanzata_render.campioni"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1838,
+  "funzione": "render",
+  "pannello": "Avanzata · Render",
+  "tipo": "casella",
+  "testo": "Arresto a soglia di rumore",
+  "id": "avanzata_render.arresto_a_soglia_di_rumore"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1855,
+  "funzione": "render",
+  "pannello": "Avanzata · Render",
+  "tipo": "cursore",
+  "testo": "(variabile)",
+  "id": "avanzata_render.render_4"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1868,
+  "funzione": "render",
+  "pannello": "Avanzata · Render",
+  "tipo": "campo numerico",
+  "testo": "(variabile)",
+  "id": "avanzata_render.render_5"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1881,
+  "funzione": "render",
+  "pannello": "Avanzata · Render",
+  "tipo": "cursore",
+  "testo": "Russian roulette da",
+  "id": "avanzata_render.russian_roulette_da"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1884,
+  "funzione": "render",
+  "pannello": "Avanzata · Render",
+  "tipo": "cursore",
+  "testo": "Clamp indiretto",
+  "id": "avanzata_render.clamp_indiretto"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1888,
+  "funzione": "render",
+  "pannello": "Avanzata · Render",
+  "tipo": "campo numerico",
+  "testo": "(variabile)",
+  "id": "avanzata_render.render_6"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1895,
+  "funzione": "render",
+  "pannello": "Avanzata · Render",
+  "tipo": "campo numerico",
+  "testo": "(variabile)",
+  "id": "avanzata_render.render_7"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1901,
+  "funzione": "render",
+  "pannello": "Avanzata · Render",
+  "tipo": "elenco a tendina",
+  "testo": "Tone mapping",
+  "id": "avanzata_render.tone_mapping"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1905,
+  "funzione": "render",
+  "pannello": "Avanzata · Render",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "avanzata_render.render_8"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1909,
+  "funzione": "render",
+  "pannello": "Avanzata · Render",
+  "tipo": "cursore",
+  "testo": "Esposizione (EV)",
+  "id": "avanzata_render.esposizione_ev"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1944,
+  "funzione": "denoiser",
+  "pannello": "Avanzata · Render",
+  "tipo": "elenco a tendina",
+  "testo": "Modalità",
+  "id": "avanzata_render.modalita"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1948,
+  "funzione": "denoiser",
+  "pannello": "Avanzata · Render",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "avanzata_render.denoiser"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1960,
+  "funzione": "denoiser",
+  "pannello": "Avanzata · Render",
+  "tipo": "casella",
+  "testo": "Usa CUDA (GPU NVIDIA)",
+  "id": "avanzata_render.usa_cuda_gpu_nvidia"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1973,
+  "funzione": "denoiser",
+  "pannello": "Avanzata · Render",
+  "tipo": "elenco a tendina",
+  "testo": "(variabile)",
+  "id": "avanzata_render.denoiser_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1975,
+  "funzione": "denoiser",
+  "pannello": "Avanzata · Render",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "avanzata_render.denoiser_3"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 1990,
+  "funzione": "denoiser",
+  "pannello": "Avanzata · Render",
+  "tipo": "campo numerico",
+  "testo": " campioni",
+  "id": "avanzata_render.campioni_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2001,
+  "funzione": "denoiser",
+  "pannello": "Avanzata · Render",
+  "tipo": "cursore",
+  "testo": "(variabile)",
+  "id": "avanzata_render.denoiser_4"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2013,
+  "funzione": "denoiser",
+  "pannello": "Avanzata · Render",
+  "tipo": "casella",
+  "testo": "Preserva i dettagli (albedo e normali)",
+  "id": "avanzata_render.preserva_i_dettagli_albedo_e_normali"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2021,
+  "funzione": "denoiser",
+  "pannello": "Avanzata · Render",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "avanzata_render.denoiser_5"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2060,
+  "funzione": "render_cameras",
+  "pannello": "Avanzata · Camera",
+  "tipo": "campo di testo",
+  "testo": "(variabile)",
+  "id": "avanzata_camera.render_cameras"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2107,
+  "funzione": "render_cameras",
+  "pannello": "Avanzata · Camera",
+  "tipo": "pulsante",
+  "testo": "+ Nuova camera dalla vista",
+  "id": "avanzata_camera.nuova_camera_dalla_vista"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2114,
+  "funzione": "render_cameras",
+  "pannello": "Avanzata · Camera",
+  "tipo": "casella",
+  "testo": "Pilota",
+  "id": "avanzata_camera.pilota"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2137,
+  "funzione": "camera_picker",
+  "pannello": "Avanzata",
+  "tipo": "elenco a tendina",
+  "testo": "Camera: {current}",
+  "id": "avanzata.camera_current"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2142,
+  "funzione": "camera_picker",
+  "pannello": "Avanzata",
+  "tipo": "scelta",
+  "testo": "Vista della viewport",
+  "id": "avanzata.vista_della_viewport"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2148,
+  "funzione": "camera_picker",
+  "pannello": "Avanzata",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "avanzata.camera_picker"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2182,
+  "funzione": "lens_controls",
+  "pannello": "Avanzata · Camera",
+  "tipo": "scelta",
+  "testo": "Prospettica",
+  "id": "avanzata_camera.prospettica"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2186,
+  "funzione": "lens_controls",
+  "pannello": "Avanzata · Camera",
+  "tipo": "scelta",
+  "testo": "Ortografica",
+  "id": "avanzata_camera.ortografica"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2198,
+  "funzione": "lens_controls",
+  "pannello": "Avanzata · Camera",
+  "tipo": "casella",
+  "testo": "Quella che la prospettiva avrebbe alla distanza del bersaglio (segue lo zoom)",
+  "id": "avanzata_camera.quella_che_la_prospettiva_avrebbe_alla_d"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2208,
+  "funzione": "lens_controls",
+  "pannello": "Avanzata · Camera",
+  "tipo": "campo numerico",
+  "testo": " m",
+  "id": "avanzata_camera.m"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2223,
+  "funzione": "lens_controls",
+  "pannello": "Avanzata · Camera",
+  "tipo": "campo numerico",
+  "testo": " mm",
+  "id": "avanzata_camera.mm"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2254,
+  "funzione": "lens_controls",
+  "pannello": "Avanzata · Camera",
+  "tipo": "casella",
+  "testo": "(variabile)",
+  "id": "avanzata_camera.lens_controls"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2263,
+  "funzione": "lens_controls",
+  "pannello": "Avanzata · Camera",
+  "tipo": "elenco a tendina",
+  "testo": "(variabile)",
+  "id": "avanzata_camera.lens_controls_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2269,
+  "funzione": "lens_controls",
+  "pannello": "Avanzata · Camera",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "avanzata_camera.lens_controls_3"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2281,
+  "funzione": "lens_controls",
+  "pannello": "Avanzata · Camera",
+  "tipo": "campo numerico",
+  "testo": "(variabile)",
+  "id": "avanzata_camera.lens_controls_4"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2294,
+  "funzione": "lens_controls",
+  "pannello": "Avanzata · Camera",
+  "tipo": "campo numerico",
+  "testo": " m",
+  "id": "avanzata_camera.m_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2302,
+  "funzione": "lens_controls",
+  "pannello": "Avanzata · Camera",
+  "tipo": "scelta",
+  "testo": "Scegli col clic",
+  "id": "avanzata_camera.scegli_col_clic"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2310,
+  "funzione": "lens_controls",
+  "pannello": "Avanzata · Camera",
+  "tipo": "pulsante",
+  "testo": "Sulla selezione",
+  "id": "avanzata_camera.sulla_selezione"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2347,
+  "funzione": "lens_controls",
+  "pannello": "Avanzata · Camera",
+  "tipo": "elenco a tendina",
+  "testo": "(variabile)",
+  "id": "avanzata_camera.lens_controls_5"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2355,
+  "funzione": "lens_controls",
+  "pannello": "Avanzata · Camera",
+  "tipo": "scelta",
+  "testo": "{n} lamelle",
+  "id": "avanzata_camera.n_lamelle"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2358,
+  "funzione": "lens_controls",
+  "pannello": "Avanzata · Camera",
+  "tipo": "scelta",
+  "testo": "{n} lamelle",
+  "id": "avanzata_camera.n_lamelle_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2367,
+  "funzione": "lens_controls",
+  "pannello": "Avanzata · Camera",
+  "tipo": "campo numerico",
+  "testo": "(variabile)",
+  "id": "avanzata_camera.lens_controls_6"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2382,
+  "funzione": "lens_controls",
+  "pannello": "Avanzata · Camera",
+  "tipo": "campo numerico",
+  "testo": "orizz. ",
+  "id": "avanzata_camera.orizz"
+ },
+ {
+  "file": "crates/forge_app/src/ui/inspector.rs",
+  "riga": 2389,
+  "funzione": "lens_controls",
+  "pannello": "Avanzata · Camera",
+  "tipo": "campo numerico",
+  "testo": "vert. ",
+  "id": "avanzata_camera.vert"
+ },
+ {
+  "file": "crates/forge_app/src/ui/library.rs",
+  "riga": 507,
+  "funzione": "window",
+  "pannello": "Libreria",
+  "tipo": "scelta",
+  "testo": "La mia libreria",
+  "id": "libreria.la_mia_libreria"
+ },
+ {
+  "file": "crates/forge_app/src/ui/library.rs",
+  "riga": 508,
+  "funzione": "window",
+  "pannello": "Libreria",
+  "tipo": "scelta",
+  "testo": "Online (ambientCG, Poly Haven)",
+  "id": "libreria.online_ambientcg_poly_haven"
+ },
+ {
+  "file": "crates/forge_app/src/ui/library.rs",
+  "riga": 511,
+  "funzione": "window",
+  "pannello": "Libreria",
+  "tipo": "pulsante",
+  "testo": "Apri cartella",
+  "id": "libreria.apri_cartella"
+ },
+ {
+  "file": "crates/forge_app/src/ui/library.rs",
+  "riga": 517,
+  "funzione": "window",
+  "pannello": "Libreria",
+  "tipo": "pulsante",
+  "testo": "Aggiorna",
+  "id": "libreria.aggiorna"
+ },
+ {
+  "file": "crates/forge_app/src/ui/library.rs",
+  "riga": 551,
+  "funzione": "mine",
+  "pannello": "Libreria",
+  "tipo": "campo di testo",
+  "testo": "cerca (nome, categoria, tag)…",
+  "id": "libreria.cerca_nome_categoria_tag"
+ },
+ {
+  "file": "crates/forge_app/src/ui/library.rs",
+  "riga": 559,
+  "funzione": "mine",
+  "pannello": "Libreria",
+  "tipo": "pulsante",
+  "testo": "Importa cartella…",
+  "id": "libreria.importa_cartella"
+ },
+ {
+  "file": "crates/forge_app/src/ui/library.rs",
+  "riga": 574,
+  "funzione": "mine",
+  "pannello": "Libreria",
+  "tipo": "pulsante",
+  "testo": "Importa zip…",
+  "id": "libreria.importa_zip"
+ },
+ {
+  "file": "crates/forge_app/src/ui/library.rs",
+  "riga": 629,
+  "funzione": "mine",
+  "pannello": "Libreria",
+  "tipo": "cursore",
+  "testo": " px",
+  "id": "libreria.px"
+ },
+ {
+  "file": "crates/forge_app/src/ui/library.rs",
+  "riga": 641,
+  "funzione": "mine",
+  "pannello": "Libreria",
+  "tipo": "pulsante",
+  "testo": "Aggiorna categorie",
+  "id": "libreria.aggiorna_categorie"
+ },
+ {
+  "file": "crates/forge_app/src/ui/library.rs",
+  "riga": 719,
+  "funzione": "mine",
+  "pannello": "Libreria",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "libreria.mine"
+ },
+ {
+  "file": "crates/forge_app/src/ui/library.rs",
+  "riga": 903,
+  "funzione": "material_card",
+  "pannello": "Libreria",
+  "tipo": "pulsante",
+  "testo": "Apri cartella",
+  "id": "libreria.apri_cartella_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/library.rs",
+  "riga": 907,
+  "funzione": "material_card",
+  "pannello": "Libreria",
+  "tipo": "pulsante",
+  "testo": "Elimina dalla libreria",
+  "id": "libreria.elimina_dalla_libreria"
+ },
+ {
+  "file": "crates/forge_app/src/ui/library.rs",
+  "riga": 920,
+  "funzione": "online_tab",
+  "pannello": "Libreria",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "libreria.online_tab"
+ },
+ {
+  "file": "crates/forge_app/src/ui/library.rs",
+  "riga": 925,
+  "funzione": "online_tab",
+  "pannello": "Libreria",
+  "tipo": "scelta",
+  "testo": "Materiali",
+  "id": "libreria.materiali"
+ },
+ {
+  "file": "crates/forge_app/src/ui/library.rs",
+  "riga": 926,
+  "funzione": "online_tab",
+  "pannello": "Libreria",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "libreria.online_tab_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/library.rs",
+  "riga": 929,
+  "funzione": "online_tab",
+  "pannello": "Libreria",
+  "tipo": "campo di testo",
+  "testo": "es. wood, metal, studio…",
+  "id": "libreria.es_wood_metal_studio"
+ },
+ {
+  "file": "crates/forge_app/src/ui/library.rs",
+  "riga": 934,
+  "funzione": "online_tab",
+  "pannello": "Libreria",
+  "tipo": "pulsante",
+  "testo": "Cerca",
+  "id": "libreria.cerca"
+ },
+ {
+  "file": "crates/forge_app/src/ui/library.rs",
+  "riga": 936,
+  "funzione": "online_tab",
+  "pannello": "Libreria",
+  "tipo": "pulsante",
+  "testo": "Aggiorna catalogo",
+  "id": "libreria.aggiorna_catalogo"
+ },
+ {
+  "file": "crates/forge_app/src/ui/library.rs",
+  "riga": 945,
+  "funzione": "online_tab",
+  "pannello": "Libreria",
+  "tipo": "elenco a tendina",
+  "testo": "(variabile)",
+  "id": "libreria.online_tab_3"
+ },
+ {
+  "file": "crates/forge_app/src/ui/library.rs",
+  "riga": 950,
+  "funzione": "online_tab",
+  "pannello": "Libreria",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "libreria.online_tab_4"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 17,
+  "funzione": "show",
+  "pannello": "Barra dei menu",
+  "tipo": "menu",
+  "testo": "File",
+  "id": "barra_dei_menu.file"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 18,
+  "funzione": "show",
+  "pannello": "Barra dei menu",
+  "tipo": "menu",
+  "testo": "Modifica",
+  "id": "barra_dei_menu.modifica"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 19,
+  "funzione": "show",
+  "pannello": "Barra dei menu",
+  "tipo": "menu",
+  "testo": "Scena",
+  "id": "barra_dei_menu.scena"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 20,
+  "funzione": "show",
+  "pannello": "Barra dei menu",
+  "tipo": "menu",
+  "testo": "Oggetti",
+  "id": "barra_dei_menu.oggetti"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 21,
+  "funzione": "show",
+  "pannello": "Barra dei menu",
+  "tipo": "menu",
+  "testo": "Vista",
+  "id": "barra_dei_menu.vista"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 22,
+  "funzione": "show",
+  "pannello": "Barra dei menu",
+  "tipo": "menu",
+  "testo": "Rendering",
+  "id": "barra_dei_menu.rendering"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 23,
+  "funzione": "show",
+  "pannello": "Barra dei menu",
+  "tipo": "menu",
+  "testo": "Libreria",
+  "id": "barra_dei_menu.libreria"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 24,
+  "funzione": "show",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "La mia libreria",
+  "id": "barra_dei_menu.la_mia_libreria"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 25,
+  "funzione": "show",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Scarica da ambientCG / Poly Haven…",
+  "id": "barra_dei_menu.scarica_da_ambientcg_poly_haven"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 27,
+  "funzione": "show",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Strumenti",
+  "id": "barra_dei_menu.strumenti"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 29,
+  "funzione": "show",
+  "pannello": "Barra dei menu",
+  "tipo": "menu",
+  "testo": "Strumenti",
+  "id": "barra_dei_menu.strumenti_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 33,
+  "funzione": "show",
+  "pannello": "Barra dei menu",
+  "tipo": "casella",
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.show"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 40,
+  "funzione": "show",
+  "pannello": "Barra dei menu",
+  "tipo": "menu",
+  "testo": "Guida",
+  "id": "barra_dei_menu.guida"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 41,
+  "funzione": "show",
+  "pannello": "Barra dei menu",
+  "tipo": "pulsante",
+  "testo": "Scorciatoie da tastiera",
+  "id": "barra_dei_menu.scorciatoie_da_tastiera"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 46,
+  "funzione": "show",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Benvenuto e informazioni…",
+  "id": "barra_dei_menu.benvenuto_e_informazioni"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 65,
+  "funzione": "item_with",
+  "pannello": "Barra dei menu",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.item_with"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 86,
+  "funzione": "tab_item",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.tab_item"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 90,
+  "funzione": "file_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Nuova scena vuota",
+  "id": "barra_dei_menu.nuova_scena_vuota"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 91,
+  "funzione": "file_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Nuova scena di test",
+  "id": "barra_dei_menu.nuova_scena_di_test"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 93,
+  "funzione": "file_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Progetti recenti",
+  "id": "barra_dei_menu.progetti_recenti"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 95,
+  "funzione": "file_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "menu",
+  "testo": "Progetti recenti",
+  "id": "barra_dei_menu.progetti_recenti_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 101,
+  "funzione": "file_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.file_menu"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 108,
+  "funzione": "file_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Salva progetto",
+  "id": "barra_dei_menu.salva_progetto"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 109,
+  "funzione": "file_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Salva progetto con nome…",
+  "id": "barra_dei_menu.salva_progetto_con_nome"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 111,
+  "funzione": "file_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Importa modello…",
+  "id": "barra_dei_menu.importa_modello"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 112,
+  "funzione": "file_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Esporta immagine…",
+  "id": "barra_dei_menu.esporta_immagine"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 114,
+  "funzione": "file_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Esci",
+  "id": "barra_dei_menu.esci"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 118,
+  "funzione": "edit_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Annulla",
+  "id": "barra_dei_menu.annulla"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 119,
+  "funzione": "edit_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Ripeti",
+  "id": "barra_dei_menu.ripeti"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 121,
+  "funzione": "edit_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Duplica",
+  "id": "barra_dei_menu.duplica"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 122,
+  "funzione": "edit_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Elimina",
+  "id": "barra_dei_menu.elimina"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 124,
+  "funzione": "edit_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Nascondi selezione",
+  "id": "barra_dei_menu.nascondi_selezione"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 125,
+  "funzione": "edit_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Nascondi tutto il resto",
+  "id": "barra_dei_menu.nascondi_tutto_il_resto"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 126,
+  "funzione": "edit_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Mostra tutto",
+  "id": "barra_dei_menu.mostra_tutto"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 128,
+  "funzione": "edit_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Impostazioni…",
+  "id": "barra_dei_menu.impostazioni"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 129,
+  "funzione": "edit_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Ripristina impostazioni predefinite",
+  "id": "barra_dei_menu.ripristina_impostazioni_predefinite"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 133,
+  "funzione": "scene_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Prepara scena prodotto",
+  "id": "barra_dei_menu.prepara_scena_prodotto"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 134,
+  "funzione": "scene_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Aspetto",
+  "id": "barra_dei_menu.aspetto"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 135,
+  "funzione": "scene_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Aspetto",
+  "id": "barra_dei_menu.aspetto_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 137,
+  "funzione": "scene_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "menu",
+  "testo": "Aspetto",
+  "id": "barra_dei_menu.aspetto_3"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 141,
+  "funzione": "scene_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.scene_menu"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 150,
+  "funzione": "scene_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Ambiente e HDRI…",
+  "id": "barra_dei_menu.ambiente_e_hdri"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 151,
+  "funzione": "scene_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Ambiente e HDRI…",
+  "id": "barra_dei_menu.ambiente_e_hdri_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 153,
+  "funzione": "scene_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Ambiente e HDRI…",
+  "id": "barra_dei_menu.ambiente_e_hdri_3"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 154,
+  "funzione": "scene_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Effetti e nebbia…",
+  "id": "barra_dei_menu.effetti_e_nebbia"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 159,
+  "funzione": "objects_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.objects_menu"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 165,
+  "funzione": "objects_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "menu",
+  "testo": "Luce",
+  "id": "barra_dei_menu.luce"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 167,
+  "funzione": "objects_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.objects_menu_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 174,
+  "funzione": "objects_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Posizione e dimensioni…",
+  "id": "barra_dei_menu.posizione_e_dimensioni"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 175,
+  "funzione": "objects_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Materiali…",
+  "id": "barra_dei_menu.materiali"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 176,
+  "funzione": "objects_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Luci…",
+  "id": "barra_dei_menu.luci"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 180,
+  "funzione": "view_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Inquadra tutto",
+  "id": "barra_dei_menu.inquadra_tutto"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 181,
+  "funzione": "view_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Inquadra selezione",
+  "id": "barra_dei_menu.inquadra_selezione"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 183,
+  "funzione": "view_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Viste standard",
+  "id": "barra_dei_menu.viste_standard"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 184,
+  "funzione": "view_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Viste standard",
+  "id": "barra_dei_menu.viste_standard_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 185,
+  "funzione": "view_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "menu",
+  "testo": "Viste standard",
+  "id": "barra_dei_menu.viste_standard_3"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 187,
+  "funzione": "view_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.view_menu"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 197,
+  "funzione": "view_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.view_menu_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 206,
+  "funzione": "view_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Camera e obiettivo…",
+  "id": "barra_dei_menu.camera_e_obiettivo"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 210,
+  "funzione": "render_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Avvia render",
+  "id": "barra_dei_menu.avvia_render"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 211,
+  "funzione": "render_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Dispositivo di calcolo",
+  "id": "barra_dei_menu.dispositivo_di_calcolo"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 212,
+  "funzione": "render_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Dispositivo di calcolo",
+  "id": "barra_dei_menu.dispositivo_di_calcolo_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 214,
+  "funzione": "render_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "menu",
+  "testo": "Dispositivo di calcolo",
+  "id": "barra_dei_menu.dispositivo_di_calcolo_3"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 218,
+  "funzione": "render_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "scelta",
+  "testo": "Scheda video (GPU)",
+  "id": "barra_dei_menu.scheda_video_gpu"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 221,
+  "funzione": "render_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "scelta",
+  "testo": "Processore (CPU)",
+  "id": "barra_dei_menu.processore_cpu"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 228,
+  "funzione": "render_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "menu",
+  "testo": "Qualità",
+  "id": "barra_dei_menu.qualita"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 233,
+  "funzione": "render_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "pulsante",
+  "testo": "{} · {spp} campioni",
+  "id": "barra_dei_menu.spp_campioni"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 242,
+  "funzione": "render_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "menu",
+  "testo": "Formato",
+  "id": "barra_dei_menu.formato"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 246,
+  "funzione": "render_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.render_menu"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 259,
+  "funzione": "render_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "casella",
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.render_menu_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 263,
+  "funzione": "render_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Impostazioni di render e denoiser…",
+  "id": "barra_dei_menu.impostazioni_di_render_e_denoiser"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 265,
+  "funzione": "render_menu",
+  "pannello": "Barra dei menu",
+  "tipo": "comando",
+  "testo": "Esporta immagine…",
+  "id": "barra_dei_menu.esporta_immagine_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 278,
+  "funzione": "ai_control",
+  "pannello": "Barra dei menu",
+  "tipo": "scelta",
+  "testo": "Controllo IA",
+  "id": "barra_dei_menu.controllo_ia"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 300,
+  "funzione": "language_switch",
+  "pannello": "Barra dei menu",
+  "tipo": "elenco a tendina",
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.language_switch"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 305,
+  "funzione": "language_switch",
+  "pannello": "Barra dei menu",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "barra_dei_menu.language_switch_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 324,
+  "funzione": "mode_switch",
+  "pannello": "Barra dei menu",
+  "tipo": "scelta",
+  "testo": "Semplice",
+  "id": "barra_dei_menu.semplice"
+ },
+ {
+  "file": "crates/forge_app/src/ui/menubar.rs",
+  "riga": 326,
+  "funzione": "mode_switch",
+  "pannello": "Barra dei menu",
+  "tipo": "scelta",
+  "testo": "Avanzata",
+  "id": "barra_dei_menu.avanzata"
+ },
+ {
+  "file": "crates/forge_app/src/ui/mod.rs",
+  "riga": 95,
+  "funzione": "import_options_window",
+  "pannello": "Finestre di dialogo",
+  "tipo": "elenco a tendina",
+  "testo": "(variabile)",
+  "id": "finestre_di_dialogo.import_options_window"
+ },
+ {
+  "file": "crates/forge_app/src/ui/mod.rs",
+  "riga": 99,
+  "funzione": "import_options_window",
+  "pannello": "Finestre di dialogo",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "finestre_di_dialogo.import_options_window_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/mod.rs",
+  "riga": 104,
+  "funzione": "import_options_window",
+  "pannello": "Finestre di dialogo",
+  "tipo": "elenco a tendina",
+  "testo": "(variabile)",
+  "id": "finestre_di_dialogo.import_options_window_3"
+ },
+ {
+  "file": "crates/forge_app/src/ui/mod.rs",
+  "riga": 108,
+  "funzione": "import_options_window",
+  "pannello": "Finestre di dialogo",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "finestre_di_dialogo.import_options_window_4"
+ },
+ {
+  "file": "crates/forge_app/src/ui/mod.rs",
+  "riga": 116,
+  "funzione": "import_options_window",
+  "pannello": "Finestre di dialogo",
+  "tipo": "scelta",
+  "testo": "Bassa",
+  "id": "finestre_di_dialogo.bassa"
+ },
+ {
+  "file": "crates/forge_app/src/ui/mod.rs",
+  "riga": 117,
+  "funzione": "import_options_window",
+  "pannello": "Finestre di dialogo",
+  "tipo": "scelta",
+  "testo": "Media",
+  "id": "finestre_di_dialogo.media"
+ },
+ {
+  "file": "crates/forge_app/src/ui/mod.rs",
+  "riga": 118,
+  "funzione": "import_options_window",
+  "pannello": "Finestre di dialogo",
+  "tipo": "scelta",
+  "testo": "Alta",
+  "id": "finestre_di_dialogo.alta"
+ },
+ {
+  "file": "crates/forge_app/src/ui/mod.rs",
+  "riga": 122,
+  "funzione": "import_options_window",
+  "pannello": "Finestre di dialogo",
+  "tipo": "casella",
+  "testo": "Appoggia sul pavimento dopo l'importazione",
+  "id": "finestre_di_dialogo.appoggia_sul_pavimento_dopo_l_importazio"
+ },
+ {
+  "file": "crates/forge_app/src/ui/mod.rs",
+  "riga": 125,
+  "funzione": "import_options_window",
+  "pannello": "Finestre di dialogo",
+  "tipo": "cursore",
+  "testo": "(variabile)",
+  "id": "finestre_di_dialogo.import_options_window_5"
+ },
+ {
+  "file": "crates/forge_app/src/ui/mod.rs",
+  "riga": 140,
+  "funzione": "import_options_window",
+  "pannello": "Finestre di dialogo",
+  "tipo": "pulsante",
+  "testo": "Importa",
+  "id": "finestre_di_dialogo.importa"
+ },
+ {
+  "file": "crates/forge_app/src/ui/mod.rs",
+  "riga": 141,
+  "funzione": "import_options_window",
+  "pannello": "Finestre di dialogo",
+  "tipo": "pulsante",
+  "testo": "Annulla",
+  "id": "finestre_di_dialogo.annulla"
+ },
+ {
+  "file": "crates/forge_app/src/ui/mod.rs",
+  "riga": 195,
+  "funzione": "confirm_discard_window",
+  "pannello": "Finestre di dialogo",
+  "tipo": "pulsante",
+  "testo": "Salva",
+  "id": "finestre_di_dialogo.salva"
+ },
+ {
+  "file": "crates/forge_app/src/ui/mod.rs",
+  "riga": 198,
+  "funzione": "confirm_discard_window",
+  "pannello": "Finestre di dialogo",
+  "tipo": "pulsante",
+  "testo": "Non salvare",
+  "id": "finestre_di_dialogo.non_salvare"
+ },
+ {
+  "file": "crates/forge_app/src/ui/mod.rs",
+  "riga": 201,
+  "funzione": "confirm_discard_window",
+  "pannello": "Finestre di dialogo",
+  "tipo": "pulsante",
+  "testo": "Annulla",
+  "id": "finestre_di_dialogo.annulla_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/mod.rs",
+  "riga": 280,
+  "funzione": "dialogs",
+  "pannello": "Finestre di dialogo",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "finestre_di_dialogo.dialogs"
+ },
+ {
+  "file": "crates/forge_app/src/ui/mod.rs",
+  "riga": 297,
+  "funzione": "dialogs",
+  "pannello": "Finestre di dialogo",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "finestre_di_dialogo.dialogs_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/quickbar.rs",
+  "riga": 17,
+  "funzione": "show",
+  "pannello": "Toolbar",
+  "tipo": "pulsante",
+  "testo": "Libreria",
+  "id": "toolbar.libreria"
+ },
+ {
+  "file": "crates/forge_app/src/ui/quickbar.rs",
+  "riga": 20,
+  "funzione": "show",
+  "pannello": "Toolbar",
+  "tipo": "pulsante",
+  "testo": "Libreria",
+  "id": "toolbar.libreria_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/quickbar.rs",
+  "riga": 23,
+  "funzione": "show",
+  "pannello": "Toolbar",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "toolbar.show"
+ },
+ {
+  "file": "crates/forge_app/src/ui/quickbar.rs",
+  "riga": 31,
+  "funzione": "show",
+  "pannello": "Toolbar",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "toolbar.show_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/quickbar.rs",
+  "riga": 37,
+  "funzione": "show",
+  "pannello": "Toolbar",
+  "tipo": "pulsante",
+  "testo": "Pannello Luci…",
+  "id": "toolbar.pannello_luci"
+ },
+ {
+  "file": "crates/forge_app/src/ui/quickbar.rs",
+  "riga": 48,
+  "funzione": "show",
+  "pannello": "Toolbar",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "toolbar.show_3"
+ },
+ {
+  "file": "crates/forge_app/src/ui/quickbar.rs",
+  "riga": 54,
+  "funzione": "show",
+  "pannello": "Toolbar",
+  "tipo": "pulsante",
+  "testo": "Camera e obiettivo…",
+  "id": "toolbar.camera_e_obiettivo"
+ },
+ {
+  "file": "crates/forge_app/src/ui/quickbar.rs",
+  "riga": 63,
+  "funzione": "show",
+  "pannello": "Toolbar",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "toolbar.show_4"
+ },
+ {
+  "file": "crates/forge_app/src/ui/quickbar.rs",
+  "riga": 72,
+  "funzione": "show",
+  "pannello": "Toolbar",
+  "tipo": "pulsante",
+  "testo": "Ambiente e HDRI…",
+  "id": "toolbar.ambiente_e_hdri"
+ },
+ {
+  "file": "crates/forge_app/src/ui/quickbar.rs",
+  "riga": 78,
+  "funzione": "show",
+  "pannello": "Toolbar",
+  "tipo": "pulsante",
+  "testo": "Apri la libreria materiali",
+  "id": "toolbar.apri_la_libreria_materiali"
+ },
+ {
+  "file": "crates/forge_app/src/ui/quickbar.rs",
+  "riga": 82,
+  "funzione": "show",
+  "pannello": "Toolbar",
+  "tipo": "pulsante",
+  "testo": "Materiali…",
+  "id": "toolbar.materiali"
+ },
+ {
+  "file": "crates/forge_app/src/ui/quickbar.rs",
+  "riga": 89,
+  "funzione": "show",
+  "pannello": "Toolbar",
+  "tipo": "pulsante",
+  "testo": "Stop",
+  "id": "toolbar.stop"
+ },
+ {
+  "file": "crates/forge_app/src/ui/quickbar.rs",
+  "riga": 90,
+  "funzione": "show",
+  "pannello": "Toolbar",
+  "tipo": "pulsante",
+  "testo": "Riavvia",
+  "id": "toolbar.riavvia"
+ },
+ {
+  "file": "crates/forge_app/src/ui/quickbar.rs",
+  "riga": 91,
+  "funzione": "show",
+  "pannello": "Toolbar",
+  "tipo": "pulsante",
+  "testo": "Esporta",
+  "id": "toolbar.esporta"
+ },
+ {
+  "file": "crates/forge_app/src/ui/quickbar.rs",
+  "riga": 96,
+  "funzione": "show",
+  "pannello": "Toolbar",
+  "tipo": "casella",
+  "testo": "(variabile)",
+  "id": "toolbar.show_5"
+ },
+ {
+  "file": "crates/forge_app/src/ui/quickbar.rs",
+  "riga": 103,
+  "funzione": "show",
+  "pannello": "Toolbar",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "toolbar.show_6"
+ },
+ {
+  "file": "crates/forge_app/src/ui/quickbar.rs",
+  "riga": 145,
+  "funzione": "cmd_button",
+  "pannello": "Toolbar",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "toolbar.cmd_button"
+ },
+ {
+  "file": "crates/forge_app/src/ui/quickbar.rs",
+  "riga": 148,
+  "funzione": "cmd_button",
+  "pannello": "Toolbar",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "toolbar.cmd_button_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/quickbar.rs",
+  "riga": 160,
+  "funzione": "render_button",
+  "pannello": "Toolbar",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "toolbar.render_button"
+ },
+ {
+  "file": "crates/forge_app/src/ui/quickbar.rs",
+  "riga": 169,
+  "funzione": "dropdown",
+  "pannello": "Toolbar",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "toolbar.dropdown"
+ },
+ {
+  "file": "crates/forge_app/src/ui/quickbar.rs",
+  "riga": 175,
+  "funzione": "tool_button",
+  "pannello": "Toolbar",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "toolbar.tool_button"
+ },
+ {
+  "file": "crates/forge_app/src/ui/settings.rs",
+  "riga": 58,
+  "funzione": "window",
+  "pannello": "Impostazioni",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "impostazioni.window"
+ },
+ {
+  "file": "crates/forge_app/src/ui/settings.rs",
+  "riga": 62,
+  "funzione": "window",
+  "pannello": "Impostazioni",
+  "tipo": "pulsante",
+  "testo": "Ripristina predefiniti",
+  "id": "impostazioni.ripristina_predefiniti"
+ },
+ {
+  "file": "crates/forge_app/src/ui/settings.rs",
+  "riga": 104,
+  "funzione": "language",
+  "pannello": "Impostazioni",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "impostazioni.language"
+ },
+ {
+  "file": "crates/forge_app/src/ui/settings.rs",
+  "riga": 125,
+  "funzione": "library",
+  "pannello": "Impostazioni",
+  "tipo": "elenco a tendina",
+  "testo": "(variabile)",
+  "id": "impostazioni.library"
+ },
+ {
+  "file": "crates/forge_app/src/ui/settings.rs",
+  "riga": 129,
+  "funzione": "library",
+  "pannello": "Impostazioni",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "impostazioni.library_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/settings.rs",
+  "riga": 135,
+  "funzione": "library",
+  "pannello": "Impostazioni",
+  "tipo": "scelta",
+  "testo": "Poly Haven",
+  "id": "impostazioni.poly_haven"
+ },
+ {
+  "file": "crates/forge_app/src/ui/settings.rs",
+  "riga": 136,
+  "funzione": "library",
+  "pannello": "Impostazioni",
+  "tipo": "scelta",
+  "testo": "Poly Haven",
+  "id": "impostazioni.poly_haven_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/settings.rs",
+  "riga": 141,
+  "funzione": "library",
+  "pannello": "Impostazioni",
+  "tipo": "scelta",
+  "testo": "Spento (consigliato)",
+  "id": "impostazioni.spento_consigliato"
+ },
+ {
+  "file": "crates/forge_app/src/ui/settings.rs",
+  "riga": 143,
+  "funzione": "library",
+  "pannello": "Impostazioni",
+  "tipo": "scelta",
+  "testo": "Valore proposto (3 % del lato della texture)",
+  "id": "impostazioni.valore_proposto_3_del_lato_della_texture"
+ },
+ {
+  "file": "crates/forge_app/src/ui/settings.rs",
+  "riga": 149,
+  "funzione": "library",
+  "pannello": "Impostazioni",
+  "tipo": "scelta",
+  "testo": "Dal file MaterialX della fonte, se c'è",
+  "id": "impostazioni.dal_file_materialx_della_fonte_se_c_e"
+ },
+ {
+  "file": "crates/forge_app/src/ui/settings.rs",
+  "riga": 177,
+  "funzione": "paths",
+  "pannello": "Impostazioni",
+  "tipo": "pulsante",
+  "testo": "Cambia…",
+  "id": "impostazioni.cambia"
+ },
+ {
+  "file": "crates/forge_app/src/ui/settings.rs",
+  "riga": 183,
+  "funzione": "paths",
+  "pannello": "Impostazioni",
+  "tipo": "pulsante",
+  "testo": "Usa la predefinita",
+  "id": "impostazioni.usa_la_predefinita"
+ },
+ {
+  "file": "crates/forge_app/src/ui/settings.rs",
+  "riga": 189,
+  "funzione": "paths",
+  "pannello": "Impostazioni",
+  "tipo": "pulsante",
+  "testo": "Apri",
+  "id": "impostazioni.apri"
+ },
+ {
+  "file": "crates/forge_app/src/ui/settings.rs",
+  "riga": 218,
+  "funzione": "rendering",
+  "pannello": "Impostazioni",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "impostazioni.rendering"
+ },
+ {
+  "file": "crates/forge_app/src/ui/settings.rs",
+  "riga": 219,
+  "funzione": "rendering",
+  "pannello": "Impostazioni",
+  "tipo": "scelta",
+  "testo": "Campioni per pixel",
+  "id": "impostazioni.campioni_per_pixel"
+ },
+ {
+  "file": "crates/forge_app/src/ui/settings.rs",
+  "riga": 223,
+  "funzione": "rendering",
+  "pannello": "Impostazioni",
+  "tipo": "campo numerico",
+  "testo": "0 = progressivo senza limite",
+  "id": "impostazioni.0_progressivo_senza_limite"
+ },
+ {
+  "file": "crates/forge_app/src/ui/settings.rs",
+  "riga": 227,
+  "funzione": "rendering",
+  "pannello": "Impostazioni",
+  "tipo": "campo numerico",
+  "testo": "0 = automatico (thread logici − 1)",
+  "id": "impostazioni.0_automatico_thread_logici_1"
+ },
+ {
+  "file": "crates/forge_app/src/ui/settings.rs",
+  "riga": 231,
+  "funzione": "rendering",
+  "pannello": "Impostazioni",
+  "tipo": "casella",
+  "testo": "Quando cambi materiali, luci o camera il rendering riparte da solo",
+  "id": "impostazioni.quando_cambi_materiali_luci_o_camera_il_"
+ },
+ {
+  "file": "crates/forge_app/src/ui/settings.rs",
+  "riga": 240,
+  "funzione": "about",
+  "pannello": "Impostazioni",
+  "tipo": "casella",
+  "testo": "Mostra all'avvio",
+  "id": "impostazioni.mostra_all_avvio"
+ },
+ {
+  "file": "crates/forge_app/src/ui/simple.rs",
+  "riga": 17,
+  "funzione": "big_button",
+  "pannello": "Semplice",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "semplice.big_button"
+ },
+ {
+  "file": "crates/forge_app/src/ui/simple.rs",
+  "riga": 22,
+  "funzione": "big_button",
+  "pannello": "Semplice",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "semplice.big_button_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/simple.rs",
+  "riga": 46,
+  "funzione": "choice",
+  "pannello": "Semplice",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "semplice.choice"
+ },
+ {
+  "file": "crates/forge_app/src/ui/simple.rs",
+  "riga": 57,
+  "funzione": "choice",
+  "pannello": "Semplice",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "semplice.choice_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/simple.rs",
+  "riga": 85,
+  "funzione": "product",
+  "pannello": "Semplice",
+  "tipo": "pulsante",
+  "testo": "Importa modello…",
+  "id": "semplice.importa_modello"
+ },
+ {
+  "file": "crates/forge_app/src/ui/simple.rs",
+  "riga": 93,
+  "funzione": "product",
+  "pannello": "Semplice",
+  "tipo": "pulsante",
+  "testo": "Appoggia sulla base",
+  "id": "semplice.appoggia_sulla_base"
+ },
+ {
+  "file": "crates/forge_app/src/ui/simple.rs",
+  "riga": 101,
+  "funzione": "product",
+  "pannello": "Semplice",
+  "tipo": "pulsante",
+  "testo": "Inquadra il prodotto",
+  "id": "semplice.inquadra_il_prodotto"
+ },
+ {
+  "file": "crates/forge_app/src/ui/simple.rs",
+  "riga": 109,
+  "funzione": "product",
+  "pannello": "Semplice",
+  "tipo": "pulsante",
+  "testo": "Adatta la scena al prodotto",
+  "id": "semplice.adatta_la_scena_al_prodotto"
+ },
+ {
+  "file": "crates/forge_app/src/ui/simple.rs",
+  "riga": 128,
+  "funzione": "look",
+  "pannello": "Semplice",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "semplice.look"
+ },
+ {
+  "file": "crates/forge_app/src/ui/simple.rs",
+  "riga": 152,
+  "funzione": "look",
+  "pannello": "Semplice",
+  "tipo": "pulsante",
+  "testo": "Prepara scena prodotto",
+  "id": "semplice.prepara_scena_prodotto"
+ },
+ {
+  "file": "crates/forge_app/src/ui/simple.rs",
+  "riga": 167,
+  "funzione": "look",
+  "pannello": "Semplice",
+  "tipo": "pulsante",
+  "testo": "Annulla preset",
+  "id": "semplice.annulla_preset"
+ },
+ {
+  "file": "crates/forge_app/src/ui/simple.rs",
+  "riga": 209,
+  "funzione": "materials",
+  "pannello": "Semplice",
+  "tipo": "pulsante",
+  "testo": "Apri la libreria materiali",
+  "id": "semplice.apri_la_libreria_materiali"
+ },
+ {
+  "file": "crates/forge_app/src/ui/simple.rs",
+  "riga": 226,
+  "funzione": "format_quality",
+  "pannello": "Semplice",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "semplice.format_quality"
+ },
+ {
+  "file": "crates/forge_app/src/ui/simple.rs",
+  "riga": 252,
+  "funzione": "format_quality",
+  "pannello": "Semplice",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "semplice.format_quality_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/simple.rs",
+  "riga": 280,
+  "funzione": "format_quality",
+  "pannello": "Semplice",
+  "tipo": "pulsante",
+  "testo": "Scheda video (GPU)",
+  "id": "semplice.scheda_video_gpu"
+ },
+ {
+  "file": "crates/forge_app/src/ui/simple.rs",
+  "riga": 296,
+  "funzione": "format_quality",
+  "pannello": "Semplice",
+  "tipo": "pulsante",
+  "testo": "Processore (CPU)",
+  "id": "semplice.processore_cpu"
+ },
+ {
+  "file": "crates/forge_app/src/ui/simple.rs",
+  "riga": 324,
+  "funzione": "render",
+  "pannello": "Semplice",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "semplice.render"
+ },
+ {
+  "file": "crates/forge_app/src/ui/simple.rs",
+  "riga": 344,
+  "funzione": "render",
+  "pannello": "Semplice",
+  "tipo": "pulsante",
+  "testo": "Salva immagine…",
+  "id": "semplice.salva_immagine"
+ },
+ {
+  "file": "crates/forge_app/src/ui/simple.rs",
+  "riga": 372,
+  "funzione": "light_colors",
+  "pannello": "Semplice",
+  "tipo": "pulsante",
+  "testo": "Tutte le luci: {tip}",
+  "id": "semplice.tutte_le_luci_tip"
+ },
+ {
+  "file": "crates/forge_app/src/ui/simple.rs",
+  "riga": 384,
+  "funzione": "light_colors",
+  "pannello": "Semplice",
+  "tipo": "colore",
+  "testo": "(variabile)",
+  "id": "semplice.light_colors"
+ },
+ {
+  "file": "crates/forge_app/src/ui/splash.rs",
+  "riga": 59,
+  "funzione": "show",
+  "pannello": "Benvenuto",
+  "tipo": "pulsante",
+  "testo": "Chiudi",
+  "id": "benvenuto.chiudi"
+ },
+ {
+  "file": "crates/forge_app/src/ui/transform.rs",
+  "riga": 18,
+  "funzione": "axis_row",
+  "pannello": "Avanzata · Oggetto",
+  "tipo": "campo numerico",
+  "testo": "{name} ",
+  "id": "avanzata_oggetto.name"
+ },
+ {
+  "file": "crates/forge_app/src/ui/transform.rs",
+  "riga": 53,
+  "funzione": "show",
+  "pannello": "Avanzata · Oggetto",
+  "tipo": "pulsante",
+  "testo": "Duplica",
+  "id": "avanzata_oggetto.duplica"
+ },
+ {
+  "file": "crates/forge_app/src/ui/transform.rs",
+  "riga": 64,
+  "funzione": "show",
+  "pannello": "Avanzata · Oggetto",
+  "tipo": "pulsante",
+  "testo": "Elimina",
+  "id": "avanzata_oggetto.elimina"
+ },
+ {
+  "file": "crates/forge_app/src/ui/transform.rs",
+  "riga": 74,
+  "funzione": "show",
+  "pannello": "Avanzata · Oggetto",
+  "tipo": "pulsante",
+  "testo": "Appoggia sul pavimento",
+  "id": "avanzata_oggetto.appoggia_sul_pavimento"
+ },
+ {
+  "file": "crates/forge_app/src/ui/transform.rs",
+  "riga": 84,
+  "funzione": "show",
+  "pannello": "Avanzata · Oggetto",
+  "tipo": "pulsante",
+  "testo": "Centra nell'origine",
+  "id": "avanzata_oggetto.centra_nell_origine"
+ },
+ {
+  "file": "crates/forge_app/src/ui/transform.rs",
+  "riga": 94,
+  "funzione": "show",
+  "pannello": "Avanzata · Oggetto",
+  "tipo": "pulsante",
+  "testo": "Reimposta",
+  "id": "avanzata_oggetto.reimposta"
+ },
+ {
+  "file": "crates/forge_app/src/ui/transform.rs",
+  "riga": 110,
+  "funzione": "show",
+  "pannello": "Avanzata · Oggetto",
+  "tipo": "casella",
+  "testo": "Snap a contatto",
+  "id": "avanzata_oggetto.snap_a_contatto"
+ },
+ {
+  "file": "crates/forge_app/src/ui/transform.rs",
+  "riga": 125,
+  "funzione": "show",
+  "pannello": "Avanzata · Oggetto",
+  "tipo": "pulsante",
+  "testo": "(variabile)",
+  "id": "avanzata_oggetto.show"
+ },
+ {
+  "file": "crates/forge_app/src/ui/transform.rs",
+  "riga": 173,
+  "funzione": "show",
+  "pannello": "Avanzata · Oggetto",
+  "tipo": "casella",
+  "testo": "Mantieni proporzioni",
+  "id": "avanzata_oggetto.mantieni_proporzioni"
+ },
+ {
+  "file": "crates/forge_app/src/ui/transform.rs",
+  "riga": 186,
+  "funzione": "show",
+  "pannello": "Avanzata · Oggetto",
+  "tipo": "campo numerico",
+  "testo": "(variabile)",
+  "id": "avanzata_oggetto.show_2"
+ },
+ {
+  "file": "crates/forge_app/src/ui/transform.rs",
+  "riga": 196,
+  "funzione": "show",
+  "pannello": "Avanzata · Oggetto",
+  "tipo": "campo numerico",
+  "testo": "(variabile)",
+  "id": "avanzata_oggetto.show_3"
+ },
+ {
+  "file": "crates/forge_app/src/ui/tree.rs",
+  "riga": 73,
+  "funzione": "show",
+  "pannello": "Pannello Scena",
+  "tipo": "casella",
+  "testo": "Mostra/nascondi",
+  "id": "pannello_scena.mostra_nascondi"
+ },
+ {
+  "file": "crates/forge_app/src/ui/tree.rs",
+  "riga": 81,
+  "funzione": "show",
+  "pannello": "Pannello Scena",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "pannello_scena.show"
+ },
+ {
+  "file": "crates/forge_app/src/ui/tree.rs",
+  "riga": 99,
+  "funzione": "show",
+  "pannello": "Pannello Scena",
+  "tipo": "pulsante",
+  "testo": "Inquadra",
+  "id": "pannello_scena.inquadra"
+ },
+ {
+  "file": "crates/forge_app/src/ui/tree.rs",
+  "riga": 103,
+  "funzione": "show",
+  "pannello": "Pannello Scena",
+  "tipo": "pulsante",
+  "testo": "Nascondi",
+  "id": "pannello_scena.nascondi"
+ },
+ {
+  "file": "crates/forge_app/src/ui/tree.rs",
+  "riga": 107,
+  "funzione": "show",
+  "pannello": "Pannello Scena",
+  "tipo": "pulsante",
+  "testo": "Mostra tutto",
+  "id": "pannello_scena.mostra_tutto"
+ },
+ {
+  "file": "crates/forge_app/src/ui/tree.rs",
+  "riga": 111,
+  "funzione": "show",
+  "pannello": "Pannello Scena",
+  "tipo": "pulsante",
+  "testo": "Duplica (Ctrl+D)",
+  "id": "pannello_scena.duplica_ctrl_d"
+ },
+ {
+  "file": "crates/forge_app/src/ui/tree.rs",
+  "riga": 116,
+  "funzione": "show",
+  "pannello": "Pannello Scena",
+  "tipo": "pulsante",
+  "testo": "Elimina dal progetto (Canc)",
+  "id": "pannello_scena.elimina_dal_progetto_canc"
+ },
+ {
+  "file": "crates/forge_app/src/ui/tree.rs",
+  "riga": 221,
+  "funzione": "show",
+  "pannello": "Pannello Scena",
+  "tipo": "casella",
+  "testo": "Accendi/spegni",
+  "id": "pannello_scena.accendi_spegni"
+ },
+ {
+  "file": "crates/forge_app/src/ui/tree.rs",
+  "riga": 225,
+  "funzione": "show",
+  "pannello": "Pannello Scena",
+  "tipo": "scelta",
+  "testo": "(variabile)",
+  "id": "pannello_scena.show_2"
+ }
+]

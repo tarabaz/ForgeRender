@@ -1,19 +1,22 @@
 //! Interfaccia utente (egui). Layout:
-//! barra superiore (comandi), pannello sinistro (albero della scena),
+//! barra dei menu e toolbar delle azioni rapide in alto (comandi in `crate::commands`),
+//! pannello sinistro (albero della scena),
 //! pannello destro (proprietà), pannello inferiore (progressi, statistiche,
 //! log), area centrale (viewport o render).
 
 pub mod central;
 pub mod gizmo;
+pub mod icons;
 pub(crate) mod inspector;
 pub mod library;
+pub mod menubar;
 pub mod navigator;
-mod settings;
+mod quickbar;
+pub(crate) mod settings;
 mod simple;
 mod splash;
 mod status;
 pub mod style;
-mod toolbar;
 mod transform;
 pub mod tree;
 
@@ -35,7 +38,9 @@ impl eframe::App for ForgeApp {
         self.handle_dropped_files(&ctx);
         self.handle_shortcuts(&ctx);
 
-        egui::Panel::top("toolbar").show(ui, |ui| toolbar::show(self, ui));
+        self.handle_close_request(&ctx);
+        egui::Panel::top("menubar").show(ui, |ui| menubar::show(self, ui));
+        egui::Panel::top("quickbar").show(ui, |ui| quickbar::show(self, ui));
         egui::Panel::bottom("status")
             .resizable(true)
             .default_size(170.0)
@@ -161,97 +166,86 @@ impl ForgeApp {
         self.ask_import(models);
     }
 
+    /// Tastiera: le scorciatoie sono nell'elenco unico dei comandi.
     fn handle_shortcuts(&mut self, ctx: &egui::Context) {
-        if ctx.egui_wants_keyboard_input() {
-            return;
-        }
-        let (save, open, import, frame_all, frame_sel, render) = ctx.input_mut(|i| {
-            (
-                i.consume_key(egui::Modifiers::COMMAND, egui::Key::S),
-                i.consume_key(egui::Modifiers::COMMAND, egui::Key::O),
-                i.consume_key(egui::Modifiers::COMMAND, egui::Key::I),
-                i.consume_key(egui::Modifiers::NONE, egui::Key::Home),
-                i.consume_key(egui::Modifiers::NONE, egui::Key::F),
-                i.consume_key(egui::Modifiers::NONE, egui::Key::F5),
-            )
-        });
-        // Gizmo e annulla/ripeti (Ctrl+Maiusc+Z = ripeti, come Ctrl+Y).
-        let (redo, undo) = ctx.input_mut(|i| {
-            let redo = i.consume_key(egui::Modifiers::COMMAND | egui::Modifiers::SHIFT, egui::Key::Z)
-                || i.consume_key(egui::Modifiers::COMMAND, egui::Key::Y);
-            (redo, i.consume_key(egui::Modifiers::COMMAND, egui::Key::Z))
-        });
-        let (dup, del) = ctx.input_mut(|i| {
-            (
-                i.consume_key(egui::Modifiers::COMMAND, egui::Key::D),
-                i.consume_key(egui::Modifiers::NONE, egui::Key::Delete),
-            )
-        });
-        // 5 (anche del tastierino): prospettica / ortografica, come in Blender.
-        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Num5)) {
-            self.toggle_ortho();
-        }
-        if dup {
-            self.duplicate_selection();
-        }
-        if del {
-            self.delete_selected_copies();
-        }
-        let (hide, isolate, unhide) = ctx.input_mut(|i| {
-            (
-                i.consume_key(egui::Modifiers::NONE, egui::Key::H),
-                i.consume_key(egui::Modifiers::SHIFT, egui::Key::H),
-                i.consume_key(egui::Modifiers::ALT, egui::Key::H),
-            )
-        });
-        if hide || isolate {
-            self.hide_selection(isolate);
-        }
-        if unhide {
-            self.show_all();
-        }
-        if undo {
-            self.undo();
-        }
-        if redo {
-            self.redo();
-        }
-        if !self.gizmo.is_dragging() {
-            use crate::ui::gizmo::GizmoMode;
-            ctx.input_mut(|i| {
-                for (k, m) in [
-                    (egui::Key::Q, GizmoMode::Select),
-                    (egui::Key::W, GizmoMode::Move),
-                    (egui::Key::E, GizmoMode::Rotate),
-                    (egui::Key::R, GizmoMode::Scale),
-                ] {
-                    if i.consume_key(egui::Modifiers::NONE, k) {
-                        self.gizmo.mode = m;
-                    }
-                }
-            });
-        }
-        if save {
-            self.save_project(false);
-        }
-        if open {
-            self.open_project_dialog();
-        }
-        if import {
-            self.import_dialog();
-        }
-        if frame_all {
-            self.frame_all();
-        }
-        if frame_sel {
-            self.frame_selection();
-        }
-        if render {
-            self.start_render();
+        let gizmo_free = !self.gizmo.is_dragging();
+        for cmd in crate::commands::pressed(ctx, gizmo_free) {
+            crate::commands::run(self, ctx, cmd);
         }
     }
 
+    /// Chiusura della finestra (X, Alt+F4) con modifiche non salvate: prima si chiede.
+    fn handle_close_request(&mut self, ctx: &egui::Context) {
+        if ctx.input(|i| i.viewport().close_requested()) && !self.exit_confirmed && self.unsaved {
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            self.confirm_discard = Some(crate::commands::Cmd::Exit);
+        }
+    }
+
+    /// "Salvare le modifiche?" prima di nuova scena, apertura o uscita.
+    fn confirm_discard_window(&mut self, ctx: &egui::Context) {
+        let Some(cmd) = self.confirm_discard else { return };
+        let mut choice = None;
+        egui::Modal::new(egui::Id::NULL.with("conferma-modifiche")).show(ctx, |ui| {
+            ui.set_width(380.0);
+            ui.heading(tr("Modifiche non salvate"));
+            ui.label(tr("Il progetto ha modifiche non salvate. Salvarle prima di continuare?"));
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                if ui
+                    .add(egui::Button::new(egui::RichText::new(tr("Salva")).strong()).fill(style::ACCENT))
+                    .clicked()
+                {
+                    choice = Some(0);
+                }
+                if ui.button(tr("Non salvare")).clicked() {
+                    choice = Some(1);
+                }
+                if ui.button(tr("Annulla")).clicked() {
+                    choice = Some(2);
+                }
+            });
+        });
+        match choice {
+            Some(0) => {
+                self.confirm_discard = None;
+                self.save_project(false);
+                // Salvataggio annullato o fallito: non si butta via niente.
+                if !self.unsaved {
+                    crate::commands::run_confirmed(self, ctx, cmd);
+                }
+            }
+            Some(1) => {
+                self.confirm_discard = None;
+                crate::commands::run_confirmed(self, ctx, cmd);
+            }
+            Some(_) => self.confirm_discard = None,
+            None => {}
+        }
+    }
+
+    /// Avviso breve in basso al centro, per 4 secondi.
+    fn toast_area(&mut self, ctx: &egui::Context) {
+        let Some((text, at)) = &self.toast else { return };
+        let age = at.elapsed().as_secs_f32();
+        if age > 4.0 {
+            self.toast = None;
+            return;
+        }
+        egui::Area::new(egui::Id::NULL.with("avviso"))
+            .anchor(egui::Align2::CENTER_BOTTOM, [0.0, -210.0])
+            .interactable(false)
+            .show(ctx, |ui| {
+                egui::Frame::popup(ui.style()).show(ui, |ui| {
+                    ui.label(egui::RichText::new(text).color(style::ACCENT));
+                });
+            });
+        ctx.request_repaint_after(std::time::Duration::from_millis(250));
+    }
+
     fn dialogs(&mut self, ctx: &egui::Context) {
+        self.confirm_discard_window(ctx);
+        self.toast_area(ctx);
         crate::ui::library::window(self, ctx);
         crate::ui::settings::window(self, ctx);
         crate::ui::splash::show(self, ctx);

@@ -17,15 +17,32 @@ fn aces(x: f32) -> f32 {
 #[inline]
 pub fn tonemap_pixel(c: Vec3, mode: ToneMapping, exposure_mul: f32) -> [u8; 3] {
     let c = c * exposure_mul;
-    let f = |v: f32| {
-        let v = if v.is_finite() { v.max(0.0) } else { 0.0 };
-        let t = match mode {
-            ToneMapping::Standard => v.min(1.0),
-            ToneMapping::AcesFilmic => aces(v),
-        };
-        (linear_to_srgb(t) * 255.0 + 0.5) as u8
-    };
+    let f = |v: f32| (tonemap_unit(v, mode) * 255.0 + 0.5) as u8;
     [f(c.x), f(c.y), f(c.z)]
+}
+
+/// Un canale lineare (già moltiplicato per l'esposizione) → valore sRGB visualizzabile in 0..1.
+#[inline]
+pub fn tonemap_unit(v: f32, mode: ToneMapping) -> f32 {
+    let v = if v.is_finite() { v.max(0.0) } else { 0.0 };
+    let t = match mode {
+        ToneMapping::Standard => v.min(1.0),
+        ToneMapping::AcesFilmic => aces(v),
+    };
+    linear_to_srgb(t)
+}
+
+/// Come [`tonemap_to_rgba8`] ma a 16 bit per canale, RGB (per TIFF): meno scalini nei
+/// gradienti dei fondali quando l'immagine si ritocca.
+pub fn tonemap_to_rgb16(linear: &[[f32; 3]], mode: ToneMapping, exposure_ev: f32) -> Vec<u16> {
+    let mul = 2f32.powf(exposure_ev);
+    let mut out = vec![0u16; linear.len() * 3];
+    out.par_chunks_mut(3).zip(linear.par_iter()).for_each(|(o, p)| {
+        for (o, v) in o.iter_mut().zip(p) {
+            *o = (tonemap_unit(v * mul, mode) * 65535.0 + 0.5) as u16;
+        }
+    });
+    out
 }
 
 /// Converte un'immagine lineare in RGBA8 (in parallelo).

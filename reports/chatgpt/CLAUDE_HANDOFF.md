@@ -1024,3 +1024,19 @@ traduzioni), stima (~290 pagine per lingua, ~300 screenshot, ~25 serie di confro
 Correzioni al mockup: "Lente ottica" sta in Camera, non in Materiali; vanno tenuti la scheda
 Render e il pulsante Controllo IA; barra del titolo personalizzata sconsigliata (si perde lo
 Snap di Windows). Aspetta le decisioni di Valerio (fondo al documento) prima di implementare.
+
+### Claude Code (cloud) — 30/10/2026: versione 0.7.0, nuova interfaccia (fasi 1 e 2)
+
+Valerio ha approvato il piano con le scelte consigliate. Fatto:
+- `crates/forge_app/src/commands.rs`: **elenco unico dei comandi** (id stabile, testo, icona,
+  scorciatoia, suggerimento, azione). Menu, toolbar e tastiera passano tutti da lì; quando
+  aggiungi un comando, aggiungilo qui e non in un pannello.
+- Barra dei menu (`ui/menubar.rs`) e toolbar con icone (`ui/quickbar.rs`), icone Phosphor
+  (`ui/icons.rs`, carattere incorporato: `egui-phosphor` non supporta egui 0.37).
+- Esportazione unica PNG/JPG/TIFF16/EXR, progetti recenti, conferma delle modifiche non salvate,
+  viste standard, luci da menu.
+- Bug trovato: egui ignora Maiusc/Alt in più, quindi H "mangiava" Maiusc+H e Alt+H. Le
+  scorciatoie ora sono in ordine dal più specifico, con un test.
+- Inventario per il manuale: `manuale/INVENTARIO.md` (366 controlli). Prossimo passo: fase 3,
+  visualizzatore del manuale.
+

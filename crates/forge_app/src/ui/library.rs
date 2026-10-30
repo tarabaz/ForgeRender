@@ -77,6 +77,14 @@ pub struct LibraryUi {
     rx: Receiver<Msg>,
 }
 
+impl LibraryUi {
+    /// Apre la finestra sulla scheda "La mia libreria" (`online` = false) o "Online".
+    pub fn open_on(&mut self, online: bool) {
+        self.open = true;
+        self.tab = if online { Tab::Online } else { Tab::Mine };
+    }
+}
+
 impl Default for LibraryUi {
     fn default() -> Self {
         let (tx, rx) = channel();

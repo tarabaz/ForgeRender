@@ -19,6 +19,36 @@ use std::sync::Arc;
 /// (es. "ForgeRender v0.1.0 (a1b2c3d)"; "dev" se compilato senza Git).
 pub const APP_TITLE: &str = concat!("ForgeRender v", env!("CARGO_PKG_VERSION"), " (", env!("FORGE_GIT_SHA"), ")");
 
+/// Tipi di luce che si possono aggiungere (pannello Luci, menu Oggetti → Luce).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NewLight {
+    Area,
+    Point,
+    Spot,
+    Directional,
+    Portal,
+}
+
+impl NewLight {
+    pub const ALL: [NewLight; 5] = [
+        NewLight::Area,
+        NewLight::Point,
+        NewLight::Spot,
+        NewLight::Directional,
+        NewLight::Portal,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            NewLight::Area => tk("Area"),
+            NewLight::Point => tk("Punto"),
+            NewLight::Spot => tk("Spot"),
+            NewLight::Directional => tk("Direzionale"),
+            NewLight::Portal => tk("Portale (finestra)"),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum View {
     Viewport,
@@ -156,6 +186,12 @@ pub struct ForgeApp {
     pub auto_restart: bool,
     pub import_opts: ImportOptions,
     pub unsaved: bool,
+    /// Comando in attesa di conferma perché butterebbe via modifiche non salvate.
+    pub confirm_discard: Option<crate::commands::Cmd>,
+    /// L'utente ha già confermato l'uscita: la chiusura della finestra non si ferma più.
+    pub exit_confirmed: bool,
+    /// Avviso breve in basso nella finestra (testo, quando è comparso).
+    pub toast: Option<(String, std::time::Instant)>,
     pub error: Option<String>,
     pub info: Option<String>,
     pub rule_pattern: String,
@@ -259,6 +295,7 @@ pub struct ForgeApp {
 impl ForgeApp {
     pub fn new(cc: &eframe::CreationContext<'_>, logs: LogBuffer, system: SystemInfo, startup: StartupOptions) -> Self {
         crate::ui::style::apply(&cc.egui_ctx);
+        crate::ui::icons::install(&cc.egui_ctx);
         let viewport = cc.wgpu_render_state.as_ref().map(ViewportRenderer::new);
         if viewport.is_none() {
             tracing::warn!("modalità sicura: viewport 3D GPU non disponibile, il rendering CPU resta utilizzabile");
@@ -284,6 +321,9 @@ impl ForgeApp {
             auto_restart: true,
             import_opts: ImportOptions::default(),
             unsaved: false,
+            confirm_discard: None,
+            exit_confirmed: false,
+            toast: None,
             error: None,
             info: None,
             rule_pattern: String::new(),
@@ -637,6 +677,63 @@ impl ForgeApp {
 
     /// Crea un oggetto semplice dimensionato e posizionato rispetto al riferimento
     /// ([`Self::anchor_bounds`]): pavimento e fondale sotto/dietro, le forme di lato sulla base.
+    /// Aggiunge una luce vicino alla selezione o al prodotto e la seleziona (pannello Luci e
+    /// menu Oggetti → Luce).
+    pub fn add_light(&mut self, kind: NewLight) {
+        use forge_math::Vec3;
+        use forge_scene::{Light, LightKind};
+        let (center, radius) = self.anchor();
+        // Portale sulla finestra selezionata: rettangolo grande come il pezzo, sul suo lato più
+        // sottile, rivolto verso il centro della scena (l'interno della stanza).
+        let portal_from_selection = {
+            let mut b = forge_math::Aabb::EMPTY;
+            for &i in &self.selection {
+                b.grow(&self.scene.exact_bounds_of(i));
+            }
+            (!b.is_empty()).then(|| {
+                let s = b.max - b.min;
+                let c = b.center();
+                let axis = if s.x <= s.y && s.x <= s.z {
+                    0
+                } else if s.y <= s.z {
+                    1
+                } else {
+                    2
+                };
+                let mut n = Vec3::ZERO;
+                n[axis] = if (center - c)[axis] >= 0.0 { 1.0 } else { -1.0 };
+                // Larghezza e altezza come le disegna il renderer (u orizzontale, v verticale).
+                let hint = if n.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
+                let u = hint.cross(n).normalize();
+                let v = n.cross(u);
+                let ext = |d: Vec3| (d.x.abs() * s.x + d.y.abs() * s.y + d.z.abs() * s.z).max(0.01);
+                Light::portal(tr("Portale finestra"), c, c + n, ext(u), ext(v))
+            })
+        };
+        let at = center + Vec3::new(1.0, 2.0, 1.5) * radius;
+        let light = match kind {
+            NewLight::Area => Light::area(tr("Luce area"), at, center, radius, radius, 5.0),
+            NewLight::Point => Light::point(tr("Luce puntiforme"), at, 20.0 * radius * radius),
+            NewLight::Spot => Light {
+                kind: LightKind::Spot {
+                    inner_angle_deg: 25.0,
+                    outer_angle_deg: 40.0,
+                },
+                target: center,
+                ..Light::point(tr("Spot"), at, 40.0 * radius * radius)
+            },
+            NewLight::Directional => Light {
+                kind: LightKind::Directional,
+                target: center,
+                ..Light::point(tr("Sole"), at, 3.0)
+            },
+            NewLight::Portal => portal_from_selection.unwrap_or_else(|| Light::portal(tr("Portale finestra"), at, center, radius, radius)),
+        };
+        self.scene.lights.push(light);
+        self.selected_light = Some(self.scene.lights.len() - 1);
+        self.shading_changed();
+    }
+
     pub fn add_object(&mut self, kind: AddKind) {
         use forge_math::{Mat4, Vec3};
         use forge_scene::AddedKind as K;
@@ -1200,22 +1297,28 @@ impl ForgeApp {
         self.render_texture.as_ref()
     }
 
-    pub fn export_png_dialog(&mut self) {
+    /// "Esporta…": un solo comando, il formato si sceglie nella finestra di salvataggio
+    /// (PNG, JPG, TIFF 16 bit, EXR); vale l'estensione del nome scritto.
+    pub fn export_dialog(&mut self) {
+        use forge_image_io::ExportFormat;
         let Some(frame) = self.session.latest_frame() else {
             self.error = Some(tr("nessuna immagine da esportare: avvia prima un rendering").into());
             return;
         };
-        let default_name = format!("render_{}spp.png", frame.samples);
-        let Some(path) = rfd::FileDialog::new()
-            .add_filter("PNG", &["png"])
-            .set_file_name(default_name)
-            .save_file()
-        else {
+        let mut dialog = rfd::FileDialog::new().set_file_name(format!("render_{}spp.png", frame.samples));
+        for f in ExportFormat::ALL {
+            dialog = dialog.add_filter(tr(export_format_label(f)), f.extensions());
+        }
+        let Some(path) = dialog.save_file() else {
             return;
         };
-        let path = with_extension(path, "png");
-        match forge_image_io::save_frame_png(
+        let (path, format) = match ExportFormat::from_path(&path) {
+            Some(f) => (path, f),
+            None => (with_extension(path, "png"), ExportFormat::Png),
+        };
+        match forge_image_io::save_frame(
             &path,
+            format,
             &frame,
             self.settings.tone_mapping,
             self.settings.exposure_ev,
@@ -1736,6 +1839,9 @@ impl ForgeApp {
         {
             let report = l.report;
             self.replace_scene(l.scene, l.meta, Some(l.settings));
+            if let Some(p) = self.meta.path.clone() {
+                self.remember_recent(&p);
+            }
             let mut notes = Vec::new();
             if !report.missing_sources.is_empty() {
                 notes.push(tf(
@@ -1775,10 +1881,24 @@ impl ForgeApp {
         };
         match forge_project::save(&path, &self.scene, &self.meta, &self.settings) {
             Ok(()) => {
+                self.remember_recent(&path);
                 self.meta.path = Some(path);
                 self.unsaved = false;
             }
             Err(e) => self.error = Some(tf("salvataggio fallito: {e:#}", &[format!("{:#}", e)])),
+        }
+    }
+
+    /// Mostra un avviso breve in basso (scompare da solo dopo qualche secondo).
+    pub fn toast(&mut self, text: impl Into<String>) {
+        self.toast = Some((text.into(), std::time::Instant::now()));
+    }
+
+    /// Aggiunge il progetto a File → Progetti recenti (salvato in `impostazioni.json`).
+    fn remember_recent(&mut self, path: &Path) {
+        let mut p = self.prefs.clone();
+        if p.push_recent(path) {
+            self.apply_prefs(p, false);
         }
     }
 
@@ -1922,6 +2042,7 @@ impl ForgeApp {
     fn handle_screenshot(&mut self, ctx: &egui::Context) {
         let Some(path) = self.startup.screenshot.clone() else { return };
         if self.screenshot_done.load(std::sync::atomic::Ordering::Acquire) {
+            self.exit_confirmed = true;
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             return;
         }
@@ -1977,3 +2098,14 @@ pub const ADD_MENU: &[(&str, AddKind)] = &[
     (tk("Cilindro"), AddKind::Cylinder),
     (tk("Tazza"), AddKind::Cup),
 ];
+
+/// Nome del formato nella finestra "Esporta…".
+pub fn export_format_label(f: forge_image_io::ExportFormat) -> &'static str {
+    use forge_image_io::ExportFormat::*;
+    match f {
+        Png => tk("PNG (senza perdita, 8 bit)"),
+        Jpeg => tk("JPG (leggero, per web e social)"),
+        Tiff16 => tk("TIFF 16 bit (per il fotoritocco)"),
+        Exr => tk("EXR (valori lineari, per il compositing)"),
+    }
+}

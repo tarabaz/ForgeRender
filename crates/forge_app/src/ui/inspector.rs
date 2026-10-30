@@ -1,10 +1,10 @@
-use crate::app::{ForgeApp, InspectorTab, RenderView};
+use crate::app::{ForgeApp, InspectorTab, NewLight, RenderView};
 use crate::i18n::{tf, tr};
 use crate::ui::style;
 use eframe::egui;
 use forge_math::Vec3;
 use forge_render_core::ToneMapping;
-use forge_scene::{light, Environment, Light, LightKind, Material, MaterialId};
+use forge_scene::{light, Environment, LightKind, Material, MaterialId};
 
 pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
     ui.horizontal_wrapped(|ui| {
@@ -878,72 +878,18 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
             }
         }
     });
-    // Portale sulla finestra selezionata: rettangolo grande come il pezzo, sul suo lato più
-    // sottile, rivolto verso il centro della scena (l'interno della stanza).
-    let portal_from_selection = {
-        let mut b = forge_math::Aabb::EMPTY;
-        for &i in &app.selection {
-            b.grow(&app.scene.exact_bounds_of(i));
-        }
-        (!b.is_empty()).then(|| {
-            let s = b.max - b.min;
-            let c = b.center();
-            let axis = if s.x <= s.y && s.x <= s.z {
-                0
-            } else if s.y <= s.z {
-                1
-            } else {
-                2
-            };
-            let mut n = Vec3::ZERO;
-            n[axis] = if (center - c)[axis] >= 0.0 { 1.0 } else { -1.0 };
-            // Larghezza e altezza come le disegna il renderer (u orizzontale, v verticale).
-            let hint = if n.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
-            let u = hint.cross(n).normalize();
-            let v = n.cross(u);
-            let ext = |d: Vec3| (d.x.abs() * s.x + d.y.abs() * s.y + d.z.abs() * s.z).max(0.01);
-            Light::portal(tr("Portale finestra"), c, c + n, ext(u), ext(v))
-        })
-    };
     ui.horizontal_wrapped(|ui| {
         ui.label(tr("Aggiungi:"));
-        let at = center + Vec3::new(1.0, 2.0, 1.5) * radius;
-        let mut add = |l: Light| {
-            app.scene.lights.push(l);
-            app.selected_light = Some(app.scene.lights.len() - 1);
-            app.shading_changed();
-        };
-        if ui.button(tr("Area")).clicked() {
-            add(Light::area(tr("Luce area"), at, center, radius, radius, 5.0));
-        }
-        if ui.button(tr("Punto")).clicked() {
-            add(Light::point(tr("Luce puntiforme"), at, 20.0 * radius * radius));
-        }
-        if ui.button(tr("Spot")).clicked() {
-            add(Light {
-                kind: LightKind::Spot {
-                    inner_angle_deg: 25.0,
-                    outer_angle_deg: 40.0,
-                },
-                target: center,
-                ..Light::point(tr("Spot"), at, 40.0 * radius * radius)
-            });
-        }
-        if ui.button(tr("Direzionale")).clicked() {
-            add(Light {
-                kind: LightKind::Directional,
-                target: center,
-                ..Light::point(tr("Sole"), at, 3.0)
-            });
-        }
-        if ui
-            .button(tr("Portale (finestra)"))
-            .on_hover_text(tr("Per gli interni illuminati dall'HDRI: il renderer cerca la luce del cielo \
+        for kind in NewLight::ALL {
+            let mut r = ui.button(tr(kind.label()));
+            if kind == NewLight::Portal {
+                r = r.on_hover_text(tr("Per gli interni illuminati dall'HDRI: il renderer cerca la luce del cielo \
                  attraverso questo rettangolo invece che a caso, molta meno grana. \
-                 Selezionare prima il vetro o il foro della finestra lo mette già al posto giusto."))
-            .clicked()
-        {
-            add(portal_from_selection.unwrap_or_else(|| Light::portal(tr("Portale finestra"), at, center, radius, radius)));
+                 Selezionare prima il vetro o il foro della finestra lo mette già al posto giusto."));
+            }
+            if r.clicked() {
+                app.add_light(kind);
+            }
         }
     });
     ui.separator();
