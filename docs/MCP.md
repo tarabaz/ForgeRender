@@ -20,7 +20,7 @@ chiavi: è Claude Code ad avviarlo sul tuo PC con l'opzione `--mcp`.
 Individua il file `forgerender.exe` nella cartella del pacchetto portable estratto, nella cartella `target\\release` della build locale oppure nella directory dell'installazione. Usa sempre il percorso completo del file, che cambia da un PC all'altro:
 
 ```
-C:\Users\valer\Dev\RenderingEngine\RenderingEngine_pulito\target\release\forgerender.exe
+$exe = (Resolve-Path "C:\PERCORSO\REALE\forgerender.exe").Path
 ```
 
 Lo script di build ci copia accanto anche le DLL del denoiser, quindi il render ha anche la
