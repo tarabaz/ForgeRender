@@ -271,6 +271,13 @@
   temporanea. **Da fare**: prova `--max 3` in `Y:\ForgeRender\Libreria` controllata da Valerio
   nell'app, poi lo spostamento di tutto a download finito, con il suo ok.
 - Prova `--max 3` in copia su `Y:\ForgeRender\Libreria` fatta (aerial_asphalt_01, aerial_beach_01/02).
+- **Fase 4 fatta (29–30/10/2026)**: download finito (868 completi, 1 errore:
+  medieval_blocks_05), spostati 865 materiali con `--sposta` in 197 s, 0 errori; in libreria
+  868 materiali Poly Haven (15,28 GB), nei download restano 13,17 GB non cancellati.
+  4 materiali importati male e riparati (Rough Linen: rugosità = anisotropia; Book Pattern,
+  Leather Red 02/03: solo varianti `col1`/`coll1`): `detect` ora ignora anisotropy/translucent/ior
+  e riconosce `col1..3`/`coll1..3`. Report: `reports/2026-10-30_import-polyhaven-locale/REPORT.md`.
+  Da fare: riscaricare medieval_blocks_05; decidere sui residui e su EXR o PNG.
 
 ### Categorie, anteprime grandi, EXR a un canale (29/10/2026)
 - **Categorie e tag** della fonte in `materiale.json` (`categories`, `tags`): Poly Haven ne dà più

@@ -114,7 +114,7 @@ enum Word {
 fn word_kind(w: &str) -> Option<Word> {
     Some(match w {
         "preview" | "thumb" | "thumbnail" | "sphere" | "render" | "cavity" | "specular" | "spec" | "translucency" | "idmap" | "id"
-        | "swatch" => Word::Ignore,
+        | "swatch" | "anisotropy" | "translucent" | "ior" => Word::Ignore,
         "normal" | "nor" | "nrm" | "norm" | "normalgl" | "normalmap" => Word::Map(MapKind::Normal(false)),
         "normaldx" => Word::Map(MapKind::Normal(true)),
         "arm" | "orm" => Word::Map(MapKind::Packed),
@@ -125,6 +125,9 @@ fn word_kind(w: &str) -> Option<Word> {
         "ao" | "ambientocclusion" | "occlusion" => Word::Map(MapKind::Ao),
         "opacity" | "alpha" | "mask" | "transparency" | "cutout" => Word::Map(MapKind::Opacity),
         "color" | "colour" | "basecolor" | "albedo" | "diffuse" | "diff" | "col" | "basecol" => Word::Map(MapKind::BaseColor),
+        // Varianti di colore di Poly Haven senza `diff` (book_pattern, leather_red_02): in ordine
+        // alfabetico vince la variante 1.
+        "col1" | "col2" | "col3" | "coll1" | "coll2" | "coll3" => Word::Map(MapKind::BaseColor),
         _ => return None,
     })
 }
@@ -460,6 +463,32 @@ mod tests {
         let rock = detect(&[f("aerial_rocks_02_rough_ao_2k.exr"), f("aerial_rocks_02_rough_2k.exr")]);
         assert_eq!(rock.ao, None);
         assert_eq!(rock.roughness, Some(f("aerial_rocks_02_rough_2k.exr")));
+    }
+
+    /// Casi reali dell'import completo: "rough" nel nome del materiale non deve far prendere
+    /// l'anisotropia come rugosità; varianti di colore `col1`/`coll1` senza `diff`.
+    #[test]
+    fn polyhaven_anisotropy_and_color_variants() {
+        let f = |n: &str| PathBuf::from(n);
+        assert_eq!(k("rough_linen_anisotropy_rotation_2k.exr"), None);
+        assert_eq!(k("rough_linen_anisotropy_strength_2k.exr"), None);
+        assert_eq!(k("rough_linen_spec_ior_2k.exr"), None);
+        assert_eq!(k("snow_01_translucent_2k.exr"), None);
+        let linen = detect(&[
+            f("rough_linen_anisotropy_rotation_2k.exr"),
+            f("rough_linen_anisotropy_strength_2k.exr"),
+            f("rough_linen_diff_2k.jpg"),
+            f("rough_linen_rough_2k.exr"),
+        ]);
+        assert_eq!(linen.roughness, Some(f("rough_linen_rough_2k.exr")));
+        let book = detect(&[
+            f("book_pattern_col2_2k.exr"),
+            f("book_pattern_col1_2k.exr"),
+            f("book_pattern_page_2k.exr"),
+        ]);
+        assert_eq!(book.base_color, Some(f("book_pattern_col1_2k.exr")));
+        let leather = detect(&[f("leather_red_02_coll2_2k.exr"), f("leather_red_02_coll1_2k.exr")]);
+        assert_eq!(leather.base_color, Some(f("leather_red_02_coll1_2k.exr")));
     }
 
     #[test]

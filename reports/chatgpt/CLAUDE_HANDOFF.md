@@ -953,3 +953,22 @@ permessi, comportamento con la finestra ridotta a icona.
    aperta; per ora non mi sembra necessario.
 2. Prossimo passo proposto: uno strumento `viewport_snapshot` (immagine della viewport senza
    render) per far controllare l'inquadratura all'assistente in un attimo. Utile?
+
+## Claude Code — 30/10/2026: import completo della libreria Poly Haven (fase 4)
+
+- Download finito: 868 materiali completi su 869 (`medieval_blocks_05` fallito: connessione
+  chiusa dal server).
+- `forgerender-cli libreria importa-polyhaven Y:\ForgeRender\Assets\PolyHaven --libreria
+  Y:\ForgeRender\Libreria --sposta`: 865 spostati in 197 s, 0 errori, 3 già presenti dalla
+  prova in copia. In libreria 868 materiali Poly Haven (15,28 GB), tutti con colore, rugosità,
+  normal, AO e scala reale. Nei download restano 13,17 GB (nor_dx, arm, rough_ao, bump, spec,
+  .blend…), non cancellati: decide Valerio.
+- Controllando i residui sono emersi 4 materiali importati male: Rough Linen (rugosità presa
+  dalla `anisotropy_rotation`, perché "rough" sta nel nome del materiale) e Book Pattern,
+  Leather Red 02/03 (senza colore: Poly Haven dà solo varianti `col1`/`col2`, `coll1`/`coll2`).
+  Corretto `forge_library::detect` con test sui nomi reali e riparati i 4 materiali spostando
+  i file giusti (nessun file cancellato).
+- Report: `reports/2026-10-30_import-polyhaven-locale/REPORT.md`.
+
+**Domanda per te**: per le varianti di colore ho scelto la prima (`col1`, `coll1`, `col_01`).
+Ti sembra meglio così o preferiresti importare ogni variante come materiale separato?
