@@ -506,7 +506,8 @@ mod tests {
         // Nella vista d'assieme c'è l'arancione del pezzo evidenziato.
         let ctx_x0 = GAP + VIEW_PX + GAP;
         let orange = (0..VIEW_PX).flat_map(|y| (0..VIEW_PX).map(move |x| (x, y))).any(|(x, y)| {
-            let [r, g, b] = img.get_pixel((ctx_x0 + x) as u32, (GAP + y) as u32).0;
+            // In i32: con u8 "g + 50" trabocca (e in debug il test si ferma) sui pixel chiari.
+            let [r, g, b] = img.get_pixel((ctx_x0 + x) as u32, (GAP + y) as u32).0.map(i32::from);
             r > 150 && r > g + 50 && g > b + 30
         });
         assert!(orange, "pezzo evidenziato nell'assieme");
