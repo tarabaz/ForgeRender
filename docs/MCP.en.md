@@ -140,6 +140,7 @@ Example requests:
 
 - "Import the model I point you to (it is in millimetres) and prepare a photo studio."
 - "Use a dark studio backdrop, a warm light on the right and a cool rim light."
+- "Look at the parts of the model, work out what they are and apply realistic library materials to each; then do a test render and fix what looks wrong."
 - "Make the part bronze satin metal and the base matte black plastic."
 - "Three-quarter view with an 85 mm lens, 4:5 format for Instagram."
 - "Make a quick test render and tell me what you would improve."
@@ -160,6 +161,7 @@ Measurements in **metres**, y up. "Right", "left", "front" are relative to the r
 | Tool | What it does |
 |---|---|
 | `scene_info` | Scene state: product (centre and size), components with material, lights, camera, environment, settings and render state |
+| `inspect_components` | Quick images of the parts (from the viewport, in a fraction of a second): for each distinct part a numbered tile with the part alone and the assembly with the part in orange, plus name, id, copies, size, materials and colours. Lets Claude understand what the parts are (shape and purpose) before choosing materials. Does not change the scene |
 | `new_scene` | New scene: studio demo or empty |
 | `open_project` / `save_project` | Open or save a `.frproject` |
 | `import_model` | Import glTF/GLB, OBJ, STL, STEP, Blender, SolidWorks (unit and up axis for STL/OBJ) |

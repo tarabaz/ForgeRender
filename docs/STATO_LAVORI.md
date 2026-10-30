@@ -418,5 +418,19 @@
 - Nota: su Windows con `core.autocrlf=true` il test `english_covers_every_interface_text`
   fallisce (le stringhe su più righe prendono `\r\n`); non dipende da queste modifiche.
 
+### 0.9.0: `inspect_components`, Claude guarda i pezzi (30/10/2026)
+- Richiesta di Valerio: che Claude capisca da solo che cosa sono i pezzi (forma e scopo) e
+  applichi i materiali, guardando la viewport invece di fare render.
+- `forge_app/src/mcp/inspect.rs`: raggruppamento dei pezzi (parte STEP con i gruppi di colore =
+  un pezzo; pezzi con le stesse mesh = copie), rasterizzatore CPU con z-buffer e sovracampionamento
+  2×, spigoli scuriti, griglia PNG con numeri. Strumento in `forge_mcp::tools` e `mcp/tools.rs`,
+  citato nelle istruzioni del server. Guida `docs/MCP.md` / `MCP.en.md` aggiornata.
+- Test: raggruppamento e copie, immagine (misure, pezzo disegnato, arancione nell'assieme, scena
+  invariata), nomi delle viste; `real_model_sheets` (ignorato) per un `.frmesh` vero.
+- Prova sul Micromouse: 25 pezzi diversi in 3 immagini da 0,03–0,06 s; riconoscibili sensore
+  HC-SR04, Arduino UNO, L298N, ruote, dissipatore, pila AA, portabatterie, molla, viti.
+- **Da verificare da Valerio**: una sessione Claude vera che usa lo strumento e applica i
+  materiali della libreria.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

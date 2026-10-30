@@ -145,6 +145,7 @@ Esempi di richieste:
 
 - «Importa il modello che ti indico (è in millimetri) e prepara uno studio fotografico.»
 - «Metti uno sfondo da studio scuro e una luce calda a destra, più un controluce freddo.»
+- «Guarda i pezzi del modello, capisci cosa sono e applica materiali realistici dalla libreria a ciascuno; poi fai un render di prova e correggi.»
 - «Fai il pezzo in metallo satinato color bronzo, la base in plastica nera opaca.»
 - «Inquadratura tre quarti con un 85 mm, formato 4:5 per Instagram.»
 - «Fammi un render di prova veloce e dimmi cosa miglioreresti.»
@@ -166,6 +167,7 @@ all'inquadratura del render.
 | Strumento | Cosa fa |
 |---|---|
 | `scene_info` | Stato della scena: prodotto (centro e misure), componenti con materiale, luci, camera, ambiente, impostazioni e stato del render |
+| `inspect_components` | Immagini veloci dei pezzi (dalla viewport, in una frazione di secondo): per ogni pezzo diverso un riquadro numerato con il pezzo da solo e l'assieme con il pezzo in arancione, più nome, id, copie, misure, materiali e colori. Serve a Claude per capire che cosa sono i pezzi (forma e funzione) prima di scegliere i materiali. Non modifica la scena |
 | `new_scene` | Scena nuova: studio dimostrativo o vuota |
 | `open_project` / `save_project` | Apre o salva un `.frproject` |
 | `import_model` | Importa glTF/GLB, OBJ, STL, STEP, Blender, SolidWorks (unità e asse per STL/OBJ) |

@@ -31,6 +31,13 @@ pub fn list() -> Value {
     let vec3 = json!({"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3});
     let sides = json!({"type": "string", "enum": SIDES, "description": "Lato rispetto all'inquadratura attuale."});
     let tools = vec![
+        tool("inspect_components", "Immagini veloci dei pezzi del prodotto (dalla viewport, non un render) per capire che cosa sono, forma e funzione, prima di scegliere i materiali. Riquadri numerati: a sinistra il pezzo da solo, a destra l'assieme con il pezzo in arancione. I pezzi identici (viti, ruote) compaiono una volta sola con l'elenco delle copie. Per ogni riquadro: nome, id da usare in apply_material, copie, misure in mm, materiali e colori attuali. Non modifica la scena. Con molti pezzi chiedi le pagine successive.",
+            json!({
+                "targets": targets.clone(),
+                "page": {"type": "integer", "description": "Pagina (da 1)."},
+                "per_page": {"type": "integer", "description": "Pezzi per immagine (1–12, predefinito 12)."},
+                "view": {"type": "string", "enum": ["tre_quarti", "alto", "basso", "fronte", "retro", "lato"], "description": "Da dove si guardano i pezzi (predefinito tre_quarti)."}
+            }), &[]),
         tool("scene_info", "Stato della scena: prodotto (centro e misure in metri), componenti con materiale, luci (indice, tipo, posizione, colore, intensità), camera, ambiente, impostazioni e stato del render. Chiamalo prima di modificare.",
             json!({"max_components": {"type": "integer", "description": "Massimo di componenti elencati (predefinito 80)."}}), &[]),
         tool("new_scene", "Nuova scena: \"studio\" (studio fotografico dimostrativo, sostituito dal primo modello importato) o \"vuota\". Le modifiche non salvate si perdono.",

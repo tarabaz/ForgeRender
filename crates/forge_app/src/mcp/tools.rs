@@ -65,6 +65,7 @@ fn dispatch(app: &mut ForgeApp, name: &str, v: &Value) -> R {
     let a = Args(v);
     match name {
         "scene_info" => scene_info(app, &a),
+        "inspect_components" => inspect_components(app, &a),
         "new_scene" => new_scene(app, &a),
         "open_project" => open_project(app, &a),
         "save_project" => save_project(app, &a),
@@ -126,6 +127,80 @@ fn dispatch(app: &mut ForgeApp, name: &str, v: &Value) -> R {
 }
 
 // --- Scena e progetto ---
+
+/// Griglia di immagini dei pezzi (da solo + nell'assieme) con misure, materiali e colori,
+/// per capire che cosa sono prima di scegliere i materiali. Non modifica la scena.
+fn inspect_components(app: &mut ForgeApp, a: &Args) -> R {
+    use super::inspect;
+    let selection: Vec<usize> = app.selection.iter().copied().collect();
+    let roots = ops::resolve_targets(&app.scene, a.0.get("targets"), &selection)?;
+    let nodes = ops::mesh_nodes_under(&app.scene, &roots);
+    let pieces = inspect::pieces(&app.scene, &nodes);
+    if pieces.is_empty() {
+        return Err("nessun pezzo visibile con geometria tra i componenti indicati".into());
+    }
+    let per_page = a.u32("per_page")?.unwrap_or(12).clamp(1, 12) as usize;
+    let pages = pieces.len().div_ceil(per_page);
+    let page = a.u32("page")?.unwrap_or(1).max(1) as usize;
+    if page > pages {
+        return Err(format!("pagina {page} oltre l'ultima ({pages})"));
+    }
+    let view = a.str("view")?.unwrap_or_else(|| "tre_quarti".into());
+    let dir = inspect::view_direction(&view)
+        .ok_or_else(|| format!("vista \"{view}\" sconosciuta: tre_quarti, alto, basso, fronte, retro, lato"))?;
+    let first = (page - 1) * per_page;
+    let shown: Vec<usize> = (first..(first + per_page).min(pieces.len())).collect();
+    let t0 = Instant::now();
+    let png = inspect::contact_sheet(&app.scene, &pieces, &shown, first + 1, dir);
+    let s = &app.scene;
+    let tiles: Vec<Value> = shown
+        .iter()
+        .map(|&k| {
+            let p = &pieces[k];
+            let b = inspect::piece_bounds(s, p);
+            let size = (b.max - b.min) * 1000.0;
+            let mut materials: Vec<String> = Vec::new();
+            let mut colors: Vec<String> = Vec::new();
+            for &i in &p.nodes {
+                if let Some(m) = s.materials.get(s.resolve_material(i)) {
+                    if !materials.contains(&m.name) {
+                        materials.push(m.name.clone());
+                    }
+                    let hex = ops::to_hex(m.base_color);
+                    if !colors.contains(&hex) {
+                        colors.push(hex);
+                    }
+                }
+            }
+            json!({
+                "numero": k + 1,
+                "nome": s.nodes[p.root].name,
+                "id": s.nodes[p.root].id.0,
+                "copie": 1 + p.copies.len(),
+                "id_copie": p.copies.iter().take(60).map(|&c| s.nodes[c].id.0.clone()).collect::<Vec<_>>(),
+                "dimensioni_mm": [size.x.round(), size.y.round(), size.z.round()],
+                "centro_m": [b.center().x, b.center().y, b.center().z],
+                "materiali": materials,
+                "colori": colors,
+            })
+        })
+        .collect();
+    tracing::info!(
+        "controllo IA: inspect_components, {} pezzi in {:.2} s",
+        shown.len(),
+        t0.elapsed().as_secs_f32()
+    );
+    let mut out = ToolOutput::ok(json!({
+        "pezzi_diversi": pieces.len(),
+        "pagina": page,
+        "pagine": pages,
+        "vista": view,
+        "immagine": "riquadri numerati in righe da 3: a sinistra il pezzo da solo, a destra l'assieme con il pezzo in arancione (in trasparenza dove è coperto)",
+        "riquadri": tiles,
+    }));
+    out.png = Some(png);
+    Ok(Step::Done(out))
+}
 
 fn scene_info(app: &mut ForgeApp, a: &Args) -> R {
     let max = a.u32("max_components")?.unwrap_or(80) as usize;

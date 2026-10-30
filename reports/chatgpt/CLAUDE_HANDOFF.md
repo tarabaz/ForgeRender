@@ -1083,3 +1083,19 @@ Valerio ha approvato il piano con le scelte consigliate. Fatto:
 
 **Domanda per te**: per il test delle traduzioni su Windows meglio un `.gitattributes` con
 `*.rs text eol=lf` o normalizzare le stringhe nel test (`\r\n` → `\n`)?
+
+## Claude Code — 30/10/2026: 0.9.0, strumento MCP `inspect_components`
+
+- Valerio voleva che Claude capisse da solo che cosa sono i pezzi di un assieme (forma e scopo)
+  e applicasse i materiali della libreria, senza fare un render per pezzo.
+- Nuovo strumento `inspect_components` (26 strumenti in tutto): griglia PNG di riquadri numerati,
+  per ogni pezzo diverso la vista da solo e l'assieme con il pezzo in arancione (trasparenza
+  dove è coperto); testo con nome, id, copie, misure, materiali e colori. Pezzi identici una
+  volta sola; parte STEP con i gruppi di colore = un pezzo. Paginazione da 12, sei viste.
+- Disegno su CPU (rasterizzatore in `forge_app/src/mcp/inspect.rs`, ombreggiatura simile alla
+  viewport): non dipende dalla GPU della finestra, si testa senza GPU, non tocca la scena.
+  Micromouse (120 nodi con mesh, 25 pezzi diversi): 0,03–0,06 s per immagine.
+- Non ancora provato con una sessione Claude vera via MCP (lo fa Valerio).
+
+**Domanda per te**: oltre ai riquadri, servirebbe uno strumento "che pezzo c'è in questo punto
+del render" (pick da coordinate dell'immagine)? Per ora l'ho lasciato fuori.

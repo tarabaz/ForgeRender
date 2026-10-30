@@ -9,7 +9,7 @@ but also working without a dedicated GPU.
 
 > **Control ForgeRender with AI — MCP**
 >
-> Open ForgeRender, turn on **AI control** and ask Claude to prepare a scene, import a CAD model, position studio lights, assign materials, set the camera and render. 25 tools, live changes and render previews sent back to the assistant. You decide when the AI may take control: when it disconnects, ForgeRender stays open with your work.
+> Open ForgeRender, turn on **AI control** and ask Claude to prepare a scene, import a CAD model, position studio lights, assign materials, set the camera and render. 26 tools, live changes and render previews sent back to the assistant. You decide when the AI may take control: when it disconnects, ForgeRender stays open with your work.
 >
 > ![AI control on and Claude connected](docs/img/mcp/en/barra_controllato.png)
 >

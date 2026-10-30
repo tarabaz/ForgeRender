@@ -61,7 +61,8 @@ const INSTRUCTIONS: &str = "ForgeRender è un renderer fotorealistico per foto d
 Prima di modificare chiama scene_info: misure in metri, y verso l'alto. \
 Flusso tipico: import_model → prepare_studio (aspetto 'studio') → add_light / edit_light → \
 apply_material o create_material → set_camera → set_render_settings → render (restituisce \
-l'immagine: guardala e correggi). \"Destra\", \"sinistra\", \"davanti\" sono rispetto \
+l'immagine: guardala e correggi). Per capire che cosa sono i pezzi (forma e funzione) prima di \
+scegliere i materiali usa inspect_components: immagini veloci, non cambia la scena. \"Destra\", \"sinistra\", \"davanti\" sono rispetto \
 all'inquadratura attuale. Ogni modifica si vede subito nella finestra di ForgeRender. \
 Non sovrascrivere file esistenti senza che l'utente lo chieda (overwrite). \
 ForgeRender lo apre l'utente e decide lui quando accettare comandi (\"Controllo IA\" nella \

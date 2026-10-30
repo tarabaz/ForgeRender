@@ -11,6 +11,21 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.9.0 — 30/10/2026
+
+**Controllo IA: Claude guarda i pezzi e capisce che cosa sono**
+- Nuovo strumento MCP **`inspect_components`**: immagini veloci dei pezzi, in stile viewport
+  (non un render), per far capire all'assistente forma e funzione di ogni pezzo prima di
+  scegliere i materiali, anche quando i nomi non dicono niente ("NAUO32", "Part1").
+- Ogni pezzo diverso ha un riquadro numerato: a sinistra il pezzo da solo e inquadrato, a destra
+  l'assieme con il pezzo in arancione (in trasparenza dove è coperto). 12 riquadri per immagine,
+  poi le pagine successive; vista a scelta (tre quarti, alto, basso, fronte, retro, lato).
+- I pezzi identici (viti, ruote ripetute) compaiono una volta sola con l'elenco delle copie; una
+  parte STEP divisa per colore conta come un pezzo solo. Per ogni riquadro: nome, id da usare in
+  `apply_material`, copie, misure in mm, materiali e colori attuali.
+- Disegnato sulla CPU (z-buffer, spigoli scuriti): non tocca la scena, non sposta la camera e non
+  salva file. Sull'assieme Micromouse (120 pezzi con mesh, 25 diversi) 0,03–0,06 s per immagine.
+
 ## 0.8.3 — 30/10/2026
 
 **Correzioni**
