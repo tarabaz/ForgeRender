@@ -9,6 +9,13 @@ per Windows 11 (sviluppato per Ryzen 9 9900X + RTX 5070) ma funzionante anche se
 > Vedi [docs/ROADMAP.it.md](docs/ROADMAP.it.md) per cosa funziona davvero oggi, cosa viene dopo
 > e quanto è complesso ogni passo.
 
+> **Controlla ForgeRender con l'IA — MCP**
+>
+> Chiedi a Claude Code di preparare la scena, importare un modello CAD, posizionare le luci da studio, assegnare i materiali, impostare la camera e lanciare il render. ForgeRender espone 24 strumenti, mostra le modifiche in tempo reale e restituisce all'assistente le anteprime dei render.
+>
+> **[Configura Claude Code o Claude Desktop →](docs/MCP.md)** · [English guide](docs/MCP.en.md)
+>
+
 ## Cosa fa oggi
 
 - **Interfaccia Semplice / Avanzata** (selettore in alto, predefinita Semplice): "Foto prodotto in
@@ -23,10 +30,7 @@ per Windows 11 (sviluppato per Ryzen 9 9900X + RTX 5070) ma funzionante anche se
 - **Lingue**: italiano e inglese, cambio immediato di tutta l'interfaccia (in alto o in
   Impostazioni → Lingua). Le traduzioni sono file separati `lang/Lan_*.json`: se ne aggiungono
   altri copiando `Lan_eng.json`.
-- **Comandato da Claude (MCP)**: con `forgerender --mcp` un assistente IA imposta la scena e fa i
-  render su richiesta in italiano ("metti uno sfondo da studio, una luce calda a destra, il pezzo
-  in metallo satinato, render 4:5"): 24 comandi per scena, luci, materiali, camera, ambiente e
-  render, con l'anteprima che torna all'assistente. Guida: [docs/MCP.md](docs/MCP.md).
+- **Controllo IA (MCP)**: comanda ForgeRender in linguaggio naturale tramite Claude Code. Consulta la [guida di configurazione MCP](docs/MCP.md) per installazione, esempi, strumenti disponibili e sicurezza.
 - **Schermata di benvenuto** all'avvio con immagine (`assets/splash.png`), versione e commit;
   si chiude con "Chiudi" e si riapre da File.
 - **Path tracing** su CPU (tutti i core) e su GPU (compute shader wgpu, Vulkan/DX12) con accumulo
