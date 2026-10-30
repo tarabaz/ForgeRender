@@ -987,6 +987,15 @@ fn prim_vertices(prim: u32) -> array<vec3<f32>, 3> {
     return array<vec3<f32>, 3>(v0, v0 + sv3(b + 4u), v0 + sv3(b + 8u));
 }
 
+// Punto del triangolo alle coordinate baricentriche dell'intersezione (come
+// RenderGeometry::surface_point): più preciso di o + d * t con l'origine lontana della
+// camera ortografica, che faceva ombreggiare da soli i triangoli sottili.
+fn surface_point(prim: u32, bu: f32, bv: f32) -> vec3<f32> {
+    let slot = S[pu(P_OFF_PRIMS) + prim * PRIM_WORDS + 26u];
+    let b = pu(P_OFF_TRIS) + slot * TRI_WORDS;
+    return sv3(b) + sv3(b + 4u) * bu + sv3(b + 8u) * bv;
+}
+
 fn emissive_area_pdf(prim: u32) -> f32 {
     let ei = S[pu(P_OFF_PRIMS) + prim * PRIM_WORDS + 25u];
     if (ei == 0xffffffffu) { return 0.0; }
@@ -1278,7 +1287,7 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
             media_cross(hm, hfront);
             var hside = hng;
             if (hfront) { hside = -hng; }
-            o = offset_ray(o + d * hit.t, hside);
+            o = offset_ray(surface_point(hit.prim, hit.u, hit.v), hside);
             hit = trace(o, d, 0.0, INF, false);
         }
         var t_surf = INF;
@@ -1385,7 +1394,7 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
 
         let prim = hit.prim;
         let pb = pu(P_OFF_PRIMS) + prim * PRIM_WORDS;
-        let p = o + d * hit.t;
+        let p = surface_point(prim, hit.u, hit.v);
         let mat_id = S[pb + 3u];
         var m = load_mat(mat_id);
         var ng = sv3(pb + 12u);

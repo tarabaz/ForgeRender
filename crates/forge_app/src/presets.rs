@@ -226,21 +226,46 @@ pub fn product_roots(scene: &Scene) -> Vec<usize> {
         .collect()
 }
 
-/// Ingombro del prodotto visibile (senza pavimento, fondale e pareti).
-pub fn product_bounds(scene: &Scene) -> Aabb {
+/// Nodi con mesh visibili del prodotto (senza pavimento, fondale e pareti).
+fn product_mesh_nodes(scene: &Scene) -> impl Iterator<Item = (usize, usize)> + '_ {
     let scenery = scenery_ids(scene);
-    let mut b = Aabb::EMPTY;
-    for (i, n) in scene.nodes.iter().enumerate() {
-        let Some(m) = n.mesh else { continue };
+    scene.nodes.iter().enumerate().filter_map(move |(i, n)| {
+        let m = n.mesh?;
         // Si sale fino alla radice per sapere se il nodo è scenografia.
         let mut r = i;
         while let Some(p) = scene.nodes[r].parent {
             r = p;
         }
-        if scenery.contains(&scene.nodes[r].id) || !scene.is_visible(i) {
-            continue;
-        }
+        (!scenery.contains(&scene.nodes[r].id) && scene.is_visible(i)).then_some((i, m))
+    })
+}
+
+/// C'è un prodotto visibile? Controllo leggero (non scorre i vertici), per l'interfaccia.
+pub fn has_product(scene: &Scene) -> bool {
+    product_mesh_nodes(scene).next().is_some()
+}
+
+/// Ingombro approssimato del prodotto (scatole dei pezzi ruotate, può sporgere oltre la forma),
+/// senza scorrere i vertici: per ciò che si calcola a ogni frame, come la posizione delle
+/// luci nuove.
+pub fn product_bounds_approx(scene: &Scene) -> Aabb {
+    let mut b = Aabb::EMPTY;
+    for (i, m) in product_mesh_nodes(scene) {
         b.grow(&scene.meshes[m].bounds().transformed(&scene.world_transform(i)));
+    }
+    b
+}
+
+/// Ingombro del prodotto visibile (senza pavimento, fondale e pareti), sui vertici veri.
+/// Le scatole dei pezzi ruotate insieme ai pezzi sporgono oltre la forma (ruote inclinate
+/// di un assieme STEP: 13 mm sotto il punto più basso), e prodotto e fondale restavano staccati.
+pub fn product_bounds(scene: &Scene) -> Aabb {
+    let mut b = Aabb::EMPTY;
+    for (i, m) in product_mesh_nodes(scene) {
+        let w = scene.world_transform(i);
+        for p in &scene.meshes[m].positions {
+            b.grow_point(w.transform_point3(*p));
+        }
     }
     b
 }
@@ -470,21 +495,57 @@ pub fn apply_look(scene: &mut Scene, s: &mut RenderSettings, look: Look) {
     }
 }
 
-/// Porta il prodotto ad appoggiare sulla base (quota 0), tenendo le parti nella loro
-/// posizione relativa. Restituisce lo spostamento verticale applicato.
+/// Porta il prodotto ad appoggiare su ciò che ha sotto: scende finché una qualsiasi delle sue
+/// mesh tocca la scenografia (fondale, pavimento, parete aggiunti), come lo snap a contatto.
+/// Senza scenografia sotto, a quota 0. Le parti restano nella loro posizione relativa.
+/// Restituisce lo spostamento verticale applicato.
 pub fn drop_product_to_base(scene: &mut Scene) -> f32 {
     let b = product_bounds(scene);
     if b.is_empty() {
         return 0.0;
     }
-    let dy = -b.min.y;
+    let roots = product_roots(scene);
+    let scenery_ids = scenery_ids(scene);
+    let scenery_roots: Vec<usize> = scene
+        .roots
+        .iter()
+        .copied()
+        .filter(|&r| !scene.nodes[r].removed && scenery_ids.contains(&scene.nodes[r].id))
+        .collect();
+    let mut scenery_bounds = Aabb::EMPTY;
+    for &r in &scenery_roots {
+        scenery_bounds.grow(&scene.exact_bounds_of(r));
+    }
+    let shift = |scene: &mut Scene, dy: f32| {
+        for &r in &roots {
+            scene.translate_world(r, Vec3::new(0.0, dy, 0.0));
+        }
+    };
+    let to_zero = -b.min.y;
+    let dy = if scenery_bounds.is_empty() {
+        shift(scene, to_zero);
+        to_zero
+    } else {
+        // Sopra tutta la scenografia, poi giù fino al primo contatto (o fino a sotto la
+        // scenografia e la quota 0, se sotto il prodotto non c'è niente).
+        let lift = (scenery_bounds.max.y - b.min.y).max(0.0) + 0.01;
+        shift(scene, lift);
+        let moving = crate::contact::subtree_mask(scene, &roots);
+        let scenery = crate::contact::subtree_mask(scene, &scenery_roots);
+        let contact = crate::contact::Contact::new(scene, &moving, |i| scenery[i], usize::MAX);
+        let fall = lift + b.min.y - scenery_bounds.min.y.min(0.0) + 1.0;
+        let dy = match contact.hit(Vec3::new(0.0, -fall, 0.0)) {
+            Some(t) => lift - t,
+            None => to_zero,
+        };
+        shift(scene, dy - lift);
+        dy
+    };
     if dy.abs() < 1e-6 {
-        return 0.0;
+        0.0
+    } else {
+        dy
     }
-    for r in product_roots(scene) {
-        scene.translate_world(r, Vec3::new(0.0, dy, 0.0));
-    }
-    dy
 }
 
 /// "Prepara scena prodotto": appoggia il prodotto sulla base, aggiunge il fondale se manca
@@ -684,6 +745,50 @@ mod tests {
         let before = s.clone();
         apply_simple_base(&mut s);
         assert_eq!(s, before, "applicarli di nuovo non cambia niente");
+    }
+
+    /// Pezzo ruotato di 45°: la sua scatola ruotata sporge sotto la forma vera. L'ingombro e
+    /// "Appoggia" devono usare i vertici (prima il prodotto restava sollevato).
+    #[test]
+    fn rotated_part_touches_the_base_exactly() {
+        let mut scene = product_scene();
+        let i = scene.find(&ComponentId("prodotto".into())).unwrap();
+        scene.nodes[i].local_transform *= Mat4::from_rotation_z(std::f32::consts::FRAC_PI_4);
+        let real_min = {
+            let w = scene.world_transform(i);
+            let m = scene.nodes[i].mesh.unwrap();
+            scene.meshes[m]
+                .positions
+                .iter()
+                .map(|p| w.transform_point3(*p).y)
+                .fold(f32::INFINITY, f32::min)
+        };
+        assert!(product_bounds_approx(&scene).min.y < real_min - 0.05, "la scatola ruotata sporge");
+        assert!((product_bounds(&scene).min.y - real_min).abs() < 1e-5);
+        drop_product_to_base(&mut scene);
+        assert!(product_bounds(&scene).min.y.abs() < 1e-5, "{:?}", product_bounds(&scene));
+    }
+
+    /// "Appoggia" scende fino a toccare la scenografia che ha sotto (pavimento rialzato), come
+    /// lo snap a contatto; se sotto non c'è niente, va a quota 0.
+    #[test]
+    fn drop_stops_on_the_scenery_below() {
+        let mut scene = product_scene();
+        scene.add_object(AddedKind::Floor { size: 2.0 }, Mat4::from_translation(Vec3::new(0.0, 0.25, 0.0)));
+        let dy = drop_product_to_base(&mut scene);
+        let b = product_bounds(&scene);
+        assert!(dy < 0.0);
+        assert!(
+            b.min.y > 0.25 && b.min.y < 0.25 + 2.0 * crate::contact::CONTACT_GAP,
+            "appoggiato sul pavimento a 0.25 m: {b:?}"
+        );
+        // Già appoggiato: non si muove più.
+        assert_eq!(drop_product_to_base(&mut scene), 0.0);
+        // Pavimento lontano, non sotto il prodotto: quota 0.
+        let mut scene = product_scene();
+        scene.add_object(AddedKind::Floor { size: 0.5 }, Mat4::from_translation(Vec3::new(5.0, 0.25, 0.0)));
+        drop_product_to_base(&mut scene);
+        assert!(product_bounds(&scene).min.y.abs() < 1e-5);
     }
 
     #[test]

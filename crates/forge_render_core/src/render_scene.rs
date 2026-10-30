@@ -293,6 +293,16 @@ impl RenderGeometry {
         let t = &self.accel.tris[self.prim_to_slot[prim] as usize];
         [t.v0, t.v0 + t.e1, t.v0 + t.e2]
     }
+
+    /// Punto del triangolo `prim` alle coordinate baricentriche `(u, v)` dell'intersezione.
+    /// Più preciso di `origine + direzione · t` quando l'origine è lontana (camera ortografica:
+    /// i raggi partono metri indietro): l'errore di quel calcolo superava lo scostamento
+    /// anti-autointersezione e i triangoli sottili si facevano ombra da soli (striature).
+    #[inline]
+    pub fn surface_point(&self, prim: usize, u: f32, v: f32) -> Vec3 {
+        let t = &self.accel.tris[self.prim_to_slot[prim] as usize];
+        t.v0 + t.e1 * u + t.e2 * v
+    }
 }
 
 /// Triangoli emissivi, campionati in proporzione alla potenza emessa (NEE).

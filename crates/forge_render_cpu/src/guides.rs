@@ -101,7 +101,7 @@ fn guide_sample(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
             return (tint * clamp01(bg), Vec3::ZERO);
         };
         let prim = hit.prim as usize;
-        let p = o + d * hit.t;
+        let p = geo.surface_point(prim, hit.u, hit.v);
         let mat_idx = scene.material_index(prim);
         let mut mat = scene.materials[mat_idx];
         let mut ng = geo.geometric_normals[prim];

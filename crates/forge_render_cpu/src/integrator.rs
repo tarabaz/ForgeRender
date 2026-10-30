@@ -70,7 +70,7 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
             beta *= media.transmittance(scene, h.t);
             media.cross(mi, front);
             o = offset_ray_origin(
-                o + d * h.t,
+                geo.surface_point(h.prim as usize, h.u, h.v),
                 if front {
                     -geo.geometric_normals[h.prim as usize]
                 } else {
@@ -176,7 +176,7 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
 
         // Geometria del punto colpito.
         let prim = hit.prim as usize;
-        let p = o + d * hit.t;
+        let p = geo.surface_point(prim, hit.u, hit.v);
         let mat_idx = scene.material_index(prim);
         let mut mat_local = scene.materials[mat_idx];
         let front_face = geo.geometric_normals[prim].dot(d) < 0.0;

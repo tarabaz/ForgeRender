@@ -660,7 +660,8 @@ impl ForgeApp {
             }
         }
         if b.is_empty() {
-            b = crate::presets::product_bounds(&self.scene);
+            // Approssimato: lo chiede il pannello Luci a ogni frame.
+            b = crate::presets::product_bounds_approx(&self.scene);
         }
         if b.is_empty() {
             b = self.scene.bounds();
@@ -1401,7 +1402,7 @@ impl ForgeApp {
 
     /// "Prepara scena prodotto": appoggia, fondale se manca, aspetto, qualità, inquadratura.
     pub fn simple_prepare_scene(&mut self) {
-        if crate::presets::product_bounds(&self.scene).is_empty() {
+        if !crate::presets::has_product(&self.scene) {
             self.simple_msg = Some(tr("Importa prima un modello: la scena non ha un prodotto da preparare.").into());
             return;
         }
@@ -1420,7 +1421,7 @@ impl ForgeApp {
     /// "Adatta la scena al prodotto": fondale e luci rifatti sulle misure attuali del prodotto,
     /// poi inquadratura. Si annulla con "Annulla preset".
     pub fn simple_fit_scene(&mut self) {
-        if crate::presets::product_bounds(&self.scene).is_empty() {
+        if !crate::presets::has_product(&self.scene) {
             self.simple_msg = Some(tr("Importa prima un modello: non c'è un prodotto a cui adattare la scena.").into());
             return;
         }

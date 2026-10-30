@@ -11,6 +11,25 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.8.3 — 30/10/2026
+
+**Correzioni**
+- **Striature in vista isometrica / ortografica**: nel render comparivano righe scure che
+  partivano dai fori dei modelli CAD (i triangoli lunghi e sottili si facevano ombra da soli).
+  In ortografica i raggi partono metri indietro e il punto colpito, calcolato come
+  origine + direzione × distanza, aveva un errore più grande dello scostamento
+  anti-autointersezione. Ora il punto si ricalcola dal triangolo colpito (coordinate
+  baricentriche), su CPU e GPU. Test `ortho_acne`: con il calcolo di prima 7627 auto-ombre su
+  16244 punti, ora 0.
+- **"Appoggia sulla base" appoggia davvero**: il punto più basso si calcolava dalle scatole dei
+  pezzi ruotate insieme ai pezzi, che sporgono oltre la forma (assieme STEP Micromouse: 12,9 mm),
+  e il prodotto restava sollevato; lo stesso valore metteva il fondale sotto il prodotto. Ora
+  l'ingombro del prodotto usa i vertici veri (fondale, luci, inquadratura compresi).
+- **"Appoggia sulla base" a contatto**: il prodotto scende finché una qualsiasi delle sue parti
+  tocca la scenografia che ha sotto (fondale, pavimento, parete aggiunti), con lo stesso calcolo
+  dello snap a contatto del gizmo (ora in `contact.rs`, usato da tutti e due); se sotto non c'è
+  niente, va a quota 0. Vale anche per il pannello Semplice e per il Controllo IA.
+
 ## 0.8.2 — 30/10/2026
 
 **Correzioni**

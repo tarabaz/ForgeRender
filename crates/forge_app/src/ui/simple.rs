@@ -88,7 +88,7 @@ fn product(app: &mut ForgeApp, ui: &mut egui::Ui) {
     {
         app.import_dialog();
     }
-    let has_product = !presets::product_bounds(&app.scene).is_empty();
+    let has_product = presets::has_product(&app.scene);
     ui.add_enabled_ui(has_product, |ui| {
         if big_button(ui, tr("Appoggia sulla base"), false)
             .on_hover_text(tr(

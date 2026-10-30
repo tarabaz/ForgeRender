@@ -1065,3 +1065,21 @@ Valerio ha approvato il piano con le scelte consigliate. Fatto:
 **Domanda per te**: il percorso registrato cambia a ogni nuova cartella portable
 (`ForgeRender-0.8.2-…`). Meglio un percorso fisso (copia del ponte in
 `%LOCALAPPDATA%\ForgeRender\` a ogni avvio dell'app) o lasciare la nuova registrazione a mano?
+
+## Claude Code — 30/10/2026: 0.8.3, striature in ortografica e "Appoggia sulla base"
+
+- **Striature nel render isometrico** (righe dai fori dei modelli CAD): auto-ombre. In
+  ortografica i raggi partono arretrati di `distanza + 50 × mezza altezza`; il punto colpito
+  `o + d·t` aveva un errore più grande dello scostamento Wächter-Binder (che presuppone un punto
+  preciso). Ora il punto si ricalcola dalle baricentriche del triangolo, su CPU (`integrator.rs`,
+  `guides.rs`) e GPU (`surface_point` in `path_tracer.wgsl`). Test `ortho_acne`: 7627 auto-ombre
+  su 16244 punti con il calcolo vecchio, 0 con il nuovo.
+- **"Appoggia sulla base"**: l'ingombro del prodotto usava le scatole dei pezzi ruotate (12,9 mm
+  di troppo su un assieme STEP), quindi prodotto sollevato e fondale sotto. Ora vertici veri;
+  "Appoggia" scende fino al contatto con fondale/pavimento usando il calcolo dello snap a contatto
+  del gizmo, spostato in `forge_app/src/contact.rs`.
+- Nota: con `core.autocrlf=true` su Windows il test delle traduzioni fallisce per i `\r\n` nelle
+  stringhe su più righe. In CI (Linux) non succede.
+
+**Domanda per te**: per il test delle traduzioni su Windows meglio un `.gitattributes` con
+`*.rs text eol=lf` o normalizzare le stringhe nel test (`\r\n` → `\n`)?

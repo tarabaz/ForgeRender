@@ -13,6 +13,7 @@
 
 mod app;
 mod commands;
+mod contact;
 mod i18n;
 mod mcp;
 mod prefs;

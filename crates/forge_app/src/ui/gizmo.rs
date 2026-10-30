@@ -12,6 +12,7 @@
 //! - Ctrl durante il trascinamento: snap ai passi impostati.
 
 use crate::app::ForgeApp;
+use crate::contact::{subtree_mask, Contact, DRAG_MAX_VERTS};
 use crate::i18n::{tf, tr};
 use crate::viewport::project;
 use eframe::egui;
@@ -67,127 +68,13 @@ pub enum Target {
     Fog(usize),
 }
 
-/// Dati per lo snap a contatto, preparati all'inizio del trascinamento: gli ostacoli
-/// non si muovono, quindi le loro BVH restano valide per tutto il trascinamento.
-struct Contact {
-    /// Vertici (in spazio mondo, all'inizio) dei componenti spostati.
-    verts: Vec<Vec3>,
-    /// Centro dei componenti spostati (per capire da che lato sta l'oggetto a contatto).
-    moving_center: Vec3,
-    /// Centro dell'ostacolo a cui appartiene ogni vertice di `obstacle_verts`.
-    obstacle_centers: Vec<Vec3>,
-    moving: forge_accel::TriangleAccel,
-    moving_n: Vec<Vec3>,
-    obstacles: forge_accel::TriangleAccel,
-    obstacle_n: Vec<Vec3>,
-    obstacle_verts: Vec<Vec3>,
-}
-
-/// Distanza di sicurezza lasciata tra le superfici a contatto (m).
-const CONTACT_GAP: f32 = 2e-4;
-/// Massimo di vertici usati per lato (oltre si campiona a passo regolare).
-const CONTACT_MAX_VERTS: usize = 40_000;
-
-impl Contact {
-    /// Prepara il contatto se uno dei componenti trascinati ha lo snap attivo.
-    fn build(scene: &Scene, sel: &[usize]) -> Option<Contact> {
-        if !sel.iter().any(|&i| scene.nodes[i].contact_snap) {
-            return None;
-        }
-        // Componenti che si muovono: i selezionati con tutti i discendenti.
-        let mut moving = vec![false; scene.nodes.len()];
-        let mut stack: Vec<usize> = sel.to_vec();
-        while let Some(i) = stack.pop() {
-            moving[i] = true;
-            stack.extend(scene.nodes[i].children.iter().copied());
-        }
-        let (mut mt, mut ot) = (Vec::new(), Vec::new());
-        let (mut mv, mut ov, mut oc) = (Vec::new(), Vec::new(), Vec::new());
-        for (i, n) in scene.nodes.iter().enumerate() {
-            let Some(mi) = n.mesh else { continue };
-            if !scene.is_visible(i) {
-                continue;
-            }
-            let m = &scene.meshes[mi];
-            let xf = scene.world_transform(i);
-            let wp: Vec<Vec3> = m.positions.iter().map(|p| xf.transform_point3(*p)).collect();
-            let tris = if moving[i] { &mut mt } else { &mut ot };
-            for idx in &m.indices {
-                tris.push(idx.map(|k| wp[k as usize]));
-            }
-            if moving[i] {
-                mv.extend(wp);
-            } else {
-                let c = forge_math::Aabb::from_points(&wp).center();
-                oc.extend(std::iter::repeat_n(c, wp.len()));
-                ov.extend(wp);
-            }
-        }
-        let step = |n: usize| n.div_ceil(CONTACT_MAX_VERTS).max(1);
-        let (sm, so) = (step(mv.len()), step(ov.len()));
-        let moving_center = forge_math::Aabb::from_points(&mv).center();
-        let normals = |t: &[[Vec3; 3]]| t.iter().map(|t| (t[1] - t[0]).cross(t[2] - t[0]).normalize_or_zero()).collect();
-        Some(Contact {
-            verts: mv.into_iter().step_by(sm).collect(),
-            moving_center,
-            moving_n: normals(&mt),
-            moving: forge_accel::TriangleAccel::build(&mt),
-            obstacle_n: normals(&ot),
-            obstacles: forge_accel::TriangleAccel::build(&ot),
-            obstacle_verts: ov.into_iter().step_by(so).collect(),
-            obstacle_centers: oc.into_iter().step_by(so).collect(),
-        })
+/// Snap a contatto preparato all'inizio del trascinamento, se uno dei componenti trascinati
+/// ce l'ha attivo: si muovono i selezionati con tutti i discendenti, tutto il resto ferma.
+fn contact_for_drag(scene: &Scene, sel: &[usize]) -> Option<Contact> {
+    if !sel.iter().any(|&i| scene.nodes[i].contact_snap) {
+        return None;
     }
-
-    /// Lunghezza ammessa dello spostamento `d` (≤ |d|) prima di toccare un ostacolo.
-    /// Le superfici quasi parallele al movimento non fermano (si può scivolare su un piano).
-    fn limit(&self, d: Vec3) -> f32 {
-        use rayon::prelude::*;
-        let len = d.length();
-        if len < 1e-9 {
-            return len;
-        }
-        let dir = d / len;
-        // Raggi da ogni punto lungo `dir`; i contatti già in essere (t ≈ 0) fermano solo se
-        // il movimento entra nell'ostacolo (dal lato del proprio centro verso l'altro).
-        let cast =
-            |accel: &forge_accel::TriangleAccel, normals: &[Vec3], from: &[Vec3], centers: &(dyn Fn(usize) -> Vec3 + Sync), dir: Vec3| {
-                from.par_iter()
-                    .enumerate()
-                    .filter_map(|(k, v)| {
-                        let center = centers(k);
-                        accel
-                            .intersect_filtered(*v, dir, -CONTACT_GAP, len + CONTACT_GAP, |prim, t, _, _| {
-                                let n = normals[prim as usize];
-                                let along = n.dot(dir);
-                                if along.abs() < 0.05 {
-                                    return false; // superficie parallela al movimento: si scivola
-                                }
-                                if t > CONTACT_GAP {
-                                    return true;
-                                }
-                                let side = n.dot(center - *v);
-                                side != 0.0 && along * side.signum() < 0.0
-                            })
-                            .map(|h| h.t)
-                    })
-                    .reduce(|| f32::INFINITY, f32::min)
-            };
-        // Vertici dell'oggetto contro gli ostacoli, e vertici degli ostacoli contro l'oggetto.
-        let mc = self.moving_center;
-        let t = cast(&self.obstacles, &self.obstacle_n, &self.verts, &|_| mc, dir).min(cast(
-            &self.moving,
-            &self.moving_n,
-            &self.obstacle_verts,
-            &|k| self.obstacle_centers[k],
-            -dir,
-        ));
-        if t.is_finite() {
-            (t - CONTACT_GAP).clamp(0.0, len)
-        } else {
-            len
-        }
-    }
+    Some(Contact::new(scene, &subtree_mask(scene, sel), |_| true, DRAG_MAX_VERTS))
 }
 
 struct Drag {
@@ -592,7 +479,7 @@ pub fn update(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::
                     }
                 };
                 let contact = match (tgt, h) {
-                    (Target::Nodes, Handle::Axis(_) | Handle::Plane(_) | Handle::Screen) => Contact::build(&app.scene, &sel),
+                    (Target::Nodes, Handle::Axis(_) | Handle::Plane(_) | Handle::Screen) => contact_for_drag(&app.scene, &sel),
                     _ => None,
                 };
                 app.gizmo.drag = Some(Drag {
@@ -1189,14 +1076,14 @@ mod tests {
     fn contact_snap_stops_on_the_floor_and_against_objects() {
         // Cubo sospeso a 1 m: scendendo di 3 m si ferma dopo 1 m (tocca il pavimento).
         let (s, a) = contact_scene(1.0);
-        let c = Contact::build(&s, &[a]).expect("snap attivo");
+        let c = contact_for_drag(&s, &[a]).expect("snap attivo");
         let down = c.limit(Vec3::new(0.0, -3.0, 0.0));
         assert!((down - 1.0).abs() < 1e-3, "si ferma a {down}");
         // Verso l'alto e di lato nessun ostacolo.
         assert!((c.limit(Vec3::new(0.0, 2.0, 0.0)) - 2.0).abs() < 1e-6);
         // Appoggiato: scivola sul pavimento, ma si ferma contro il cubo B (facce a 1 m e 2.5 m).
         let (s, a) = contact_scene(0.0);
-        let c = Contact::build(&s, &[a]).unwrap();
+        let c = contact_for_drag(&s, &[a]).unwrap();
         let side = c.limit(Vec3::new(4.0, 0.0, 0.0));
         assert!((side - 2.0).abs() < 1e-3, "contro B a {side}");
         assert!(
@@ -1211,7 +1098,7 @@ mod tests {
         // Senza snap sull'oggetto non si prepara nulla.
         let (mut s, a) = contact_scene(1.0);
         s.nodes[a].contact_snap = false;
-        assert!(Contact::build(&s, &[a]).is_none());
+        assert!(contact_for_drag(&s, &[a]).is_none());
     }
 
     #[test]

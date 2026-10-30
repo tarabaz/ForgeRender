@@ -399,5 +399,24 @@
 - Da valutare: un percorso fisso per il ponte, perché il percorso registrato cambia a ogni nuova
   cartella portable.
 
+### 0.8.3: striature in ortografica, "Appoggia sulla base" (30/10/2026)
+- Trovati da Valerio con l'assieme STEP Micromouse (SolidWorks, componenti in file separati:
+  il convertitore segue da solo i rimandi del file principale; 120 pezzi, 31 colori).
+- **Striature in isometrica**: auto-ombre sui triangoli sottili attorno ai fori. Punto colpito
+  ricalcolato dal triangolo (`RenderGeometry::surface_point`, `surface_point` nello shader) al
+  posto di `o + d·t`, che con l'origine arretrata dell'ortografica sbagliava più dello
+  scostamento Wächter-Binder. Test `forge_render_cpu/tests/ortho_acne.rs` (prima 7627 auto-ombre
+  su 16244 punti, ora 0).
+- **Appoggia**: `presets::product_bounds` sui vertici veri (prima scatole ruotate: 12,9 mm di
+  troppo sul Micromouse, fondale messo sotto il prodotto); `has_product` leggero per
+  l'interfaccia; `product_bounds_approx` per l'ancoraggio delle luci (pannello Luci, ogni frame).
+  "Appoggia sulla base" scende fino al contatto con la scenografia sotto (`contact.rs`, lo stesso
+  calcolo dello snap a contatto del gizmo), altrimenti quota 0. Test
+  `rotated_part_touches_the_base_exactly`, `drop_stops_on_the_scenery_below`.
+- **Da verificare da Valerio** su Windows: render isometrico del Micromouse senza striature (GPU
+  e CPU), "Appoggia" con il fondale fotografico.
+- Nota: su Windows con `core.autocrlf=true` il test `english_covers_every_interface_text`
+  fallisce (le stringhe su più righe prendono `\r\n`); non dipende da queste modifiche.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

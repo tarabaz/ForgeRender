@@ -71,7 +71,7 @@ fn dispatch(app: &mut ForgeApp, name: &str, v: &Value) -> R {
         "import_model" => import_model(app, &a),
         "prepare_studio" => prepare_studio(app, &a),
         "fit_scene_to_product" => {
-            if presets::product_bounds(&app.scene).is_empty() {
+            if !presets::has_product(&app.scene) {
                 return Err("nella scena non c'è un prodotto: importa prima un modello".into());
             }
             app.simple_fit_scene();
@@ -300,7 +300,7 @@ fn prepare_studio(app: &mut ForgeApp, a: &Args) -> R {
     if let Some(q) = a.str("quality")? {
         app.simple_quality = quality_of(&q)?;
     }
-    if presets::product_bounds(&app.scene).is_empty() {
+    if !presets::has_product(&app.scene) {
         // Senza prodotto: solo aspetto e qualità (luci, ambiente, colori).
         app.simple_apply_look(app.simple_look);
         app.simple_apply_quality(app.simple_quality);
@@ -676,7 +676,7 @@ fn create_material(app: &mut ForgeApp, a: &Args) -> R {
         "metallic": m.metallic, "roughness": m.roughness, "transmission": m.transmission,
     });
     app.scene.materials.upsert(m);
-    let names = if a.has("targets") || !presets::product_bounds(&app.scene).is_empty() {
+    let names = if a.has("targets") || presets::has_product(&app.scene) {
         assign(app, &id, a.0.get("targets"))?
     } else {
         app.appearance_changed();
