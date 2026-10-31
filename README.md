@@ -55,6 +55,17 @@ For the full technical notes, see [CHANGELOG.md](CHANGELOG.md) (Italian, authori
 
 </details>
 
+> **Control ForgeRender with AI — MCP**
+>
+> Open ForgeRender, turn on **AI control** and ask Claude to prepare a scene, import a CAD model, position studio lights, assign materials, set the camera and render. 26 tools, live changes and render previews sent back to the assistant. You decide when the AI may take control: when it disconnects, ForgeRender stays open with your work.
+>
+> ![AI control on and Claude connected](docs/img/mcp/en/barra_controllato.png)
+>
+> **[Set up Claude Code or Claude Desktop →](docs/MCP.en.md)** · [Italian guide](docs/MCP.md)
+
+> See [docs/ROADMAP.md](docs/ROADMAP.md) for what really works today, what comes next and
+> how complex each next step is.
+
 ## What it does today
 
 - **Simple / Advanced interface** (switch at the top, Simple by default): "Product photo in
