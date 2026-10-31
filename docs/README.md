@@ -8,7 +8,7 @@ documentation; Italian translations are available where listed below.
 ## User documentation
 
 - [README and downloads](../README.md)
-- [What's new — changelog](../CHANGELOG.md)
+- [What's new — changelog](../CHANGELOG.en.md)
 - [User manual](../manuale/en/01-introduzione/intro.benvenuto.md)
 - [MCP integration: control ForgeRender with an AI assistant](MCP.en.md)
 - [Roadmap and project status](ROADMAP.md)
