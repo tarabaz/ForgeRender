@@ -1,5 +1,7 @@
 # Novità di ForgeRender
 
+🇬🇧 [Read the changelog in English](CHANGELOG.en.md) (versione di riferimento)
+
 La versione è in un solo punto: `version` in `[workspace.package]` del `Cargo.toml` alla radice.
 Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<versione> (<commit>)`.
 
