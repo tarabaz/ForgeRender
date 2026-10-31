@@ -20,7 +20,7 @@ pub use camera::{Camera, OrbitController, RenderCamera};
 pub use environment::Environment;
 pub use fog::{FogPreset, FogVolume, FOG_PRESETS, FOG_QUALITY};
 pub use light::{Light, LightKind};
-pub use material::{Material, MaterialId, MaterialLibrary, Projection, TextureMapping};
+pub use material::{Material, MaterialId, MaterialLibrary, Projection, TextureAnchor, TextureMapping};
 pub use mesh::Mesh;
 pub use scene::{ComponentId, CopyRecord, Node, NodeIndex, Scene, UserTransform};
 pub use units::LengthUnit;

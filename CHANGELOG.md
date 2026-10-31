@@ -11,6 +11,23 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.17.0 — 31/10/2026
+
+**Fase 2: ancoraggio delle texture Box**
+- Nell'editor dei materiali (proiezione Box) si sceglie l'ancoraggio: **Pezzo** (la texture
+  segue il singolo pezzo, come dalla 0.15), **Assieme** (una sola proiezione per tutto
+  l'assieme, continua anche tra pezzi ruotati diversamente; segue l'assieme) o **Mondo** (texture
+  ferma nella scena, come fino alla 0.14). CPU e GPU coincidono nelle tre modalità.
+- Progetti salvati prima della 0.15: all'apertura i materiali Box passano su Mondo, così le
+  venature restano dove erano (avviso nella finestra di apertura). Schema del progetto 2.
+
+**Fase 3: Appoggia**
+- Con più pezzi scelti ognuno scende per conto suo, dal più basso al più alto: si fermano sul
+  proprio appoggio e si impilano.
+- Contatto spigolo contro spigolo: due spigoli incrociati non si compenetrano più.
+- Un pezzo nascosto scelto si appoggia comunque su ciò che ha sotto.
+- Un solo Ctrl+Z annulla tutto (l'operazione cambia solo i pezzi scelti).
+
 ## 0.16.0 — 31/10/2026
 
 **Fase 1 della revisione: correttezza di materiali e texture**

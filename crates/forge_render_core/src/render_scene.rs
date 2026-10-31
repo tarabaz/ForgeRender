@@ -279,8 +279,6 @@ pub struct RenderGeometry {
     pub tri_uvs: Vec<[Vec2; 3]>,
     /// Tangente ∂p/∂u in spazio mondo (zero se la mesh non ha UV).
     pub tri_tangents: Vec<Vec3>,
-    /// Riferimento della proiezione box per ogni nodo di scena (indice = nodo).
-    pub node_frames: Vec<crate::displace::BoxFrame>,
     /// Flag per primitiva (vedi [`crate::displace::FLAG_DISPLACED_BOX`]).
     pub tri_flags: Vec<u32>,
     /// Posizione di ogni primitiva (ordine originale) dentro `accel.tris` (ordine BVH).
@@ -344,7 +342,7 @@ impl RenderGeometry {
         let mut ttan = Vec::new();
         let mut tflags = Vec::new();
         let displaced = displacement_plan(scene);
-        let mut node_frames = vec![crate::displace::BoxFrame::default(); scene.nodes.len()];
+        let node_frames = box_frames(scene);
         for (i, node) in scene.nodes.iter().enumerate() {
             let Some(mi) = node.mesh else { continue };
             if !scene.is_visible(i) {
@@ -355,8 +353,6 @@ impl RenderGeometry {
             let nxf = Mat3::from_mat4(xf).inverse().transpose();
             // Una trasformazione con determinante negativo (specchiatura) inverte il winding.
             let mirrored = Mat3::from_mat4(xf).determinant() < 0.0;
-            let (rot, origin) = scene.texture_frame(i);
-            node_frames[i] = crate::displace::BoxFrame { rot, origin };
             let has_n = mesh.has_normals();
             let has_uv = mesh.uvs.len() == mesh.positions.len();
             if let Some((params, target)) = displaced.get(&i) {
@@ -444,11 +440,29 @@ impl RenderGeometry {
             tri_uvs: tuv,
             tri_tangents: ttan,
             tri_flags: tflags,
-            node_frames,
             prim_to_slot,
             bounds,
         }
     }
+}
+
+/// Riferimento della proiezione Box di ogni nodo con mesh, secondo l'ancoraggio del materiale
+/// che il nodo usa (pezzo, assieme o mondo). Lo usano il displacement e lo shading.
+pub fn box_frames(scene: &Scene) -> Vec<crate::displace::BoxFrame> {
+    (0..scene.nodes.len())
+        .map(|i| {
+            if scene.nodes[i].mesh.is_none() {
+                return crate::displace::BoxFrame::default();
+            }
+            let anchor = scene
+                .materials
+                .get(scene.resolve_material(i))
+                .map(|m| m.mapping.anchor)
+                .unwrap_or_default();
+            let (rot, origin) = scene.texture_frame_for(i, anchor);
+            crate::displace::BoxFrame { rot, origin }
+        })
+        .collect()
 }
 
 /// Componenti da suddividere per il displacement, con parametri e lato dei
@@ -531,6 +545,9 @@ pub struct RenderScene {
     pub portals: Portals,
     /// Qualche materiale ha una mappa di opacità (ritaglio): le intersezioni vanno filtrate.
     pub has_cutout: bool,
+    /// Riferimento della proiezione Box di ogni nodo (indice = nodo), secondo l'ancoraggio del
+    /// suo materiale: lo legge lo shading di CPU e GPU.
+    pub node_frames: Vec<crate::displace::BoxFrame>,
     /// Nebbie volumetriche già calcolate.
     pub fogs: Vec<Arc<forge_volume::BakedFog>>,
 }
@@ -666,6 +683,7 @@ impl RenderScene {
         let id = next_scene_id();
         RenderScene {
             has_cutout,
+            node_frames: box_frames(scene),
             fogs,
             id,
             content_id: id,
@@ -699,6 +717,7 @@ impl RenderScene {
             camera,
             portals: self.portals.clone(),
             has_cutout: self.has_cutout,
+            node_frames: self.node_frames.clone(),
             fogs: self.fogs.clone(),
         }
     }
@@ -821,7 +840,7 @@ mod tests {
             let i = s.add_node(None, forge_scene::ComponentId("cubo".into()), "Cubo", src, Some(m));
             s.refresh_pivots();
             s.nodes[i].user = user;
-            RenderGeometry::build(&s)
+            RenderScene::compile(&s)
         };
         let src = forge_math::Mat4::from_rotation_y(0.5);
         let a = build(Default::default(), src);
@@ -831,10 +850,11 @@ mod tests {
             scale: Vec3::ONE,
         };
         let b = build(moved, src);
+        let (a, b, fra, frb) = (a.geometry.clone(), b.geometry.clone(), a.node_frames, b.node_frames);
         assert_eq!(a.tri_node.len(), b.tri_node.len());
         for prim in 0..a.tri_node.len() {
-            let fa = a.node_frames[a.tri_node[prim] as usize];
-            let fb = b.node_frames[b.tri_node[prim] as usize];
+            let fa = fra[a.tri_node[prim] as usize];
+            let fb = frb[b.tri_node[prim] as usize];
             for (pa, pb) in a.vertices(prim).into_iter().zip(b.vertices(prim)) {
                 let (la, lb) = (fa.to_local(pa), fb.to_local(pb));
                 assert!((la - lb).length() < 1e-4, "{la} vs {lb}");

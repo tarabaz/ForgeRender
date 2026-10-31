@@ -151,6 +151,7 @@ pub fn import_named(
                 scale: 1.0,
                 rotation_deg: 0.0,
                 offset: [0.0; 2],
+                ..Default::default()
             };
         }
         let mat = mat.sanitized();

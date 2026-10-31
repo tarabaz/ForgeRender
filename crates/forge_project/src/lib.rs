@@ -18,7 +18,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 pub const FORMAT_ID: &str = "forgerender-project";
-pub const SCHEMA_VERSION: u32 = 1;
+/// Schema 2 (0.17.0): ancoraggio della proiezione Box nel mapping dei materiali.
+pub const SCHEMA_VERSION: u32 = 2;
 pub const EXTENSION: &str = "frproject";
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -79,6 +80,10 @@ pub struct ProjectFile {
     pub fogs: Vec<forge_scene::FogVolume>,
     #[serde(default)]
     pub render: RenderSettings,
+    /// Materiali Box messi su ancoraggio "mondo" dalla migrazione di un progetto precedente
+    /// alla 0.15 (non salvato: serve solo per l'avviso all'apertura).
+    #[serde(skip)]
+    pub migrated_world_anchor: usize,
 }
 
 /// Metadati del progetto aperto che non stanno nella [`Scene`].
@@ -96,6 +101,8 @@ pub struct LoadReport {
     /// (rinominati o rimossi). Le loro assegnazioni vengono conservate.
     pub missing_components: Vec<ComponentId>,
     pub warnings: Vec<String>,
+    /// Informazioni sull'apertura che non sono problemi (es. migrazione di un progetto vecchio).
+    pub notes: Vec<String>,
 }
 
 pub struct LoadedProject {
@@ -175,6 +182,7 @@ pub fn to_project_file(scene: &Scene, meta: &ProjectMeta, settings: &RenderSetti
         active_camera: scene.active_camera,
         fogs: scene.fogs.clone(),
         render: settings.clone(),
+        migrated_world_anchor: 0,
     }
 }
 
@@ -208,8 +216,49 @@ pub fn parse(json: &str) -> anyhow::Result<ProjectFile> {
     if ver > SCHEMA_VERSION {
         bail!("progetto creato con una versione più recente (schema {ver}, supportato fino a {SCHEMA_VERSION})");
     }
-    // Qui verranno inserite le migrazioni tra versioni dello schema (ver < SCHEMA_VERSION).
-    serde_json::from_value(v).context("struttura del progetto non valida")
+    // Migrazioni tra versioni dello schema (ver < SCHEMA_VERSION).
+    let mut v = v;
+    let migrated = if ver < 2 { migrate_box_anchor(&mut v) } else { 0 };
+    let mut pf: ProjectFile = serde_json::from_value(v).context("struttura del progetto non valida")?;
+    pf.migrated_world_anchor = migrated;
+    Ok(pf)
+}
+
+/// Versione "x.y.z" come (x, y, z); `None` se non leggibile.
+fn parse_version(s: &str) -> Option<(u32, u32, u32)> {
+    let mut it = s.trim().split('.').map(|p| p.trim().parse::<u32>().ok());
+    Some((it.next()??, it.next().flatten().unwrap_or(0), it.next().flatten().unwrap_or(0)))
+}
+
+/// Schema 1 → 2: fino alla 0.14 la proiezione Box era ancorata al mondo. I progetti salvati
+/// prima della 0.15 (o senza versione) riaprono i materiali Box su `World`, così le venature
+/// restano dove erano; quelli della 0.15–0.16 restano sul pezzo (il nuovo predefinito).
+/// Restituisce quanti materiali sono stati spostati su `World`.
+fn migrate_box_anchor(v: &mut serde_json::Value) -> usize {
+    let old = v
+        .get("app_version")
+        .and_then(|x| x.as_str())
+        .and_then(parse_version)
+        .is_none_or(|ver| ver < (0, 15, 0));
+    if !old {
+        return 0;
+    }
+    let Some(materials) = v.get_mut("materials").and_then(|m| m.as_array_mut()) else {
+        return 0;
+    };
+    let mut n = 0;
+    for m in materials {
+        let Some(obj) = m.as_object_mut() else { continue };
+        let mapping = obj.entry("mapping").or_insert_with(|| serde_json::json!({}));
+        let Some(mapping) = mapping.as_object_mut() else { continue };
+        // Senza "projection" vale il predefinito, cioè Box.
+        let is_box = mapping.get("projection").and_then(|p| p.as_str()).is_none_or(|p| p == "Box");
+        if is_box && !mapping.contains_key("anchor") {
+            mapping.insert("anchor".into(), serde_json::json!("World"));
+            n += 1;
+        }
+    }
+    n
 }
 
 /// Se un file esterno (HDRI, texture) non esiste più nel percorso salvato, lo
@@ -238,6 +287,12 @@ pub fn load(path: &Path) -> anyhow::Result<LoadedProject> {
     let pf = parse(&text)?;
     let project_dir = path.parent();
     let mut report = LoadReport::default();
+    if pf.migrated_world_anchor > 0 {
+        report.notes.push(format!(
+            "progetto di una versione precedente alla 0.15: {} materiali con proiezione Box restano ancorati al mondo come allora (si cambia nell'editor dei materiali, Ancoraggio)",
+            pf.migrated_world_anchor
+        ));
+    }
     let mut scene = if pf.test_scene { Scene::test_scene() } else { Scene::default() };
     // Le assegnazioni del progetto sostituiscono quelle predefinite.
     scene.assignments.clear();
@@ -592,5 +647,98 @@ mod tests {
         assert_eq!(l.scene.triangle_count(), scene.triangle_count());
         assert_eq!(l.scene.assignments, scene.assignments);
         std::fs::remove_dir_all(dir).ok();
+    }
+
+    /// Progetto con un materiale Box, uno UV e uno Box già ancorato, salvato da `app_version`
+    /// con lo schema 1 (senza il campo `anchor`, come prima della 0.17).
+    fn old_project_json(app_version: Option<&str>) -> String {
+        let mut scene = Scene::default();
+        for (id, projection) in [
+            ("box", forge_scene::Projection::Box),
+            ("uv", forge_scene::Projection::Uv),
+            ("fissato", forge_scene::Projection::Box),
+        ] {
+            scene.materials.upsert(Material {
+                id: MaterialId::new(id),
+                mapping: forge_scene::TextureMapping {
+                    projection,
+                    ..Default::default()
+                },
+                ..Default::default()
+            });
+        }
+        let pf = to_project_file(&scene, &ProjectMeta::default(), &RenderSettings::default());
+        let mut v = serde_json::to_value(&pf).unwrap();
+        v["schema_version"] = 1.into();
+        match app_version {
+            Some(a) => v["app_version"] = a.into(),
+            None => {
+                v.as_object_mut().unwrap().remove("app_version");
+            }
+        }
+        for m in v["materials"].as_array_mut().unwrap() {
+            let fixed = m["id"] == "fissato";
+            let mapping = m["mapping"].as_object_mut().unwrap();
+            if fixed {
+                mapping.insert("anchor".into(), "Assembly".into());
+            } else {
+                mapping.remove("anchor");
+            }
+        }
+        v.to_string()
+    }
+
+    fn anchors(pf: &ProjectFile) -> Vec<(String, forge_scene::TextureAnchor)> {
+        let mut v: Vec<_> = pf
+            .materials
+            .iter()
+            .filter(|m| ["box", "uv", "fissato"].contains(&m.id.0.as_str()))
+            .map(|m| (m.id.0.clone(), m.mapping.anchor))
+            .collect();
+        v.sort_by(|a, b| a.0.cmp(&b.0));
+        v
+    }
+
+    /// Prima della 0.15 la proiezione Box era ancorata al mondo: quei progetti riaprono i
+    /// materiali Box su World (aspetto invariato); dalla 0.15 restano sul pezzo; un ancoraggio
+    /// già scritto non si tocca; gli UV non c'entrano. Salvando, il valore resta e non si migra
+    /// una seconda volta.
+    #[test]
+    fn box_anchor_migration_from_older_projects() {
+        use forge_scene::TextureAnchor::{Assembly, Component, World};
+        for (ver, expect_box, migrated) in [
+            (Some("0.14.0"), World, 1),
+            (Some("0.9.3"), World, 1),
+            (Some("0.15.0"), Component, 0),
+            (Some("0.16.0"), Component, 0),
+        ] {
+            let pf = parse(&old_project_json(ver)).unwrap();
+            // Il progetto contiene anche i predefiniti (Box): migrano tutti quelli senza ancoraggio.
+            assert_eq!(pf.migrated_world_anchor > 0, migrated > 0, "{ver:?}: {}", pf.migrated_world_anchor);
+            let box_without_anchor = pf
+                .materials
+                .iter()
+                .filter(|m| m.mapping.projection == forge_scene::Projection::Box && m.id.0 != "fissato")
+                .count();
+            if migrated > 0 {
+                assert_eq!(pf.migrated_world_anchor, box_without_anchor);
+            }
+            assert_eq!(
+                anchors(&pf),
+                vec![("box".into(), expect_box), ("fissato".into(), Assembly), ("uv".into(), Component)],
+                "{ver:?}"
+            );
+        }
+        // Riaperto, salvato con lo schema attuale e riaperto: niente seconda migrazione.
+        let pf = parse(&old_project_json(Some("0.14.0"))).unwrap();
+        let mut scene = Scene::default();
+        for m in pf.materials {
+            scene.materials.upsert(m);
+        }
+        let saved = serde_json::to_string(&to_project_file(&scene, &ProjectMeta::default(), &RenderSettings::default())).unwrap();
+        let again = parse(&saved).unwrap();
+        assert_eq!(again.schema_version, SCHEMA_VERSION);
+        assert_eq!(again.migrated_world_anchor, 0);
+        assert_eq!(anchors(&again)[0], ("box".into(), World));
     }
 }

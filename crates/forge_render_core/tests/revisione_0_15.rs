@@ -6,7 +6,7 @@
 use forge_math::{Mat4, Quat, Vec3};
 use forge_render_core::displace::{self, box_weights, BoxFrame, Params};
 use forge_render_core::texture::Texture;
-use forge_render_core::RenderGeometry;
+use forge_render_core::RenderScene;
 use forge_scene::{primitives, ComponentId, Scene, TextureMapping, UserTransform};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -160,9 +160,10 @@ fn cube_scene(src: Mat4, user: UserTransform) -> (Scene, usize) {
 }
 
 /// Ogni faccia del cubo usa una sola proiezione (normale lungo un asse dell'oggetto).
-fn faces_use_one_axis(geo: &RenderGeometry) -> bool {
+fn faces_use_one_axis(rs: &RenderScene) -> bool {
+    let geo = &rs.geometry;
     (0..geo.tri_node.len()).all(|prim| {
-        let f = geo.node_frames[geo.tri_node[prim] as usize];
+        let f = rs.node_frames[geo.tri_node[prim] as usize];
         let w = box_weights(f.dir_to_local(geo.geometric_normals[prim]));
         w.iter().filter(|&&x| x > 0.0).count() == 1
     })
@@ -192,11 +193,12 @@ fn box_frame_with_rotation_mirror_and_non_uniform_scale() {
     ];
     for (name, src, user) in cases {
         let (s, _) = cube_scene(src, user);
-        let geo = RenderGeometry::build(&s);
+        let rs = RenderScene::compile(&s);
+        let geo = &rs.geometry;
         assert_eq!(geo.tri_node.len(), 12, "{name}");
-        assert!(faces_use_one_axis(&geo), "{name}: una faccia mescola più proiezioni");
+        assert!(faces_use_one_axis(&rs), "{name}: una faccia mescola più proiezioni");
         for prim in 0..12 {
-            let f = geo.node_frames[geo.tri_node[prim] as usize];
+            let f = rs.node_frames[geo.tri_node[prim] as usize];
             assert!(geo.vertices(prim).iter().all(|v| f.to_local(*v).is_finite()), "{name}");
         }
     }

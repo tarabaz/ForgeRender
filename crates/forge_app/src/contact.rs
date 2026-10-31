@@ -29,14 +29,24 @@ pub const DRAG_MAX_VERTS: usize = 40_000;
 
 impl Contact {
     /// `moving[i]`: il nodo `i` si muove; `obstacle(i)`: il nodo `i` (fermo) può fermare il
-    /// movimento. Si usano solo i nodi visibili. Con `max_verts` i vertici di ogni lato vengono
+    /// movimento. Gli ostacoli nascosti non contano; il gruppo che si muove sì, anche se nascosto.
+    /// Con `max_verts` i vertici di ogni lato vengono
     /// campionati a passo regolare (`usize::MAX` = tutti).
     pub fn new(scene: &Scene, moving: &[bool], obstacle: impl Fn(usize) -> bool, max_verts: usize) -> Contact {
         let (mut mt, mut ot) = (Vec::new(), Vec::new());
         let (mut mv, mut ov, mut oc) = (Vec::new(), Vec::new(), Vec::new());
+        let moving_visible = (0..scene.nodes.len()).any(|i| moving[i] && scene.nodes[i].mesh.is_some() && scene.is_visible(i));
         for (i, n) in scene.nodes.iter().enumerate() {
             let Some(mi) = n.mesh else { continue };
-            if !scene.is_visible(i) || !(moving[i] || obstacle(i)) {
+            // Ostacoli: solo quelli visibili. Del gruppo che si muove contano i pezzi visibili; se è
+            // tutto nascosto contano tutti (un pezzo nascosto scelto per "Appoggia" deve comunque
+            // fermarsi sul suo appoggio).
+            let usable = if moving[i] {
+                !n.removed && (scene.is_visible(i) || !moving_visible)
+            } else {
+                obstacle(i) && scene.is_visible(i)
+            };
+            if !usable {
                 continue;
             }
             let m = &scene.meshes[mi];
@@ -116,6 +126,147 @@ impl Contact {
         t.is_finite().then(|| (t - CONTACT_GAP).clamp(0.0, len))
     }
 
+    /// Contatto tra i lati (spigolo contro spigolo) lungo `d`: due lati che si incrociano senza
+    /// che un vertice tocchi una faccia (es. due cubi ruotati con gli spigoli incrociati). Nel
+    /// piano perpendicolare al movimento si cercano gli incroci tra i lati del gruppo e quelli
+    /// degli ostacoli; la distanza lungo `d` tra i due punti è lo spostamento possibile. Per non
+    /// confrontare tutti con tutti, i lati degli ostacoli vanno in una griglia 2D.
+    pub fn edge_hit(&self, d: Vec3) -> Option<f32> {
+        use rayon::prelude::*;
+        let len = d.length();
+        if len < 1e-9 || !self.has_obstacles {
+            return None;
+        }
+        let dir = d / len;
+        let u = dir.any_orthonormal_vector();
+        let w = dir.cross(u);
+        // Lato proiettato: estremi 2D e profondità lungo `dir`.
+        type Edge = ([f32; 2], [f32; 2], f32, f32);
+        let edges = |tris: &[forge_accel::Triangle]| -> Vec<Edge> {
+            let mut out = Vec::with_capacity(tris.len() * 3);
+            for t in tris {
+                let p = [t.v0, t.v0 + t.e1, t.v0 + t.e2];
+                for k in 0..3 {
+                    let (a, b) = (p[k], p[(k + 1) % 3]);
+                    out.push(([a.dot(u), a.dot(w)], [b.dot(u), b.dot(w)], a.dot(dir), b.dot(dir)));
+                }
+            }
+            out
+        };
+        let bounds = |e: &Edge| (e.0[0].min(e.1[0]), e.0[1].min(e.1[1]), e.0[0].max(e.1[0]), e.0[1].max(e.1[1]));
+        let moving = edges(&self.moving.tris);
+        let obstacles = edges(&self.obstacles.tris);
+        if moving.is_empty() || obstacles.is_empty() {
+            return None;
+        }
+        // Zona utile: dove le proiezioni si sovrappongono; davanti al gruppo lungo `dir`.
+        let extent = |es: &[Edge]| {
+            es.iter().fold((f32::MAX, f32::MAX, f32::MIN, f32::MIN), |b, e| {
+                let (x0, y0, x1, y1) = bounds(e);
+                (b.0.min(x0), b.1.min(y0), b.2.max(x1), b.3.max(y1))
+            })
+        };
+        let (m, o) = (extent(&moving), extent(&obstacles));
+        let zone = (m.0.max(o.0), m.1.max(o.1), m.2.min(o.2), m.3.min(o.3));
+        if zone.0 > zone.2 || zone.1 > zone.3 {
+            return None;
+        }
+        let min_depth = moving.iter().map(|e| e.2.min(e.3)).fold(f32::MAX, f32::min);
+        let max_depth = moving.iter().map(|e| e.2.max(e.3)).fold(f32::MIN, f32::max);
+        let inside = |e: &Edge| {
+            let (x0, y0, x1, y1) = bounds(e);
+            x1 >= zone.0 && x0 <= zone.2 && y1 >= zone.1 && y0 <= zone.3
+        };
+        let obstacles: Vec<Edge> = obstacles
+            .into_iter()
+            .filter(|e| inside(e) && e.2.max(e.3) >= min_depth - CONTACT_GAP && e.2.min(e.3) <= max_depth + len + CONTACT_GAP)
+            .collect();
+        let moving: Vec<Edge> = moving.into_iter().filter(inside).collect();
+        if moving.is_empty() || obstacles.is_empty() {
+            return None;
+        }
+        // Griglia: lato della cella dalla lunghezza media dei lati, al massimo 1024 celle per asse.
+        let mean = |es: &[Edge]| {
+            es.iter()
+                .map(|e| ((e.1[0] - e.0[0]).powi(2) + (e.1[1] - e.0[1]).powi(2)).sqrt())
+                .sum::<f32>()
+                / es.len() as f32
+        };
+        let span = (zone.2 - zone.0).max(zone.3 - zone.1).max(1e-6);
+        let cell = mean(&obstacles).max(mean(&moving)).max(span / 1024.0).max(1e-6);
+        let nx = (((zone.2 - zone.0) / cell).ceil() as usize).clamp(1, 1024);
+        let ny = (((zone.3 - zone.1) / cell).ceil() as usize).clamp(1, 1024);
+        let cell_of = |x: f32, y: f32| {
+            let cx = (((x - zone.0) / cell).floor().max(0.0) as usize).min(nx - 1);
+            let cy = (((y - zone.1) / cell).floor().max(0.0) as usize).min(ny - 1);
+            (cx, cy)
+        };
+        // Lati grandi (molte celle, es. pavimento): a parte, si provano con tutti.
+        let mut grid: Vec<Vec<u32>> = vec![Vec::new(); nx * ny];
+        let mut big: Vec<u32> = Vec::new();
+        for (k, e) in obstacles.iter().enumerate() {
+            let (x0, y0, x1, y1) = bounds(e);
+            let (a, b) = (cell_of(x0, y0), cell_of(x1, y1));
+            if (b.0 - a.0 + 1) * (b.1 - a.1 + 1) > 64 {
+                big.push(k as u32);
+                continue;
+            }
+            for cy in a.1..=b.1 {
+                for cx in a.0..=b.0 {
+                    grid[cy * nx + cx].push(k as u32);
+                }
+            }
+        }
+        // Incrocio nel piano: distanza lungo `dir` dal lato del gruppo a quello dell'ostacolo.
+        let cross2 = |a: [f32; 2], b: [f32; 2]| a[0] * b[1] - a[1] * b[0];
+        let travel = |m: &Edge, o: &Edge| -> Option<f32> {
+            let r = [m.1[0] - m.0[0], m.1[1] - m.0[1]];
+            let s = [o.1[0] - o.0[0], o.1[1] - o.0[1]];
+            let den = cross2(r, s);
+            if den.abs() <= 1e-12 * (r[0].abs() + r[1].abs() + 1e-9) * (s[0].abs() + s[1].abs() + 1e-9) {
+                return None; // paralleli: li coprono i raggi dai vertici
+            }
+            let q = [o.0[0] - m.0[0], o.0[1] - m.0[1]];
+            let (t, v) = (cross2(q, s) / den, cross2(q, r) / den);
+            if !(0.0..=1.0).contains(&t) || !(0.0..=1.0).contains(&v) {
+                return None;
+            }
+            let dm = m.2 + (m.3 - m.2) * t;
+            let dob = o.2 + (o.3 - o.2) * v;
+            let dist = dob - dm;
+            (dist >= -CONTACT_GAP && dist <= len + CONTACT_GAP).then_some(dist)
+        };
+        let best = moving
+            .par_iter()
+            .map(|m| {
+                let mut best = f32::INFINITY;
+                let mut test = |k: u32| {
+                    if let Some(t) = travel(m, &obstacles[k as usize]) {
+                        best = best.min(t);
+                    }
+                };
+                for &k in &big {
+                    test(k);
+                }
+                let (x0, y0, x1, y1) = bounds(m);
+                let (a, b) = (cell_of(x0, y0), cell_of(x1, y1));
+                if (b.0 - a.0 + 1) * (b.1 - a.1 + 1) > 4096 {
+                    (0..obstacles.len() as u32).for_each(&mut test);
+                } else {
+                    for cy in a.1..=b.1 {
+                        for cx in a.0..=b.0 {
+                            for &k in &grid[cy * nx + cx] {
+                                test(k);
+                            }
+                        }
+                    }
+                }
+                best
+            })
+            .reduce(|| f32::INFINITY, f32::min);
+        best.is_finite().then(|| (best - CONTACT_GAP).clamp(0.0, len))
+    }
+
     /// Lunghezza ammessa dello spostamento `d` (≤ |d|) prima di toccare un ostacolo.
     /// Le superfici quasi parallele al movimento non fermano (si può scivolare su un piano).
     pub fn limit(&self, d: Vec3) -> f32 {
@@ -134,12 +285,15 @@ pub fn subtree_mask(scene: &Scene, roots: &[usize]) -> Vec<bool> {
     mask
 }
 
-/// "Appoggia": i componenti scendono finché toccano l'oggetto che hanno subito sotto (qualsiasi
-/// componente visibile: un altro pezzo, il fondale, il pavimento), come lo snap a contatto
-/// verso il basso. Con niente sotto si fermano a quota 0. I componenti dentro un assieme
-/// anch'esso scelto si muovono con lui. Restituisce lo spostamento verticale applicato.
+/// "Appoggia": ogni componente scelto scende finché tocca l'oggetto che ha subito sotto
+/// (qualsiasi componente visibile: un altro pezzo, il fondale, il pavimento), come lo snap a
+/// contatto verso il basso; con niente sotto si ferma a quota 0. Con più componenti scelti
+/// ognuno scende per conto suo, dal più basso al più alto, e quelli già appoggiati fanno da
+/// appoggio agli altri (pile comprese). I componenti dentro un assieme anch'esso scelto si
+/// muovono con lui. Il contatto considera vertici contro facce e spigolo contro spigolo.
+/// Restituisce lo spostamento verticale più grande applicato.
 pub fn drop_onto_below(scene: &mut Scene, nodes: &[usize]) -> f32 {
-    let roots: Vec<usize> = nodes
+    let mut roots: Vec<(usize, forge_math::Aabb)> = nodes
         .iter()
         .copied()
         .filter(|&i| {
@@ -152,29 +306,35 @@ pub fn drop_onto_below(scene: &mut Scene, nodes: &[usize]) -> f32 {
             }
             true
         })
+        .map(|i| (i, scene.exact_bounds_of(i)))
+        .filter(|(_, b)| !b.is_empty())
         .collect();
-    let mut b = forge_math::Aabb::EMPTY;
-    for &r in &roots {
-        b.grow(&scene.exact_bounds_of(r));
-    }
-    if b.is_empty() {
-        return 0.0;
-    }
-    let moving = subtree_mask(scene, &roots);
-    let contact = Contact::new(scene, &moving, |i| !moving[i], usize::MAX);
-    let lowest = scene.bounds().min.y.min(0.0);
-    let fall = b.min.y - lowest + 1.0;
-    let dy = match contact.hit(Vec3::new(0.0, -fall.max(1e-3), 0.0)) {
-        Some(t) => -t,
-        None => -b.min.y,
-    };
-    if dy.abs() < 1e-7 {
-        return 0.0;
-    }
-    for &r in &roots {
+    roots.sort_by(|a, b| a.1.min.y.total_cmp(&b.1.min.y));
+    let mut largest = 0.0f32;
+    for (r, _) in roots {
+        // Posizione attuale: i pezzi già appoggiati possono averlo spostato (stesso assieme).
+        let b = scene.exact_bounds_of(r);
+        let moving = subtree_mask(scene, &[r]);
+        let contact = Contact::new(scene, &moving, |i| !moving[i], usize::MAX);
+        let lowest = scene.bounds().min.y.min(0.0);
+        let d = Vec3::new(0.0, -(b.min.y - lowest + 1.0).max(1e-3), 0.0);
+        let hit = match (contact.hit(d), contact.edge_hit(d)) {
+            (Some(a), Some(e)) => Some(a.min(e)),
+            (a, e) => a.or(e),
+        };
+        let dy = match hit {
+            Some(t) => -t,
+            None => -b.min.y,
+        };
+        if dy.abs() < 1e-7 {
+            continue;
+        }
         scene.translate_world(r, Vec3::new(0.0, dy, 0.0));
+        if dy.abs() > largest.abs() {
+            largest = dy;
+        }
     }
-    dy
+    largest
 }
 
 #[cfg(test)]
@@ -259,7 +419,6 @@ mod tests {
     /// Selezione multipla di oggetti separati: ognuno deve scendere fino al proprio appoggio.
     /// Oggi si muovono come un blocco unico: il primo che tocca ferma anche gli altri.
     #[test]
-    #[ignore = "problema riproducibile: la selezione multipla scende come un blocco unico"]
     fn multi_selection_drops_each_object() {
         let (mut s, ids) = floor_and_cubes(&[
             (Vec3::new(-3.0, 1.0, 0.0), Mat4::IDENTITY),
@@ -276,7 +435,6 @@ mod tests {
     /// due lati, non tra un vertice e una faccia. Il cubo sopra deve fermarsi sullo spigolo
     /// di quello sotto senza compenetrarlo.
     #[test]
-    #[ignore = "problema riproducibile: il contatto spigolo-spigolo non viene visto"]
     fn edge_on_edge_contact_does_not_penetrate() {
         let q = std::f32::consts::FRAC_PI_4;
         let (mut s, ids) = floor_and_cubes(&[
@@ -293,7 +451,6 @@ mod tests {
     /// Oggetto nascosto scelto: oggi non ha vertici per il contatto e va a quota 0 anche se
     /// sotto c'è un appoggio. Deve comportarsi come se fosse visibile (o non muoversi).
     #[test]
-    #[ignore = "problema riproducibile: un oggetto nascosto va sempre a quota 0"]
     fn hidden_selection_still_lands_on_support() {
         let (mut s, ids) = floor_and_cubes(&[
             (Vec3::new(0.0, 0.5, 0.0), Mat4::IDENTITY),
@@ -384,6 +541,45 @@ mod tests {
             "{}",
             s.exact_bounds_of(ids[1]).min.y
         );
+    }
+
+    /// Annulla: il pannello registra lo stato dei componenti scelti prima di "Appoggia" e
+    /// Ctrl+Z rimette quelli. Va bene solo se l'operazione non tocca altro: qui, con assieme e
+    /// figlio scelti, pile, pezzi nascosti e non scelti nella scena, cambiano solo i nodi scelti,
+    /// e rimettendo il loro stato la scena torna identica (un solo Ctrl+Z).
+    #[test]
+    fn drop_changes_only_the_selection_so_one_undo_restores_it() {
+        let (mut s, ids) = floor_and_cubes(&[
+            (Vec3::new(0.0, 0.5, 0.0), Mat4::IDENTITY),
+            (Vec3::new(0.2, 3.0, 0.0), Mat4::from_rotation_y(0.3)),
+            (Vec3::new(3.0, 2.0, 0.0), Mat4::IDENTITY),
+            (Vec3::new(-3.0, 4.0, 0.0), Mat4::IDENTITY),
+        ]);
+        s.nodes[ids[3]].visible = false;
+        let cube = s.nodes[ids[0]].mesh.unwrap();
+        let asm = s.add_node(
+            None,
+            ComponentId("asm".into()),
+            "A",
+            Mat4::from_translation(Vec3::new(6.0, 5.0, 0.0)),
+            None,
+        );
+        let child = s.add_node(Some(asm), ComponentId("asm/b".into()), "B", Mat4::IDENTITY, Some(cube));
+        s.refresh_pivots();
+        let selection = [ids[1], ids[2], ids[3], asm, child];
+        let before: Vec<_> = s.nodes.iter().map(|n| n.user).collect();
+        drop_onto_below(&mut s, &selection);
+        for (i, n) in s.nodes.iter().enumerate() {
+            if !selection.contains(&i) {
+                assert_eq!(n.user, before[i], "nodo {i} non scelto modificato");
+            }
+        }
+        assert!(selection.iter().any(|&i| s.nodes[i].user != before[i]), "niente si è mosso");
+        // Annulla: si rimette lo stato registrato dei nodi scelti.
+        for &i in &selection {
+            s.nodes[i].user = before[i];
+        }
+        assert!(s.nodes.iter().zip(&before).all(|(n, b)| n.user == *b));
     }
 
     /// Costo su una mesh densa (sfera da circa 1,2 milioni di triangoli sopra un pavimento).

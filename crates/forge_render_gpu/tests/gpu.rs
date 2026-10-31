@@ -279,6 +279,7 @@ fn gpu_box_mapped_texture() {
             scale: 1.0,
             rotation_deg: 0.0,
             offset: [0.0; 2],
+            ..Default::default()
         };
         s.camera = Camera {
             position: Vec3::new(x, 5.0, 0.3),
@@ -961,6 +962,7 @@ fn gpu_blended_box_on_curved_rotated_mirrored_matches_cpu() {
             scale: 0.15,
             rotation_deg: 17.0,
             offset: [0.1, 0.3],
+            ..Default::default()
         },
         ..Default::default()
     };
@@ -1075,6 +1077,91 @@ fn gpu_blended_displacement_on_curved_surfaces_matches_cpu() {
     };
     let rs = RenderScene::compile(&s);
     assert!(rs.triangle_count() > 20_000, "geometria non suddivisa: {}", rs.triangle_count());
+    let spp = 256;
+    let mut cpu = CpuBackend::new(4).unwrap();
+    let a = render_with(&mut cpu, &s, &st, spp);
+    let b = render_with(&mut cpu, &s, &RenderSettings { seed: 999, ..st.clone() }, spp);
+    let gpu_img = render_with(&mut g, &s, &st, spp);
+    let rmse = |x: &[[f32; 3]], y: &[[f32; 3]]| {
+        let e: f64 = x
+            .iter()
+            .zip(y)
+            .map(|(p, q)| (0..3).map(|k| ((p[k] - q[k]) as f64).powi(2)).sum::<f64>())
+            .sum();
+        (e / (x.len() * 3) as f64).sqrt()
+    };
+    let mean = |x: &[[f32; 3]]| x.iter().map(|p| (p[0] + p[1] + p[2]) as f64).sum::<f64>() / (x.len() * 3) as f64;
+    let (noise, diff) = (rmse(&a, &b), rmse(&a, &gpu_img));
+    let (ma, mg) = (mean(&a), mean(&gpu_img));
+    eprintln!("media CPU {ma:.4} GPU {mg:.4} | RMSE CPU−CPU {noise:.4} GPU−CPU {diff:.4}");
+    assert!((ma - mg).abs() / ma < 0.02, "media CPU {ma} vs GPU {mg}");
+    assert!(diff < noise * 1.5, "RMSE GPU−CPU {diff} vs rumore CPU−CPU {noise}");
+}
+
+/// Ancoraggio della proiezione Box (pezzo, assieme, mondo) in un assieme ruotato e spostato,
+/// con un pezzo ruotato nel file: la GPU legge gli stessi riferimenti della CPU.
+#[test]
+fn gpu_box_anchors_match_cpu() {
+    let Some(mut g) = gpu() else { return };
+    let mut s = Scene {
+        environment: Environment::Uniform {
+            color: [0.8, 0.8, 0.85],
+            strength: 1.0,
+        },
+        ..Default::default()
+    };
+    s.lights.push(Light::point("P", Vec3::new(1.0, 2.5, 2.0), 30.0));
+    let anchors = [
+        ("pezzo", forge_scene::TextureAnchor::Component),
+        ("assieme", forge_scene::TextureAnchor::Assembly),
+        ("mondo", forge_scene::TextureAnchor::World),
+    ];
+    for (id, anchor) in anchors {
+        s.materials.upsert(Material {
+            id: MaterialId::new(id),
+            base_color_texture: Some(pattern_png("an_col.png", 31, true)),
+            normal_texture: Some(pattern_png("an_nor.png", 32, true)),
+            roughness: 0.6,
+            mapping: forge_scene::TextureMapping {
+                scale: 0.2,
+                anchor,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+    }
+    let root = s.add_node(
+        None,
+        ComponentId("asm".into()),
+        "Assieme",
+        Mat4::from_translation(Vec3::new(0.0, 0.3, 0.0)),
+        None,
+    );
+    let sphere = s.add_mesh(primitives::uv_sphere(0.25, 64, 32));
+    for (k, (id, _)) in anchors.iter().enumerate() {
+        let cid = ComponentId(format!("asm/{id}"));
+        let xf = Mat4::from_translation(Vec3::new(-0.6 + 0.6 * k as f32, 0.0, 0.0)) * Mat4::from_rotation_y(0.4 * k as f32);
+        s.add_node(Some(root), cid.clone(), *id, xf, Some(sphere));
+        s.assignments.insert(cid, MaterialId::new(*id));
+    }
+    s.refresh_pivots();
+    s.nodes[root].user = forge_scene::UserTransform {
+        translation: Vec3::new(0.1, 0.0, -0.2),
+        rotation_deg: Vec3::new(10.0, 30.0, 0.0),
+        scale: Vec3::ONE,
+    };
+    s.camera = Camera {
+        position: Vec3::new(0.0, 1.0, 2.0),
+        target: Vec3::new(0.0, 0.3, 0.0),
+        up: Vec3::Y,
+        vfov_deg: 45.0,
+        ..Default::default()
+    };
+    let st = RenderSettings {
+        width: 48,
+        height: 32,
+        ..Default::default()
+    };
     let spp = 256;
     let mut cpu = CpuBackend::new(4).unwrap();
     let a = render_with(&mut cpu, &s, &st, spp);

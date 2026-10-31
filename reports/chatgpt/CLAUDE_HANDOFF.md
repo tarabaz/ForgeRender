@@ -1709,3 +1709,76 @@ test (`forge_render_core/tests/revisione_0_15.rs`, `forge_render_gpu/tests/gpu.r
 - Migrazione: progetto "0.14.0" → `World`, "0.15.0" → `Component`, salvataggio e riapertura
   stabili.
 - CPU/GPU uguali per le tre modalità; render prima/dopo di un progetto 0.14 riaperto.
+
+
+## Claude Code — 31/10/2026: 0.17.0, Fase 2 (ancoraggio texture) e Fase 3 (Appoggia)
+
+Valerio ha approvato le due fasi insieme ("procedi fase 2 e 3 insieme e poi controlla tutto").
+
+### Fase 2: ancoraggio della proiezione Box
+- `forge_scene::TextureAnchor` (`Component`, predefinito; `Assembly`; `World`) in
+  `TextureMapping::anchor` (serde con default). `Scene::texture_frame_for(nodo, anchor)`:
+  - pezzo = `texture_frame` della 0.15;
+  - assieme = rotazione e origine della radice dell'albero, con le sue trasformazioni utente;
+  - mondo = identità.
+- Il riferimento dipende dal materiale del nodo, quindi non sta più in `RenderGeometry`:
+  `render_scene::box_frames(scene)` lo calcola alla compilazione (`RenderScene::node_frames`),
+  che si rifà a ogni cambio di materiale. Lo usano lo shading CPU (`textures::apply` ora
+  riceve la `RenderScene`) e la GPU (`layout.rs`). Il displacement lo calcola con la stessa
+  funzione in `RenderGeometry::build`, e l'impronta del displacement dell'app include l'anchor:
+  cambiarlo ricostruisce la geometria spostata.
+- Migrazione (`forge_project`, `SCHEMA_VERSION` = 2): un file con schema 1 e `app_version`
+  minore di 0.15.0 mette `anchor: "World"` sui materiali Box che non lo hanno; con 0.15 e 0.16
+  restano `Component`. Un ancoraggio già scritto non si tocca. Il numero di materiali migrati va
+  in `LoadReport::notes` (nuovo campo, informazioni che non sono problemi), mostrato all'apertura.
+  I campioni in `samples/` sono della 0.1.0 e migrano su World.
+- UI: "Ancoraggio: Pezzo / Assieme / Mondo" nell'editor dei materiali, sotto la scala, solo con
+  la proiezione Box; traduzioni inglesi aggiunte.
+
+### Fase 3: Appoggia (`forge_app/src/contact.rs`)
+- Ogni radice scelta scende per conto suo, dal più basso al più alto, con tutti gli altri
+  componenti come ostacoli: si impilano. Assieme e figlio scelti insieme si muovono una volta.
+- `Contact::edge_hit(d)`: contatto spigolo contro spigolo.
+  - Nel piano perpendicolare al movimento si cercano gli incroci tra i lati del gruppo e quelli
+    degli ostacoli, e la distanza lungo `d` tra i due punti dà lo spostamento.
+  - Una griglia 2D con lato pari alla lunghezza media dei lati (massimo 1024 × 1024 celle)
+    evita di confrontare tutti con tutti. I lati molto grandi (es. pavimento) vanno a parte; i
+    lati paralleli li coprono già i raggi dai vertici.
+  - In "Appoggia" si prende il minimo tra raggi dai vertici e incroci dei lati. Il trascinamento
+    col gizmo usa ancora solo i vertici (per la velocità).
+- `Contact::new`: gli ostacoli nascosti non contano. Del gruppo che si muove contano i pezzi
+  visibili, oppure tutti se è interamente nascosto: così un pezzo nascosto scelto si appoggia,
+  e un pezzo nascosto dentro un assieme visibile non lo ferma.
+- Annulla: il pannello fa un solo `push_undo` dei pezzi scelti; il test verifica che
+  l'operazione non cambi nessun nodo non scelto, quindi un Ctrl+Z ripristina tutto.
+
+### Test eseguiti e risultati
+- Diventati obbligatori (prima `#[ignore]` e falliti):
+  - `multi_selection_drops_each_object`;
+  - `edge_on_edge_contact_does_not_penetrate`: spigolo sopra a 1,4145 m sulla cresta a 1,4143 m,
+    cioè lo scarto di sicurezza di 0,2 mm (prima 0,50 m di compenetrazione);
+  - `hidden_selection_still_lands_on_support`.
+- Nuovi:
+  - `drop_changes_only_the_selection_so_one_undo_restores_it`;
+  - `tests/ancoraggio.rs`, con tre test (pezzo, assieme, mondo) su un assieme con un pezzo
+    ruotato nel file, uno spostato da solo e l'assieme ruotato e spostato;
+  - `box_anchor_migration_from_older_projects` (0.14.0 e 0.9.3 → World; 0.15.0 e 0.16.0 →
+    Component; ancoraggio già scritto intatto; salvataggio e riapertura senza seconda migrazione);
+  - `gpu_box_anchors_match_cpu`: media 0,7507 contro 0,7506, RMSE GPU−CPU 0,0074 pari al rumore.
+- Appoggia su 1,2 milioni di triangoli: 172 ms con gli spigoli (137 ms prima).
+- Suite completa: **250 passati, 0 falliti, 7 ignorati** (misure e censimenti), compresi 19 test
+  GPU; clippy `-D warnings` e fmt puliti.
+- Programma vero: apertura di `samples/scene/cocktail-ghiaccio-secco/bench_ad.frproject` (0.1.0)
+  senza errori. Non verificato a schermo: il controllo "Ancoraggio" nell'editor; nello screenshot
+  automatico la selezione all'avvio non si applica a un progetto caricato in background, quindi
+  la sezione del mapping non compare. È coperto dalla compilazione, dal test delle traduzioni e
+  dai test dei riferimenti.
+
+### Limiti residui
+- Il contatto spigolo-spigolo non c'è nel trascinamento con il gizmo (solo in "Appoggia").
+- Nella modalità "Assieme" l'assieme è la radice dell'albero: non si può scegliere un
+  sotto-assieme come riferimento.
+- I lati duplicati (ogni lato appartiene a due triangoli) si provano due volte: costo doppio
+  accettabile (172 ms su 1,2 milioni di triangoli).
+- Ancora da decidere: le normal e le height a 2048 px nella conversione BlenderKit (vedi la nota
+  della 0.16.0).

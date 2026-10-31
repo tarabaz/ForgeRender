@@ -570,6 +570,8 @@ impl ForgeApp {
                 v.to_bits().hash(&mut h);
             }
             (m.mapping.projection == forge_scene::Projection::Uv).hash(&mut h);
+            // Con la proiezione box le altezze dipendono dal riferimento (pezzo, assieme, mondo).
+            m.mapping.anchor.hash(&mut h);
         }
         if any {
             h.finish() | 1
@@ -1877,6 +1879,7 @@ impl ForgeApp {
                 notes.push(tf("{} componenti con materiale assegnato non sono più presenti (rinominati o rimossi). Le assegnazioni sono conservate:\n- {}", &[format!("{}", report.missing_components.len()), report.missing_components.iter().take(20).map(|c| c.0.clone()).collect::<Vec<_>>().join("\n- ").to_string()]));
             }
             notes.extend(report.warnings);
+            notes.extend(report.notes);
             if !notes.is_empty() {
                 self.info = Some(notes.join("\n\n"));
             }

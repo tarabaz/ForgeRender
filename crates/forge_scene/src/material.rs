@@ -97,6 +97,22 @@ pub enum Projection {
     Box,
 }
 
+/// A cosa è ancorata la proiezione Box: assi e origine da cui partono le coordinate.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub enum TextureAnchor {
+    /// Al singolo pezzo (0.15+): la texture lo segue quando lo si sposta o lo si ruota; pezzi
+    /// accostati e orientati allo stesso modo restano continui, pezzi ruotati diversamente nel
+    /// file hanno ognuno i propri assi.
+    #[default]
+    Component,
+    /// All'assieme (la radice dell'albero: file importato o oggetto aggiunto): tutti i pezzi
+    /// condividono la proiezione, continua anche tra pezzi ruotati diversamente; segue l'assieme,
+    /// mentre su un pezzo spostato da solo la texture scorre.
+    Assembly,
+    /// Al mondo (come fino alla 0.14): la texture resta ferma e l'oggetto ci scorre sopra.
+    World,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct TextureMapping {
@@ -105,6 +121,8 @@ pub struct TextureMapping {
     pub scale: f32,
     pub rotation_deg: f32,
     pub offset: [f32; 2],
+    /// Solo per la proiezione Box: a cosa sono ancorate le coordinate.
+    pub anchor: TextureAnchor,
 }
 
 impl Default for TextureMapping {
@@ -114,6 +132,7 @@ impl Default for TextureMapping {
             scale: 0.1,
             rotation_deg: 0.0,
             offset: [0.0; 2],
+            anchor: TextureAnchor::Component,
         }
     }
 }

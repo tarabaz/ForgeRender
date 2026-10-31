@@ -318,6 +318,7 @@ fn box_mapped_texture_in_furnace() {
             scale: 1.0,
             rotation_deg: 0.0,
             offset: [0.0; 2],
+            ..Default::default()
         };
         s.camera = Camera {
             position: Vec3::new(x, 5.0, 0.3),

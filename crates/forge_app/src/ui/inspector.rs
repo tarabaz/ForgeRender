@@ -571,7 +571,7 @@ pub(crate) fn mapping_controls(ui: &mut egui::Ui, m: &mut Material, obj_size: Op
         ui.label(tr("Proiezione"));
         changed |= ui
             .radio_value(&mut mp.projection, forge_scene::Projection::Box, tr("Box (CAD)"))
-            .on_hover_text(tr("Proiezione cubica in spazio mondo: non richiede UV, la scala è in metri reali"))
+            .on_hover_text(tr("Proiezione cubica sfumata: non richiede UV, la scala è in metri reali"))
             .changed();
         changed |= ui
             .radio_value(&mut mp.projection, forge_scene::Projection::Uv, tr("UV della mesh"))
@@ -626,6 +626,29 @@ pub(crate) fn mapping_controls(ui: &mut egui::Ui, m: &mut Material, obj_size: Op
                     }
                 });
             }
+            ui.horizontal_wrapped(|ui| {
+                use forge_scene::TextureAnchor;
+                ui.label(tr("Ancoraggio"));
+                for (a, label, hint) in [
+                    (
+                        TextureAnchor::Component,
+                        tr("Pezzo"),
+                        tr("La texture segue il singolo pezzo quando lo sposti o lo ruoti"),
+                    ),
+                    (
+                        TextureAnchor::Assembly,
+                        tr("Assieme"),
+                        tr("Una sola proiezione per tutto l'assieme: venature continue tra i pezzi, segue l'assieme"),
+                    ),
+                    (
+                        TextureAnchor::World,
+                        tr("Mondo"),
+                        tr("Texture ferma nella scena: l'oggetto ci scorre sopra quando lo muovi (come fino alla 0.14)"),
+                    ),
+                ] {
+                    changed |= ui.radio_value(&mut mp.anchor, a, label).on_hover_text(hint).changed();
+                }
+            });
         }
         forge_scene::Projection::Uv => {
             ui.horizontal(|ui| {

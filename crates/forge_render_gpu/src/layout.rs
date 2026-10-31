@@ -164,7 +164,7 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
     assert_eq!(w.pos() as usize - p[P_OFF_TRIS] as usize, geo.accel.tris.len() * TRI_WORDS);
     // --- Riferimenti della proiezione box per nodo: rotazione (quaternione xyzw), origine, 0 ---
     let frames_off = w.pos();
-    for fr in &geo.node_frames {
+    for fr in &scene.node_frames {
         for v in fr.rot.to_array() {
             w.f(v);
         }

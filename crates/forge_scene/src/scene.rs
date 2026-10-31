@@ -309,6 +309,24 @@ impl Scene {
         (self.world_frame_of(idx), origin)
     }
 
+    /// Riferimento della proiezione Box del componente secondo l'ancoraggio del materiale:
+    /// rotazione oggetto → mondo e origine. Vedi [`crate::material::TextureAnchor`].
+    pub fn texture_frame_for(&self, idx: NodeIndex, anchor: crate::material::TextureAnchor) -> (forge_math::Quat, Vec3) {
+        use crate::material::TextureAnchor;
+        match anchor {
+            TextureAnchor::Component => self.texture_frame(idx),
+            TextureAnchor::Assembly => {
+                let mut root = idx;
+                while let Some(p) = self.nodes[root].parent {
+                    root = p;
+                }
+                let origin = self.world_transform(root).transform_point3(Vec3::ZERO);
+                (self.world_frame_of(root), if origin.is_finite() { origin } else { Vec3::ZERO })
+            }
+            TextureAnchor::World => (forge_math::Quat::IDENTITY, Vec3::ZERO),
+        }
+    }
+
     /// Dimensioni del componente lungo i suoi assi, con la scala: la rotazione non le
     /// cambia (un cubo da 800 mm ruotato resta 800 × 800 × 800).
     pub fn local_size(&self, idx: NodeIndex) -> Vec3 {

@@ -108,7 +108,7 @@ fn guide_sample(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
         let [n0, n1, n2] = geo.shading_normals[prim];
         let mut ns = (n0 * (1.0 - hit.u - hit.v) + n1 * hit.u + n2 * hit.v).normalize_or(ng);
         if let Some(tex) = &scene.material_textures[mat_idx] {
-            crate::textures::apply(tex, geo, &hit, p, &mut mat, &mut ns);
+            crate::textures::apply(tex, scene, &hit, p, &mut mat, &mut ns);
         }
         let wo = -d;
         let entering = ng.dot(wo) > 0.0;

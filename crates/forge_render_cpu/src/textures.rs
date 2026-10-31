@@ -5,7 +5,7 @@
 use forge_accel::TriangleHit;
 use forge_math::{Vec2, Vec3};
 use forge_render_core::texture::Texture;
-use forge_render_core::{displace, MaterialTextures, RenderGeometry, RenderMaterial, RenderScene};
+use forge_render_core::{displace, MaterialTextures, RenderMaterial, RenderScene};
 use forge_scene::Projection;
 
 /// Una lettura della texture: coordinate, direzioni tangenti (∂p/∂u, ∂p/∂v) in spazio
@@ -24,10 +24,11 @@ struct Tap {
 /// La proiezione box è nello spazio dell'oggetto (la texture segue l'oggetto quando lo si
 /// ruota o sposta) e le tre proiezioni si sfumano secondo la normale di shading `n`: sulle
 /// superfici curve niente tasselli che cambiano da un triangolo all'altro.
-fn taps(tex: &MaterialTextures, geo: &RenderGeometry, prim: usize, bu: f32, bv: f32, p: Vec3, n: Vec3) -> ([Tap; 3], usize, f32) {
+fn taps(tex: &MaterialTextures, scene: &RenderScene, prim: usize, bu: f32, bv: f32, p: Vec3, n: Vec3) -> ([Tap; 3], usize, f32) {
+    let geo = &*scene.geometry;
     let tangent = geo.tri_tangents[prim];
     let flags = geo.tri_flags[prim];
-    let frame = geo.node_frames.get(geo.tri_node[prim] as usize).copied().unwrap_or_default();
+    let frame = scene.node_frames.get(geo.tri_node[prim] as usize).copied().unwrap_or_default();
     let use_uv = tex.mapping.projection == Projection::Uv && tangent != Vec3::ZERO;
     // La rotazione del mapping ruota anche il riferimento tangente.
     let (sn, cs) = tex.mapping.rotation_deg.to_radians().sin_cos();
@@ -121,8 +122,8 @@ fn tangent_frame(n: Vec3, du: Vec3, dv: Vec3) -> Option<(Vec3, Vec3)> {
 }
 
 /// Modifica il materiale locale e la normale di shading secondo le texture.
-pub fn apply(tex: &MaterialTextures, geo: &RenderGeometry, hit: &TriangleHit, p: Vec3, mat: &mut RenderMaterial, ns: &mut Vec3) {
-    let (all, count, m_per_uv) = taps(tex, geo, hit.prim as usize, hit.u, hit.v, p, *ns);
+pub fn apply(tex: &MaterialTextures, scene: &RenderScene, hit: &TriangleHit, p: Vec3, mat: &mut RenderMaterial, ns: &mut Vec3) {
+    let (all, count, m_per_uv) = taps(tex, scene, hit.prim as usize, hit.u, hit.v, p, *ns);
     let taps = &all[..count];
     if let Some(t) = &tex.base_color {
         mat.base_color *= sample(t, taps);
@@ -182,7 +183,7 @@ pub fn opaque_at(scene: &RenderScene, prim: u32, t: f32, u: f32, v: f32, o: Vec3
     let geo = &scene.geometry;
     let [n0, n1, n2] = geo.shading_normals[prim as usize];
     let n = (n0 * (1.0 - u - v) + n1 * u + n2 * v).normalize_or(geo.geometric_normals[prim as usize]);
-    let (all, count, _) = taps(tex, geo, prim as usize, u, v, o + d * t, n);
+    let (all, count, _) = taps(tex, scene, prim as usize, u, v, o + d * t, n);
     sample(op, &all[..count]).x >= 0.5
 }
 

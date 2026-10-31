@@ -509,5 +509,12 @@
 - Fase 2 (ancoraggio Component / Assembly / World) e Fase 3 (Appoggia) in attesa di approvazione:
   piano in `reports/chatgpt/CLAUDE_HANDOFF.md`.
 
+### 0.17.0: Fase 2 (ancoraggio texture) e Fase 3 (Appoggia) della revisione (31/10/2026)
+- `TextureMapping::anchor` (Component / Assembly / World), `Scene::texture_frame_for`,
+  `render_scene::box_frames` → `RenderScene::node_frames` (shading CPU e GPU); migrazione dei
+  progetti schema 1 con `app_version` < 0.15 su World (`forge_project::migrate_box_anchor`).
+- `contact::drop_onto_below`: caduta indipendente per pezzo, `Contact::edge_hit` (spigolo
+  contro spigolo, griglia 2D), pezzi nascosti scelti.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

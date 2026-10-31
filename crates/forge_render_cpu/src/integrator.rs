@@ -191,7 +191,7 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
         let [n0, n1, n2] = geo.shading_normals[prim];
         let mut ns = (n0 * (1.0 - hit.u - hit.v) + n1 * hit.u + n2 * hit.v).normalize_or(ng);
         if let Some(tex) = &scene.material_textures[mat_idx] {
-            crate::textures::apply(tex, geo, &hit, p, &mut mat_local, &mut ns);
+            crate::textures::apply(tex, scene, &hit, p, &mut mat_local, &mut ns);
         }
         let mat = &mat_local;
         let wo = -d;
