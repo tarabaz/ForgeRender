@@ -2146,3 +2146,14 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
 - Regola operativa richiesta: usare esclusivamente `main`; non creare né usare branch di lavoro. Le note storiche che dicono il contrario sono superate da questa decisione.
 - Limite degli strumenti: la connessione GitHub disponibile permette lettura e scrittura dei file, ma non espone azioni amministrative per cambiare il default branch o cancellare branch. Al controllo il default branch era ancora `claude/festive-heisenberg-d2ow6z`; branch elencati: `main`, `claude/festive-heisenberg-d2ow6z`, `chatgpt/claude-report-notes`, `tools/polyhaven-material-library`. Nessun branch è stato cancellato e il default non è stato cambiato.
 - Nessuna compilazione, test o verifica manuale UI eseguita in questa attività.
+
+
+## ChatGPT — 01/11/2026: README collegati all'ultima release
+
+- Richiesta di Valerio: sostituire nei README il collegamento diretto allo ZIP della 0.23.0 con un rimando alla pagina delle release.
+- Aggiornati su `main`:
+  - `README.md`: pulsante “Download the latest version” → `https://github.com/tarabaz/ForgeRender/releases/latest`, più link a tutte le release.
+  - `README.it.md`: pulsante “Scarica l'ultima versione” con gli stessi collegamenti.
+- La pagina latest mostra i pacchetti disponibili e le note della release corrente; il README non contiene più un URL ZIP legato alla versione 0.23.0.
+- Nessun link a un asset ZIP è stato inventato o modificato. Nessun codice applicativo cambiato.
+- Verifica: file aggiornati tramite GitHub API su `main`; nessun test/build necessario per questa modifica documentale.
