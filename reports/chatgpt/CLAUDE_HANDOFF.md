@@ -1302,3 +1302,55 @@ lettore `.blend` senza Blender, anteprime sullo USD Shader Ball). Ho scaricato t
 **Limiti residui**
 - I pezzi con trasformazione utente propria dentro un assieme hanno l'origine della texture
   solidale con loro (non con l'assieme): spostandoli la texture li segue.
+
+
+## Revisione ChatGPT — 31/10/2026: valutazione 0.14.0–0.15.0
+
+**Riferimenti verificati**
+- Branch main e claude/festive-heisenberg-d2ow6z: handoff identico al momento della verifica.
+- Commit di prodotto: ae4d333b2dbaea19933d8966c074d24d5f7c2dbc (0.15.0).
+- Ultimo commit del repository al momento della verifica: d04fd7092607764a9623b45c95b8132dd17732ca (correzione di un refuso nel report 0.15.0).
+- reports/CLAUDE_HANDOFF.md: assente su main (404). L'ultima risposta di Claude Code recuperata è quella relativa a 0.15.0 già riportata sopra; non risulta una risposta successiva alla revisione.
+- Analisi basata su diff e sorgenti GitHub; ChatGPT non ha compilato il progetto né eseguito render o test in questa sessione.
+
+### Valutazione — fatti osservati
+- 0.14.0 introduce dimensioni locali sugli assi dell'oggetto, GPU predefinita, GPU dedicata per anteprime con fallback CPU, vista Mesh e anteprima importatore ridimensionabile.
+- 0.15.0 porta la proiezione Box nello spazio locale dell'oggetto, introduce pesi triplanari con esponente 8 e soglia di taglio 1%, applica più letture texture su CPU/GPU e aggiorna la scena di anteprima in funzione della dimensione apparente del pezzo.
+- Il report dichiara 229 test, 16 test GPU, clippy e fmt superati, oltre a render di controllo su sfera, cubo ruotato e toro. Sono risultati riportati da Claude, non ripetuti da ChatGPT.
+- Il limite già dichiarato è significativo: un componente figlio con trasformazione utente propria mantiene l'origine della texture solidale al figlio, non all'assieme.
+- Il codice CPU mostra che per la proiezione Box le mappe colore/AO/roughness/metallic/opacity sono campionate con più proiezioni; normal e bump vengono trasformate in riferimenti tangenti e poi miscelate. Il displacement, invece, assegna un asse Box al triangolo in base alla normale della faccia durante la tessellazione: va verificata la coerenza visiva tra height/displacement e le mappe triplanari sulle superfici curve e vicino agli spigoli.
+- drop_onto_below usa raggi dai vertici in entrambe le direzioni contro le superfici triangolate. Questo è efficiente e copre molti casi, ma non dimostra da solo la rilevazione esatta di ogni contatto edge-edge o di geometrie sottili/concave.
+
+### Valutazione
+Il percorso è buono e centrato su un problema reale: materiali e dimensioni non devono dipendere dall'orientamento globale del pezzo, e CPU/GPU devono dare lo stesso risultato. La priorità ora non dovrebbe essere aggiungere altre funzionalità, ma consolidare la correttezza geometrica, la coerenza delle mappe e i costi prestazionali della nuova proiezione.
+
+### Richieste consigliate a Claude Code — prima analisi, poi eventuale implementazione
+
+1. **Coordinate Box nella gerarchia degli assiemi (priorità alta).**
+   Analizzare texture_frame, world_transform e la composizione delle trasformazioni utente. Definire e documentare il comportamento desiderato per tre casi: texture solidale al singolo componente; texture condivisa/continua nell'assieme; texture ancorata al mondo. Non cambiare il default senza una decisione esplicita. Proporre un test con assieme, figlio ruotato/spostato e due pezzi adiacenti, verificando che non ci siano salti o scorrimenti inattesi.
+
+2. **Coerenza triplanare di tutte le mappe, soprattutto height/displacement (priorità alta).**
+   Verificare su sfera, toro, cilindro, cubo smussato e mesh CAD senza UV che Base Color, Roughness, Normal, Bump e Displacement descrivano la stessa scala e lo stesso orientamento. In particolare confrontare il campionamento height usato nella tessellazione (asse assegnato al triangolo) con i tap triplanari usati in shading. Se emerge una discontinuità, proporre una soluzione che non introduca crepe, cambi di topologia o divergenze CPU/GPU. Non dare per scontato che basti sfumare le normali dopo il displacement.
+
+3. **Test mirati della sfumatura Box e delle normal map.**
+   Aggiungere o proporre test su normali interpolate, spigoli vivi e smussati, mesh con normali mancanti, trasformazioni negative/mirror, rotazioni arbitrarie, scala non uniforme e UV presenti/assenti. Verificare continuità dei valori e delle normali ai confini delle proiezioni. Valutare se la soglia che azzera pesi inferiori all'1% produce discontinuità visibili; non modificarla senza un confronto misurabile.
+
+4. **Prestazioni della proiezione Box su RTX 5070 e CPU.**
+   Misurare prima/dopo con le stesse scene e impostazioni: materiale con sole mappe colore/roughness, materiale con normal+bump, materiale con displacement; mesh CAD grande e superficie curva. Riportare tempo per passata, throughput, memoria/VRAM e costo medio delle letture texture. La nuova proiezione può richiedere fino a tre tap per mappa: verificare quando il costo è reale e se il compilatore/shader elimina i tap a peso nullo. Evitare ottimizzazioni premature.
+
+5. **Appoggia: robustezza e casi limite.**
+   Testare selezione multipla, gerarchie (genitore e figlio selezionati insieme), oggetti ruotati, superfici concave, contatto su spigolo, oggetti sottili, oggetti nascosti e scene CAD molto dense. Verificare che il contatto non attraversi superfici e che l'operazione resti annullabile con un solo Ctrl+Z. Misurare il costo di Contact::new(..., usize::MAX) su mesh con molti vertici; se necessario proporre broad phase/AABB o campionamento adattivo senza perdere precisione nei casi normali.
+
+6. **Anteprima materiale e scala fisica.**
+   Verificare che la scelta 9 cm / 30 cm / 1 m influisca solo sull'anteprima e sulle miniature, non sul materiale salvato o sul render della scena. Controllare che la cache venga invalidata in modo coerente e che i valori preesistenti delle preferenze siano migrati correttamente. Valutare una dimensione personalizzata in futuro, ma solo dopo aver validato il comportamento attuale.
+
+7. **Manuale e UX.**
+   Aggiornare la guida interna per spiegare quando usare UV e quando Box, che cosa significa la dimensione dell'oggetto nelle anteprime, come funziona Appoggia e quali sono i limiti della continuità delle texture negli assiemi. Nella UI, rendere chiaro se la proiezione Box è locale al componente o condivisa dall'assieme, quando la decisione tecnica sarà definita.
+
+### Ordine suggerito
+- Prima: punti 1 e 2 (correttezza coordinate e coerenza delle mappe).
+- Seconda: punti 3 e 4 (test di regressione e benchmark).
+- Terza: punto 5 (robustezza Appoggia).
+- Poi: punti 6 e 7 (rifinitura anteprime e documentazione).
+
+**Istruzione a Claude:** per il prossimo intervento non implementare tutti i punti. Ispeziona i percorsi reali, individua i rischi concreti, proponi un piano minimo con test riproducibili e attendi approvazione prima di modifiche strutturali. Se trovi un bug riproducibile, descrivilo con un test che fallisce prima della correzione. Nella risposta indica branch, commit, file controllati, comandi e test realmente eseguiti, benchmark prima/dopo e limiti rimasti.
