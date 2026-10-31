@@ -1242,3 +1242,35 @@ lettore `.blend` senza Blender, anteprime sullo USD Shader Ball). Ho scaricato t
 - Nessuna anteprima GPU separata: l'anteprima usa il path tracer CPU (veloce sullo shader ball).
 - Il nome/categoria scelti valgono per un materiale alla volta (nessun import multiplo dalla
   finestra; la CLI importa una cartella intera).
+
+
+## Claude Code — 31/10/2026: 0.14.0, dimensioni locali, GPU prima scelta, vista Mesh
+
+**File modificati**
+- `forge_scene/src/scene.rs`: la scala utente agisce lungo gli assi propri del componente
+  (`frame_of` = rotazione nella posizione sorgente): `UserTransform::matrix(pivot, frame)`,
+  `UserTransform::from_matrix`, `Scene::user_matrix`, `world_frame_of`, `local_size`. Test
+  `size_and_scale_follow_the_object_axes` (cubo 0,8 m ruotato di 29°: 800 × 800 × 800, scala
+  X 1,5 → 1200 × 800 × 800 senza deformazione, gizmo che ricostruisce la trasformazione).
+- `ui/transform.rs`: dimensioni da `local_size`. `ui/gizmo.rs`: assi locali e `apply_world`
+  con lo stesso frame.
+- `ui/central.rs`: `render_preview` prova prima una GPU dedicata alle anteprime
+  (`preview_gpu`, `GpuBackend` separato da quello del render), poi la CPU; `preview_device`.
+- `app.rs`/`prefs.rs`/`ui/settings.rs`: GPU di partenza in tutte le modalità appena pronta,
+  GPU predefinita per i nuovi progetti.
+- `ui/blend_import.rs`: anteprima grande quanto la colonna (gradini di 64 px, 128–1024).
+- `viewport.rs`: pipeline a linee per la vista Mesh (spigoli costruiti al primo uso),
+  selettore Standard/Mesh nella barra della viewport, `--mesh`.
+- `ui/quickbar.rs`: "Materiale" apre la libreria senza menu.
+- `added.rs`/`scene.rs`: primitive con tre volte i segmenti.
+
+**Test eseguiti davvero**
+- Suite completa, clippy `-D warnings`, fmt.
+- Screenshot reali: viewport in vista Mesh (wireframe visibile); importatore con
+  "Aged Gunmetal Steel", anteprima grande quanto la colonna e log "anteprime dei materiali
+  sulla GPU". Il primo screenshot ha trovato un errore WGSL (un entry point chiamato da un
+  altro), corretto.
+
+**Limiti residui**
+- Proiezione Box ancora nello spazio del mondo (in attesa dell'ok di Valerio).
+- La CLI resta sul backend scelto con `--backend` (predefinito quello del progetto).

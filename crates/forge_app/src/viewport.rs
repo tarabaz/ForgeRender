@@ -49,8 +49,7 @@ struct VOut {
     @location(3) wpos: vec3<f32>,
 };
 
-@vertex
-fn vs(v: VIn) -> VOut {
+fn shade_vertex(v: VIn) -> VOut {
     var o: VOut;
     o.clip = u.view_proj * vec4<f32>(v.pos, 1.0);
     o.n = v.normal;
@@ -58,6 +57,11 @@ fn vs(v: VIn) -> VOut {
     o.sel = v.sel;
     o.wpos = v.pos;
     return o;
+}
+
+@vertex
+fn vs(v: VIn) -> VOut {
+    return shade_vertex(v);
 }
 
 @fragment
@@ -75,6 +79,22 @@ fn fs(i: VOut) -> @location(0) vec4<f32> {
     }
     return vec4<f32>(c, 1.0);
 }
+
+// Vista Mesh: spigoli dei triangoli, appena davanti alla superficie per non sparire nel depth.
+@vertex
+fn vs_wire(v: VIn) -> VOut {
+    var o = shade_vertex(v);
+    o.clip.z = max(o.clip.z - 3e-5 * o.clip.w - 1e-4 * abs(o.clip.z), 0.0);
+    return o;
+}
+
+@fragment
+fn fs_wire(i: VOut) -> @location(0) vec4<f32> {
+    if (i.sel > 0.5) {
+        return vec4<f32>(1.0, 0.55, 0.15, 1.0);
+    }
+    return vec4<f32>(i.color * 0.25 + vec3<f32>(0.02, 0.02, 0.025), 1.0);
+}
 "#;
 
 struct Targets {
@@ -87,11 +107,17 @@ struct Targets {
 
 pub struct ViewportRenderer {
     pipeline: wgpu::RenderPipeline,
+    wire_pipeline: wgpu::RenderPipeline,
     uniform_buf: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     vertex_buf: Option<wgpu::Buffer>,
     index_buf: Option<wgpu::Buffer>,
     index_count: u32,
+    /// Spigoli dei triangoli (vista Mesh), costruiti solo quando servono.
+    edge_buf: Option<wgpu::Buffer>,
+    edge_count: u32,
+    /// Indici dei triangoli dell'ultimo upload, per costruire gli spigoli.
+    tri_indices: Vec<u32>,
     targets: Option<Targets>,
     texture_id: Option<egui::TextureId>,
     pub adapter_info: String,
@@ -123,47 +149,67 @@ impl ViewportRenderer {
             immediate_size: 0,
         });
         let attrs = wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x3, 3 => Float32];
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("viewport-pipeline"),
-            layout: Some(&layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs"),
-                compilation_options: Default::default(),
-                buffers: &[Some(wgpu::VertexBufferLayout {
-                    array_stride: std::mem::size_of::<Vertex>() as u64,
-                    step_mode: wgpu::VertexStepMode::Vertex,
-                    attributes: &attrs,
-                })],
-            },
-            primitive: wgpu::PrimitiveState {
-                cull_mode: None,
-                ..Default::default()
-            },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: DEPTH_FORMAT,
-                depth_write_enabled: Some(true),
-                depth_compare: Some(wgpu::CompareFunction::Less),
-                stencil: Default::default(),
-                bias: Default::default(),
-            }),
-            multisample: wgpu::MultisampleState {
-                count: SAMPLES,
-                ..Default::default()
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs"),
-                compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: COLOR_FORMAT,
-                    blend: None,
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            multiview_mask: None,
-            cache: None,
-        });
+        // Triangoli ombreggiati, oppure (vista Mesh) i loro spigoli come linee.
+        let make = |label, vs, fs, topology, depth_write, compare| {
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some(label),
+                layout: Some(&layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some(vs),
+                    compilation_options: Default::default(),
+                    buffers: &[Some(wgpu::VertexBufferLayout {
+                        array_stride: std::mem::size_of::<Vertex>() as u64,
+                        step_mode: wgpu::VertexStepMode::Vertex,
+                        attributes: &attrs,
+                    })],
+                },
+                primitive: wgpu::PrimitiveState {
+                    topology,
+                    cull_mode: None,
+                    ..Default::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: DEPTH_FORMAT,
+                    depth_write_enabled: Some(depth_write),
+                    depth_compare: Some(compare),
+                    stencil: Default::default(),
+                    bias: Default::default(),
+                }),
+                multisample: wgpu::MultisampleState {
+                    count: SAMPLES,
+                    ..Default::default()
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some(fs),
+                    compilation_options: Default::default(),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: COLOR_FORMAT,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                multiview_mask: None,
+                cache: None,
+            })
+        };
+        let pipeline = make(
+            "viewport-pipeline",
+            "vs",
+            "fs",
+            wgpu::PrimitiveTopology::TriangleList,
+            true,
+            wgpu::CompareFunction::Less,
+        );
+        let wire_pipeline = make(
+            "viewport-wire",
+            "vs_wire",
+            "fs_wire",
+            wgpu::PrimitiveTopology::LineList,
+            false,
+            wgpu::CompareFunction::LessEqual,
+        );
         let uniform_buf = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("viewport-uniforms"),
             size: std::mem::size_of::<Uniforms>() as u64,
@@ -183,11 +229,15 @@ impl ViewportRenderer {
         tracing::info!("GPU viewport: {adapter_info}, driver {} {}", info.driver, info.driver_info);
         Self {
             pipeline,
+            wire_pipeline,
             uniform_buf,
             bind_group,
             vertex_buf: None,
             index_buf: None,
             index_count: 0,
+            edge_buf: None,
+            edge_count: 0,
+            tri_indices: Vec::new(),
             targets: None,
             texture_id: None,
             adapter_info,
@@ -198,6 +248,8 @@ impl ViewportRenderer {
     pub fn upload_scene(&mut self, rs: &egui_wgpu::RenderState, scene: &Scene, selection: &BTreeSet<usize>) {
         let mut verts: Vec<Vertex> = Vec::new();
         let mut indices: Vec<u32> = Vec::new();
+        self.edge_buf = None;
+        self.tri_indices.clear();
         for (i, node) in scene.nodes.iter().enumerate() {
             let Some(mi) = node.mesh else { continue };
             if !scene.is_visible(i) {
@@ -266,6 +318,33 @@ impl ViewportRenderer {
             contents: bytemuck::cast_slice(&indices),
             usage: wgpu::BufferUsages::INDEX,
         }));
+        self.tri_indices = indices;
+    }
+
+    /// Spigoli dei triangoli per la vista Mesh (dall'ultimo upload; una volta sola).
+    fn ensure_edges(&mut self, rs: &egui_wgpu::RenderState) {
+        if self.edge_buf.is_some() || self.tri_indices.is_empty() {
+            return;
+        }
+        let edges: Vec<u32> = self
+            .tri_indices
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .flat_map(|t| [t[0], t[1], t[1], t[2], t[2], t[0]])
+            .collect();
+        if (edges.len() * 4) as u64 > rs.device.limits().max_buffer_size {
+            tracing::warn!("troppi triangoli per la vista Mesh: spigoli non mostrati");
+            self.tri_indices.clear();
+            return;
+        }
+        use wgpu::util::DeviceExt;
+        self.edge_count = edges.len() as u32;
+        self.edge_buf = Some(rs.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("viewport-edges"),
+            contents: bytemuck::cast_slice(&edges),
+            usage: wgpu::BufferUsages::INDEX,
+        }));
     }
 
     fn ensure_targets(&mut self, rs: &egui_wgpu::RenderState, size: [u32; 2]) {
@@ -313,7 +392,8 @@ impl ViewportRenderer {
         });
     }
 
-    /// Disegna la scena e restituisce la texture da mostrare.
+    /// Disegna la scena e restituisce la texture da mostrare; `mesh_view` = vista Mesh
+    /// (spigoli dei triangoli sopra l'ombreggiatura).
     pub fn render(
         &mut self,
         rs: &egui_wgpu::RenderState,
@@ -321,9 +401,13 @@ impl ViewportRenderer {
         scene_radius: f32,
         size: [u32; 2],
         background: Vec3,
+        mesh_view: bool,
     ) -> Option<egui::TextureId> {
         let size = [size[0].clamp(1, 8192), size[1].clamp(1, 8192)];
         self.ensure_targets(rs, size);
+        if mesh_view {
+            self.ensure_edges(rs);
+        }
         let t = self.targets.as_ref()?;
         let aspect = size[0] as f32 / size[1] as f32;
         let dist = (camera.position - camera.target).length();
@@ -377,6 +461,11 @@ impl ViewportRenderer {
                 pass.set_vertex_buffer(0, vb.slice(..));
                 pass.set_index_buffer(ib.slice(..), wgpu::IndexFormat::Uint32);
                 pass.draw_indexed(0..self.index_count, 0, 0..1);
+                if let (true, Some(eb)) = (mesh_view, &self.edge_buf) {
+                    pass.set_pipeline(&self.wire_pipeline);
+                    pass.set_index_buffer(eb.slice(..), wgpu::IndexFormat::Uint32);
+                    pass.draw_indexed(0..self.edge_count, 0, 0..1);
+                }
             }
         }
         rs.queue.submit(Some(enc.finish()));

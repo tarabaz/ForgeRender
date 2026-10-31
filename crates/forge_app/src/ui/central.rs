@@ -844,7 +844,14 @@ pub fn material_preview(app: &mut ForgeApp, ui: &mut egui::Ui) {
         }
         ui.vertical(|ui| {
             ui.label(egui::RichText::new(tr("Anteprima")).strong());
-            ui.label(egui::RichText::new(tr("Path tracing CPU, 32 campioni")).weak().small());
+            ui.label(
+                egui::RichText::new(tf(
+                    "Path tracing {}, {} campioni",
+                    &[preview_device().to_string(), preview_samples().to_string()],
+                ))
+                .weak()
+                .small(),
+            );
             if pv.pending.is_some() {
                 ui.spinner();
             }
@@ -902,6 +909,46 @@ fn preview_stage() -> Option<&'static PreviewStage> {
         .as_ref()
 }
 
+/// Anteprime sulla GPU permesse (no in modalità sicura, `FORGE_PREVIEW_CPU=1` le forza sulla CPU).
+static PREVIEW_GPU_ALLOWED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+
+pub fn set_preview_gpu_allowed(on: bool) {
+    PREVIEW_GPU_ALLOWED.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// GPU delle anteprime: un dispositivo suo, separato da quello del render, così le anteprime
+/// non costringono il render a ricaricare la scena sulla scheda. Creata al primo uso (i
+/// thread che arrivano intanto aspettano), `None` se la GPU non c'è.
+fn preview_gpu() -> Option<&'static std::sync::Mutex<forge_render_gpu::GpuBackend>> {
+    static GPU: std::sync::OnceLock<Option<std::sync::Mutex<forge_render_gpu::GpuBackend>>> = std::sync::OnceLock::new();
+    if !PREVIEW_GPU_ALLOWED.load(std::sync::atomic::Ordering::Relaxed) || std::env::var_os("FORGE_PREVIEW_CPU").is_some() {
+        return None;
+    }
+    GPU.get_or_init(|| match forge_render_gpu::GpuBackend::new() {
+        Ok(g) => {
+            tracing::info!("anteprime dei materiali sulla GPU");
+            PREVIEW_ON_GPU.store(true, std::sync::atomic::Ordering::Relaxed);
+            Some(std::sync::Mutex::new(g))
+        }
+        Err(e) => {
+            tracing::warn!("anteprime dei materiali sulla CPU, GPU non disponibile: {e:#}");
+            None
+        }
+    })
+    .as_ref()
+}
+
+static PREVIEW_ON_GPU: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Dispositivo delle anteprime per le etichette: "GPU" o "CPU".
+pub fn preview_device() -> &'static str {
+    if PREVIEW_ON_GPU.load(std::sync::atomic::Ordering::Relaxed) && PREVIEW_GPU_ALLOWED.load(std::sync::atomic::Ordering::Relaxed) {
+        "GPU"
+    } else {
+        "CPU"
+    }
+}
+
 /// Anteprima del materiale, `size` × `size` pixel (RGBA8), con i campioni delle impostazioni:
 /// sullo shader ball del progetto delle anteprime, oppure (se manca) su una sfera.
 pub(crate) fn render_preview(mat: &Material, size: u32) -> Vec<u8> {
@@ -934,6 +981,29 @@ pub(crate) fn render_preview(mat: &Material, size: u32) -> Vec<u8> {
     let mut acc = Accumulator::new(size, size);
     let mut pass = vec![[0.0; 3]; acc.pixel_count()];
     let cancel = std::sync::atomic::AtomicBool::new(false);
+    // GPU come prima scelta: tutti i campioni a passate grandi; se fallisce, la CPU.
+    if let Some(gpu) = preview_gpu() {
+        if let Ok(mut be) = gpu.lock() {
+            let mut done = 0;
+            while done < samples {
+                match be.render_pass(&rs, &settings, done, samples - done, &mut pass, &cancel) {
+                    Ok(n @ 1..) => {
+                        acc.add_samples(&pass, n);
+                        done += n;
+                    }
+                    Ok(_) => break,
+                    Err(e) => {
+                        tracing::warn!("anteprima sulla GPU non riuscita ({e:#}): uso la CPU");
+                        break;
+                    }
+                }
+            }
+            if done >= samples {
+                return forge_render_core::tonemap_to_rgba8(&acc.resolve(), settings.tone_mapping, 0.0);
+            }
+            acc = Accumulator::new(size, size);
+        }
+    }
     if let Ok(mut be) = forge_render_cpu::CpuBackend::new(threads) {
         for i in 0..samples {
             if let Ok(n @ 1..) = be.render_pass(&rs, &settings, i, 1, &mut pass, &cancel) {

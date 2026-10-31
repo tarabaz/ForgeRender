@@ -11,6 +11,34 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.14.0 — 31/10/2026
+
+**Dimensioni e scala sugli assi dell'oggetto**
+- Le dimensioni del pannello Oggetto sono quelle dell'oggetto lungo i suoi assi, non il
+  riquadro nel mondo: un cubo da 800 mm ruotato resta 800 × 800 × 800. Cambiando una
+  dimensione si scala l'oggetto lungo il suo asse, senza deformarlo.
+- La scala (pannello e gizmo) agisce sempre lungo gli assi propri del componente (la sua
+  rotazione nel file sorgente più quella utente). I progetti con scala uniforme non cambiano;
+  quelli con scala diversa sui tre assi di un pezzo ruotato nel file ora lo allungano lungo i
+  suoi assi.
+
+**GPU come prima scelta**
+- Il motore di render parte sulla GPU in ogni modalità appena si sa che funziona (la CPU solo
+  se la GPU manca o se la sceglie l'utente); le Impostazioni propongono GPU per i nuovi
+  progetti. Funziona con schede NVIDIA, AMD e Intel (Vulkan o DirectX 12).
+- Anteprime dei materiali (pannello, miniature della libreria, importatore) sulla GPU, con un
+  dispositivo dedicato per non disturbare il render; la CPU solo se la GPU non c'è
+  (`FORGE_PREVIEW_CPU=1` la forza, modalità sicura sempre CPU).
+
+**Interfaccia**
+- Importa materiale da Blender: l'anteprima segue la colonna e la finestra (si rifà alla
+  nuova dimensione, a gradini di 64 pixel).
+- Viewport: vista **Standard** o **Mesh** (triangoli delle mesh sopra l'ombreggiatura) nella
+  barra in alto della viewport; `--mesh` all'avvio.
+- Barra in alto: "Materiale" è un pulsante che apre direttamente la libreria.
+- Oggetti generati (sfera, cilindro, tazza, fondali) e scena di test con mesh tre volte più
+  fitte: niente sfaccettature visibili sulla sfera e sul toro.
+
 ## 0.13.0 — 31/10/2026
 
 **Libreria → Importa materiale da Blender…**

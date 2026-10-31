@@ -74,16 +74,13 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 ui.close();
             }
         });
-        dropdown(ui, icons::MATERIAL, tr("Materiale"), |ui| {
-            if ui.button(tr("Apri la libreria materiali")).clicked() {
-                run(app, ui, Cmd::LibraryMine);
-                ui.close();
-            }
-            if ui.button(tr("Materiali…")).clicked() {
-                run(app, ui, Cmd::Tab(InspectorTab::Materials));
-                ui.close();
-            }
-        });
+        // Materiale: un clic e si apre la libreria (niente menu).
+        if tool_button(ui, icons::MATERIAL, tr("Materiale"), true, None)
+            .on_hover_text(tr("Apri la libreria materiali"))
+            .clicked()
+        {
+            run(app, ui, Cmd::LibraryMine);
+        }
         ui.separator();
         render_button(app, ui);
         cmd_button(app, ui, Cmd::Stop, tr("Stop"));

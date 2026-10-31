@@ -57,24 +57,43 @@ impl UserTransform {
         *self == Self::default()
     }
 
-    /// Matrice in spazio mondo dato il punto di rotazione/scala.
-    pub fn matrix(&self, pivot: Vec3) -> Mat4 {
-        if self.is_identity() {
-            return Mat4::IDENTITY;
-        }
+    /// Rotazione utente (angoli di Eulero XYZ sugli assi del mondo).
+    pub fn rotation(&self) -> forge_math::Quat {
         let r = self.rotation_deg;
-        let rot = forge_math::Quat::from_euler(
+        forge_math::Quat::from_euler(
             forge_math::glam::EulerRot::XYZ,
             r.x.to_radians(),
             r.y.to_radians(),
             r.z.to_radians(),
-        );
+        )
+    }
+
+    /// Matrice in spazio mondo dato il punto di rotazione/scala e gli assi propri del
+    /// componente (`frame`, la sua rotazione nel file sorgente): la scala agisce lungo gli
+    /// assi dell'oggetto, non del mondo, così un cubo ruotato resta un cubo.
+    pub fn matrix(&self, pivot: Vec3, frame: forge_math::Quat) -> Mat4 {
+        if self.is_identity() {
+            return Mat4::IDENTITY;
+        }
         let scale = Vec3::new(
             if self.scale.x.abs() > 1e-9 { self.scale.x } else { 1e-9 },
             if self.scale.y.abs() > 1e-9 { self.scale.y } else { 1e-9 },
             if self.scale.z.abs() > 1e-9 { self.scale.z } else { 1e-9 },
         );
-        Mat4::from_translation(self.translation + pivot) * Mat4::from_quat(rot) * Mat4::from_scale(scale) * Mat4::from_translation(-pivot)
+        let local_scale = Mat4::from_quat(frame) * Mat4::from_scale(scale) * Mat4::from_quat(frame.inverse());
+        Mat4::from_translation(self.translation + pivot) * Mat4::from_quat(self.rotation()) * local_scale * Mat4::from_translation(-pivot)
+    }
+
+    /// Trasformazione utente che produce la matrice mondo `m` (stessa forma di
+    /// [`UserTransform::matrix`], con la scala lungo gli assi `frame`).
+    pub fn from_matrix(m: Mat4, pivot: Vec3, frame: forge_math::Quat) -> Self {
+        let (scale, rot, _) = (m * Mat4::from_quat(frame)).to_scale_rotation_translation();
+        let (x, y, z) = (rot * frame.inverse()).normalize().to_euler(forge_math::glam::EulerRot::XYZ);
+        Self {
+            translation: m.transform_point3(pivot) - pivot,
+            rotation_deg: Vec3::new(x.to_degrees(), y.to_degrees(), z.to_degrees()),
+            scale,
+        }
     }
 }
 
@@ -234,11 +253,59 @@ impl Scene {
         while let Some(i) = k {
             let n = &self.nodes[i];
             if !n.user.is_identity() {
-                user = n.user.matrix(n.pivot) * user;
+                user = self.user_matrix(i) * user;
             }
             k = n.parent;
         }
         user * self.source_world_transform(idx)
+    }
+
+    /// Assi propri del componente: la sua rotazione nella posizione del file sorgente.
+    pub fn frame_of(&self, idx: NodeIndex) -> forge_math::Quat {
+        let (_, r, _) = self.source_world_transform(idx).to_scale_rotation_translation();
+        if r.is_finite() {
+            r.normalize()
+        } else {
+            forge_math::Quat::IDENTITY
+        }
+    }
+
+    /// Matrice della trasformazione utente del nodo (spazio mondo, scala sui suoi assi).
+    pub fn user_matrix(&self, idx: NodeIndex) -> Mat4 {
+        let n = &self.nodes[idx];
+        if n.user.is_identity() {
+            return Mat4::IDENTITY;
+        }
+        n.user.matrix(n.pivot, self.frame_of(idx))
+    }
+
+    /// Assi del componente nella scena: rotazione sorgente, rotazione utente e antenati.
+    pub fn world_frame_of(&self, idx: NodeIndex) -> forge_math::Quat {
+        let (_, r, _) = self.world_transform(idx).to_scale_rotation_translation();
+        if r.is_finite() {
+            r.normalize()
+        } else {
+            forge_math::Quat::IDENTITY
+        }
+    }
+
+    /// Dimensioni del componente lungo i suoi assi, con la scala: la rotazione non le
+    /// cambia (un cubo da 800 mm ruotato resta 800 × 800 × 800).
+    pub fn local_size(&self, idx: NodeIndex) -> Vec3 {
+        let to_local = Mat4::from_quat(self.world_frame_of(idx).inverse());
+        let mut b = Aabb::EMPTY;
+        let mut stack = vec![idx];
+        while let Some(i) = stack.pop() {
+            if let Some(m) = self.nodes[i].mesh {
+                b.grow(&self.meshes[m].bounds().transformed(&(to_local * self.world_transform(i))));
+            }
+            stack.extend(&self.nodes[i].children);
+        }
+        if b.is_empty() {
+            Vec3::ZERO
+        } else {
+            b.extent()
+        }
     }
 
     /// Ricalcola i punti di rotazione/scala (centro dei componenti nella posizione
@@ -415,7 +482,7 @@ impl Scene {
         while let Some(i) = k {
             let n = &self.nodes[i];
             if !n.user.is_identity() {
-                ancestors = n.user.matrix(n.pivot) * ancestors;
+                ancestors = self.user_matrix(i) * ancestors;
             }
             k = n.parent;
         }
@@ -549,14 +616,14 @@ impl Scene {
             (
                 "Sfera acciaio",
                 "sfera-acciaio",
-                primitives::uv_sphere(0.5, 64, 32),
+                primitives::uv_sphere(0.5, 192, 96),
                 Mat4::from_translation(Vec3::new(-1.1, 0.5, 0.0)),
                 "acciaio-lucidato",
             ),
             (
                 "Sfera vetro",
                 "sfera-vetro",
-                primitives::uv_sphere(0.45, 64, 32),
+                primitives::uv_sphere(0.45, 192, 96),
                 Mat4::from_translation(Vec3::new(0.0, 0.45, 0.8)),
                 "vetro",
             ),
@@ -570,7 +637,7 @@ impl Scene {
             (
                 "Toro rame",
                 "toro-rame",
-                primitives::torus(0.35, 0.12, 64, 24),
+                primitives::torus(0.35, 0.12, 192, 72),
                 Mat4::from_translation(Vec3::new(1.2, 0.12, 0.2)),
                 "rame",
             ),
@@ -650,6 +717,33 @@ mod tests {
         s.center_on_origin(a);
         let c = s.bounds_of(b).center();
         assert!(c.x.abs() < 1e-5 && c.z.abs() < 1e-5, "{c}");
+    }
+
+    /// Dimensioni e scala sono lungo gli assi dell'oggetto: un cubo da 0,8 m ruotato di 29°
+    /// (nel file o dall'utente) misura 800 × 800 × 800 mm, e scalarlo in X lo allunga lungo il
+    /// suo asse X senza deformarlo. Il gizmo ricostruisce la stessa trasformazione.
+    #[test]
+    fn size_and_scale_follow_the_object_axes() {
+        let mut s = Scene::default();
+        let m = s.add_mesh(primitives::cuboid(Vec3::splat(0.8)));
+        let i = s.add_node(None, ComponentId("cubo".into()), "Cubo", Mat4::from_rotation_y(0.5), Some(m));
+        s.refresh_pivots();
+        let world = s.bounds_of(i).extent();
+        assert!(world.x > 0.9, "il riquadro del mondo è più largo: {world}");
+        assert!((s.local_size(i) - Vec3::splat(0.8)).length() < 1e-5, "{}", s.local_size(i));
+        s.nodes[i].user.rotation_deg = Vec3::new(10.0, 35.0, -20.0);
+        assert!((s.local_size(i) - Vec3::splat(0.8)).length() < 1e-5, "{}", s.local_size(i));
+        s.nodes[i].user.scale = Vec3::new(1.5, 1.0, 1.0);
+        let size = s.local_size(i);
+        assert!((size - Vec3::new(1.2, 0.8, 0.8)).length() < 1e-4, "{size}");
+        // Gli spigoli restano ortogonali (nessuna deformazione obliqua).
+        let w = s.world_transform(i);
+        let (ex, ey) = (w.transform_vector3(Vec3::X), w.transform_vector3(Vec3::Y));
+        assert!(ex.dot(ey).abs() < 1e-5);
+        let u = s.nodes[i].user;
+        let back = UserTransform::from_matrix(s.user_matrix(i), s.nodes[i].pivot, s.frame_of(i));
+        assert!((back.scale - u.scale).length() < 1e-4, "{back:?}");
+        assert!((back.matrix(s.nodes[i].pivot, s.frame_of(i)).w_axis - s.user_matrix(i).w_axis).length() < 1e-4);
     }
 
     #[test]

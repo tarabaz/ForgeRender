@@ -22,8 +22,9 @@ use std::sync::mpsc::{channel, Receiver};
 
 type Loaded = Result<(Vec<Extracted>, Vec<String>), String>;
 
-/// Lato dell'anteprima nella finestra (pixel).
-const PREVIEW_PX: u32 = 256;
+/// Lato dell'anteprima nella finestra (punti dell'interfaccia): segue la colonna tra questi limiti.
+const PREVIEW_MIN_UI: f32 = 160.0;
+const PREVIEW_MAX_UI: f32 = 1024.0;
 
 /// Categorie proposte (come quelle dei siti: nomi italiani nell'interfaccia).
 const CATEGORIES: [&str; 8] = ["metal", "wood", "fabric", "leather", "stone", "plastic", "concrete", ""];
@@ -32,7 +33,8 @@ const CATEGORIES: [&str; 8] = ["metal", "wood", "fabric", "leather", "stone", "p
 struct Preview {
     /// Valori del materiale mostrati nell'anteprima attuale.
     key: Option<String>,
-    pending: Option<(String, Receiver<Vec<u8>>)>,
+    /// Chiave, lato in pixel e risultato del render in corso.
+    pending: Option<(String, u32, Receiver<Vec<u8>>)>,
     texture: Option<egui::TextureHandle>,
 }
 
@@ -151,12 +153,21 @@ impl BlendImportUi {
     }
 }
 
-/// Anteprima del materiale modificato: si rifà quando cambiano i valori (una alla volta).
+/// Anteprima del materiale modificato, grande quanto la colonna (segue la finestra): si rifà
+/// quando cambiano i valori o la dimensione (una alla volta; intanto quella vecchia si scala).
 fn preview_image(ui: &mut egui::Ui, pv: &mut Preview, m: &Material) {
-    let key = format!("{m:?}");
-    if let Some((k, rx)) = &pv.pending {
+    // Lato mostrato: tutta la larghezza della colonna, senza superare l'altezza libera.
+    let side = ui
+        .available_width()
+        .min(ui.available_height() - 90.0)
+        .clamp(PREVIEW_MIN_UI, PREVIEW_MAX_UI);
+    // Pixel renderizzati: il lato reale sullo schermo, a gradini di 64 per non rifarla a ogni
+    // pixel di trascinamento della finestra.
+    let px = ((side * ui.ctx().pixels_per_point() / 64.0).round() as u32 * 64).clamp(128, 1024);
+    let key = format!("{px}|{m:?}");
+    if let Some((k, n, rx)) = &pv.pending {
         if let Ok(rgba) = rx.try_recv() {
-            let img = egui::ColorImage::from_rgba_unmultiplied([PREVIEW_PX as usize; 2], &rgba);
+            let img = egui::ColorImage::from_rgba_unmultiplied([*n as usize; 2], &rgba);
             match &mut pv.texture {
                 Some(t) => t.set(img, egui::TextureOptions::LINEAR),
                 None => pv.texture = Some(ui.ctx().load_texture("blend-import-preview", img, egui::TextureOptions::LINEAR)),
@@ -171,15 +182,15 @@ fn preview_image(ui: &mut egui::Ui, pv: &mut Preview, m: &Material) {
         std::thread::Builder::new()
             .name("forge-blend-preview".into())
             .spawn(move || {
-                let _ = tx.send(crate::ui::central::render_preview(&mat, PREVIEW_PX));
+                let _ = tx.send(crate::ui::central::render_preview(&mat, px));
             })
             .ok();
-        pv.pending = Some((key, rx));
+        pv.pending = Some((key, px, rx));
     }
     if pv.pending.is_some() {
         ui.ctx().request_repaint_after(std::time::Duration::from_millis(80));
     }
-    let size = egui::vec2(PREVIEW_PX as f32, PREVIEW_PX as f32);
+    let size = egui::vec2(side, side);
     match &pv.texture {
         Some(t) => {
             ui.image((t.id(), size));
@@ -195,8 +206,11 @@ fn preview_image(ui: &mut egui::Ui, pv: &mut Preview, m: &Material) {
         }
         ui.label(
             egui::RichText::new(tf(
-                "Shader ball, {} campioni (Impostazioni, Anteprime dei materiali)",
-                &[format!("{}", crate::ui::central::preview_samples())],
+                "Shader ball, {} campioni sulla {} (Impostazioni, Anteprime dei materiali)",
+                &[
+                    format!("{}", crate::ui::central::preview_samples()),
+                    crate::ui::central::preview_device().to_string(),
+                ],
             ))
             .small()
             .weak(),

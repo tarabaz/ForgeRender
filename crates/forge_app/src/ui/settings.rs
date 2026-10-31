@@ -285,8 +285,8 @@ fn rendering(ui: &mut egui::Ui, p: &mut Preferences) {
     egui::Grid::new("prefs-render").num_columns(2).spacing([12.0, 8.0]).show(ui, |ui| {
         ui.label(tr("Dispositivo"));
         ui.horizontal(|ui| {
-            ui.selectable_value(&mut p.new_backend, BackendKind::Cpu, "CPU");
             ui.selectable_value(&mut p.new_backend, BackendKind::Gpu, "GPU");
+            ui.selectable_value(&mut p.new_backend, BackendKind::Cpu, "CPU");
         });
         ui.end_row();
         ui.label(tr("Campioni per pixel"));

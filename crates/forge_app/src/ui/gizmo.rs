@@ -162,7 +162,7 @@ fn ancestor_user(scene: &Scene, idx: usize) -> Mat4 {
     while let Some(i) = k {
         let n = &scene.nodes[i];
         if !n.user.is_identity() {
-            m = n.user.matrix(n.pivot) * m;
+            m = scene.user_matrix(i) * m;
         }
         k = n.parent;
     }
@@ -174,14 +174,9 @@ fn ancestor_user(scene: &Scene, idx: usize) -> Mat4 {
 pub fn apply_world(scene: &Scene, idx: usize, start: &UserTransform, world: Mat4) -> UserTransform {
     let a = ancestor_user(scene, idx);
     let p = scene.nodes[idx].pivot;
-    let m = a.inverse() * world * a * start.matrix(p);
-    let (scale, rot, _) = m.to_scale_rotation_translation();
-    let (x, y, z) = rot.to_euler(forge_math::glam::EulerRot::XYZ);
-    UserTransform {
-        translation: m.transform_point3(p) - p,
-        rotation_deg: Vec3::new(x.to_degrees(), y.to_degrees(), z.to_degrees()),
-        scale,
-    }
+    let frame = scene.frame_of(idx);
+    let m = a.inverse() * world * a * start.matrix(p, frame);
+    UserTransform::from_matrix(m, p, frame)
 }
 
 /// Punto di rotazione del componente in spazio mondo.
@@ -192,14 +187,7 @@ fn world_pivot(scene: &Scene, idx: usize) -> Vec3 {
 
 /// Assi del componente: rotazione utente composta con quella degli antenati.
 fn local_axes(scene: &Scene, idx: usize) -> [Vec3; 3] {
-    let n = &scene.nodes[idx];
-    let r = n.user.rotation_deg;
-    let rot = Quat::from_euler(
-        forge_math::glam::EulerRot::XYZ,
-        r.x.to_radians(),
-        r.y.to_radians(),
-        r.z.to_radians(),
-    );
+    let rot = scene.nodes[idx].user.rotation() * scene.frame_of(idx);
     let a = ancestor_user(scene, idx);
     [Vec3::X, Vec3::Y, Vec3::Z].map(|v| a.transform_vector3(rot * v).normalize_or(v))
 }
@@ -987,6 +975,11 @@ pub fn toolbar(app: &mut ForgeApp, ui: &mut egui::Ui, rect: egui::Rect) {
                 {
                     app.redo();
                 }
+                ui.separator();
+                ui.selectable_value(&mut app.viewport_mesh, false, tr("Standard"))
+                    .on_hover_text(tr("Vista ombreggiata con i colori dei materiali"));
+                ui.selectable_value(&mut app.viewport_mesh, true, tr("Mesh"))
+                    .on_hover_text(tr("Mostra anche i triangoli delle mesh (wireframe sopra l'ombreggiatura)"));
             });
         });
     }

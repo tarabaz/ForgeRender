@@ -485,5 +485,15 @@
 - Resta la fase 5 ("Esporta come predefinito" con controllo della licenza) e la decisione su
   come integrare nel programma la libreria che Valerio costruirà con l'importatore.
 
+### 0.14.0: dimensioni locali, GPU prima scelta, vista Mesh (31/10/2026)
+- Dimensioni e scala lungo gli assi dell'oggetto (`Scene::local_size`, `frame_of`,
+  `user_matrix`; `UserTransform::matrix(pivot, frame)` e `from_matrix`): un cubo ruotato
+  resta un cubo, le dimensioni non cambiano con la rotazione.
+- GPU di partenza in ogni modalità; anteprime dei materiali sulla GPU (dispositivo dedicato,
+  CPU di riserva); anteprima dell'importatore che segue la finestra.
+- Viewport Standard/Mesh, pulsante "Materiale" che apre la libreria, primitive più fitte.
+- Restano in attesa: proiezione Box nello spazio dell'oggetto (la texture non scivola sugli
+  oggetti ruotati) e dimensione dell'oggetto dell'anteprima (10 cm / 30 cm / 1 m).
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

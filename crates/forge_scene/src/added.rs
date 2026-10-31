@@ -73,14 +73,14 @@ impl AddedKind {
                 depth,
                 height,
                 radius,
-            } => primitives::backdrop(width, depth, height, radius, 24),
+            } => primitives::backdrop(width, depth, height, radius, 72),
             AddedKind::StudioSweep {
                 width,
                 depth,
                 height,
                 radius,
                 tilt_deg,
-            } => primitives::studio_sweep(width, depth, height, radius, tilt_deg, 32),
+            } => primitives::studio_sweep(width, depth, height, radius, tilt_deg, 96),
             AddedKind::Wall { width, height } => {
                 let mut m = primitives::plane(width, height);
                 // Piano XZ ruotato in verticale, rivolto verso +Z, base a y = 0.
@@ -102,14 +102,14 @@ impl AddedKind {
                 m
             }
             AddedKind::Sphere { radius } => {
-                let mut m = primitives::uv_sphere(radius, 64, 32);
+                let mut m = primitives::uv_sphere(radius, 192, 96);
                 for p in &mut m.positions {
                     p.y += radius;
                 }
                 m
             }
-            AddedKind::Cylinder { radius, height } => primitives::cylinder(radius, height, 64),
-            AddedKind::Cup { radius, height } => primitives::cup(radius, height, (radius * 0.06).max(0.002), 64),
+            AddedKind::Cylinder { radius, height } => primitives::cylinder(radius, height, 192),
+            AddedKind::Cup { radius, height } => primitives::cup(radius, height, (radius * 0.06).max(0.002), 192),
         }
     }
 }

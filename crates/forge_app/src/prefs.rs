@@ -87,7 +87,7 @@ impl Default for Preferences {
             preview_samples: 64,
             preview_resolution: 128,
             library_dir: None,
-            new_backend: r.backend,
+            new_backend: BackendKind::Gpu,
             new_samples: r.target_samples,
             new_threads: r.threads,
             auto_restart: true,

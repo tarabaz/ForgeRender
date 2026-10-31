@@ -122,6 +122,8 @@ pub struct StartupOptions {
     pub ui_mode: Option<crate::prefs::UiMode>,
     /// Vista isometrica all'avvio (test e screenshot).
     pub iso: bool,
+    /// Viewport in vista Mesh all'avvio (`--mesh`, test e screenshot).
+    pub mesh: bool,
     /// "Controllo IA" acceso all'avvio (`--controllo-ia`, prove automatiche).
     pub mcp: bool,
     /// Esegue "Prepara scena prodotto" all'avvio con l'aspetto indicato (test e screenshot).
@@ -235,6 +237,8 @@ pub struct ForgeApp {
 
     pub viewport: Option<ViewportRenderer>,
     viewport_uploaded: Option<(u64, u64, BTreeSet<usize>)>,
+    /// Viewport in vista Mesh: wireframe dei triangoli sopra l'ombreggiatura.
+    pub viewport_mesh: bool,
     pub render_texture: Option<egui::TextureHandle>,
     render_texture_key: Option<(u64, ToneMapping, u32, u32, RenderView)>,
     /// Cosa mostrare del render: finale, grezzo o i buffer guida del denoiser.
@@ -359,6 +363,7 @@ impl ForgeApp {
             session: RenderSession::new(),
             viewport,
             viewport_uploaded: None,
+            viewport_mesh: false,
             render_texture: None,
             render_texture_key: None,
             render_view: RenderView::Final,
@@ -401,6 +406,7 @@ impl ForgeApp {
         };
         // Prepara il backend GPU in background (creazione dispositivo e compilazione
         // dello shader da parte del driver), così è pronto quando serve.
+        crate::ui::central::set_preview_gpu_allowed(!app.safe_mode);
         if !app.safe_mode {
             let (tx, rx) = std::sync::mpsc::channel();
             std::thread::Builder::new()
@@ -480,6 +486,7 @@ impl ForgeApp {
         if let Some(m) = startup.ui_mode {
             app.prefs.ui_mode = m;
         }
+        app.viewport_mesh = startup.mesh;
         if startup.iso {
             app.orbit.lens.ortho = true;
             app.orbit.yaw = std::f32::consts::FRAC_PI_4;
@@ -1942,7 +1949,14 @@ impl ForgeApp {
             self.viewport_uploaded = Some(key);
         }
         let radius = self.scene.bounds().radius().max(1e-3);
-        vp.render(rs, &self.scene.camera, radius, size, forge_math::Vec3::splat(0.045))
+        vp.render(
+            rs,
+            &self.scene.camera,
+            radius,
+            size,
+            forge_math::Vec3::splat(0.045),
+            self.viewport_mesh,
+        )
     }
 }
 
@@ -2030,14 +2044,14 @@ impl ForgeApp {
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(title));
     }
 
-    /// Modalità Semplice: valori di base sempre attivi (vedi `presets::apply_simple_base`) e GPU
-    /// come dispositivo predefinito appena si sa che funziona.
+    /// GPU come dispositivo di partenza in ogni modalità, appena si sa che funziona (la CPU
+    /// solo se la GPU manca o se la sceglie l'utente); in modalità Semplice anche i valori di
+    /// base sempre attivi (vedi `presets::apply_simple_base`).
     fn apply_simple_defaults(&mut self) {
-        if self.prefs.ui_mode != crate::prefs::UiMode::Simple {
-            return;
+        if self.prefs.ui_mode == crate::prefs::UiMode::Simple {
+            crate::presets::apply_simple_base(&mut self.settings);
         }
-        crate::presets::apply_simple_base(&mut self.settings);
-        if !self.simple_gpu_checked {
+        if !self.simple_gpu_checked && !self.safe_mode {
             match self.gpu_ready() {
                 Some(true) => {
                     self.settings.backend = forge_render_core::BackendKind::Gpu;

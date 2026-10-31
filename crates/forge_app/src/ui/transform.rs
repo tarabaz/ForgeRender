@@ -146,9 +146,10 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
         let bounds = app.scene.bounds_of(i);
         let mut user = app.scene.nodes[i].user;
         egui::Grid::new("xf-grid").num_columns(2).spacing([10.0, 6.0]).show(ui, |ui| {
-            // Dimensioni reali: modificandole si cambia la scala.
+            // Dimensioni reali lungo gli assi dell'oggetto (la rotazione non le cambia):
+            // modificandole si cambia la scala sullo stesso asse.
             if !bounds.is_empty() {
-                let size = bounds.extent();
+                let size = app.scene.local_size(i);
                 let mut target = size;
                 if axis_row(ui, tr("Dimensioni"), &mut target, MM, 0.5, tr(" mm")) {
                     let lock = ui
