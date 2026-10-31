@@ -1,8 +1,8 @@
 ; Installer di ForgeRender (Inno Setup 6).
-; Compilazione:  ISCC.exe /DAppVersion=0.14.0 /DBinDir=..\..\target\release packaging\windows\forgerender.iss
+; Compilazione:  ISCC.exe /DAppVersion=0.15.0 /DBinDir=..\..\target\release packaging\windows\forgerender.iss
 
 #ifndef AppVersion
-  #define AppVersion "0.14.0"
+  #define AppVersion "0.15.0"
 #endif
 #ifndef BinDir
   #define BinDir "..\..\target\release"

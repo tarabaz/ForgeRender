@@ -88,7 +88,9 @@ pub const PORTAL_WORDS: usize = 16;
 
 pub const NODE_WORDS: usize = 8;
 pub const TRI_WORDS: usize = 12;
+/// Primitiva: … 7 = offset del riferimento box del suo nodo ([`FRAME_WORDS`] parole).
 pub const PRIM_WORDS: usize = 28;
+pub const FRAME_WORDS: u32 = 8;
 /// Materiale: … 30–32 assorbimento del volume (1/m), 33 priorità, 34–35 liberi.
 pub const MAT_WORDS: usize = 36;
 pub const LIGHT_WORDS: usize = 24;
@@ -160,6 +162,15 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
         w.u(0);
     }
     assert_eq!(w.pos() as usize - p[P_OFF_TRIS] as usize, geo.accel.tris.len() * TRI_WORDS);
+    // --- Riferimenti della proiezione box per nodo: rotazione (quaternione xyzw), origine, 0 ---
+    let frames_off = w.pos();
+    for fr in &geo.node_frames {
+        for v in fr.rot.to_array() {
+            w.f(v);
+        }
+        w.v3(fr.origin);
+        w.u(0);
+    }
     // --- Primitive in ordine originale ---
     p[P_OFF_PRIMS] = w.pos();
     for prim in 0..geo.tri_node.len() {
@@ -167,7 +178,8 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
         w.v3(n0);
         w.u(scene.material_index(prim) as u32);
         w.v3(n1);
-        w.u(0);
+        // Riferimento box del nodo (offset nel buffer).
+        w.u(frames_off + geo.tri_node[prim] * FRAME_WORDS);
         w.v3(n2);
         w.u(0);
         w.v3(geo.geometric_normals[prim]);

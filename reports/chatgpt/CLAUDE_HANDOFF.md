@@ -1274,3 +1274,31 @@ lettore `.blend` senza Blender, anteprime sullo USD Shader Ball). Ho scaricato t
 **Limiti residui**
 - Proiezione Box ancora nello spazio del mondo (in attesa dell'ok di Valerio).
 - La CLI resta sul backend scelto con `--backend` (predefinito quello del progetto).
+
+
+## Claude Code — 31/10/2026: 0.15.0, proiezione Box sull'oggetto e sfumata, Appoggia a contatto
+
+**File modificati**
+- `forge_scene/src/scene.rs`: `texture_frame` (assi dell'oggetto; origine = radice mossa con
+  le trasformazioni utente del pezzo, così pezzi accostati restano continui).
+- `forge_render_core/src/displace.rs`: `BoxFrame`, `box_coords`, `box_weights`
+  (esponente `BOX_BLEND_POWER` = 8, pesi < 1 %% azzerati); `tessellate` con il frame.
+- `render_scene.rs`: `RenderGeometry::node_frames`; test `box_mapping_follows_the_object`.
+- `forge_render_cpu/src/textures.rs`: letture multiple (`taps`) per colore, AO, rugosità,
+  metallo, opacità; normal map e bump per proiezione e poi normali sfumate.
+- `forge_render_gpu`: riferimenti per nodo nel buffer (parola 7 della primitiva = offset,
+  `FRAME_WORDS` = 8), `tex_taps` / `tap_sample` nello shader con le stesse formule.
+- `forge_app`: `contact::drop_onto_below` (pulsante "Appoggia" e MCP `drop_to_floor`), con
+  test `drop_lands_on_the_object_below`; dimensione dell'oggetto delle anteprime
+  (`preview_object_cm`, `scale_for_preview`); miniature v6.
+
+**Test eseguiti davvero**
+- 229 test, clippy `-D warnings`, fmt; i 16 test GPU (CPU e GPU coincidono, texture e
+  displacement compresi).
+- Render di controllo (`box_mapping_render_for_review` con `FORGE_TEST_OUT`): rovere su
+  sfera, cubo ruotato e toro senza tasselli, venatura allineata alle facce del cubo.
+  Shader ball misurato: 0,089 m.
+
+**Limiti residui**
+- I pezzi con trasformazione utente propria dentro un assieme hanno l'origine della texture
+  solidale con loro (non con l'assieme): spostandoli la texture li segue.

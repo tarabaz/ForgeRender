@@ -11,6 +11,27 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.15.0 — 31/10/2026
+
+**Texture a proiezione Box**
+- Proiezione sugli assi dell'oggetto: la texture segue il pezzo quando lo si sposta o ruota
+  (prima restava ferma nel mondo e scivolava), e su un cubo ruotato la venatura è
+  allineata alle facce. Pezzi accostati dello stesso assieme restano continui.
+- Le tre proiezioni si sfumano secondo la normale: sulle superfici curve (sfera, toro)
+  niente più tasselli che cambiano da un triangolo all'altro. Vale anche per normal map,
+  rilievo e ritaglio, su CPU e GPU (stesse formule), e per il displacement.
+
+**Anteprime dei materiali**
+- Impostazioni → Anteprime dei materiali → Dimensione dell'oggetto: Reale (9 cm), 30 cm
+  (predefinita) o 1 m. Texture, rilievo e displacement si scalano sulla sfera come su un
+  oggetto di quella dimensione, così l'anteprima somiglia al pezzo nella scena.
+- Miniature rifatte (versione v6) con la nuova proiezione.
+
+**Appoggia**
+- Il pulsante "Appoggia" del pannello Oggetto (e l'opzione dello strumento MCP) fa scendere
+  i pezzi scelti finché toccano l'oggetto subito sotto (altro pezzo, fondale, pavimento),
+  come lo snap a contatto verso il basso; con niente sotto vanno a quota 0. Ctrl+Z annulla.
+
 ## 0.14.0 — 31/10/2026
 
 **Dimensioni e scala sugli assi dell'oggetto**

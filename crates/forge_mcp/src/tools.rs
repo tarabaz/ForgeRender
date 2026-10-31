@@ -67,7 +67,7 @@ pub fn list() -> Value {
                 "move_m": {"description": "Spostamento [x, y, z] in metri (x destra del mondo, y alto, z verso la vista frontale).", "type": "array", "items": {"type": "number"}},
                 "rotate_deg": {"description": "Rotazione aggiunta [x, y, z] in gradi (y = giro sul piano).", "type": "array", "items": {"type": "number"}},
                 "scale": {"type": "number", "description": "Fattore di scala uniforme (2 = doppio)."},
-                "drop_to_floor": {"type": "boolean", "description": "Appoggia a quota 0 dopo la trasformazione."}
+                "drop_to_floor": {"type": "boolean", "description": "Appoggia dopo la trasformazione: scende fino a toccare l'oggetto subito sotto (pezzo, fondale o pavimento), quota 0 se sotto non c'è niente."}
             }), &[]),
         tool("set_visibility", "Mostra o nasconde componenti.", json!({"targets": targets, "visible": {"type": "boolean"}}), &["targets", "visible"]),
         tool("add_light", "Aggiunge una luce puntata sul prodotto. Esempi: \"luce a destra\" → side destra; \"controluce\" → side controluce. Intensità: usa strength (1 = normale, 2 = doppia) se non conosci le unità.",

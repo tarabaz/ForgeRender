@@ -289,6 +289,26 @@ impl Scene {
         }
     }
 
+    /// Riferimento delle texture a proiezione Box del componente: assi dell'oggetto (come le
+    /// dimensioni) e origine solidale con lui. L'origine è quella della radice dell'albero
+    /// mossa con le trasformazioni utente del componente, così pezzi accostati di uno stesso
+    /// assieme restano continui e la texture segue l'oggetto quando lo si sposta o ruota.
+    pub fn texture_frame(&self, idx: NodeIndex) -> (forge_math::Quat, Vec3) {
+        let mut root = idx;
+        while let Some(p) = self.nodes[root].parent {
+            root = p;
+        }
+        let src = self.source_world_transform(idx);
+        let user_chain = if src.determinant().abs() > 1e-20 {
+            self.world_transform(idx) * src.inverse()
+        } else {
+            Mat4::IDENTITY
+        };
+        let origin = user_chain.transform_point3(self.nodes[root].local_transform.transform_point3(Vec3::ZERO));
+        let origin = if origin.is_finite() { origin } else { Vec3::ZERO };
+        (self.world_frame_of(idx), origin)
+    }
+
     /// Dimensioni del componente lungo i suoi assi, con la scala: la rotazione non le
     /// cambia (un cubo da 800 mm ruotato resta 800 × 800 × 800).
     pub fn local_size(&self, idx: NodeIndex) -> Vec3 {

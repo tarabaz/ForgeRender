@@ -495,5 +495,12 @@
 - Restano in attesa: proiezione Box nello spazio dell'oggetto (la texture non scivola sugli
   oggetti ruotati) e dimensione dell'oggetto dell'anteprima (10 cm / 30 cm / 1 m).
 
+### 0.15.0: proiezione Box sugli assi dell'oggetto e sfumata, Appoggia a contatto (31/10/2026)
+- Texture Box nello spazio dell'oggetto (`Scene::texture_frame`, `RenderGeometry::node_frames`,
+  `displace::BoxFrame`) e sfumate tra le tre proiezioni (`box_weights`, esponente 8) su CPU
+  e GPU; displacement con coordinate dell'oggetto.
+- Anteprime: dimensione dell'oggetto (Reale 9 cm / 30 cm / 1 m), miniature v6.
+- "Appoggia" sul pezzo subito sotto (`contact::drop_onto_below`).
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

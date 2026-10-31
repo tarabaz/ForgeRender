@@ -429,9 +429,7 @@ fn transform_objects(app: &mut ForgeApp, a: &Args) -> R {
         }
     }
     if a.bool("drop_to_floor")?.unwrap_or(false) {
-        for &i in &nodes {
-            app.scene.drop_to_floor(i, 0.0);
-        }
+        crate::contact::drop_onto_below(&mut app.scene, &nodes);
     }
     app.geometry_changed();
     done(

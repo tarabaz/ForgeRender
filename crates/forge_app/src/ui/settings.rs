@@ -88,9 +88,16 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
     if reset {
         p = Preferences::default();
     }
-    let previews_changed = p.preview_samples != app.prefs.preview_samples || p.preview_resolution != app.prefs.preview_resolution;
+    let previews_changed = p.preview_samples != app.prefs.preview_samples
+        || p.preview_resolution != app.prefs.preview_resolution
+        || p.preview_object_cm != app.prefs.preview_object_cm;
+    // La dimensione cambia l'aspetto: le miniature salvate nella libreria vanno rifatte.
+    let object_changed = p.preview_object_cm != app.prefs.preview_object_cm;
     if p != app.prefs {
         app.apply_prefs(p, false);
+    }
+    if object_changed {
+        forge_library::store::clear_thumbnail_cache();
     }
     if clear_cache {
         let n = forge_library::store::clear_thumbnail_cache();
@@ -212,6 +219,21 @@ fn library(ui: &mut egui::Ui, p: &mut Preferences, clear_cache: &mut bool) {
             ui.label(tr("Campioni (passaggi)"));
             ui.add(egui::DragValue::new(&mut p.preview_samples).range(4..=4096).speed(4.0))
                 .on_hover_text(tr("Più campioni = anteprime meno rumorose ma più lente da generare"));
+            ui.end_row();
+            ui.label(tr("Dimensione dell'oggetto"));
+            ui.horizontal(|ui| {
+                for cm in crate::ui::central::PREVIEW_OBJECT_SIZES_CM {
+                    let label = match cm {
+                        0 => tr("Reale (9 cm)").to_string(),
+                        100 => "1 m".to_string(),
+                        c => format!("{c} cm"),
+                    };
+                    ui.selectable_value(&mut p.preview_object_cm, cm, label).on_hover_text(tr(
+                        "Il materiale si mostra come su un oggetto di questa dimensione: texture e rilievo \
+                         (in misure reali) si scalano sulla sfera dell'anteprima",
+                    ));
+                }
+            });
             ui.end_row();
         });
     ui.horizontal(|ui| {

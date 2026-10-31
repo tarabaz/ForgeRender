@@ -71,13 +71,15 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             structural = true;
         }
         if ui
-            .button(tr("Appoggia sul pavimento"))
-            .on_hover_text(tr("Porta il punto più basso a quota 0"))
+            .button(tr("Appoggia"))
+            .on_hover_text(tr(
+                "Scende finché tocca l'oggetto che ha subito sotto (un altro pezzo, il fondale o il pavimento), \
+                 come lo snap a contatto verso il basso; con niente sotto va a quota 0",
+            ))
             .clicked()
         {
-            for &i in &sel {
-                app.scene.drop_to_floor(i, 0.0);
-            }
+            app.push_undo(&sel);
+            crate::contact::drop_onto_below(&mut app.scene, &sel);
             changed = true;
         }
         if ui

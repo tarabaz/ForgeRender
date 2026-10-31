@@ -338,6 +338,7 @@ impl LibraryUi {
         serde_json::to_string(m).unwrap_or_default().hash(&mut h);
         // Anche i campioni: cambiandoli nelle impostazioni le anteprime si rifanno.
         crate::ui::central::preview_samples().hash(&mut h);
+        crate::ui::central::preview_object_cm().hash(&mut h);
         let hash = h.finish();
         let key = |s: u32| format!("preset:{}:{s}:{hash:016x}", m.id.0);
         let file = store::preset_thumbnail_dir().join(format!("{}-{size}-{hash:016x}.png", m.id.0));

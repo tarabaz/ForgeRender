@@ -279,6 +279,8 @@ pub struct RenderGeometry {
     pub tri_uvs: Vec<[Vec2; 3]>,
     /// Tangente ∂p/∂u in spazio mondo (zero se la mesh non ha UV).
     pub tri_tangents: Vec<Vec3>,
+    /// Riferimento della proiezione box per ogni nodo di scena (indice = nodo).
+    pub node_frames: Vec<crate::displace::BoxFrame>,
     /// Flag per primitiva (vedi [`crate::displace::FLAG_BOX_UV`]).
     pub tri_flags: Vec<u32>,
     /// Posizione di ogni primitiva (ordine originale) dentro `accel.tris` (ordine BVH).
@@ -342,6 +344,7 @@ impl RenderGeometry {
         let mut ttan = Vec::new();
         let mut tflags = Vec::new();
         let displaced = displacement_plan(scene);
+        let mut node_frames = vec![crate::displace::BoxFrame::default(); scene.nodes.len()];
         for (i, node) in scene.nodes.iter().enumerate() {
             let Some(mi) = node.mesh else { continue };
             if !scene.is_visible(i) {
@@ -352,10 +355,12 @@ impl RenderGeometry {
             let nxf = Mat3::from_mat4(xf).inverse().transpose();
             // Una trasformazione con determinante negativo (specchiatura) inverte il winding.
             let mirrored = Mat3::from_mat4(xf).determinant() < 0.0;
+            let (rot, origin) = scene.texture_frame(i);
+            node_frames[i] = crate::displace::BoxFrame { rot, origin };
             let has_n = mesh.has_normals();
             let has_uv = mesh.uvs.len() == mesh.positions.len();
             if let Some((params, target)) = displaced.get(&i) {
-                for t in crate::displace::tessellate(mesh, &xf, mirrored, params, *target) {
+                for t in crate::displace::tessellate(mesh, &xf, mirrored, params, *target, &node_frames[i]) {
                     let p = t.p;
                     let ng = (p[1] - p[0]).cross(p[2] - p[0]);
                     let ng = if mirrored { -ng } else { ng }.normalize_or_zero();
@@ -439,6 +444,7 @@ impl RenderGeometry {
             tri_uvs: tuv,
             tri_tangents: ttan,
             tri_flags: tflags,
+            node_frames,
             prim_to_slot,
             bounds,
         }
@@ -803,6 +809,44 @@ fn build_emissive(geo: &RenderGeometry, node_material: &[u32], materials: &[Rend
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// La proiezione box è nello spazio dell'oggetto: ruotando e spostando il cubo, gli stessi
+    /// punti della sua superficie hanno le stesse coordinate (la texture lo segue), e la
+    /// faccia di un cubo ruotato nel file usa un solo asse (niente texture obliqua).
+    #[test]
+    fn box_mapping_follows_the_object() {
+        let build = |user: forge_scene::UserTransform, src: forge_math::Mat4| {
+            let mut s = Scene::default();
+            let m = s.add_mesh(forge_scene::primitives::cuboid(Vec3::splat(0.8)));
+            let i = s.add_node(None, forge_scene::ComponentId("cubo".into()), "Cubo", src, Some(m));
+            s.refresh_pivots();
+            s.nodes[i].user = user;
+            RenderGeometry::build(&s)
+        };
+        let src = forge_math::Mat4::from_rotation_y(0.5);
+        let a = build(Default::default(), src);
+        let moved = forge_scene::UserTransform {
+            translation: Vec3::new(0.3, 0.1, -0.2),
+            rotation_deg: Vec3::new(0.0, 40.0, 15.0),
+            scale: Vec3::ONE,
+        };
+        let b = build(moved, src);
+        assert_eq!(a.tri_node.len(), b.tri_node.len());
+        for prim in 0..a.tri_node.len() {
+            let fa = a.node_frames[a.tri_node[prim] as usize];
+            let fb = b.node_frames[b.tri_node[prim] as usize];
+            for (pa, pb) in a.vertices(prim).into_iter().zip(b.vertices(prim)) {
+                let (la, lb) = (fa.to_local(pa), fb.to_local(pb));
+                assert!((la - lb).length() < 1e-4, "{la} vs {lb}");
+            }
+            // Faccia del cubo: normale lungo un asse dell'oggetto, una sola proiezione.
+            let w = crate::displace::box_weights(fb.dir_to_local(b.geometric_normals[prim]));
+            assert_eq!(w.iter().filter(|&&x| x > 0.0).count(), 1, "{w:?}");
+        }
+        // Normale a 45°: le due proiezioni si sfumano a metà.
+        let w = crate::displace::box_weights(Vec3::new(1.0, 1.0, 0.0).normalize());
+        assert!((w[0] - 0.5).abs() < 1e-5 && (w[1] - 0.5).abs() < 1e-5, "{w:?}");
+    }
 
     /// La scena contiene tutti i predefiniti, molti con le mappe: si caricano solo le texture
     /// dei materiali usati (prima tutte, e il renderer GPU superava i limiti dei buffer).

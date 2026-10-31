@@ -18,9 +18,9 @@ use std::path::{Path, PathBuf};
 pub const MATERIAL_FILE: &str = "materiale.json";
 /// Anteprima renderizzata (v4: con gli EXR a un canale di Poly Haven letti; nella v3 rugosità,
 /// AO e height in EXR "Y" mancavano. Le vecchie si rifanno).
-pub const THUMBNAIL_FILE: &str = "anteprima-v5.png";
+pub const THUMBNAIL_FILE: &str = "anteprima-v6.png";
 /// Anteprime delle versioni precedenti: si eliminano quando si salva quella nuova.
-const LEGACY_THUMBNAIL_FILES: [&str; 8] = [
+const LEGACY_THUMBNAIL_FILES: [&str; 11] = [
     "anteprima.png",
     "anteprima-v2.png",
     "anteprima-v3.png",
@@ -29,6 +29,9 @@ const LEGACY_THUMBNAIL_FILES: [&str; 8] = [
     "anteprima-v4.png",
     "anteprima-v4-256.png",
     "anteprima-v4-512.png",
+    "anteprima-v5.png",
+    "anteprima-v5-256.png",
+    "anteprima-v5-512.png",
 ];
 /// Versione di `materiale.json`. Nella 1 il displacement veniva acceso in automatico
 /// all'import (3 % del lato della texture): al caricamento si riporta a 0.
@@ -363,7 +366,7 @@ pub fn thumbnail_file(size: u32) -> String {
     if size <= THUMBNAIL_SIZES[0] {
         THUMBNAIL_FILE.to_string()
     } else {
-        format!("anteprima-v5-{size}.png")
+        format!("anteprima-v6-{size}.png")
     }
 }
 

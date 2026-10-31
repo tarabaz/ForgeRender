@@ -90,7 +90,8 @@ pub struct Material {
 pub enum Projection {
     /// Coordinate UV della mesh (OBJ con `vt`). Senza UV si ricade sulla proiezione box.
     Uv,
-    /// Proiezione cubica in spazio mondo lungo l'asse dominante della normale:
+    /// Proiezione cubica sugli assi dell'oggetto (la texture lo segue quando lo si sposta o
+    /// ruota), con le tre proiezioni sfumate secondo la normale:
     /// adatta ai modelli CAD, che di solito non hanno UV.
     #[default]
     Box,

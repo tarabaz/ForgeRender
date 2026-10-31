@@ -164,7 +164,7 @@ fn preview_image(ui: &mut egui::Ui, pv: &mut Preview, m: &Material) {
     // Pixel renderizzati: il lato reale sullo schermo, a gradini di 64 per non rifarla a ogni
     // pixel di trascinamento della finestra.
     let px = ((side * ui.ctx().pixels_per_point() / 64.0).round() as u32 * 64).clamp(128, 1024);
-    let key = format!("{px}|{m:?}");
+    let key = format!("{px}|{}|{m:?}", crate::ui::central::preview_object_cm());
     if let Some((k, n, rx)) = &pv.pending {
         if let Ok(rgba) = rx.try_recv() {
             let img = egui::ColorImage::from_rgba_unmultiplied([*n as usize; 2], &rgba);

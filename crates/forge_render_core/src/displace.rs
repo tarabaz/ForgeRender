@@ -50,6 +50,74 @@ pub fn box_frame(axis: usize) -> (Vec3, Vec3) {
     }
 }
 
+/// Coordinate box di base sull'asse indicato (0 = X, 1 = Y, 2 = Z).
+pub fn box_coords(p: Vec3, axis: usize) -> Vec2 {
+    match axis {
+        0 => Vec2::new(p.z, p.y),
+        1 => Vec2::new(p.x, p.z),
+        _ => Vec2::new(p.x, p.y),
+    }
+}
+
+/// Esponente della sfumatura tra le tre proiezioni box: alto = passaggio stretto (niente
+/// immagini sovrapposte sulle facce), ma senza il taglio netto da un triangolo all'altro.
+pub const BOX_BLEND_POWER: i32 = 8;
+
+/// Pesi delle tre proiezioni box per una normale (nello spazio dell'oggetto); quelli sotto
+/// l'1 % si azzerano, così quasi ovunque basta una lettura della texture.
+pub fn box_weights(n: Vec3) -> [f32; 3] {
+    let a = n.abs();
+    let mut w = [a.x, a.y, a.z].map(|v| v.powi(BOX_BLEND_POWER));
+    let sum: f32 = w.iter().sum();
+    if sum.is_nan() || sum <= 0.0 {
+        return [0.0, 1.0, 0.0];
+    }
+    for v in &mut w {
+        *v /= sum;
+        if *v < 0.01 {
+            *v = 0.0;
+        }
+    }
+    let sum: f32 = w.iter().sum();
+    w.map(|v| v / sum)
+}
+
+/// Riferimento dell'oggetto per la proiezione box: le texture seguono l'oggetto (assi e
+/// posizione) invece del mondo, quindi non scivolano quando lo si sposta o lo si ruota.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BoxFrame {
+    /// Rotazione oggetto → mondo.
+    pub rot: forge_math::Quat,
+    pub origin: Vec3,
+}
+
+impl Default for BoxFrame {
+    fn default() -> Self {
+        Self {
+            rot: forge_math::Quat::IDENTITY,
+            origin: Vec3::ZERO,
+        }
+    }
+}
+
+impl BoxFrame {
+    /// Punto del mondo nello spazio dell'oggetto (in metri reali: niente scala).
+    #[inline]
+    pub fn to_local(&self, p: Vec3) -> Vec3 {
+        self.rot.inverse() * (p - self.origin)
+    }
+
+    #[inline]
+    pub fn dir_to_local(&self, d: Vec3) -> Vec3 {
+        self.rot.inverse() * d
+    }
+
+    #[inline]
+    pub fn dir_to_world(&self, d: Vec3) -> Vec3 {
+        self.rot * d
+    }
+}
+
 /// Massimo di triangoli prodotti dal displacement in tutta la scena.
 pub const BUDGET: usize = 3_000_000;
 /// Segmenti massimi per lato di un triangolo originale.
@@ -125,7 +193,8 @@ pub struct OutTri {
 }
 
 /// Suddivide e sposta la mesh (in spazio mondo).
-pub fn tessellate(mesh: &Mesh, xf: &Mat4, mirrored: bool, params: &Params, target: f32) -> Vec<OutTri> {
+/// Le coordinate box della superficie originale sono nello spazio dell'oggetto (`frame`).
+pub fn tessellate(mesh: &Mesh, xf: &Mat4, mirrored: bool, params: &Params, target: f32, frame: &BoxFrame) -> Vec<OutTri> {
     let nxf = Mat3::from_mat4(*xf).inverse().transpose();
     let wp: Vec<Vec3> = mesh.positions.iter().map(|p| xf.transform_point3(*p)).collect();
     let has_n = mesh.has_normals();
@@ -223,8 +292,8 @@ pub fn tessellate(mesh: &Mesh, xf: &Mat4, mirrored: bool, params: &Params, targe
         let (base, flags) = if has_uv {
             (idx.map(|k| mesh.uvs[k as usize]), 0)
         } else {
-            let axis = box_base(Vec3::ZERO, fnrm).1;
-            (p.map(|v| box_base(v, fnrm).0), box_flags(axis))
+            let axis = box_base(Vec3::ZERO, frame.dir_to_local(fnrm)).1;
+            (p.map(|v| box_coords(frame.to_local(v), axis)), box_flags(axis))
         };
         let seg = [0, 1, 2].map(|e| segments((p[(e + 1) % 3] - p[e]).length(), target));
         let n = seg.iter().copied().max().unwrap_or(1);
@@ -409,7 +478,7 @@ mod tests {
         let mesh = forge_scene::primitives::cuboid(Vec3::ONE);
         let p = params(noise_tex(), 0.05);
         // 0.08: lati del cubo a 16 segmenti, diagonali a 32 (punti di bordo interpolati).
-        let out = tessellate(&mesh, &Mat4::IDENTITY, false, &p, 0.08);
+        let out = tessellate(&mesh, &Mat4::IDENTITY, false, &p, 0.08, &BoxFrame::default());
         assert!(out.len() > 12 * 64, "{} triangoli", out.len());
         let key = |v: Vec3| [v.x, v.y, v.z].map(|x| (x * 1e5).round() as i64);
         let mut edges: HashMap<([i64; 3], [i64; 3]), i32> = HashMap::new();
@@ -430,7 +499,7 @@ mod tests {
     fn constant_height_offsets_faces() {
         let mesh = forge_scene::primitives::cuboid(Vec3::ONE);
         let white = Texture::from_rgb8(1, 1, vec![[255; 3]], false);
-        let out = tessellate(&mesh, &Mat4::IDENTITY, false, &params(white, 0.1), 0.2);
+        let out = tessellate(&mesh, &Mat4::IDENTITY, false, &params(white, 0.1), 0.2, &BoxFrame::default());
         // I centri delle facce (lontani dagli spigoli) stanno a 0.5 + 0.1.
         let far = out
             .iter()

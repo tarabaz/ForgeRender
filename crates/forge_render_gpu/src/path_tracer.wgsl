@@ -387,59 +387,119 @@ fn tex_sample(tex: u32, uv: vec2<f32>) -> vec3<f32> {
     return mix(top, bot, ty);
 }
 
-struct TexCoords { uv: vec2<f32>, du: vec3<f32>, dv: vec3<f32>, m_per_uv: f32 };
+// Letture della texture nel punto (come forge_render_cpu::textures::taps): una per gli UV,
+// fino a tre per la proiezione box, che è nello spazio dell'oggetto e sfumata secondo la
+// normale di shading.
+struct Taps {
+    uv: array<vec2<f32>, 3>,
+    du: array<vec3<f32>, 3>,
+    dv: array<vec3<f32>, 3>,
+    w: array<f32, 3>,
+    n: u32,
+    m_per_uv: f32,
+};
 
-// Coordinate di texture e direzioni tangenti (come forge_render_cpu::textures::coordinates).
-fn tex_coords(m: Mat, prim: u32, bu: f32, bv: f32, p: vec3<f32>) -> TexCoords {
+// Rotazione di v con il quaternione q (xyzw).
+fn qrot(q: vec4<f32>, v: vec3<f32>) -> vec3<f32> {
+    let t = 2.0 * cross(q.xyz, v);
+    return v + q.w * t + cross(q.xyz, t);
+}
+
+fn box_t(axis: u32) -> vec3<f32> {
+    if (axis == 0u) { return vec3<f32>(0.0, 0.0, 1.0); }
+    return vec3<f32>(1.0, 0.0, 0.0);
+}
+
+fn box_b(axis: u32) -> vec3<f32> {
+    if (axis == 1u) { return vec3<f32>(0.0, 0.0, 1.0); }
+    return vec3<f32>(0.0, 1.0, 0.0);
+}
+
+fn box_uv(p: vec3<f32>, axis: u32) -> vec2<f32> {
+    if (axis == 0u) { return vec2<f32>(p.z, p.y); }
+    if (axis == 1u) { return vec2<f32>(p.x, p.z); }
+    return vec2<f32>(p.x, p.y);
+}
+
+fn tex_taps(m: Mat, prim: u32, bu: f32, bv: f32, p: vec3<f32>, ns: vec3<f32>) -> Taps {
     let pb = pu(P_OFF_PRIMS) + prim * PRIM_WORDS;
     let tangent = sv3(pb + 22u);
     let ngeo = sv3(pb + 12u);
+    let fb = S[pb + 7u];
+    let q = vec4<f32>(sf(fb), sf(fb + 1u), sf(fb + 2u), sf(fb + 3u));
+    let qi = vec4<f32>(-q.xyz, q.w);
+    let origin = sv3(fb + 4u);
     let use_uv = !m.proj_box && dot(tangent, tangent) > 0.0;
-    var base: vec2<f32>;
-    var t: vec3<f32>;
-    var b: vec3<f32>;
-    var is_box = false;
-    let flags = S[pb + 27u];
-    if ((flags & 1u) != 0u) {
-        // Superficie spostata dal displacement: coordinate box della superficie originale.
-        is_box = true;
-        let a0 = vec2<f32>(sf(pb + 16u), sf(pb + 17u));
-        let a1 = vec2<f32>(sf(pb + 18u), sf(pb + 19u));
-        let a2 = vec2<f32>(sf(pb + 20u), sf(pb + 21u));
-        base = a0 * (1.0 - bu - bv) + a1 * bu + a2 * bv;
-        let axis = (flags >> 1u) & 3u;
-        if (axis == 0u) { t = vec3<f32>(0.0, 0.0, 1.0); b = vec3<f32>(0.0, 1.0, 0.0); }
-        else if (axis == 1u) { t = vec3<f32>(1.0, 0.0, 0.0); b = vec3<f32>(0.0, 0.0, 1.0); }
-        else { t = vec3<f32>(1.0, 0.0, 0.0); b = vec3<f32>(0.0, 1.0, 0.0); }
-    } else if (use_uv) {
-        let a0 = vec2<f32>(sf(pb + 16u), sf(pb + 17u));
-        let a1 = vec2<f32>(sf(pb + 18u), sf(pb + 19u));
-        let a2 = vec2<f32>(sf(pb + 20u), sf(pb + 21u));
-        base = a0 * (1.0 - bu - bv) + a1 * bu + a2 * bv;
-        t = normalize(tangent);
-        b = cross(ngeo, t);
-    } else {
-        is_box = true;
-        let n = abs(ngeo);
-        if (n.x >= n.y && n.x >= n.z) { base = vec2<f32>(p.z, p.y); t = vec3<f32>(0.0, 0.0, 1.0); b = vec3<f32>(0.0, 1.0, 0.0); }
-        else if (n.y >= n.z) { base = vec2<f32>(p.x, p.z); t = vec3<f32>(1.0, 0.0, 0.0); b = vec3<f32>(0.0, 0.0, 1.0); }
-        else { base = vec2<f32>(p.x, p.y); t = vec3<f32>(1.0, 0.0, 0.0); b = vec3<f32>(0.0, 1.0, 0.0); }
-    }
-    var s = m.map_scale;
-    var mpu = 1.0;
-    if (is_box) {
-        s = 1.0 / max(m.map_scale, 1e-6);
-        mpu = max(m.map_scale, 1e-6);
-    }
-    let q = base * s;
     let sn = m.map_sin;
     let cs = m.map_cos;
-    var r: TexCoords;
-    r.uv = vec2<f32>(q.x * cs - q.y * sn, q.x * sn + q.y * cs) + m.map_off;
-    r.du = t * cs - b * sn;
-    r.dv = t * sn + b * cs;
-    r.m_per_uv = mpu;
+    var r: Taps;
+    r.n = 0u;
+    let flags = S[pb + 27u];
+    var bases: array<vec2<f32>, 3>;
+    var ts: array<vec3<f32>, 3>;
+    var bs: array<vec3<f32>, 3>;
+    var is_box = true;
+    if ((flags & 1u) != 0u) {
+        // Superficie spostata dal displacement: coordinate box della superficie originale.
+        let a0 = vec2<f32>(sf(pb + 16u), sf(pb + 17u));
+        let a1 = vec2<f32>(sf(pb + 18u), sf(pb + 19u));
+        let a2 = vec2<f32>(sf(pb + 20u), sf(pb + 21u));
+        let axis = (flags >> 1u) & 3u;
+        bases[0] = a0 * (1.0 - bu - bv) + a1 * bu + a2 * bv;
+        ts[0] = qrot(q, box_t(axis));
+        bs[0] = qrot(q, box_b(axis));
+        r.w[0] = 1.0;
+        r.n = 1u;
+    } else if (use_uv) {
+        is_box = false;
+        let a0 = vec2<f32>(sf(pb + 16u), sf(pb + 17u));
+        let a1 = vec2<f32>(sf(pb + 18u), sf(pb + 19u));
+        let a2 = vec2<f32>(sf(pb + 20u), sf(pb + 21u));
+        bases[0] = a0 * (1.0 - bu - bv) + a1 * bu + a2 * bv;
+        ts[0] = normalize(tangent);
+        bs[0] = cross(ngeo, ts[0]);
+        r.w[0] = 1.0;
+        r.n = 1u;
+    } else {
+        let pl = qrot(qi, p - origin);
+        let a = abs(qrot(qi, ns));
+        var w = pow(a, vec3<f32>(8.0));
+        let s0 = w.x + w.y + w.z;
+        if (s0 > 0.0) { w = w / s0; } else { w = vec3<f32>(0.0, 1.0, 0.0); }
+        w = select(w, vec3<f32>(0.0), w < vec3<f32>(0.01));
+        w = w / (w.x + w.y + w.z);
+        for (var axis = 0u; axis < 3u; axis = axis + 1u) {
+            if (w[axis] > 0.0) {
+                bases[r.n] = box_uv(pl, axis);
+                ts[r.n] = qrot(q, box_t(axis));
+                bs[r.n] = qrot(q, box_b(axis));
+                r.w[r.n] = w[axis];
+                r.n = r.n + 1u;
+            }
+        }
+    }
+    var s = m.map_scale;
+    r.m_per_uv = 1.0;
+    if (is_box) {
+        s = 1.0 / max(m.map_scale, 1e-6);
+        r.m_per_uv = max(m.map_scale, 1e-6);
+    }
+    for (var k = 0u; k < r.n; k = k + 1u) {
+        let qq = bases[k] * s;
+        r.uv[k] = vec2<f32>(qq.x * cs - qq.y * sn, qq.x * sn + qq.y * cs) + m.map_off;
+        r.du[k] = ts[k] * cs - bs[k] * sn;
+        r.dv[k] = ts[k] * sn + bs[k] * cs;
+    }
     return r;
+}
+
+// Media pesata delle letture.
+fn tap_sample(tex: u32, tp: Taps) -> vec3<f32> {
+    var c = vec3<f32>(0.0);
+    for (var k = 0u; k < tp.n; k = k + 1u) {
+        c = c + tex_sample(tex, tp.uv[k]) * tp.w[k];
+    }
+    return c;
 }
 
 // Riferimento tangente ortonormale attorno a n, orientato come (du, dv); w = 0 se degenere.
@@ -451,54 +511,62 @@ fn tangent_t(n: vec3<f32>, du: vec3<f32>) -> vec4<f32> {
 
 // Applica le texture (come forge_render_cpu::textures::apply).
 fn apply_textures(m: ptr<function, Mat>, prim: u32, bu: f32, bv: f32, p: vec3<f32>, ns: ptr<function, vec3<f32>>) {
-    let tc = tex_coords(*m, prim, bu, bv, p);
-    let uv = tc.uv;
-    if ((*m).tex_base >= 0) { (*m).base = (*m).base * tex_sample(u32((*m).tex_base), uv); }
+    let tp = tex_taps(*m, prim, bu, bv, p, *ns);
+    if ((*m).tex_base >= 0) { (*m).base = (*m).base * tap_sample(u32((*m).tex_base), tp); }
     if ((*m).tex_ao >= 0) {
-        let ao = tex_sample(u32((*m).tex_ao), uv).x;
+        let ao = tap_sample(u32((*m).tex_ao), tp).x;
         (*m).base = (*m).base * (1.0 + (ao - 1.0) * (*m).ao_strength);
     }
     if ((*m).tex_rough >= 0) {
-        var rr = tex_sample(u32((*m).tex_rough), uv).x;
+        var rr = tap_sample(u32((*m).tex_rough), tp).x;
         if ((*m).gloss) { rr = 1.0 - rr; }
         let r = clamp(rr * (*m).roughness, 0.0, 1.0);
         (*m).alpha = max(r * r, 1e-3);
     }
     if ((*m).tex_metal >= 0) {
-        (*m).metallic = clamp((*m).metallic * tex_sample(u32((*m).tex_metal), uv).x, 0.0, 1.0);
+        (*m).metallic = clamp((*m).metallic * tap_sample(u32((*m).tex_metal), tp).x, 0.0, 1.0);
     }
-    if ((*m).tex_normal >= 0) {
-        var c = tex_sample(u32((*m).tex_normal), uv) * 2.0 - vec3<f32>(1.0);
-        if ((*m).normal_dx) { c.y = -c.y; }
-        let n = *ns;
-        let tf = tangent_t(n, tc.du);
-        if (tf.w > 0.0) {
-            let tt = tf.xyz;
-            var bb = cross(n, tt);
-            if (dot(bb, tc.dv) < 0.0) { bb = -bb; }
-            let pert = tt * (c.x * (*m).normal_strength) + bb * (c.y * (*m).normal_strength) + n * max(c.z, 1e-3);
-            if (dot(pert, pert) > 0.0) { *ns = normalize(pert); }
+    let has_bump = (*m).tex_height >= 0 && (*m).bump_m > 0.0;
+    if ((*m).tex_normal < 0 && !has_bump) { return; }
+    // Normal map e rilievo per ogni proiezione, poi le normali si sfumano con i pesi.
+    let n0 = *ns;
+    var blended = vec3<f32>(0.0);
+    for (var k = 0u; k < tp.n; k = k + 1u) {
+        var n = n0;
+        let uv = tp.uv[k];
+        if ((*m).tex_normal >= 0) {
+            var c = tex_sample(u32((*m).tex_normal), uv) * 2.0 - vec3<f32>(1.0);
+            if ((*m).normal_dx) { c.y = -c.y; }
+            let tf = tangent_t(n, tp.du[k]);
+            if (tf.w > 0.0) {
+                let tt = tf.xyz;
+                var bb = cross(n, tt);
+                if (dot(bb, tp.dv[k]) < 0.0) { bb = -bb; }
+                let pert = tt * (c.x * (*m).normal_strength) + bb * (c.y * (*m).normal_strength) + n * max(c.z, 1e-3);
+                if (dot(pert, pert) > 0.0) { n = normalize(pert); }
+            }
         }
-    }
-    if ((*m).tex_height >= 0 && (*m).bump_m > 0.0) {
-        // Bump mapping: gradiente dell'altezza con differenze centrate di un texel.
-        let ht = u32((*m).tex_height);
-        let ib = pu(P_OFF_TEXINFO) + ht * 4u;
-        let eu = 1.0 / f32(max(S[ib + 1u], 1u));
-        let ev = 1.0 / f32(max(S[ib + 2u], 1u));
-        let gu = (tex_sample(ht, uv + vec2<f32>(eu, 0.0)).x - tex_sample(ht, uv - vec2<f32>(eu, 0.0)).x) / (2.0 * eu);
-        let gv = (tex_sample(ht, uv + vec2<f32>(0.0, ev)).x - tex_sample(ht, uv - vec2<f32>(0.0, ev)).x) / (2.0 * ev);
-        let n = *ns;
-        let tf = tangent_t(n, tc.du);
-        if (tf.w > 0.0) {
-            let tt = tf.xyz;
-            var bb = cross(n, tt);
-            if (dot(bb, tc.dv) < 0.0) { bb = -bb; }
-            let k = (*m).bump_m / tc.m_per_uv;
-            let pert = n - tt * (gu * k) - bb * (gv * k);
-            if (dot(pert, pert) > 0.0) { *ns = normalize(pert); }
+        if (has_bump) {
+            // Bump mapping: gradiente dell'altezza con differenze centrate di un texel.
+            let ht = u32((*m).tex_height);
+            let ib = pu(P_OFF_TEXINFO) + ht * 4u;
+            let eu = 1.0 / f32(max(S[ib + 1u], 1u));
+            let ev = 1.0 / f32(max(S[ib + 2u], 1u));
+            let gu = (tex_sample(ht, uv + vec2<f32>(eu, 0.0)).x - tex_sample(ht, uv - vec2<f32>(eu, 0.0)).x) / (2.0 * eu);
+            let gv = (tex_sample(ht, uv + vec2<f32>(0.0, ev)).x - tex_sample(ht, uv - vec2<f32>(0.0, ev)).x) / (2.0 * ev);
+            let tf = tangent_t(n, tp.du[k]);
+            if (tf.w > 0.0) {
+                let tt = tf.xyz;
+                var bb = cross(n, tt);
+                if (dot(bb, tp.dv[k]) < 0.0) { bb = -bb; }
+                let kk = (*m).bump_m / tp.m_per_uv;
+                let pert = n - tt * (gu * kk) - bb * (gv * kk);
+                if (dot(pert, pert) > 0.0) { n = normalize(pert); }
+            }
         }
+        blended = blended + n * tp.w[k];
     }
+    if (dot(blended, blended) > 0.0) { *ns = normalize(blended); }
 }
 
 // Ritaglio: vero se il punto del triangolo è opaco (come forge_render_cpu::textures::opaque_at).
@@ -508,8 +576,10 @@ fn opaque_at(prim: u32, t: f32, bu: f32, bv: f32, o: vec3<f32>, d: vec3<f32>) ->
     let top = bitcast<i32>(S[mb + 26u]);
     if (top < 0) { return true; }
     let m = load_mat(S[pb + 3u]);
-    let tc = tex_coords(m, prim, bu, bv, o + d * t);
-    return tex_sample(u32(top), tc.uv).x >= 0.5;
+    var n = sv3(pb) * (1.0 - bu - bv) + sv3(pb + 4u) * bu + sv3(pb + 8u) * bv;
+    if (dot(n, n) > 0.0) { n = normalize(n); } else { n = sv3(pb + 12u); }
+    let tp = tex_taps(m, prim, bu, bv, o + d * t, n);
+    return tap_sample(u32(top), tp).x >= 0.5;
 }
 
 // ---------------------------------------------------------------- BSDF

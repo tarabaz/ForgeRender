@@ -133,3 +133,108 @@ pub fn subtree_mask(scene: &Scene, roots: &[usize]) -> Vec<bool> {
     }
     mask
 }
+
+/// "Appoggia": i componenti scendono finché toccano l'oggetto che hanno subito sotto (qualsiasi
+/// componente visibile: un altro pezzo, il fondale, il pavimento), come lo snap a contatto
+/// verso il basso. Con niente sotto si fermano a quota 0. I componenti dentro un assieme
+/// anch'esso scelto si muovono con lui. Restituisce lo spostamento verticale applicato.
+pub fn drop_onto_below(scene: &mut Scene, nodes: &[usize]) -> f32 {
+    let roots: Vec<usize> = nodes
+        .iter()
+        .copied()
+        .filter(|&i| {
+            let mut p = scene.nodes[i].parent;
+            while let Some(k) = p {
+                if nodes.contains(&k) {
+                    return false;
+                }
+                p = scene.nodes[k].parent;
+            }
+            true
+        })
+        .collect();
+    let mut b = forge_math::Aabb::EMPTY;
+    for &r in &roots {
+        b.grow(&scene.exact_bounds_of(r));
+    }
+    if b.is_empty() {
+        return 0.0;
+    }
+    let moving = subtree_mask(scene, &roots);
+    let contact = Contact::new(scene, &moving, |i| !moving[i], usize::MAX);
+    let lowest = scene.bounds().min.y.min(0.0);
+    let fall = b.min.y - lowest + 1.0;
+    let dy = match contact.hit(Vec3::new(0.0, -fall.max(1e-3), 0.0)) {
+        Some(t) => -t,
+        None => -b.min.y,
+    };
+    if dy.abs() < 1e-7 {
+        return 0.0;
+    }
+    for &r in &roots {
+        scene.translate_world(r, Vec3::new(0.0, dy, 0.0));
+    }
+    dy
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use forge_math::Mat4;
+    use forge_scene::{primitives, ComponentId};
+
+    /// "Appoggia" si ferma sull'oggetto subito sotto (il cubo sopra l'altro cubo), sul
+    /// pavimento se sotto c'è solo quello, e a quota 0 se sotto non c'è niente.
+    #[test]
+    fn drop_lands_on_the_object_below() {
+        let mut s = Scene::default();
+        let cube = s.add_mesh(primitives::cuboid(Vec3::ONE));
+        let floor = s.add_mesh(primitives::plane(10.0, 10.0));
+        let raised = Mat4::from_translation(Vec3::new(0.0, 0.2, 0.0));
+        s.add_node(None, ComponentId("pavimento".into()), "Pavimento", raised, Some(floor));
+        let a = s.add_node(
+            None,
+            ComponentId("a".into()),
+            "A",
+            Mat4::from_translation(Vec3::new(0.0, 0.7, 0.0)),
+            Some(cube),
+        );
+        let b = s.add_node(
+            None,
+            ComponentId("b".into()),
+            "B",
+            Mat4::from_translation(Vec3::new(0.3, 3.0, 0.2)),
+            Some(cube),
+        );
+        let c = s.add_node(
+            None,
+            ComponentId("c".into()),
+            "C",
+            Mat4::from_translation(Vec3::new(3.0, 2.0, 0.0)),
+            Some(cube),
+        );
+        let far = s.add_node(
+            None,
+            ComponentId("d".into()),
+            "D",
+            Mat4::from_translation(Vec3::new(20.0, 2.0, 0.0)),
+            Some(cube),
+        );
+        s.refresh_pivots();
+        drop_onto_below(&mut s, &[b]);
+        let top_a = s.exact_bounds_of(a).max.y;
+        assert!(
+            (s.exact_bounds_of(b).min.y - top_a).abs() < 1e-3,
+            "B su A: {}",
+            s.exact_bounds_of(b).min.y
+        );
+        drop_onto_below(&mut s, &[c]);
+        assert!(
+            (s.exact_bounds_of(c).min.y - 0.2).abs() < 1e-3,
+            "C sul pavimento: {}",
+            s.exact_bounds_of(c).min.y
+        );
+        drop_onto_below(&mut s, &[far]);
+        assert!(s.exact_bounds_of(far).min.y.abs() < 1e-5, "D a quota 0");
+    }
+}

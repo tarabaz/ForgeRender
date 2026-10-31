@@ -870,6 +870,36 @@ pub fn preview_samples() -> u32 {
     PREVIEW_SAMPLES.load(std::sync::atomic::Ordering::Relaxed)
 }
 
+/// Dimensione apparente dell'oggetto delle anteprime in centimetri (0 = quella reale dello
+/// shader ball, circa 9 cm). Impostazioni → Anteprime dei materiali.
+static PREVIEW_OBJECT_CM: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(30);
+
+/// Valori proposti nelle impostazioni (0 = reale).
+pub const PREVIEW_OBJECT_SIZES_CM: [u32; 3] = [0, 30, 100];
+
+pub fn set_preview_object_cm(cm: u32) {
+    PREVIEW_OBJECT_CM.store(cm.min(1000), std::sync::atomic::Ordering::Relaxed);
+}
+
+pub fn preview_object_cm() -> u32 {
+    PREVIEW_OBJECT_CM.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// L'anteprima mostra il materiale come su un oggetto della dimensione scelta: con la
+/// proiezione box texture, rilievo e displacement (tutti in misure reali) si rimpiccioliscono
+/// in proporzione sullo shader ball. Così una venatura da 60 cm non si vede ingrandita su una
+/// sfera da 9 cm, e l'anteprima somiglia al pezzo vero nella scena.
+fn scale_for_preview(m: &mut Material, ball_m: f32) {
+    let cm = preview_object_cm();
+    if cm == 0 || !m.has_textures() || m.mapping.projection != forge_scene::Projection::Box {
+        return;
+    }
+    let k = (ball_m / (cm as f32 / 100.0)).clamp(1e-3, 1e3);
+    m.mapping.scale *= k;
+    m.bump_mm *= k;
+    m.displacement_mm *= k;
+}
+
 /// Scena delle anteprime: il progetto `anteprima/anteprima.frproject` (shader ball, luci, camera
 /// e ambiente scelti da Valerio) accanto ai materiali predefiniti, con la geometria già pronta.
 /// Il materiale va sul pezzo `material_surface`.
@@ -877,6 +907,8 @@ struct PreviewStage {
     scene: Scene,
     geometry: std::sync::Arc<forge_render_core::RenderGeometry>,
     target: ComponentId,
+    /// Lato del pezzo che porta il materiale (m), per la dimensione apparente delle anteprime.
+    size_m: f32,
 }
 
 fn preview_stage() -> Option<&'static PreviewStage> {
@@ -904,7 +936,17 @@ fn preview_stage() -> Option<&'static PreviewStage> {
                 .clone();
             let geometry = RenderScene::compile(&scene).geometry.clone();
             tracing::info!("scena delle anteprime: {}", project.display());
-            Some(PreviewStage { scene, geometry, target })
+            let size_m = scene
+                .find(&target)
+                .map(|i| scene.exact_bounds_of(i).extent().max_element())
+                .filter(|s| *s > 1e-4)
+                .unwrap_or(0.1);
+            Some(PreviewStage {
+                scene,
+                geometry,
+                target,
+                size_m,
+            })
         })
         .as_ref()
 }
@@ -961,6 +1003,9 @@ pub(crate) fn render_preview(mat: &Material, size: u32) -> Vec<u8> {
         std::thread::available_parallelism().map(|n| n.get() / 2).unwrap_or(2).max(2)
     };
     let mut m = mat.clone();
+    if let Some(stage) = preview_stage() {
+        scale_for_preview(&mut m, stage.size_m);
+    }
     m.id = forge_scene::MaterialId::new("__preview");
     let rs = match preview_stage() {
         Some(stage) => {
@@ -1068,6 +1113,8 @@ mod tests {
     fn previews_use_the_shader_ball() {
         let stage = preview_stage().expect("assets/anteprima/anteprima.frproject");
         assert!(stage.scene.nodes.iter().any(|n| n.id == stage.target));
+        eprintln!("shader ball: {:.3} m", stage.size_m);
+        assert!((0.03..0.5).contains(&stage.size_m), "{}", stage.size_m);
         set_preview_samples(8);
         let presets = forge_scene::material::presets();
         let ids = ["legno-rovere", "acciaio-satinato", "vetro", "bk-acciaio-spazzolato"];
@@ -1086,5 +1133,43 @@ mod tests {
                 set_preview_samples(8);
             }
         }
+    }
+
+    /// Con `FORGE_TEST_OUT`: scena di test con il rovere su sfera, cubo ruotato e toro (proiezione
+    /// box sugli assi dell'oggetto e sfumata), per controllare a occhio la resa.
+    #[test]
+    fn box_mapping_render_for_review() {
+        let Ok(dir) = std::env::var("FORGE_TEST_OUT") else { return };
+        let mut s = Scene::test_scene();
+        let presets = forge_scene::material::presets();
+        let Some(oak) = presets.iter().find(|m| m.id.0 == "legno-rovere") else {
+            return;
+        };
+        s.materials.upsert(oak.clone());
+        for id in ["sfera-acciaio", "box-plastica", "toro-rame"] {
+            s.assignments.insert(ComponentId(format!("test/Scena/{id}")), oak.id.clone());
+        }
+        let rs = RenderScene::compile(&s);
+        let (w, h) = (640, 400);
+        let settings = RenderSettings {
+            width: w,
+            height: h,
+            max_bounces: 6,
+            ..Default::default()
+        };
+        let mut acc = Accumulator::new(w, h);
+        let mut pass = vec![[0.0; 3]; acc.pixel_count()];
+        let cancel = std::sync::atomic::AtomicBool::new(false);
+        let mut be = forge_render_cpu::CpuBackend::new(0).unwrap();
+        for i in 0..48 {
+            if let Ok(n @ 1..) = be.render_pass(&rs, &settings, i, 1, &mut pass, &cancel) {
+                acc.add_samples(&pass, n);
+            }
+        }
+        let px = forge_render_core::tonemap_to_rgba8(&acc.resolve(), settings.tone_mapping, 0.0);
+        image::RgbaImage::from_raw(w, h, px)
+            .unwrap()
+            .save(std::path::Path::new(&dir).join("scena_rovere.png"))
+            .unwrap();
     }
 }

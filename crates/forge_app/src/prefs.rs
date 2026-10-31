@@ -44,6 +44,8 @@ pub struct Preferences {
     pub preview_samples: u32,
     /// Risoluzione minima delle anteprime dei materiali: 128 (bassa), 256 (media), 512 (alta).
     pub preview_resolution: u32,
+    /// Dimensione apparente dell'oggetto delle anteprime (cm, 0 = reale, circa 9 cm).
+    pub preview_object_cm: u32,
     // --- Percorsi ---
     /// Cartella della libreria scelta dall'utente (`None` = predefinita).
     pub library_dir: Option<PathBuf>,
@@ -86,6 +88,7 @@ impl Default for Preferences {
             library_card_size: 112,
             preview_samples: 64,
             preview_resolution: 128,
+            preview_object_cm: 30,
             library_dir: None,
             new_backend: BackendKind::Gpu,
             new_samples: r.target_samples,
@@ -109,6 +112,7 @@ impl Preferences {
         }
         self.library_card_size = self.library_card_size.clamp(64, 512);
         self.preview_samples = self.preview_samples.clamp(4, 4096);
+        self.preview_object_cm = self.preview_object_cm.min(1000);
         self.preview_resolution = match self.preview_resolution {
             0..=191 => 128,
             192..=383 => 256,
@@ -137,6 +141,7 @@ impl Preferences {
         forge_library::paths::set_custom_root(self.library_dir.clone());
         forge_library::store::set_import_displacement(self.import_displacement);
         crate::ui::central::set_preview_samples(self.preview_samples);
+        crate::ui::central::set_preview_object_cm(self.preview_object_cm);
     }
 
     pub fn load_from(path: &Path) -> (Self, Option<String>) {
@@ -223,6 +228,7 @@ mod tests {
             library_card_size: 256,
             preview_samples: 512,
             preview_resolution: 512,
+            preview_object_cm: 100,
             library_dir: Some(PathBuf::from("/x/Libreria")),
             new_backend: BackendKind::Gpu,
             new_samples: 256,
