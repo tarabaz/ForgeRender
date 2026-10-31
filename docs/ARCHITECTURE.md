@@ -1,107 +1,120 @@
-# Architettura di ForgeRender
+# ForgeRender Architecture
+
+🇮🇹 [Leggi in italiano](ARCHITECTURE.it.md)
 
 ## Workspace
 
-| Crate | Ruolo |
+| Crate | Responsibility |
 |---|---|
-| `forge_math` | AABB, raggi (offset anti-acne di Wächter & Binder), basi ortonormali, RNG PCG32 deterministico, campionamento |
-| `forge_scene` | Modello dati: mesh, albero componenti con `ComponentId` stabili, materiali, luci, ambiente, camera, unità, primitive |
-| `forge_accel` | BVH binaria SAH a 16 bin, nodi `#[repr(C)]` da 32 byte (riutilizzabili sulla GPU), intersezione Möller–Trumbore |
-| `forge_render_core` | `RenderSettings`, `RenderGeometry` (BVH condivisa), `RenderScene`, accumulatore, tone mapping, trait `RenderBackend`, `RenderSession` |
-| `forge_render_cpu` | Backend CPU: BSDF, campionamento luci, integratore path tracing, pool Rayon dedicato |
-| `forge_import` | Import OBJ/STL, validazione mesh, normali con angolo di piega, conversione unità e Z-up → Y-up |
-| `forge_project` | Formato `.frproject`, versionamento schema, salvataggio atomico, report componenti/file mancanti |
-| `forge_image_io` | Export PNG, JPG, TIFF 16 bit ed EXR con scrittura atomica |
-| `forge_telemetry` | Rilevamento hardware (sysinfo), monitor CPU/RAM, log `tracing` con buffer per la UI |
-| `forge_cli` | `forgerender-cli`: render headless, benchmark scalabilità thread |
-| `forge_app` | `forgerender`: GUI egui/eframe, viewport wgpu fuori schermo, orchestrazione |
+| `forge_math` | AABBs, rays (Wächter & Binder anti-acne offset), orthonormal bases, deterministic PCG32 RNG, sampling |
+| `forge_scene` | Data model: meshes, component tree with stable `ComponentId` values, materials, lights, environment, camera, units, primitives |
+| `forge_accel` | 16-bin SAH binary BVH, 32-byte `#[repr(C)]` nodes (GPU-compatible), Möller–Trumbore intersection |
+| `forge_render_core` | `RenderSettings`, shared-BVH `RenderGeometry`, `RenderScene`, accumulator, tone mapping, `RenderBackend` trait, `RenderSession` |
+| `forge_render_cpu` | CPU backend: BSDFs, light sampling, path-tracing integrator, dedicated Rayon pool |
+| `forge_import` | OBJ/STL import, mesh validation, crease-angle normals, unit conversion and Z-up → Y-up conversion |
+| `forge_project` | `.frproject` format, schema versioning, atomic saves, reports for missing components/files |
+| `forge_image_io` | PNG, JPG, 16-bit TIFF and EXR export with atomic writes |
+| `forge_telemetry` | Hardware detection (sysinfo), CPU/RAM monitoring, `tracing` logs buffered for the UI |
+| `forge_cli` | `forgerender-cli`: headless rendering and thread-scaling benchmarks |
+| `forge_app` | `forgerender`: egui/eframe GUI, off-screen wgpu viewport, orchestration |
 
-Materiali, luci e camera sono moduli di `forge_scene` invece che crate separati: sono
-tipi di dati piccoli e strettamente legati, separarli avrebbe solo aggiunto attrito.
+Materials, lights and camera are modules of `forge_scene`, rather than separate crates:
+they are small, tightly related data types, and splitting them would add overhead without
+a meaningful benefit.
 
-## Flusso di rendering
+## Rendering pipeline
 
-1. La UI modifica la `Scene` e incrementa due revisioni: `geometry_rev` (mesh, visibilità)
-   e `shading_rev` (materiali, luci, ambiente, camera).
-2. Se cambia la geometria, la BVH (`RenderGeometry`) viene ricostruita **su un thread
-   separato**; altrimenti si riusa: spostare la camera o cambiare un materiale costa
-   pochi microsecondi anche su assiemi da milioni di triangoli.
-3. `RenderScene::compile_with_geometry` produce i dati per l'integratore e li passa a
-   `RenderSession`, che gira su un thread proprio.
-4. Ogni passata del backend calcola **un campione per ogni pixel** in un buffer separato.
-   Solo le passate complete vengono sommate all'accumulatore: pausa, stop o riavvio
-   scartano la passata in corso, quindi l'immagine non contiene mai campioni parziali
-   o incompatibili.
-5. La UI legge l'ultimo frame (media lineare) e applica tone mapping ed esposizione
-   senza riavviare il render.
+1. The UI edits the `Scene` and increments two revisions: `geometry_rev` (meshes and
+   visibility) and `shading_rev` (materials, lights, environment and camera).
+2. When geometry changes, the BVH (`RenderGeometry`) is rebuilt **on a separate thread**.
+   Otherwise it is reused: moving the camera or changing a material takes only a few
+   microseconds, even for assemblies containing millions of triangles.
+3. `RenderScene::compile_with_geometry` prepares the integrator data and passes it to
+   `RenderSession`, which runs on its own thread.
+4. Each backend pass computes **one sample per pixel** into a separate buffer. Only
+   completed passes are added to the accumulator. Pausing, stopping or restarting discards
+   the pass in progress, so the image never contains partial or incompatible samples.
+5. The UI reads the latest frame (linear average) and applies tone mapping and exposure
+   without restarting the render.
 
-Il generatore casuale dipende solo da `(seed, pixel, indice campione)`: lo stesso render
-dà lo stesso risultato con 1 o 24 thread (verificato da test), il che rende possibile
-in futuro distribuire i campioni tra CPU e GPU senza duplicazioni.
+The random-number generator depends only on `(seed, pixel, sample index)`: the same render
+produces the same result with 1 or 24 threads (verified by tests). This also makes it
+possible to distribute samples between CPU and GPU in the future without duplication.
 
-## Integratore
+## Integrator
 
-Path tracing unidirezionale:
-- NEE verso una luce scelta uniformemente; MIS con euristica della potenza tra
-  campionamento della luce e della BSDF per le luci ad area; peso 1 per luci delta;
-- l'ambiente e le superfici emissive sono raggiunti solo via BSDF (peso 1, stimatore corretto);
-- Russian roulette dal 3° rimbalzo; clamp dei contributi indiretti opzionale e disattivato
-  (introdurrebbe bias).
+Unidirectional path tracing:
 
-BSDF "principled lite": Lambert pesato (1−F)(1−F) + GGX con Smith height-correlated e
-Schlick, campionamento delle normali visibili (Heitz 2018); vetro liscio con Fresnel
-esatto e scala della radianza (n₁/n₂)².
+- Next-event estimation (NEE) samples a light chosen uniformly. Multiple importance
+  sampling (MIS), using the power heuristic, combines light and BSDF sampling for area
+  lights; delta lights use weight 1.
+- The environment and emissive surfaces are reached only through BSDF sampling (weight 1,
+  unbiased estimator).
+- Russian roulette starts at the third bounce. Indirect-contribution clamping is optional
+  and disabled because it would introduce bias.
 
-### Verifiche automatiche
+The **principled-lite BSDF** combines weighted Lambert diffuse `(1−F)(1−F)` with GGX,
+height-correlated Smith masking-shadowing and Schlick Fresnel, using visible-normal
+sampling (Heitz 2018). Smooth glass uses exact Fresnel and radiance scaling
+`(n₁/n₂)²`.
 
-- *White furnace*: sfera Lambert con albedo ρ in ambiente uniforme = ρ esatto; vetro = 1;
-  metalli/plastiche ≤ 1 (nessuna energia creata).
-- Luce puntiforme e luce rettangolare confrontate con le soluzioni analitiche (fattore di forma).
-- Coerenza tra `sample`, `eval` e `pdf` delle BSDF; reciprocità; PDF normalizzate.
-- BVH contro intersezione a forza bruta su raggi casuali.
-- Convergenza: RMSE a 128 campioni < metà di quello a 8.
+### Automated checks
 
-### Limiti noti della Milestone 1
+- *White furnace*: a Lambert sphere with albedo ρ in a uniform environment returns exactly
+  ρ; glass returns 1; metals and plastics return ≤ 1 (no energy creation).
+- Point and rectangular lights are compared with analytical solutions (form factor).
+- BSDF `sample`, `eval` and `pdf` consistency; reciprocity; normalized PDFs.
+- BVH intersections are compared with brute-force intersections over random rays.
+- Convergence: RMSE at 128 samples is less than half the RMSE at 8 samples.
 
-- La compensazione multi-scattering di Turquin dipende solo dalla direzione d'uscita:
-  reciprocità approssimata (scarto < 1%).
-- Niente profondità di campo, opacità/ritagli, displacement.
-- Le caustiche (luce focalizzata da vetro/metallo) convergono lentamente, come in ogni
-  path tracer unidirezionale.
-- Geometria appiattita in spazio mondo (niente instancing): assiemi con molte copie dello
-  stesso pezzo occupano più memoria. Instancing a due livelli previsto con l'import STEP.
+### Known Milestone 1 limitations
+
+- Turquin multi-scattering compensation depends only on the outgoing direction:
+  reciprocity is approximate (error below 1%).
+- No depth of field, opacity/cut-outs or displacement.
+- Caustics (light focused by glass or metal) converge slowly, as in any unidirectional
+  path tracer.
+- Geometry is flattened into world space (no instancing), so assemblies with many copies
+  of the same part use more memory. Two-level instancing is planned with STEP import.
 
 ## Viewport
 
-wgpu (DX12/Vulkan su Windows, GPU ad alte prestazioni preferita, quindi la RTX invece
-della grafica integrata del Ryzen). La scena è disegnata in una texture fuori schermo
-con MSAA 4× e depth buffer, poi mostrata da egui. Se l'inizializzazione GPU fallisce,
-l'app si riavvia da sola con `--safe-mode` (OpenGL, viewport disattivata, render CPU attivo).
+The viewport uses wgpu (DX12/Vulkan on Windows), preferring the high-performance GPU
+(e.g. the RTX rather than the Ryzen integrated graphics). The scene is drawn to an
+off-screen texture with 4× MSAA and a depth buffer, then displayed by egui. If GPU
+initialization fails, the app automatically restarts in `--safe-mode` (OpenGL, viewport
+disabled, CPU rendering enabled).
 
-## Progetti
+## Projects
 
-`.frproject` è JSON leggibile con `format`, `schema_version`, riferimenti ai file sorgente
-(percorso relativo + assoluto di riserva + opzioni di import), materiali, assegnazioni
-`ComponentId → MaterialId`, visibilità, luci, ambiente, camera e impostazioni di render.
-La geometria non è copiata: il file CAD originale non viene mai modificato.
-Assegnazioni a componenti spariti vengono conservate e segnalate.
-Le texture (Fase 3) seguiranno la stessa strategia: riferimento esterno relativo/assoluto,
-con opzione futura di "pacchetto progetto" che copia gli asset in una cartella accanto.
+A `.frproject` file is readable JSON containing `format`, `schema_version`, source-file
+references (relative path, absolute fallback and import options), materials,
+`ComponentId → MaterialId` assignments, visibility, lights, environment, camera and
+render settings.
 
-## Piani per le parti non-Rust (Fasi 4–5)
+Geometry is not copied: the original CAD file is never modified. Assignments to components
+that are no longer present are preserved and reported.
 
-- **STEP**: convertitore esterno minimo in C++ con Open CASCADE (XCAF: gerarchia, nomi,
-  colori, unità, trasformazioni; triangolazione con tolleranza controllata), eseguito come
-  processo separato: un crash di OCCT non chiude l'app e la licenza LGPL resta isolata.
-- **SolidWorks**: bridge C# con le Interop DLL installate con SolidWorks (COM), che apre il
-  documento in sola lettura ed esporta STEP AP214/AP242 + JSON con struttura, id e
-  trasformazioni. Richiede SolidWorks con licenza sul PC.
-- **GPU**: prima un path tracer in compute shader WGSL via wgpu che riusa il layout BVH di
-  `forge_accel`; ray tracing hardware (Vulkan ray query o OptiX) valutato dopo le misure.
-- **Denoiser**: Intel Open Image Denoise (Apache 2.0), con buffer albedo e normali.
+Textures (Phase 3) will follow the same strategy: relative/absolute external references,
+with a future option for a “project package” that copies assets into a neighbouring folder.
 
-## Scelte sulle dipendenze
+## Plans for non-Rust components (Phases 4–5)
 
-Tutte mantenute e con licenze permissive (MIT/Apache/BSD/Zlib): `glam`, `rayon`, `serde`,
-`tracing`, `image` (solo PNG), `tobj`, `stl_io`, `sysinfo`, `eframe`/`egui`/`wgpu`, `rfd`.
-Nessun binding inventato verso CUDA/OptiX.
+- **STEP**: a minimal external C++ converter using Open CASCADE (XCAF: hierarchy, names,
+  colors, units and transforms; controlled-tolerance triangulation). It runs as a separate
+  process, so an OCCT crash cannot close the app and the LGPL dependency remains isolated.
+- **SolidWorks**: a C# bridge using the Interop DLLs installed with SolidWorks (COM). It
+  opens the document read-only and exports STEP AP214/AP242 plus JSON containing structure,
+  IDs and transforms. A licensed SolidWorks installation is required on the PC.
+- **GPU**: first, a WGSL compute-shader path tracer through wgpu that reuses the
+  `forge_accel` BVH layout; hardware ray tracing (Vulkan ray query or OptiX) will be
+  evaluated after measurements.
+- **Denoiser**: Intel Open Image Denoise (Apache 2.0), using albedo and normal buffers.
+
+## Dependency choices
+
+All maintained dependencies use permissive licenses (MIT/Apache/BSD/Zlib):
+`glam`, `rayon`, `serde`, `tracing`, `image` (PNG only), `tobj`, `stl_io`,
+`sysinfo`, `eframe`/`egui`/`wgpu` and `rfd`.
+
+No unsupported or invented CUDA/OptiX bindings are used.
