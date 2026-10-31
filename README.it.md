@@ -2,20 +2,58 @@
 
 🇬🇧 [Read in English](README.md) (versione di riferimento)
 
-Renderer fotorealistico per modelli CAD, assiemi meccanici e scene 3D in generale, scritto in
-Rust. Path tracing progressivo fisicamente basato su CPU e GPU, interfaccia desktop, pensato
-per Windows 11 (sviluppato per Ryzen 9 9900X + RTX 5070) ma funzionante anche senza GPU dedicata.
+![ForgeRender — motore di rendering CAD e 3D](assets/readme-hero.png)
 
-> **Controlla ForgeRender con l'IA — MCP**
->
-> Apri ForgeRender, accendi **Controllo IA** e chiedi a Claude di preparare la scena, importare un modello CAD, posizionare le luci da studio, assegnare i materiali, impostare la camera e lanciare il render. 25 comandi, modifiche visibili in tempo reale e anteprime dei render restituite all'assistente. Decidi tu quando l'IA può comandare: quando si scollega, ForgeRender resta aperto con il tuo lavoro.
->
-> ![Controllo IA acceso e Claude collegato](docs/img/mcp/it/barra_controllato.png)
->
-> **[Configura Claude Code o Claude Desktop →](docs/MCP.md)** · [English guide](docs/MCP.en.md)
+**Motore di rendering fotorealistico per CAD e 3D, per Windows 11 · 64 bit.**  
+Scritto in Rust, con path tracing progressivo su CPU e GPU per modelli CAD, assiemi meccanici e scene 3D.
 
-> Vedi [docs/ROADMAP.it.md](docs/ROADMAP.it.md) per cosa funziona davvero oggi, cosa viene dopo
-> e quanto è complesso ogni passo.
+## Scarica ForgeRender 0.22.0
+
+<sub><strong>VERSIONE STABILE</strong> · Windows 11 · x64 · ZIP portable</sub>
+
+[⬇️ **SCARICA FORGERENDER 0.22.0 — ZIP PORTABLE**](https://francystore3d.it/download/ForgeRender-0.22.0-portable-x64.zip)
+
+Nessuna installazione richiesta: estrai lo ZIP e avvia `forgerender.exe`.  
+Il pacchetto verrà pubblicato al link qui sopra.
+
+### Novità della versione 0.22.0
+
+- **Viste multiple automatiche:** genera viste frontali, posteriori, laterali, dall'alto e a tre quarti, con inquadratura automatica.
+- **Video turntable:** crea un'animazione del prodotto in rotazione ed esportala in MP4 (H.264).
+- **Passaggi di render:** esporta albedo, normali, profondità, maschera del prodotto e ID dei componenti.
+
+<details>
+<summary><strong>Versioni precedenti — storico completo delle release</strong></summary>
+
+- **0.21.0 — Editor materiali ed esportazione ZIP:** modifica materiali e mappe, ruota l'anteprima in tempo reale, applica e salva le modifiche ed esporta materiali portabili in ZIP. Corretti anche i campioni di Bozza e il ridimensionamento ripetuto dei fondali.
+- **0.20.0 — Scala dei materiali adattata:** le texture con proiezione Box si adattano al singolo oggetto o all'assieme; rilievo e displacement mantengono la stessa scala su CPU e GPU.
+- **0.19.0 — Luci spot volumetriche:** fasci di luce visibili con densità e lunghezza regolabili, ombre coniche e risultati coerenti tra CPU e GPU.
+- **0.18.0 — Integrazione IA con un clic:** configurazione e gestione del ponte MCP per Claude Desktop, Claude Code e Codex, con stato della connessione e aggiornamento sicuro delle configurazioni.
+- **0.17.1 — Correzioni a viewport e camera:** riavvio automatico del render solo nella vista Render; migliorate inquadratura della camera e navigazione.
+- **0.17.0 — Ancoraggio texture Box e appoggio:** scelta tra ancoraggio Pezzo, Assieme o Mondo; appoggio di più oggetti con annullamento e impilamento senza compenetrazioni.
+- **0.16.0 — Correttezza di materiali e texture:** displacement Box più uniforme, coerenza CPU/GPU e importazione migliorata dei nodi Blender Displacement e Bump.
+- **0.15.0 — Proiezione Box e anteprime materiali:** texture triplanari allineate agli oggetti, proiezioni più morbide sulle superfici curve, anteprime scalabili e appoggio a contatto.
+- **0.14.0 — Dimensioni sugli assi dell'oggetto e GPU prioritaria:** dimensioni e scala seguono gli assi locali; anteprime GPU e miglioramenti all'interfaccia.
+- **0.13.0 — Importatore materiali Blender:** analisi e importazione di materiali, mappe e valori shader supportati dai file `.blend`, senza richiedere Blender per la lettura.
+- **0.12.0 — Anteprime su shader ball:** miniature e anteprime renderizzate su una scena shader-ball reale; nel pannello Materiali vengono mostrati quelli usati nella scena.
+- **0.11.0 — Libreria materiali unificata:** materiali predefiniti e scaricati in un unico catalogo; aggiunti preset metallici e legno derivati da BlenderKit, soggetti alle relative restrizioni di licenza.
+- **0.10.0 — Materiali predefiniti con mappe:** primi materiali con mappe per rovere, pelle nera e marmo bianco lucido.
+- **0.9.0 — Ispezione componenti con IA:** strumento MCP per creare anteprime numerate dei componenti e riconoscere le parti ripetute negli assiemi CAD.
+- **0.8.3 — Correzioni a render e appoggio:** risolti artefatti di auto-ombreggiatura in ortografica e migliorato l'appoggio preciso sulla base.
+- **0.8.2 — Correzioni:** interventi di stabilità e rendering.
+- **0.8.1 — Correzioni:** ulteriori correzioni dell'applicazione.
+- **0.8.0 — Manuale e compilazione:** manuale interno, miglioramenti al processo di compilazione e correzioni.
+- **0.7.0 — Revisione dell'interfaccia:** menu e barra strumenti separati, nuove funzioni, correzioni e prima fase del manuale.
+- **0.6.0 — Modalità Semplice e prima configurazione:** flusso semplificato per la foto prodotto, statistiche, schermata di benvenuto, controllo IA e guide.
+- **0.5.0 — Controllo IA separato:** separazione del ponte di controllo IA dal programma principale.
+- **0.4.0 — Controllo tramite Claude e MCP:** prima integrazione per il controllo in linguaggio naturale e miglioramenti collegati.
+- **0.3.0 — Flusso foto prodotto:** strumenti per la fotografia prodotto, viewport e camera, illuminazione e interfaccia.
+- **0.2.0 — Primo flusso di lavoro e libreria:** modalità Semplice, libreria materiali, miglioramenti al render, esempi portable e strumenti di compilazione.
+- **0.1.0 — Prima versione:** path tracer CPU/GPU, import CAD/3D, libreria materiali, denoiser OIDN, camera professionale, luci, nebbia volumetrica, progetti, pacchetto portable e installer.
+
+Per le note tecniche complete consulta [CHANGELOG.md](CHANGELOG.md) (in italiano, registro ufficiale delle release).
+
+</details>
 
 ## Cosa fa oggi
 
