@@ -61,6 +61,9 @@ $stepExe = Join-Path $bin "forgerender-step.exe"
 if ($WithStep -and (Test-Path $stepExe)) { Copy-Item $stepExe $staging } else { Write-Host "Pacchetto senza convertitore STEP (usa -WithStep per includerlo)" }
 Copy-Item (Join-Path $PSScriptRoot "LEGGIMI.txt") $staging
 # File di lingua (lang\Lan_*.json): modificabili, e se ne aggiungono altri accanto.
+# Licenza del progetto e attribuzione: accompagnano anche la distribuzione portable.
+Copy-Item (Join-Path $root "LICENSE") $staging
+Copy-Item (Join-Path $root "NOTICE") $staging
 Copy-Item -Recurse (Join-Path $root "lang") (Join-Path $staging "lang")
 # Manuale interno (Guida → Manuale, F1): pagine e immagini, senza l'inventario per gli sviluppatori.
 Copy-Item -Recurse (Join-Path $root "manuale") (Join-Path $staging "manuale")
