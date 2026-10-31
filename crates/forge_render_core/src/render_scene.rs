@@ -679,7 +679,8 @@ impl RenderScene {
         let emissive = build_emissive(&geometry, &node_material, &materials).map(Arc::new);
 
         let has_cutout = material_textures.iter().flatten().any(|t| t.opacity.is_some());
-        let fogs = crate::fog::bake_fogs(scene, &geometry);
+        let mut fogs = crate::fog::bake_fogs(scene, &geometry);
+        fogs.extend(crate::fog::beam_fogs(scene));
         let id = next_scene_id();
         RenderScene {
             has_cutout,

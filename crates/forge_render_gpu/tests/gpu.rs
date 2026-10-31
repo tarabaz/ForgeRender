@@ -1182,3 +1182,75 @@ fn gpu_box_anchors_match_cpu() {
     assert!((ma - mg).abs() / ma < 0.02, "media CPU {ma} vs GPU {mg}");
     assert!(diff < noise * 1.5, "RMSE GPU−CPU {diff} vs rumore CPU−CPU {noise}");
 }
+
+/// Fascio volumetrico di una spot: su sfondo nero il cono di foschia è visibile (più chiaro
+/// dentro che appena fuori) e la GPU converge alla stessa immagine della CPU.
+#[test]
+fn gpu_spot_beam_matches_cpu() {
+    let Some(mut g) = gpu() else { return };
+    let mut s = Scene {
+        environment: Environment::Uniform {
+            color: [0.0; 3],
+            strength: 0.0,
+        },
+        ..Default::default()
+    };
+    s.materials.upsert(mat(0.5, 0.0, 0.8, 0.5, 0.0));
+    let floor = s.add_mesh(primitives::plane(6.0, 6.0));
+    let cid = ComponentId("pavimento".into());
+    s.add_node(None, cid.clone(), "Pavimento", Mat4::IDENTITY, Some(floor));
+    s.assignments.insert(cid, MaterialId::new("test"));
+    let mut spot = Light::point("Spot", Vec3::new(0.0, 2.0, 0.0), 60.0);
+    spot.kind = forge_scene::LightKind::Spot {
+        inner_angle_deg: 20.0,
+        outer_angle_deg: 30.0,
+    };
+    spot.target = Vec3::ZERO;
+    spot.beam_density = 1.0;
+    spot.beam_length = 2.2;
+    s.lights.push(spot);
+    s.camera = Camera {
+        position: Vec3::new(0.0, 1.0, 3.0),
+        target: Vec3::new(0.0, 1.0, 0.0),
+        up: Vec3::Y,
+        vfov_deg: 50.0,
+        ..Default::default()
+    };
+    let st = RenderSettings {
+        width: 48,
+        height: 32,
+        ..Default::default()
+    };
+    let rs = RenderScene::compile(&s);
+    assert_eq!(rs.fogs.len(), 1, "il fascio è un volume");
+    let spp = 2048;
+    let mut cpu = CpuBackend::new(4).unwrap();
+    let a = render_with(&mut cpu, &s, &st, spp);
+    let b = render_with(&mut cpu, &s, &RenderSettings { seed: 999, ..st.clone() }, spp);
+    let gpu_img = render_with(&mut g, &s, &st, spp);
+    // A metà altezza: il centro dell'immagine è nel fascio, i lati fuori.
+    let inside = mean_region(&a, 48, 22, 12, 26, 16);
+    let outside = mean_region(&a, 48, 2, 12, 6, 16);
+    eprintln!("dentro {inside} fuori {outside}");
+    assert!(
+        inside.x > 0.02 && inside.x > outside.x * 5.0,
+        "fascio non visibile: {inside} vs {outside}"
+    );
+    let rmse = |x: &[[f32; 3]], y: &[[f32; 3]]| {
+        let e: f64 = x
+            .iter()
+            .zip(y)
+            .map(|(p, q)| (0..3).map(|k| ((p[k] - q[k]) as f64).powi(2)).sum::<f64>())
+            .sum();
+        (e / (x.len() * 3) as f64).sqrt()
+    };
+    let mean = |x: &[[f32; 3]]| x.iter().map(|p| (p[0] + p[1] + p[2]) as f64).sum::<f64>() / (x.len() * 3) as f64;
+    let (noise, diff) = (rmse(&a, &b), rmse(&a, &gpu_img));
+    let (ma, mg) = (mean(&a), mean(&gpu_img));
+    eprintln!(
+        "media CPU {ma:.4} CPU2 {:.4} GPU {mg:.4} | RMSE CPU−CPU {noise:.4} GPU−CPU {diff:.4}",
+        mean(&b)
+    );
+    assert!((ma - mg).abs() / ma < 0.03, "media CPU {ma} vs GPU {mg}");
+    assert!(diff < noise * 1.5, "RMSE GPU−CPU {diff} vs rumore CPU−CPU {noise}");
+}

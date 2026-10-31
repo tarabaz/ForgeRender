@@ -96,7 +96,7 @@ pub const MAT_WORDS: usize = 36;
 pub const LIGHT_WORDS: usize = 24;
 /// Intestazione di una nebbia: min(3), lato cella, risoluzione(3), unità di densità,
 /// albedo(3), anisotropia, offset dei dati (u16 a coppie), offset dei majorant per blocco,
-/// lato del blocco in celle, 1 libera.
+/// lato del blocco in celle, flag (bit 0: solo camera, i fasci delle spot).
 pub const FOG_WORDS: usize = 16;
 
 pub struct SceneBuffer {
@@ -477,7 +477,8 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
             off_data,
             off_major,
             forge_volume::MACRO_CELLS as u32,
-            0,
+            // Flag: bit 0 = solo per i raggi dalla camera, diffusione singola (fasci delle spot).
+            u32::from(f.camera_only),
         ];
         h.copy_from_slice(&words);
     }

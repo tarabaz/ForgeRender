@@ -103,6 +103,8 @@ pub fn list() -> Value {
                 "cone_softness_pct": {"type": "number"},
                 "range_m": {"type": "number"},
                 "range_softness": {"type": "number"},
+                "beam_density": {"type": "number", "description": "Spot: fascio di luce visibile nell'aria (foschia nel cono, 1/m): 0 spento, 0.3 leggero, 1 marcato, 3 denso."},
+                "beam_length_m": {"type": "number", "description": "Spot: lunghezza del fascio visibile in metri."},
                 "enabled": {"type": "boolean"},
                 "shadows": {"type": "boolean"},
                 "name": {"type": "string"}

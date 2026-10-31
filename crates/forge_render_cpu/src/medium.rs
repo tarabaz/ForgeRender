@@ -41,9 +41,14 @@ fn for_each_segment(f: &BakedFog, o: Vec3, d: Vec3, t0: f32, t1: f32, mut visit:
 
 /// Prima collisione reale con una delle nebbie lungo il raggio entro `t_max`:
 /// (distanza, indice della nebbia).
-pub fn sample_collision(scene: &RenderScene, o: Vec3, d: Vec3, t_max: f32, rng: &mut Pcg32) -> Option<(f32, usize)> {
+/// `camera_path`: il percorso viene ancora dalla camera (solo rimbalzi speculari): solo allora
+/// contano anche le nebbie [`forge_volume::BakedFog::camera_only`] (i fasci delle spot).
+pub fn sample_collision(scene: &RenderScene, o: Vec3, d: Vec3, t_max: f32, camera_path: bool, rng: &mut Pcg32) -> Option<(f32, usize)> {
     let mut best: Option<(f32, usize)> = None;
     for (fi, f) in scene.fogs.iter().enumerate() {
+        if f.camera_only && !camera_path {
+            continue;
+        }
         let limit = best.map(|b| b.0).unwrap_or(t_max);
         let Some((t0, t1)) = clip(f, o, d, limit) else { continue };
         let mut hit = None;

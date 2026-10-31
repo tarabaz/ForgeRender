@@ -1195,12 +1195,14 @@ fn fog_segment(b: u32, o: vec3<f32>, d: vec3<f32>, t: f32, t1: f32) -> vec2<f32>
     return vec2<f32>(tb, sf(S[b + 13u] + idx));
 }
 
-// Prima collisione reale (delta tracking): (t, indice nebbia), t < 0 se nessuna.
-fn fog_collision(o: vec3<f32>, d: vec3<f32>, tmax: f32) -> vec2<f32> {
+// Prima collisione reale (delta tracking): (t, indice nebbia), t < 0 se nessuna. Le nebbie con
+// il flag "solo camera" (parola 15, bit 0: i fasci delle spot) contano solo se `camera_path`.
+fn fog_collision(o: vec3<f32>, d: vec3<f32>, tmax: f32, camera_path: bool) -> vec2<f32> {
     var best_t = -1.0;
     var best_k = 0u;
     for (var k: u32 = 0u; k < pu(P_N_FOGS); k = k + 1u) {
         let b = fog_base(k);
+        if ((S[b + 15u] & 1u) != 0u && !camera_path) { continue; }
         var limit = tmax;
         if (best_t >= 0.0) { limit = best_t; }
         let c = fog_clip(b, o, d, limit);
@@ -1357,6 +1359,8 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
     var l = vec3<f32>(0.0);
     var beta = vec3<f32>(1.0);
     var specular = true;
+    // Ancora "visto dalla camera" (solo rimbalzi speculari): i fasci delle spot contano solo così.
+    var camera_path = true;
     var prev_pdf = 0.0;
     let n_lights = pu(P_N_LIGHTS);
     let n_select = pu(P_N_SELECT);
@@ -1412,7 +1416,7 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
         if (pu(P_N_FOGS) > 0u) {
             var t_end = t_surf;
             if (lt > 0.0) { t_end = lt; }
-            let ev = fog_collision(o, d, t_end);
+            let ev = fog_collision(o, d, t_end, camera_path);
             if (ev.x >= 0.0) {
                 let fb = fog_base(u32(ev.y));
                 let p = o + d * ev.x;
@@ -1448,9 +1452,12 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
                         }
                     }
                 }
+                // Fascio di una spot: diffusione singola (luce diretta, poi fine del percorso).
+                if ((S[fb + 15u] & 1u) != 0u) { break; }
                 let wi = hg_sample(g, d, rnd(), rnd());
                 prev_pdf = hg_pdf(g, dot(d, wi));
                 specular = false;
+                camera_path = false;
                 o = p;
                 d = wi;
                 if (depth + 1u >= pu(P_RR_START)) {
@@ -1571,6 +1578,7 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
         beta = beta * s.weight;
         if (!(beta.x < INF && beta.y < INF && beta.z < INF) || (beta.x == 0.0 && beta.y == 0.0 && beta.z == 0.0)) { break; }
         specular = s.delta;
+        camera_path = camera_path && s.delta;
         prev_pdf = s.pdf;
         if (dot(s.wi, ng) < 0.0 && m.transmission > 0.0) { media_cross(mat_id, front_face); }
         var side = ng;

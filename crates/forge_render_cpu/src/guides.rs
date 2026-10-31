@@ -85,7 +85,7 @@ fn guide_sample(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
         // rivolta alla camera (la media sui campioni pesa nebbia e superficie per la trasmittanza).
         if !scene.fogs.is_empty() {
             let t_end = light.map(|x| x.0).unwrap_or(t_surf);
-            if let Some((_, fi)) = crate::medium::sample_collision(scene, o, d, t_end, rng) {
+            if let Some((_, fi)) = crate::medium::sample_collision(scene, o, d, t_end, true, rng) {
                 return (tint * clamp01(scene.fogs[fi].albedo), -d);
             }
         }

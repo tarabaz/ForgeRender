@@ -11,6 +11,19 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.19.0 — 31/10/2026
+
+**Luci spot volumetriche**
+- Pannello Luci, luce Spot: "Fascio visibile → Volumetrico" mostra il cono di luce nell'aria,
+  come in una sala con un po' di foschia. Si regolano l'intensità del fascio (densità della
+  foschia) e la lunghezza; forma e bordo seguono l'apertura e la sfumatura del cono, colore e
+  ombre (gli oggetti nel fascio proiettano coni d'ombra) vengono dalla luce.
+- Il fascio lo vede la camera (anche attraverso vetri e specchi) con una diffusione sola: non
+  illumina la scena con rimbalzi deboli e rumorosi, quindi le superfici restano pulite.
+  Le nebbie simulate (ghiaccio secco) restano fisiche come prima.
+- CPU e GPU danno lo stesso risultato. Anche dal controllo IA: edit_light con beam_density e
+  beam_length_m.
+
 ## 0.18.0 — 31/10/2026
 
 **Integrazione AI con un clic**

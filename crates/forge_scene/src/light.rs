@@ -53,6 +53,13 @@ pub struct Light {
     /// 1 = sfuma dalla sorgente al bordo).
     #[serde(default = "default_range_softness")]
     pub range_softness: f32,
+    /// Spot: fascio di luce visibile (foschia nel cono della luce). Densità della foschia in
+    /// 1/m: 0 = spento; 0,3 leggero, 1 marcato, 3 molto denso.
+    #[serde(default)]
+    pub beam_density: f32,
+    /// Spot: lunghezza del fascio visibile in metri (0 = il raggio d'azione, o 3 m se illimitato).
+    #[serde(default)]
+    pub beam_length: f32,
 }
 
 fn default_range_softness() -> f32 {
@@ -91,6 +98,8 @@ impl Light {
             visible_to_camera: false,
             range: 0.0,
             range_softness: default_range_softness(),
+            beam_density: 0.0,
+            beam_length: 0.0,
         }
     }
 
@@ -116,6 +125,8 @@ impl Light {
             visible_to_camera: false,
             range: 0.0,
             range_softness: default_range_softness(),
+            beam_density: 0.0,
+            beam_length: 0.0,
         }
     }
 }

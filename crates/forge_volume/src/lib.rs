@@ -40,6 +40,10 @@ pub struct BakedFog {
     pub albedo: Vec3,
     pub anisotropy: f32,
     pub max_density: f32,
+    /// Visibile solo ai raggi che vengono dalla camera (anche attraverso vetri e specchi), con
+    /// una sola diffusione: i fasci delle spot. Non illumina la scena con rimbalzi (deboli e
+    /// molto rumorosi con una luce puntiforme); le nebbie simulate restano fisiche (false).
+    pub camera_only: bool,
     /// Statistiche (per log e benchmark).
     pub sim_steps: u32,
     pub sim_ms: f64,
@@ -65,9 +69,44 @@ impl BakedFog {
             albedo,
             anisotropy,
             max_density: density,
+            camera_only: false,
             sim_steps: 0,
             sim_ms: 0.0,
             bake_ms: 0.0,
+        }
+    }
+
+    /// Mezzo con densità data da una funzione (σt in 1/m), campionata ai centri delle celle di
+    /// una griglia che copre [min, max] con `longest` celle sul lato più lungo. Serve per i
+    /// volumi costruiti a mano (es. il fascio di una luce spot).
+    pub fn from_fn(min: Vec3, max: Vec3, longest: usize, albedo: Vec3, anisotropy: f32, density: impl Fn(Vec3) -> f32 + Sync) -> BakedFog {
+        use rayon::prelude::*;
+        let t0 = std::time::Instant::now();
+        let spec = GridSpec::covering(min, max, longest);
+        let values: Vec<f32> = (0..spec.len())
+            .into_par_iter()
+            .map(|i| {
+                let (x, y, z) = spec.coords(i);
+                density(spec.center(x, y, z)).max(0.0)
+            })
+            .collect();
+        let max_density = values.iter().copied().fold(0.0f32, f32::max);
+        let unit = max_density.max(1e-12) / 65535.0;
+        let data: Vec<u16> = values.iter().map(|v| (v / unit).round().clamp(0.0, 65535.0) as u16).collect();
+        let (macro_res, macro_majorant) = macro_majorants(&spec, &data, unit);
+        BakedFog {
+            spec,
+            data,
+            unit,
+            macro_res,
+            macro_majorant,
+            albedo,
+            anisotropy,
+            max_density,
+            camera_only: false,
+            sim_steps: 0,
+            sim_ms: 0.0,
+            bake_ms: t0.elapsed().as_secs_f64() * 1e3,
         }
     }
 
@@ -389,6 +428,7 @@ pub fn bake_detail(fog: &FogVolume, sim_state: &SimState, solid: Option<SolidFn>
         albedo: Vec3::from_array(f.albedo),
         anisotropy: f.anisotropy,
         max_density,
+        camera_only: false,
         sim_steps: sim.steps,
         sim_ms,
         bake_ms,

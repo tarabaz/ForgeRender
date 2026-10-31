@@ -323,6 +323,10 @@ pub fn light_json(i: usize, l: &Light) -> Value {
             } else {
                 0.0
             });
+            if l.beam_density > 0.0 {
+                v["fascio_densita"] = json!(l.beam_density);
+                v["fascio_lunghezza_m"] = json!(beam_len(l));
+            }
         }
         _ => {}
     }
@@ -389,6 +393,11 @@ pub fn scene_json(scene: &Scene, max_components: usize) -> Value {
         },
         "ambiente": env,
     })
+}
+
+/// Lunghezza del fascio visibile di una spot (come la usa il render).
+pub fn beam_len(l: &Light) -> f32 {
+    forge_render_core::fog::beam_length(l)
 }
 
 #[cfg(test)]

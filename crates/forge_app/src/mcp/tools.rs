@@ -598,6 +598,14 @@ fn edit_light(app: &mut ForgeApp, a: &Args) -> R {
         }
         *inner_angle_deg = *outer_angle_deg * (1.0 - soft);
     }
+    if matches!(l.kind, LightKind::Spot { .. }) {
+        if let Some(d) = a.f32("beam_density")? {
+            l.beam_density = d.clamp(0.0, 20.0);
+        }
+        if let Some(len) = a.f32("beam_length_m")? {
+            l.beam_length = len.max(0.0);
+        }
+    }
     if l.has_range() {
         if let Some(rg) = a.f32("range_m")? {
             l.range = rg.max(0.0);

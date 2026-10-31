@@ -234,6 +234,119 @@ pub fn bake_fogs(scene: &Scene, geo: &RenderGeometry) -> Vec<Arc<BakedFog>> {
     out
 }
 
+/// Lunghezza del fascio visibile di una spot: quella impostata, oppure il raggio d'azione, oppure 3 m.
+pub fn beam_length(l: &forge_scene::Light) -> f32 {
+    if l.beam_length > 0.0 {
+        l.beam_length
+    } else if l.range > 0.0 {
+        l.range
+    } else {
+        3.0
+    }
+}
+
+/// Densità della foschia del fascio nel punto `p` (1/m): dentro il cono della spot, con il bordo
+/// sfumato tra l'angolo interno e quello esterno e la fine sfumata nell'ultimo quinto.
+pub fn beam_density_at(l: &forge_scene::Light, p: Vec3) -> f32 {
+    let forge_scene::LightKind::Spot {
+        inner_angle_deg,
+        outer_angle_deg,
+    } = l.kind
+    else {
+        return 0.0;
+    };
+    let len = beam_length(l);
+    let dir = l.direction();
+    let v = p - l.position;
+    let along = v.dot(dir);
+    if along <= 0.0 || along > len {
+        return 0.0;
+    }
+    let outer = (outer_angle_deg.clamp(0.1, 179.0) * 0.5).to_radians();
+    let inner = (inner_angle_deg.clamp(0.0, outer_angle_deg) * 0.5).to_radians().min(outer - 1e-3);
+    let angle = (v - dir * along).length().atan2(along);
+    let smooth = |e0: f32, e1: f32, x: f32| {
+        let t = ((x - e0) / (e1 - e0).max(1e-6)).clamp(0.0, 1.0);
+        t * t * (3.0 - 2.0 * t)
+    };
+    let edge = 1.0 - smooth(inner, outer, angle);
+    let end = 1.0 - smooth(0.8 * len, len, along);
+    l.beam_density * edge * end
+}
+
+/// Riquadro che contiene il cono del fascio.
+fn beam_bounds(l: &forge_scene::Light) -> (Vec3, Vec3) {
+    let outer_half = match l.kind {
+        forge_scene::LightKind::Spot { outer_angle_deg, .. } => (outer_angle_deg.clamp(0.1, 179.0) * 0.5).to_radians(),
+        _ => 0.0,
+    };
+    let len = beam_length(l);
+    let dir = l.direction();
+    let base = l.position + dir * len;
+    let radius = len * outer_half.min(1.4).tan();
+    let e = Vec3::new(
+        (1.0 - dir.x * dir.x).max(0.0).sqrt(),
+        (1.0 - dir.y * dir.y).max(0.0).sqrt(),
+        (1.0 - dir.z * dir.z).max(0.0).sqrt(),
+    ) * radius;
+    ((base - e).min(l.position), (base + e).max(l.position))
+}
+
+fn beam_cache() -> &'static Mutex<HashMap<String, Arc<BakedFog>>> {
+    static C: OnceLock<Mutex<HashMap<String, Arc<BakedFog>>>> = OnceLock::new();
+    C.get_or_init(Default::default)
+}
+
+/// Fasci visibili delle spot accese con `beam_density` > 0: una foschia a forma di cono,
+/// illuminata come le altre nebbie (dalla spot stessa e dalle altre luci, con le ombre).
+pub fn beam_fogs(scene: &Scene) -> Vec<Arc<BakedFog>> {
+    let mut out = Vec::new();
+    for l in &scene.lights {
+        if !l.enabled || l.beam_density <= 0.0 || !matches!(l.kind, forge_scene::LightKind::Spot { .. }) {
+            continue;
+        }
+        let key = format!(
+            "{:?}|{:?}|{:?}|{}|{}|{}",
+            l.position,
+            l.target,
+            l.kind,
+            l.beam_density,
+            beam_length(l),
+            l.range
+        );
+        if let Some(b) = beam_cache().lock().unwrap().get(&key) {
+            out.push(b.clone());
+            continue;
+        }
+        let (min, max) = beam_bounds(l);
+        // Celle: abbastanza per il diametro del fascio (bordo morbido) senza superare ~8 milioni.
+        let ext = max - min;
+        let outer_half = match l.kind {
+            forge_scene::LightKind::Spot { outer_angle_deg, .. } => (outer_angle_deg * 0.5).to_radians(),
+            _ => 0.5,
+        };
+        let diameter = 2.0 * beam_length(l) * outer_half.min(1.4).tan();
+        let mut cell = (diameter / 24.0).min(beam_length(l) / 48.0).max(ext.max_element() / 256.0);
+        while (ext.x / cell).ceil() * (ext.y / cell).ceil() * (ext.z / cell).ceil() > 8.0e6 {
+            cell *= 1.25;
+        }
+        let longest = ((ext.max_element() / cell).ceil() as usize).clamp(8, 256);
+        let lc = l.clone();
+        let mut fog = BakedFog::from_fn(min, max, longest, Vec3::ONE, 0.3, move |p| beam_density_at(&lc, p));
+        // Fascio da studio: lo vede la camera (diffusione singola), non illumina la scena.
+        fog.camera_only = true;
+        let b = Arc::new(fog);
+        tracing::info!("fascio volumetrico «{}»: {:?} celle in {:.0} ms", l.name, b.spec.res, b.bake_ms);
+        let mut c = beam_cache().lock().unwrap();
+        if c.len() > 16 {
+            c.clear();
+        }
+        c.insert(key, b.clone());
+        out.push(b);
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

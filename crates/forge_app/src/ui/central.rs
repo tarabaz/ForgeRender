@@ -1170,6 +1170,22 @@ mod tests {
         for id in ["sfera-acciaio", "box-plastica", "toro-rame"] {
             s.assignments.insert(ComponentId(format!("test/Scena/{id}")), oak.id.clone());
         }
+        // `FORGE_REVIEW_BEAM` = densità: spot volumetrica dall'alto sulla scena, ambiente scuro.
+        if let Some(d) = std::env::var("FORGE_REVIEW_BEAM").ok().and_then(|v| v.parse::<f32>().ok()) {
+            for l in &mut s.lights {
+                l.intensity *= 0.05;
+            }
+            let mut spot = Light::point("Spot volumetrica", Vec3::new(-0.6, 2.6, 0.8), 120.0);
+            spot.kind = LightKind::Spot {
+                inner_angle_deg: 18.0,
+                outer_angle_deg: 30.0,
+            };
+            spot.target = Vec3::new(0.0, 0.0, 0.0);
+            spot.color = [1.0, 0.85, 0.65];
+            spot.beam_density = d;
+            spot.beam_length = 3.0;
+            s.lights.push(spot);
+        }
         // `FORGE_REVIEW_CLOSE` = sfera-acciaio, toro-rame o box-plastica: inquadratura ravvicinata
         // del pezzo (cuciture tra le proiezioni); `FORGE_REVIEW_GPU` rende con la GPU.
         let close = std::env::var("FORGE_REVIEW_CLOSE").ok();

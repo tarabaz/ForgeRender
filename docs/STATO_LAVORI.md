@@ -522,5 +522,10 @@
   dell'assistente (`rpc::client_name`, `link::Client::connect(assistant)`).
 - Prossimo: luci spot volumetriche con fascio regolabile.
 
+### 0.19.0: luci spot volumetriche (31/10/2026)
+- `Light::beam_density` / `beam_length`; `render_core::fog::beam_fogs` (griglia a cono con
+  `BakedFog::from_fn`, flag `camera_only`); integratori CPU/GPU: i fasci contano solo sui percorsi
+  dalla camera (rimbalzi speculari) con diffusione singola.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

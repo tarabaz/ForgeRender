@@ -24,6 +24,8 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
     let mut l = Vec3::ZERO;
     let mut beta = Vec3::ONE;
     let mut specular_bounce = true; // il raggio camera si comporta come un rimbalzo delta
+                                    // Ancora "visto dalla camera" (solo rimbalzi speculari): i fasci delle spot contano solo così.
+    let mut camera_path = true;
     let mut prev_pdf = 0.0f32;
     // L'ambiente (HDRI, o qualsiasi ambiente se ci sono portali) è una "luce" in più
     // nella scelta uniforme della NEE.
@@ -104,7 +106,7 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
         // se non avviene la throughput resta invariata).
         if !scene.fogs.is_empty() {
             let t_end = light_hit.map(|x| x.0).unwrap_or(t_surf);
-            if let Some((tm, fi)) = crate::medium::sample_collision(scene, o, d, t_end, rng) {
+            if let Some((tm, fi)) = crate::medium::sample_collision(scene, o, d, t_end, camera_path, rng) {
                 let fog = &scene.fogs[fi];
                 let p = o + d * tm;
                 beta *= fog.albedo;
@@ -127,10 +129,15 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
                         }
                     }
                 }
+                // Fascio di una spot: diffusione singola (luce diretta, poi fine del percorso).
+                if fog.camera_only {
+                    break;
+                }
                 let (u1, u2) = rng.next_2d();
                 let wi = crate::medium::hg_sample(g, d, u1, u2);
                 prev_pdf = crate::medium::hg_pdf(g, d.dot(wi));
                 specular_bounce = false;
+                camera_path = false;
                 o = p;
                 d = wi;
                 if depth + 1 >= settings.russian_roulette_start {
@@ -254,6 +261,7 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
             break;
         }
         specular_bounce = s.delta;
+        camera_path &= s.delta;
         prev_pdf = s.pdf;
         if s.wi.dot(ng) < 0.0 && mat.transmission > 0.0 {
             // Rifratto: si entra nel volume (o se ne esce).

@@ -1034,6 +1034,43 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 }
                 _ => {}
             }
+            if matches!(l.kind, LightKind::Spot { .. }) {
+                // Fascio visibile: foschia nel cono (forma = apertura e sfumatura del cono).
+                let mut beam = l.beam_density > 0.0;
+                ui.label(tr("Fascio visibile"));
+                if ui
+                    .checkbox(&mut beam, tr("Volumetrico"))
+                    .on_hover_text(tr(
+                        "Mostra il cono di luce nell'aria, come in una sala con un po' di foschia: forma e bordo seguono l'apertura e la sfumatura del cono",
+                    ))
+                    .changed()
+                {
+                    l.beam_density = if beam { 0.5 } else { 0.0 };
+                    if beam && l.beam_length <= 0.0 {
+                        l.beam_length = ((l.target - l.position).length() * 1.1).max(0.1);
+                    }
+                    changed = true;
+                }
+                ui.end_row();
+                if l.beam_density > 0.0 {
+                    ui.label(tr("Intensità del fascio"));
+                    changed |= ui
+                        .add(egui::Slider::new(&mut l.beam_density, 0.02..=5.0).logarithmic(true))
+                        .on_hover_text(tr("Densità della foschia nel cono: più alta = fascio più marcato e luminoso"))
+                        .changed();
+                    ui.end_row();
+                    ui.label(tr("Lunghezza del fascio (m)"));
+                    changed |= ui
+                        .add(
+                            egui::DragValue::new(&mut l.beam_length)
+                                .speed((radius * 0.01).max(0.001))
+                                .range(0.01..=1e4),
+                        )
+                        .on_hover_text(tr("Fin dove si vede il fascio (sfuma nell'ultimo quinto)"))
+                        .changed();
+                    ui.end_row();
+                }
+            }
             if l.has_range() {
                 // Raggio d'azione: indipendente dall'intensità (la bolla nella viewport).
                 let mut limited = l.range > 0.0;

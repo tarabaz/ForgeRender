@@ -1835,3 +1835,39 @@ Valerio ha approvato le due fasi insieme ("procedi fase 2 e 3 insieme e poi cont
 **Non provato dal vivo**
 - I pulsanti sui file reali di Valerio e il riavvio di Claude Desktop: chiuderebbe anche questa
   sessione di Claude Code, che gira dentro l'app. Coperti dai test su cartelle finte.
+
+
+## Claude Code — 31/10/2026: 0.19.0, luci spot volumetriche
+
+**Come funziona**
+- Il fascio è una nebbia generata, non simulata:
+  - `forge_volume::BakedFog::from_fn` riempie una griglia allineata agli assi che copre il cono;
+  - `render_core::fog::beam_density_at` dà la densità: bordo sfumato tra angolo interno ed
+    esterno, fine sfumata nell'ultimo quinto, lunghezza = `beam_length`, oppure il raggio
+    d'azione, oppure 3 m;
+  - le celle bastano per il diametro del fascio, fino a 256 per lato e circa 8 milioni in tutto;
+  - cache per parametri;
+  - `RenderScene::fogs` = nebbie simulate + fasci, quindi CPU e GPU li rendono con il codice
+    delle nebbie che c'era già.
+- Flag `camera_only` (parola 15 dell'intestazione della nebbia sulla GPU, prima libera).
+  - Il fascio conta solo finché il percorso viene dalla camera (rimbalzi speculari compresi).
+  - Alla diffusione nel fascio: luce diretta (NEE), poi fine del percorso.
+  - Motivo: con una luce puntiforme la luce rimbalzata dalla foschia è debolissima ma crea
+    granelli su tutte le superfici, visti nel primo render (`reports/fascio-volumetrico/prima…`);
+    con la regola le superfici restano pulite (`…/dopo…`).
+  - Le nebbie simulate non hanno il flag e restano fisiche (test del ghiaccio secco invariato).
+
+**Test**
+- `gpu_spot_beam_matches_cpu`, a 2048 campioni:
+  - dentro il cono 0,89, fuori 0;
+  - media CPU 0,0674 e 0,0673, GPU 0,0666;
+  - RMSE GPU−CPU 0,0385 contro un rumore CPU−CPU di 0,0555.
+  - A 256 campioni la media sembrava diversa del 5 %: era rumore.
+- Suite 259 passati, 0 falliti; clippy e fmt puliti.
+- Non verificato a schermo: il pannello della spot (la scena di test non ha spot). Il codice
+  compila e le traduzioni sono complete.
+
+**Limiti**
+- Il fascio è rumoroso: servono molti campioni o il denoiser. Il campionamento equiangolare
+  verso le luci puntiformi nei volumi è il miglioramento naturale.
+- Il fascio non illumina gli oggetti con la luce diffusa dalla foschia (scelta voluta).
