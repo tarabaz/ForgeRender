@@ -67,6 +67,7 @@ fn main() -> anyhow::Result<()> {
         };
         m.mapping = TextureMapping {
             projection: Projection::Box,
+            fit_object: true,
             scale: x.scale_m,
             ..TextureMapping::default()
         };

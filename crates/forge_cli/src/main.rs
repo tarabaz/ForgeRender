@@ -615,14 +615,14 @@ fn import_blenderkit(args: &Args) -> anyhow::Result<()> {
                 Ok(x) => {
                     let slots: Vec<String> = x.images.iter().map(|i| format!("{:?}={}", i.slot, i.name)).collect();
                     println!(
-                        "{}: metallic {:.2} roughness {:.2}{} normal ×{:.2}{} scala {:.2} m | {}",
+                        "{}: metallic {:.2} roughness {:.2}{} normal ×{:.2}{} {:.2} ripetizioni sull'oggetto | {}",
                         x.name,
                         x.material.metallic,
                         x.material.roughness,
                         if x.material.roughness_is_gloss { " (glossiness)" } else { "" },
                         x.material.normal_strength,
                         if x.material.normal_directx { " (DirectX)" } else { "" },
-                        x.scale_m,
+                        1.0 / x.scale_m.max(1e-6),
                         if slots.is_empty() {
                             "nessuna immagine".into()
                         } else {

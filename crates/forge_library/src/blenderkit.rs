@@ -121,7 +121,8 @@ pub struct Extracted {
     pub unused_images: Vec<String>,
     /// Avvisi generali (anche quelli salvati come note del materiale).
     pub notes: Vec<String>,
-    /// Lato della ripetizione stimato dal nodo Mapping (metri).
+    /// Scala "Adatta all'oggetto": frazione del pezzo coperta da una ripetizione (1 / ripetizioni
+    /// del nodo Mapping; 1 senza Mapping).
     pub scale_m: f32,
 }
 
@@ -750,7 +751,7 @@ fn convert<'a>(
         procedural: Vec::new(),
         unused_images: Vec::new(),
         notes: Vec::new(),
-        scale_m: 0.5,
+        scale_m: 1.0,
     };
     let mut used_images: Vec<String> = Vec::new();
     let mut repeats: Option<(f32, Option<String>)> = None;
@@ -1034,27 +1035,30 @@ fn convert<'a>(
             }
         }
     }
-    // Scala: lato della ripetizione dalle ripetizioni del Mapping (stima su 1 m di UV).
+    // Scala: in Blender le texture seguono gli UV dell'oggetto (anteprima di BlenderKit: una
+    // ripetizione sull'oggetto). Si usa "Adatta all'oggetto": le ripetizioni del Mapping
+    // diventano ripetizioni sul pezzo (senza Mapping, una).
     if let Some((r, coords)) = repeats {
-        x.scale_m = (1.0 / r).clamp(0.05, 5.0);
+        x.scale_m = (1.0 / r).clamp(0.01, 20.0);
         x.params.push(Param {
             name: "Scala texture",
             blender: format!("Mapping Scale {r:.3}{}", coords.map(|c| format!(" ({c})")).unwrap_or_default()),
-            forge: format!("{:.2} m per ripetizione (Box)", x.scale_m),
-            status: Status::Approximate,
-            note: "le UV di Blender non hanno una misura reale: scala stimata, da regolare".into(),
+            forge: format!("{:.2} ripetizioni sull'oggetto (Adatta all'oggetto)", 1.0 / x.scale_m),
+            status: Status::Exact,
+            note: String::new(),
         });
     } else if !x.images.is_empty() {
         x.params.push(Param {
             name: "Scala texture",
-            blender: "nessun Mapping".into(),
-            forge: format!("{:.2} m per ripetizione (Box)", x.scale_m),
-            status: Status::Approximate,
-            note: "scala non indicata nel file: valore di partenza, da regolare".into(),
+            blender: "nessun Mapping (una ripetizione sugli UV)".into(),
+            forge: "1 ripetizione sull'oggetto (Adatta all'oggetto)".into(),
+            status: Status::Exact,
+            note: String::new(),
         });
     }
     x.material.mapping = TextureMapping {
         projection: Projection::Box,
+        fit_object: true,
         scale: x.scale_m,
         ..TextureMapping::default()
     };

@@ -447,20 +447,40 @@ impl RenderGeometry {
 }
 
 /// Riferimento della proiezione Box di ogni nodo con mesh, secondo l'ancoraggio del materiale
-/// che il nodo usa (pezzo, assieme o mondo). Lo usano il displacement e lo shading.
+/// che il nodo usa (pezzo, assieme o mondo) e, con "Adatta all'oggetto", la dimensione del
+/// pezzo (lato più lungo lungo i suoi assi; dell'assieme intero con l'ancoraggio Assieme).
+/// Lo usano il displacement e lo shading.
 pub fn box_frames(scene: &Scene) -> Vec<crate::displace::BoxFrame> {
+    // Dimensione di ogni radice (per l'ancoraggio Assieme), calcolata una volta sola.
+    let mut root_size: std::collections::HashMap<usize, f32> = std::collections::HashMap::new();
     (0..scene.nodes.len())
         .map(|i| {
             if scene.nodes[i].mesh.is_none() {
                 return crate::displace::BoxFrame::default();
             }
-            let anchor = scene
+            let mapping = scene
                 .materials
                 .get(scene.resolve_material(i))
-                .map(|m| m.mapping.anchor)
+                .map(|m| m.mapping)
                 .unwrap_or_default();
-            let (rot, origin) = scene.texture_frame_for(i, anchor);
-            crate::displace::BoxFrame { rot, origin }
+            let (rot, origin) = scene.texture_frame_for(i, mapping.anchor);
+            let scale = if mapping.fit_object {
+                let size = match mapping.anchor {
+                    forge_scene::TextureAnchor::Assembly => {
+                        let mut root = i;
+                        while let Some(p) = scene.nodes[root].parent {
+                            root = p;
+                        }
+                        *root_size.entry(root).or_insert_with(|| scene.local_size(root).max_element())
+                    }
+                    forge_scene::TextureAnchor::World => scene.bounds_of(i).extent().max_element(),
+                    forge_scene::TextureAnchor::Component => scene.local_size(i).max_element(),
+                };
+                1.0 / size.max(1e-4)
+            } else {
+                1.0
+            };
+            crate::displace::BoxFrame { rot, origin, scale }
         })
         .collect()
 }
@@ -470,6 +490,7 @@ pub fn box_frames(scene: &Scene) -> Vec<crate::displace::BoxFrame> {
 fn displacement_plan(scene: &Scene) -> std::collections::HashMap<usize, (crate::displace::Params, f32)> {
     use crate::displace::{estimate, Params, BUDGET};
     let mut plan = std::collections::HashMap::new();
+    let frames = box_frames(scene);
     for (i, node) in scene.nodes.iter().enumerate() {
         let Some(mi) = node.mesh else { continue };
         if !scene.is_visible(i) {
@@ -497,6 +518,7 @@ fn displacement_plan(scene: &Scene) -> std::collections::HashMap<usize, (crate::
             amount_m: m.displacement_mm * 1e-3,
             mid: m.displacement_mid,
             use_uv: m.mapping.projection == forge_scene::Projection::Uv && mesh.uvs.len() == mesh.positions.len(),
+            box_unit_m: 1.0 / frames[i].scale.max(1e-9),
         };
         let target = params.target_edge(mesh, &scene.world_transform(i));
         plan.insert(i, (params, target));

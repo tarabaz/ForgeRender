@@ -104,6 +104,9 @@ pub struct BoxFrame {
     /// Rotazione oggetto → mondo.
     pub rot: forge_math::Quat,
     pub origin: Vec3,
+    /// Coordinate per metro: 1 con la scala in metri; 1 / lato più lungo dell'oggetto con
+    /// "Adatta all'oggetto" (la ripetizione segue la dimensione del pezzo).
+    pub scale: f32,
 }
 
 impl Default for BoxFrame {
@@ -111,15 +114,17 @@ impl Default for BoxFrame {
         Self {
             rot: forge_math::Quat::IDENTITY,
             origin: Vec3::ZERO,
+            scale: 1.0,
         }
     }
 }
 
 impl BoxFrame {
-    /// Punto del mondo nello spazio dell'oggetto (in metri reali: niente scala).
+    /// Punto del mondo nello spazio dell'oggetto: in metri reali, oppure in frazioni
+    /// dell'oggetto con "Adatta all'oggetto" (vedi [`BoxFrame::scale`]).
     #[inline]
     pub fn to_local(&self, p: Vec3) -> Vec3 {
-        self.rot.inverse() * (p - self.origin)
+        self.rot.inverse() * (p - self.origin) * self.scale
     }
 
     #[inline]
@@ -146,6 +151,9 @@ pub struct Params {
     pub mid: f32,
     /// Coordinate dagli UV della mesh (altrimenti proiezione box).
     pub use_uv: bool,
+    /// Metri di un'unità delle coordinate box: 1, oppure il lato dell'oggetto con "Adatta
+    /// all'oggetto" (serve a stimare quanto fitta suddividere).
+    pub box_unit_m: f32,
 }
 
 impl Params {
@@ -186,7 +194,7 @@ impl Params {
                 1.0
             }
         } else {
-            self.mapping.scale.max(1e-6)
+            self.mapping.scale.max(1e-6) * self.box_unit_m.max(1e-6)
         };
         (2.5 * m_per_uv / res).max(1e-5)
     }
@@ -512,6 +520,7 @@ mod tests {
             amount_m: amount,
             mid: 0.0,
             use_uv: false,
+            box_unit_m: 1.0,
         }
     }
 

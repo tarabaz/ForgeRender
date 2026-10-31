@@ -162,14 +162,15 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
         w.u(0);
     }
     assert_eq!(w.pos() as usize - p[P_OFF_TRIS] as usize, geo.accel.tris.len() * TRI_WORDS);
-    // --- Riferimenti della proiezione box per nodo: rotazione (quaternione xyzw), origine, 0 ---
+    // --- Riferimenti della proiezione box per nodo: rotazione (quaternione xyzw), origine, scala ---
     let frames_off = w.pos();
     for fr in &scene.node_frames {
         for v in fr.rot.to_array() {
             w.f(v);
         }
         w.v3(fr.origin);
-        w.u(0);
+        // Coordinate per metro ("Adatta all'oggetto": 1 / lato del pezzo).
+        w.f(fr.scale);
     }
     // --- Primitive in ordine originale ---
     p[P_OFF_PRIMS] = w.pos();

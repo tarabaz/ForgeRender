@@ -1121,10 +1121,15 @@ fn gpu_box_anchors_match_cpu() {
             id: MaterialId::new(id),
             base_color_texture: Some(pattern_png("an_col.png", 31, true)),
             normal_texture: Some(pattern_png("an_nor.png", 32, true)),
+            // Rilievo: verifica anche i metri per ripetizione con "Adatta all'oggetto".
+            height_texture: Some(pattern_png("an_h.png", 33, false)),
+            bump_mm: 2.0,
             roughness: 0.6,
             mapping: forge_scene::TextureMapping {
                 scale: 0.2,
                 anchor,
+                // Pezzo e assieme con la ripetizione adattata all'oggetto, mondo in metri.
+                fit_object: anchor != forge_scene::TextureAnchor::World,
                 ..Default::default()
             },
             ..Default::default()

@@ -156,3 +156,39 @@ fn world_anchor_stays_in_the_scene() {
     move_root(&mut a);
     assert!((coords_of(&a, a.left) - before).length() > 0.1, "l'oggetto scorre sulla texture");
 }
+
+/// "Adatta all'oggetto": la ripetizione segue la dimensione del pezzo. Una sfera da 5 cm e una
+/// da 50 cm con lo stesso materiale hanno le stesse coordinate texture nei punti corrispondenti
+/// (la texture appare uguale); in metri, invece, la grande ne mostra dieci volte di più.
+#[test]
+fn fit_object_follows_the_piece_size() {
+    let coords = |fit: bool| {
+        let mut s = Scene::default();
+        s.materials.upsert(Material {
+            id: MaterialId::new("m"),
+            mapping: forge_scene::TextureMapping {
+                fit_object: fit,
+                scale: 1.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+        let small = s.add_mesh(primitives::uv_sphere(0.025, 32, 16));
+        let big = s.add_mesh(primitives::uv_sphere(0.25, 32, 16));
+        let a = s.add_node(None, ComponentId("piccola".into()), "P", Mat4::IDENTITY, Some(small));
+        let b = s.add_node(None, ComponentId("grande".into()), "G", Mat4::from_translation(Vec3::X), Some(big));
+        for id in ["piccola", "grande"] {
+            s.assignments.insert(ComponentId(id.into()), MaterialId::new("m"));
+        }
+        s.refresh_pivots();
+        let f = frames(&s);
+        let dir = Vec3::new(0.3, 0.8, 0.5).normalize();
+        let pa = s.world_transform(a).transform_point3(dir * 0.025);
+        let pb = s.world_transform(b).transform_point3(dir * 0.25);
+        (f[a].to_local(pa), f[b].to_local(pb))
+    };
+    let (a, b) = coords(true);
+    assert!((a - b).length() < 1e-4, "adattata: {a} vs {b}");
+    let (a, b) = coords(false);
+    assert!((b - a * 10.0).length() < 1e-4, "in metri: {a} vs {b}");
+}

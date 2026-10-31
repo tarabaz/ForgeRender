@@ -33,6 +33,7 @@
   "ao_strength": 0.5,
   "mapping": {
     "projection": "Box",
+    "fit_object": true,
     "scale": 1.0,
     "rotation_deg": 0.0,
     "offset": [

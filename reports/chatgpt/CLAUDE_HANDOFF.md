@@ -1918,3 +1918,30 @@ Le modalità 3 e 4 sono entrambe richieste: non scegliere una sola variante. La 
 - **Non implementare ancora**: prima Claude Code deve restituire una valutazione tecnica, una proposta di milestone/priorità e test di accettazione. L'implementazione sarà approvata separatamente.
 
 **Stato**: proposta approvata per essere inserita nella roadmap e valutata; non implementata e non testata. Il render fotorealistico esistente non va modificato o rimosso.
+
+
+## Claude Code — 31/10/2026: 0.20.0, scala adattata all'oggetto
+
+- Su proposta di Valerio ("ripetizioni sull'oggetto a 1 di base") la ripetizione dei
+  materiali BlenderKit segue la dimensione di ogni pezzo.
+  - Per pezzo, perché il materiale è condiviso: fissare i metri sull'oggetto selezionato
+    sbaglierebbe sugli altri.
+  - `TextureMapping::fit_object`: `scale` = frazione del lato più lungo per ripetizione.
+  - `box_frames` mette `BoxFrame::scale` = 1 / lato (`Scene::local_size` del pezzo, della
+    radice con Assieme, riquadro del mondo con Mondo); `to_local` lo applica.
+  - I metri per ripetizione del rilievo diventano `scale / frame.scale`; sulla GPU la parola 7
+    del riferimento (prima 0).
+  - Displacement: `Params::box_unit_m` per la densità della suddivisione.
+- Predefiniti BlenderKit: `"fit_object": true` aggiunto ai 38 `materiale.json`; lo `scale`
+  esistente diventa la frazione per ripetizione (1 = una ripetizione).
+- Importatore e convertitore: `scale_m` = 1 / ripetizioni del Mapping (1 senza Mapping),
+  `fit_object: true`.
+- Anteprime: `scale_for_preview` non tocca i materiali adattati (l'anteprima mostra lo stesso
+  aspetto per costruzione).
+- Test:
+  - `fit_object_follows_the_piece_size`: sfere da 5 e 50 cm con le stesse coordinate nei punti
+    corrispondenti; in metri il rapporto è 10;
+  - `gpu_box_anchors_match_cpu` con pezzo e assieme in modalità adattata più il rilievo: CPU
+    0,7508, GPU 0,7506.
+- Render: `reports/scala-materiali/`, zincato 2 su sfere da 5 cm e 1 m, stesso aspetto.
+- Suite completa verde.

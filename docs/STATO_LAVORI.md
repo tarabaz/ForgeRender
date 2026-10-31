@@ -527,5 +527,10 @@
   `BakedFog::from_fn`, flag `camera_only`); integratori CPU/GPU: i fasci contano solo sui percorsi
   dalla camera (rimbalzi speculari) con diffusione singola.
 
+### 0.20.0: scala dei materiali adattata all'oggetto (31/10/2026)
+- `TextureMapping::fit_object`; `BoxFrame::scale` (1 / lato del pezzo) calcolato in
+  `box_frames`; CPU e GPU (parola 7 del riferimento) e displacement (`Params::box_unit_m`);
+  predefiniti BlenderKit e importatore in modalità adattata.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

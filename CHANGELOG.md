@@ -11,6 +11,19 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.20.0 — 31/10/2026
+
+**Scala dei materiali adattata all'oggetto**
+- Editor materiali, proiezione Box: "Scala: In metri / Adatta all'oggetto". Con "Adatta
+  all'oggetto" la ripetizione segue la dimensione di ogni pezzo (lato più lungo, o dell'assieme
+  con l'ancoraggio Assieme): "Ripetizioni sull'oggetto", 1 di partenza. La stessa texture sta
+  bene su una sfera da 5 cm e su un tavolo, come nelle anteprime di BlenderKit.
+- I 38 materiali BlenderKit partono in "Adatta all'oggetto" con 1 ripetizione (prima 1 m per
+  ripetizione: su oggetti piccoli la texture era enorme e sfocata). L'importatore .blend fa lo
+  stesso: le ripetizioni del nodo Mapping diventano ripetizioni sull'oggetto.
+- Rilievo e displacement seguono la stessa scala; CPU e GPU coincidono. Rovere, marmo, pelle e i
+  materiali scaricati restano in metri.
+
 ## 0.19.0 — 31/10/2026
 
 **Luci spot volumetriche**

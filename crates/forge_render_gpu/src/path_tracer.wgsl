@@ -447,6 +447,8 @@ fn tex_taps(m: Mat, prim: u32, bu: f32, bv: f32, p: vec3<f32>, ns: vec3<f32>) ->
     let q = vec4<f32>(sf(fb), sf(fb + 1u), sf(fb + 2u), sf(fb + 3u));
     let qi = vec4<f32>(-q.xyz, q.w);
     let origin = sv3(fb + 4u);
+    // Coordinate per metro ("Adatta all'oggetto": 1 / lato del pezzo, altrimenti 1).
+    let fscale = max(sf(fb + 7u), 1e-9);
     let use_uv = !m.proj_box && dot(tangent, tangent) > 0.0;
     let sn = m.map_sin;
     let cs = m.map_cos;
@@ -487,7 +489,7 @@ fn tex_taps(m: Mat, prim: u32, bu: f32, bv: f32, p: vec3<f32>, ns: vec3<f32>) ->
         r.w[0] = 1.0;
         r.n = 1u;
     } else {
-        let pl = qrot(qi, pp - origin);
+        let pl = qrot(qi, pp - origin) * fscale;
         let a = abs(qrot(qi, nn));
         var w = pow(a, vec3<f32>(8.0));
         let s0 = w.x + w.y + w.z;
@@ -509,7 +511,7 @@ fn tex_taps(m: Mat, prim: u32, bu: f32, bv: f32, p: vec3<f32>, ns: vec3<f32>) ->
     r.m_per_uv = 1.0;
     if (is_box) {
         s = 1.0 / max(m.map_scale, 1e-6);
-        r.m_per_uv = max(m.map_scale, 1e-6);
+        r.m_per_uv = max(m.map_scale, 1e-6) / fscale;
     }
     for (var k = 0u; k < r.n; k = k + 1u) {
         let qq = bases[k] * s;

@@ -589,6 +589,7 @@ impl ForgeApp {
             (m.mapping.projection == forge_scene::Projection::Uv).hash(&mut h);
             // Con la proiezione box le altezze dipendono dal riferimento (pezzo, assieme, mondo).
             m.mapping.anchor.hash(&mut h);
+            m.mapping.fit_object.hash(&mut h);
         }
         if any {
             h.finish() | 1

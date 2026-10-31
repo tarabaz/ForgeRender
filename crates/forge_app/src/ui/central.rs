@@ -899,7 +899,8 @@ pub fn preview_object_cm() -> u32 {
 /// sfera da 9 cm, e l'anteprima somiglia al pezzo vero nella scena.
 fn scale_for_preview(m: &mut Material, ball_m: f32) {
     let cm = preview_object_cm();
-    if cm == 0 || !m.has_textures() || m.mapping.projection != forge_scene::Projection::Box {
+    // Con "Adatta all'oggetto" la ripetizione segue già la dimensione del pezzo: niente da scalare.
+    if cm == 0 || !m.has_textures() || m.mapping.projection != forge_scene::Projection::Box || m.mapping.fit_object {
         return;
     }
     let k = (ball_m / (cm as f32 / 100.0)).clamp(1e-3, 1e3);
@@ -1169,6 +1170,21 @@ mod tests {
         s.materials.upsert(oak.clone());
         for id in ["sfera-acciaio", "box-plastica", "toro-rame"] {
             s.assignments.insert(ComponentId(format!("test/Scena/{id}")), oak.id.clone());
+        }
+        // `FORGE_REVIEW_SMALL`: una sfera da 5 cm con il materiale (FORGE_REVIEW_CLOSE=sfera-5cm).
+        if std::env::var_os("FORGE_REVIEW_SMALL").is_some() {
+            let mesh = s.add_mesh(primitives::uv_sphere(0.025, 192, 96));
+            let root = s.nodes.iter().position(|n| n.parent.is_none()).unwrap_or(0);
+            let id = ComponentId("test/Scena/sfera-5cm".into());
+            s.add_node(
+                Some(root),
+                id.clone(),
+                "Sfera 5 cm",
+                forge_math::Mat4::from_translation(Vec3::new(0.6, 0.025, 0.9)),
+                Some(mesh),
+            );
+            s.assignments.insert(id, oak.id.clone());
+            s.refresh_pivots();
         }
         // `FORGE_REVIEW_BEAM` = densità: spot volumetrica dall'alto sulla scena, ambiente scuro.
         if let Some(d) = std::env::var("FORGE_REVIEW_BEAM").ok().and_then(|v| v.parse::<f32>().ok()) {

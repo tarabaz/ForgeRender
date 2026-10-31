@@ -123,6 +123,11 @@ pub struct TextureMapping {
     pub offset: [f32; 2],
     /// Solo per la proiezione Box: a cosa sono ancorate le coordinate.
     pub anchor: TextureAnchor,
+    /// Solo per la proiezione Box: la ripetizione segue la dimensione dell'oggetto invece dei
+    /// metri. `scale` è allora la frazione del lato più lungo del pezzo (o dell'assieme, con
+    /// l'ancoraggio Assieme) coperta da una ripetizione: 1 = una ripetizione sull'oggetto, come
+    /// le anteprime di BlenderKit; la stessa texture sta bene su una sfera da 5 cm e su un tavolo.
+    pub fit_object: bool,
 }
 
 impl Default for TextureMapping {
@@ -133,6 +138,7 @@ impl Default for TextureMapping {
             rotation_deg: 0.0,
             offset: [0.0; 2],
             anchor: TextureAnchor::Component,
+            fit_object: false,
         }
     }
 }

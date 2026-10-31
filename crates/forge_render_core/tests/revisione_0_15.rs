@@ -85,6 +85,7 @@ fn displaced_curved_surface_has_continuous_texture_coordinates() {
         amount_m: 0.005,
         mid: 0.5,
         use_uv: false,
+        box_unit_m: 1.0,
     };
     let frame = BoxFrame::default();
     let out = displace::tessellate(&mesh, &Mat4::IDENTITY, false, &params, 0.02, &frame);
@@ -238,7 +239,18 @@ fn assembly_parts_share_box_coordinates() {
         let p = s.world_transform(root).transform_point3(Vec3::new(0.0, 0.5, 0.2));
         let (rl, ol) = s.texture_frame(left);
         let (rr, or) = s.texture_frame(right);
-        let (fl, fr) = (BoxFrame { rot: rl, origin: ol }, BoxFrame { rot: rr, origin: or });
+        let (fl, fr) = (
+            BoxFrame {
+                rot: rl,
+                origin: ol,
+                ..Default::default()
+            },
+            BoxFrame {
+                rot: rr,
+                origin: or,
+                ..Default::default()
+            },
+        );
         (fl.to_local(p) - fr.to_local(p)).length()
     };
     assert!(shared(&s) < 1e-5);

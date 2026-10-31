@@ -580,51 +580,94 @@ pub(crate) fn mapping_controls(ui: &mut egui::Ui, m: &mut Material, obj_size: Op
     });
     match mp.projection {
         forge_scene::Projection::Box => {
-            ui.label(tr("Dimensione di una ripetizione")).on_hover_text(tr(
-                "Lato reale di una piastrella della texture: più piccola = più ripetizioni (es. mattoni più piccoli)",
-            ));
+            // Scala: in metri reali, oppure adattata all'oggetto (ripetizioni sul pezzo).
             ui.horizontal(|ui| {
-                changed |= ui
-                    .add(
-                        egui::Slider::new(&mut mp.scale, 0.002..=50.0)
-                            .logarithmic(true)
-                            .custom_formatter(|v, _| fmt_len(v as f32))
-                            .custom_parser(parse_len),
-                    )
-                    .changed();
-                if ui
-                    .small_button(tr("÷2"))
-                    .on_hover_text(tr("Texture più piccola (il doppio delle ripetizioni)"))
-                    .clicked()
-                {
-                    mp.scale = (mp.scale * 0.5).max(0.0001);
-                    changed = true;
-                }
-                if ui
-                    .small_button(tr("×2"))
-                    .on_hover_text(tr("Texture più grande (metà delle ripetizioni)"))
-                    .clicked()
-                {
-                    mp.scale = (mp.scale * 2.0).min(1000.0);
+                ui.label(tr("Scala"));
+                let before = mp.fit_object;
+                ui.radio_value(&mut mp.fit_object, false, tr("In metri")).on_hover_text(tr(
+                    "Una ripetizione ha una misura reale (es. 60 cm per le doghe di legno): uguale su tutti gli oggetti",
+                ));
+                ui.radio_value(&mut mp.fit_object, true, tr("Adatta all'oggetto")).on_hover_text(tr(
+                    "La ripetizione segue la dimensione del pezzo, come le anteprime di BlenderKit: la stessa texture sta bene su una sfera da 5 cm e su un tavolo",
+                ));
+                if mp.fit_object != before {
+                    // Si conserva l'aspetto sull'oggetto selezionato (se c'è).
+                    mp.scale = match (mp.fit_object, obj_size) {
+                        (true, Some(size)) => (mp.scale / size.max(1e-6)).clamp(0.001, 1000.0),
+                        (true, None) => 1.0,
+                        (false, Some(size)) => (mp.scale * size).clamp(0.0001, 1000.0),
+                        (false, None) => 0.5,
+                    };
                     changed = true;
                 }
             });
-            if let Some(size) = obj_size {
-                let mut reps = size / mp.scale.max(1e-6);
+            if mp.fit_object {
+                // `scale` = frazione del lato più lungo per ripetizione: si mostrano le ripetizioni.
+                let mut reps = 1.0 / mp.scale.max(1e-6);
                 ui.horizontal(|ui| {
                     ui.label(tr("Ripetizioni sull'oggetto"));
                     if ui
-                        .add(egui::DragValue::new(&mut reps).speed(0.1).range(0.01..=100000.0).max_decimals(1))
-                        .on_hover_text(tf(
-                            "Quante volte la texture si ripete sul lato più lungo dell'oggetto selezionato ({})",
-                            &[fmt_len(size).to_string()],
+                        .add(egui::Slider::new(&mut reps, 0.05..=50.0).logarithmic(true).max_decimals(2))
+                        .on_hover_text(tr(
+                            "Quante volte la texture si ripete sul lato più lungo di ogni pezzo (1 = una volta)",
                         ))
                         .changed()
                     {
-                        mp.scale = (size / reps.max(0.01)).clamp(0.0001, 1000.0);
+                        mp.scale = (1.0 / reps.max(0.001)).clamp(0.001, 1000.0);
+                        changed = true;
+                    }
+                    if ui.small_button("1").on_hover_text(tr("Una ripetizione sull'oggetto")).clicked() {
+                        mp.scale = 1.0;
                         changed = true;
                     }
                 });
+            } else {
+                ui.label(tr("Dimensione di una ripetizione")).on_hover_text(tr(
+                    "Lato reale di una piastrella della texture: più piccola = più ripetizioni (es. mattoni più piccoli)",
+                ));
+                ui.horizontal(|ui| {
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut mp.scale, 0.002..=50.0)
+                                .logarithmic(true)
+                                .custom_formatter(|v, _| fmt_len(v as f32))
+                                .custom_parser(parse_len),
+                        )
+                        .changed();
+                    if ui
+                        .small_button(tr("÷2"))
+                        .on_hover_text(tr("Texture più piccola (il doppio delle ripetizioni)"))
+                        .clicked()
+                    {
+                        mp.scale = (mp.scale * 0.5).max(0.0001);
+                        changed = true;
+                    }
+                    if ui
+                        .small_button(tr("×2"))
+                        .on_hover_text(tr("Texture più grande (metà delle ripetizioni)"))
+                        .clicked()
+                    {
+                        mp.scale = (mp.scale * 2.0).min(1000.0);
+                        changed = true;
+                    }
+                });
+                if let Some(size) = obj_size {
+                    let mut reps = size / mp.scale.max(1e-6);
+                    ui.horizontal(|ui| {
+                        ui.label(tr("Ripetizioni sull'oggetto"));
+                        if ui
+                            .add(egui::DragValue::new(&mut reps).speed(0.1).range(0.01..=100000.0).max_decimals(1))
+                            .on_hover_text(tf(
+                                "Quante volte la texture si ripete sul lato più lungo dell'oggetto selezionato ({})",
+                                &[fmt_len(size).to_string()],
+                            ))
+                            .changed()
+                        {
+                            mp.scale = (size / reps.max(0.01)).clamp(0.0001, 1000.0);
+                            changed = true;
+                        }
+                    });
+                }
             }
             ui.horizontal_wrapped(|ui| {
                 use forge_scene::TextureAnchor;

@@ -46,7 +46,9 @@ fn taps(tex: &MaterialTextures, scene: &RenderScene, prim: usize, bu: f32, bv: f
     };
     let mut out = [none; 3];
     // Box: una ripetizione = `scale` metri. UV: senza dimensioni reali si assume 1 m.
-    let box_m = tex.mapping.scale.max(1e-6);
+    // Metri reali di una ripetizione: con "Adatta all'oggetto" le coordinate sono frazioni
+    // dell'oggetto (frame.scale = 1 / lato), quindi la ripetizione vale scale / frame.scale metri.
+    let box_m = tex.mapping.scale.max(1e-6) / frame.scale.max(1e-9);
     // Superficie spostata con la proiezione box: punto e direzione della superficie originale
     // (ogni vertice porta l'altezza applicata e la direzione), così colore, rilievo e altezza
     // usano le stesse letture sfumate, nello stesso punto.
