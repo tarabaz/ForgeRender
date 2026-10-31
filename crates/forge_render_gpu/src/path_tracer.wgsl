@@ -421,6 +421,24 @@ fn box_uv(p: vec3<f32>, axis: u32) -> vec2<f32> {
     return vec2<f32>(p.x, p.y);
 }
 
+// Inverso di displace::pack_dir: direzione ottaedrica 12 + 12 bit in un float intero.
+fn unpack_dir(v: f32) -> vec3<f32> {
+    let c = u32(max(v, 0.0));
+    var x = f32(c / 4096u) / 4095.0 * 2.0 - 1.0;
+    var y = f32(c % 4096u) / 4095.0 * 2.0 - 1.0;
+    let z = 1.0 - abs(x) - abs(y);
+    if (z < 0.0) {
+        let sx = select(-1.0, 1.0, x >= 0.0);
+        let sy = select(-1.0, 1.0, y >= 0.0);
+        let ox = x;
+        x = (1.0 - abs(y)) * sx;
+        y = (1.0 - abs(ox)) * sy;
+    }
+    let d = vec3<f32>(x, y, z);
+    if (dot(d, d) > 0.0) { return normalize(d); }
+    return vec3<f32>(0.0, 0.0, 1.0);
+}
+
 fn tex_taps(m: Mat, prim: u32, bu: f32, bv: f32, p: vec3<f32>, ns: vec3<f32>) -> Taps {
     let pb = pu(P_OFF_PRIMS) + prim * PRIM_WORDS;
     let tangent = sv3(pb + 22u);
@@ -439,18 +457,26 @@ fn tex_taps(m: Mat, prim: u32, bu: f32, bv: f32, p: vec3<f32>, ns: vec3<f32>) ->
     var ts: array<vec3<f32>, 3>;
     var bs: array<vec3<f32>, 3>;
     var is_box = true;
-    if ((flags & 1u) != 0u) {
-        // Superficie spostata dal displacement: coordinate box della superficie originale.
-        let a0 = vec2<f32>(sf(pb + 16u), sf(pb + 17u));
-        let a1 = vec2<f32>(sf(pb + 18u), sf(pb + 19u));
-        let a2 = vec2<f32>(sf(pb + 20u), sf(pb + 21u));
-        let axis = (flags >> 1u) & 3u;
-        bases[0] = a0 * (1.0 - bu - bv) + a1 * bu + a2 * bv;
-        ts[0] = qrot(q, box_t(axis));
-        bs[0] = qrot(q, box_b(axis));
-        r.w[0] = 1.0;
-        r.n = 1u;
-    } else if (use_uv) {
+    // Superficie spostata con la proiezione box: punto e direzione della superficie originale
+    // (ogni vertice porta l'altezza applicata e la direzione), poi la stessa sfumatura.
+    var pp = p;
+    var nn = ns;
+    let displaced = (flags & 1u) != 0u;
+    if (displaced) {
+        let tb = pu(P_OFF_TRIS) + S[pb + 26u] * TRI_WORDS;
+        let v0 = sv3(tb);
+        let v = array<vec3<f32>, 3>(v0, v0 + sv3(tb + 4u), v0 + sv3(tb + 8u));
+        let bw = array<f32, 3>(1.0 - bu - bv, bu, bv);
+        pp = vec3<f32>(0.0);
+        var dir = vec3<f32>(0.0);
+        for (var k = 0u; k < 3u; k = k + 1u) {
+            let d = unpack_dir(sf(pb + 17u + 2u * k));
+            pp = pp + (v[k] - d * sf(pb + 16u + 2u * k)) * bw[k];
+            dir = dir + d * bw[k];
+        }
+        if (dot(dir, dir) > 0.0) { nn = normalize(dir); }
+    }
+    if (use_uv && !displaced) {
         is_box = false;
         let a0 = vec2<f32>(sf(pb + 16u), sf(pb + 17u));
         let a1 = vec2<f32>(sf(pb + 18u), sf(pb + 19u));
@@ -461,12 +487,13 @@ fn tex_taps(m: Mat, prim: u32, bu: f32, bv: f32, p: vec3<f32>, ns: vec3<f32>) ->
         r.w[0] = 1.0;
         r.n = 1u;
     } else {
-        let pl = qrot(qi, p - origin);
-        let a = abs(qrot(qi, ns));
+        let pl = qrot(qi, pp - origin);
+        let a = abs(qrot(qi, nn));
         var w = pow(a, vec3<f32>(8.0));
         let s0 = w.x + w.y + w.z;
         if (s0 > 0.0) { w = w / s0; } else { w = vec3<f32>(0.0, 1.0, 0.0); }
-        w = select(w, vec3<f32>(0.0), w < vec3<f32>(0.01));
+        // Soglia continua (come displace::box_weights): il peso arriva a zero senza salti.
+        w = max(w - vec3<f32>(0.01), vec3<f32>(0.0));
         w = w / (w.x + w.y + w.z);
         for (var axis = 0u; axis < 3u; axis = axis + 1u) {
             if (w[axis] > 0.0) {

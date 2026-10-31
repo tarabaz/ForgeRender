@@ -281,7 +281,7 @@ pub struct RenderGeometry {
     pub tri_tangents: Vec<Vec3>,
     /// Riferimento della proiezione box per ogni nodo di scena (indice = nodo).
     pub node_frames: Vec<crate::displace::BoxFrame>,
-    /// Flag per primitiva (vedi [`crate::displace::FLAG_BOX_UV`]).
+    /// Flag per primitiva (vedi [`crate::displace::FLAG_DISPLACED_BOX`]).
     pub tri_flags: Vec<u32>,
     /// Posizione di ogni primitiva (ordine originale) dentro `accel.tris` (ordine BVH).
     pub prim_to_slot: Vec<u32>,

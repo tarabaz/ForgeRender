@@ -27,8 +27,8 @@
   "opacity_texture": null,
   "normal_directx": false,
   "roughness_is_gloss": true,
-  "bump_mm": 0.0,
-  "displacement_mm": 0.0,
+  "bump_mm": 3.0,
+  "displacement_mm": 3.0,
   "displacement_mid": 0.5,
   "ao_strength": 0.5,
   "mapping": {

@@ -1533,3 +1533,179 @@ Lettura dei dati:
 **Nuovi file**: `crates/forge_render_core/tests/revisione_0_15.rs`,
 `crates/forge_render_gpu/examples/bench_box.rs`. Test aggiunti in `contact.rs`, `central.rs`,
 `prefs.rs`, `blenderkit.rs` e `gpu.rs`.
+
+
+## Claude Code — 31/10/2026: 0.16.0, Fase 1 (correttezza di materiali e texture) e piano della Fase 2
+
+**Riferimenti**
+- Branch `claude/festive-heisenberg-d2ow6z`; si parte da `fe838c8` (analisi della revisione).
+- Commit e push sul branch e su `main` subito dopo questa nota (vedi `git log`).
+- Fase 2 e Fase 3 non sono implementate: si attende la valutazione di Valerio.
+
+### Fatto (Fase 1)
+1. **Displacement con proiezione Box sfumata** (`forge_render_core/src/displace.rs`).
+   - L'altezza di ogni punto è la media delle tre proiezioni, con i pesi della direzione di
+     spostamento (`Params::height_box`). Dipende solo da posizione e direzione, che su vertici
+     e lati condivisi sono canoniche: il campo è continuo e i vertici restano condivisi, quindi
+     niente crepe.
+   - Ogni vertice spostato porta nell'UV l'altezza applicata e la direzione, compressa in un
+     float intero esatto: ottaedrica, 12 + 12 bit (`pack_dir` / `unpack_dir`, flag
+     `FLAG_DISPLACED_BOX`).
+   - Lo shading (CPU `textures.rs`, GPU `path_tracer.wgsl`) ricostruisce punto e normale della
+     superficie originale e usa la stessa sfumatura di colore, normal, rilievo e opacità. Non
+     servono parole in più nel buffer GPU: si usano i 6 float degli UV.
+   - Il vecchio formato (un asse per triangolo, `FLAG_BOX_UV`) è stato tolto. Il displacement
+     con gli UV non cambia.
+2. **Soglia continua dei pesi**: `w' = max(w − 0,01, 0)` rinormalizzato, uguale su CPU e GPU.
+3. **Conversione del rilievo da Blender** (`forge_library/src/blenderkit.rs`).
+   - Nodo Displacement: Scale × 1000 = mm e Midlevel = `displacement_mid`.
+   - Metodo del materiale (`Material.displacement_method`, primo byte): 0 Bump only →
+     `bump_mm`; 1 Displacement only → `displacement_mm`; 2 → entrambi; campo assente → Bump,
+     il predefinito di Blender.
+   - Nodo Bump: Strength × Distance. La Normal Map collegata al Normal del Bump va nello slot
+     normal; prima si perdeva.
+   - Oltre 100 mm il rilievo si limita e il parametro risulta "approssimato".
+   - Il rapporto per parametro dice valori e metodo.
+4. **Riconversione dei 38 predefiniti BlenderKit**, dopo aver conservato gli originali.
+   - Copia completa (29 MB, mappe comprese) in `dist/backup/materiali-blenderkit-prima-0.16`
+     (locale, fuori da git); i 38 `materiale.json` originali in
+     `reports/revisione-0.16/materiali-blenderkit-prima/` (in git).
+   - La riconversione è andata in `dist/backup/riconversione-0.16` e poi è stata confrontata con
+     gli attuali. Nei `materiale.json` cambiano solo `bump_mm`, `displacement_mm` e
+     `displacement_mid` (30 su 38). Tutte le mappe sono identiche byte per byte e tutti gli altri
+     valori uguali.
+   - In `assets` si sono copiati solo i `materiale.json`.
+   - Esempi: Acciaio ossidato con displacement 10 mm (Displacement only); Ferro arrugginito molto
+     graffiato con rilievo 40 mm (Bump only); Acciaio nero con rilievo e displacement 2 mm
+     (entrambi); Acciaio spazzolato a 0 (Scale 0 nel file).
+
+**File modificati**: `forge_render_core/src/displace.rs`, `forge_render_core/src/render_scene.rs`
+(commento), `forge_render_cpu/src/textures.rs`, `forge_render_gpu/src/path_tracer.wgsl`,
+`forge_library/src/blenderkit.rs`, `forge_app/src/ui/central.rs` (render di controllo:
+`FORGE_REVIEW_MAT`, `_DISP_MM`, `_BUMP_MM`, `_NO_NORMAL`, `_CLOSE` = sfera/toro/cubo, `_GPU`),
+test (`forge_render_core/tests/revisione_0_15.rs`, `forge_render_gpu/tests/gpu.rs`),
+30 `assets/materiali-blenderkit/*/materiale.json`, versione 0.16.0, CHANGELOG, STATO_LAVORI.
+
+### Test eseguiti e risultati
+- Diventati **obbligatori** (prima `#[ignore]` e falliti):
+  - `box_weights_are_continuous`: salto massimo 0,00007 a passi di 0,001° (prima 0,0100);
+  - `displaced_curved_surface_has_continuous_texture_coordinates` sulla sfera 48 × 24:
+    - vertici con dati diversi 0 su 45 506 (prima 796);
+    - punto originale ricostruito entro 2,1 mm dalla sfera ideale, cioè la freccia delle corde
+      del poliedro (massimo atteso 4,3 mm);
+    - altezza uguale a quella della proiezione sfumata nell'89 % delle occorrenze; il resto sono
+      i punti di raccordo delle giunzioni a T, interpolati per costruzione e fitti vicino ai poli;
+    - 1152 giunzioni a T e **0 crepe**: il punto medio di ogni lato senza gemello sta su un lato
+      dell'altra parte.
+- Nuovi:
+  - `packed_directions_round_trip`: errore sotto 1 mrad, codici interi esatti in f32;
+  - `gpu_blended_displacement_on_curved_surfaces_matches_cpu` (sfera ruotata e toro, displacement
+    20 mm, normal e bump): media CPU 0,3597 contro GPU 0,3598, RMSE GPU−CPU 0,0070 contro rumore
+    CPU−CPU 0,0066;
+  - `relief_from_displacement_node_and_method` sui file di Valerio (saltato se mancano): valori
+    attesi per i metodi 0, 1 e 2 e Scale 0.
+- Restano verdi `gpu_displacement_matches_cpu` (cubo), `gpu_all_texture_maps_match_cpu`,
+  `gpu_blended_box_on_curved_rotated_mirrored_matches_cpu` e il test di chiusura del cubo
+  spostato.
+- Suite completa: **241 passati, 0 falliti, 10 ignorati** (i 3 problemi di Appoggia per la
+  Fase 3, misure e censimenti). Clippy `-D warnings` e fmt puliti.
+
+### Render prima/dopo (GPU, 512 campioni, primi piani; in `reports/revisione-0.16/render/`)
+- **Displacement 3 mm, acciaio verniciato scrostato.** Prima: tagli dritti orizzontali e
+  verticali sulla sfera e sul toro. Dopo: passaggi sfumati. Differenza misurata tra prima e
+  dopo:
+
+  | Pezzo | Differenza media | Pixel oltre 20 livelli |
+  |---|---|---|
+  | Sfera | 2,27 livelli | 2,4 % |
+  | Toro | 1,61 livelli | 1,3 % |
+  | Cubo | 0,17 livelli | 0,0 % |
+
+  La correzione tocca solo le zone di passaggio; sul cubo, dove ogni faccia ha una sola
+  proiezione, non cambia nulla.
+- **Conversione**: con l'Acciaio ossidato in displacement 10 mm il profilo del toro e della
+  sfera si vede ondulato. Ferro arrugginito, CPU e GPU sulla stessa inquadratura: differenza
+  media 4,2 livelli, dovuta al rumore della CPU a 48 campioni (l'uguaglianza statistica la danno
+  i test).
+
+### Materiali BlenderKit "piatti": cosa dicono i dati
+- Con i valori giusti la differenza visiva è spesso piccola, e non per un errore di ForgeRender.
+  Misure sulle immagini originali dentro i .blend (`survey_relief_maps_in_sources`):
+  - in 9 materiali su 38 la mappa height è **costante**: scrostato, satinato, titanio, dorato,
+    ramato, nichelato, argentato, zincato 2; il ferro arrugginito ha deviazione 0,4 livelli;
+  - la normal map ha un'**inclinazione media di 0,3–1°** nella maggior parte dei metalli (già
+    nel file BlenderKit).
+- Anche in Blender quei metalli prendono il loro aspetto da colore e rugosità, non dal rilievo.
+  Le prove a parità di tutto il resto confermano:
+  - scrostato con rilievo 0 o 40 mm: differenza 0,00 livelli, perché la height è piatta;
+  - ferro con o senza normal map: 0,71 livelli.
+- Rilievo vero solo dove la sorgente ce l'ha (ossidato, molto ossidato, invecchiato, zincato
+  invecchiato, griglia, serbatoio verniciato).
+- **Perdita reale trovata**: il riduttore a 1024 px (Lanczos) dell'esempio
+  `blenderkit_predefiniti` abbassa l'inclinazione delle normal ricche di dettaglio del 10–30 %
+  (Steel Tank Painted da 13,8° a 9,5°, Heavily Oxidized da 3,3° a 2,3°).
+  - **Proposta, non fatta**: tenere le normal e le height a 2048 px, o ridurle rinormalizzando i
+    vettori.
+  - Serve l'ok: raddoppia lo spazio delle mappe (circa 4 volte i pixel di normal e height).
+
+### Limiti e regressioni note
+- I punti di raccordo delle giunzioni a T portano altezza e direzione interpolate. Lo shading li
+  ricostruisce comunque sulla superficie originale, salvo un errore bilineare trascurabile.
+- La sfumatura sulle superfici spostate usa la direzione di spostamento: sugli spigoli vivi
+  (bisettrice) c'è una fascia larga una cella della suddivisione con le due proiezioni miste.
+- I materiali Displacement only (14 dei 38) ora suddividono la geometria: più triangoli e più
+  memoria. Sulla sfera del benchmark si arriva a 1,57 milioni di triangoli e 319 MB. Il budget
+  di 3 milioni di triangoli per scena resta il limite.
+- Le texture dei pezzi Box ancorate al pezzo restano come nella 0.15 (Fase 2).
+
+### Piano della Fase 2: ancoraggio delle texture Box (da approvare, non implementato)
+**Le tre modalità**, come proprietà del mapping del materiale (`TextureMapping::anchor`):
+- `Component` (comportamento attuale della 0.15):
+  - assi = rotazione del pezzo (sorgente e utente);
+  - origine = radice dell'albero mossa con le trasformazioni del pezzo;
+  - la texture segue il pezzo quando lo si sposta o ruota; pezzi accostati e orientati allo
+    stesso modo restano continui; pezzi ruotati diversamente hanno ognuno i propri assi.
+- `Assembly`:
+  - assi e origine della radice dell'assieme (il nodo più alto dell'albero, cioè il file
+    importato o l'oggetto aggiunto), comprese le sue trasformazioni utente;
+  - tutti i pezzi dell'assieme condividono la proiezione: venature continue anche tra pezzi
+    ruotati diversamente nel file, e la texture segue l'assieme;
+  - spostando un solo pezzo dentro l'assieme, la texture scorre su quel pezzo (è ancorata
+    all'assieme).
+- `World`:
+  - assi e origine del mondo, come nella 0.14: la texture resta ferma e l'oggetto ci scorre
+    sopra quando lo si muove;
+  - sfumatura e displacement restano quelli nuovi (la 0.14 aveva i tagli per triangolo), quindi
+    le posizioni delle venature tornano quelle di allora ma i passaggi sono sfumati.
+
+**Compatibilità dei progetti**
+- Il `.frproject` salva già `app_version` (es. "0.14.0") e `schema_version` (oggi 1), e in
+  `forge_project::parse` c'è il punto per le migrazioni.
+- Proposta:
+  - `SCHEMA_VERSION` = 2;
+  - campo `anchor` con `#[serde(default)]` = `Component`;
+  - migrazione da schema 1: se `app_version` è assente o minore di 0.15.0, tutti i materiali Box
+    del progetto passano a `World` (aspetto 0.14); con 0.15.x restano `Component`;
+  - al salvataggio il valore è scritto esplicitamente, quindi la migrazione avviene una sola
+    volta;
+  - i predefiniti e i materiali nuovi partono `Component`;
+  - un avviso nel rapporto di caricamento dice quanti materiali sono stati messi su `World`.
+- Va verificato che i materiali assegnati salvati nel progetto siano quelli usati al caricamento,
+  e non i predefiniti ricaricati: in caso contrario la migrazione va fatta sulle assegnazioni.
+
+**Implementazione prevista**
+- Il riferimento dipende dal materiale del nodo, quindi `node_frames` si calcola con l'anchor del
+  materiale risolto del nodo (`RenderGeometry::build`, già usato dal displacement).
+- Cambiare l'anchor di un materiale deve ricostruire la geometria quando c'è displacement, e
+  aggiornare i riferimenti anche senza displacement. Si porta il calcolo di `node_frames` nella
+  compilazione della scena di render (lato shading) e lo si lascia in `build` solo per il
+  displacement. È il punto da verificare.
+- UI: scelta "Ancoraggio della texture: pezzo / assieme / mondo" nella sezione del mapping
+  dell'editor materiali (solo con la proiezione Box).
+
+**Test previsti**
+- Assieme con figlio ruotato e spostato e pezzi accostati, per ognuna delle tre modalità: stesse
+  coordinate sul lato in comune dove previsto, scorrimento dove previsto.
+- Migrazione: progetto "0.14.0" → `World`, "0.15.0" → `Component`, salvataggio e riapertura
+  stabili.
+- CPU/GPU uguali per le tre modalità; render prima/dopo di un progetto 0.14 riaperto.

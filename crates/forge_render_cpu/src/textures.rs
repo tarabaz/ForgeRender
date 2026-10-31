@@ -46,19 +46,25 @@ fn taps(tex: &MaterialTextures, geo: &RenderGeometry, prim: usize, bu: f32, bv: 
     let mut out = [none; 3];
     // Box: una ripetizione = `scale` metri. UV: senza dimensioni reali si assume 1 m.
     let box_m = tex.mapping.scale.max(1e-6);
-    if flags & displace::FLAG_BOX_UV != 0 {
-        // Superficie spostata: coordinate box (nello spazio dell'oggetto) della superficie originale.
-        let [a, b, c] = geo.tri_uvs[prim];
-        let (t, bb) = displace::box_frame(displace::box_axis(flags));
-        out[0] = tap(
-            a * (1.0 - bu - bv) + b * bu + c * bv,
-            frame.dir_to_world(t),
-            frame.dir_to_world(bb),
-            true,
-            1.0,
-        );
-        (out, 1, box_m)
-    } else if use_uv {
+    // Superficie spostata con la proiezione box: punto e direzione della superficie originale
+    // (ogni vertice porta l'altezza applicata e la direzione), così colore, rilievo e altezza
+    // usano le stesse letture sfumate, nello stesso punto.
+    let (p, n) = if flags & displace::FLAG_DISPLACED_BOX != 0 {
+        let uv = geo.tri_uvs[prim];
+        let v = geo.vertices(prim);
+        let bw = [1.0 - bu - bv, bu, bv];
+        let mut po = Vec3::ZERO;
+        let mut dir = Vec3::ZERO;
+        for k in 0..3 {
+            let d = displace::unpack_dir(uv[k].y);
+            po += (v[k] - d * uv[k].x) * bw[k];
+            dir += d * bw[k];
+        }
+        (po, dir.normalize_or(n))
+    } else {
+        (p, n)
+    };
+    if use_uv && flags & displace::FLAG_DISPLACED_BOX == 0 {
         let [a, b, c] = geo.tri_uvs[prim];
         let ng = geo.geometric_normals[prim];
         let t = tangent.normalize_or_zero();

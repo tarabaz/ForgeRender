@@ -1,15 +1,18 @@
 //! Verifiche della revisione 0.15.0 (proiezione Box sugli assi dell'oggetto e sfumata).
 //!
-//! I test con `#[ignore]` descrivono il comportamento voluto e oggi falliscono: documentano un
-//! problema riproducibile ancora da correggere (`cargo test -- --ignored` li esegue).
+//! I primi due test riproducevano problemi reali (soglia dei pesi a gradino, displacement con
+//! un solo asse per triangolo): erano `#[ignore]` e fallivano; dalla 0.16.0 sono obbligatori.
 
-use forge_math::{Mat4, Quat, Vec2, Vec3};
+use forge_math::{Mat4, Quat, Vec3};
 use forge_render_core::displace::{self, box_weights, BoxFrame, Params};
 use forge_render_core::texture::Texture;
 use forge_render_core::RenderGeometry;
 use forge_scene::{primitives, ComponentId, Scene, TextureMapping, UserTransform};
 use std::collections::HashMap;
 use std::sync::Arc;
+
+/// Lato orientato, dai vertici quantizzati.
+type EdgeKey = ([i64; 3], [i64; 3]);
 
 fn key(v: Vec3) -> [i64; 3] {
     [v.x, v.y, v.z].map(|x| (x * 1e5).round() as i64)
@@ -33,10 +36,9 @@ fn max_weight_step() -> (f32, f32) {
     (worst, at)
 }
 
-/// I pesi devono variare con continuità: con passi di 0,001° nessun salto oltre 0,002.
-/// Oggi la soglia dell'1 % azzera di colpo un peso di circa 0,01 (salto dello stesso ordine).
+/// I pesi variano con continuità: con passi di 0,001° nessun salto oltre 0,002 (con la
+/// soglia a gradino della 0.15.0 il salto era 0,0100 a 60,6°).
 #[test]
-#[ignore = "problema riproducibile: la soglia dell'1 % dei pesi Box produce un salto"]
 fn box_weights_are_continuous() {
     let (worst, at) = max_weight_step();
     eprintln!("salto massimo dei pesi: {worst:.5} a {at:.3}°");
@@ -64,12 +66,14 @@ fn noise_tex() -> Texture {
     Texture::from_rgb8(n, n, data, false)
 }
 
-/// Displacement su una superficie curva senza UV: stesso punto della superficie, stesse
-/// coordinate texture da tutti i triangoli che lo toccano (altrimenti colore, rilievo e
-/// altezza saltano lungo i lati dove cambia l'asse Box). Oggi ogni triangolo originale usa
-/// un solo asse, scelto dalla sua normale: lungo i cambi d'asse le coordinate non coincidono.
+/// Displacement su una superficie curva senza UV, con la proiezione box sfumata:
+/// - stesso punto della superficie, stessi dati di shading (altezza e direzione) da tutti i
+///   triangoli che lo toccano (nella 0.15.0: 796 vertici su 45 506 diversi, cuciture);
+/// - il punto originale ricostruito dallo shading sta sulla sfera di partenza;
+/// - l'altezza applicata è quella della proiezione sfumata in quel punto (displacement e
+///   shading leggono le stesse coordinate);
+/// - nessun lato aperto (niente crepe).
 #[test]
-#[ignore = "problema riproducibile: il displacement usa un solo asse Box per triangolo (niente sfumatura)"]
 fn displaced_curved_surface_has_continuous_texture_coordinates() {
     let mesh = primitives::uv_sphere(0.5, 48, 24);
     let params = Params {
@@ -82,27 +86,67 @@ fn displaced_curved_surface_has_continuous_texture_coordinates() {
         mid: 0.5,
         use_uv: false,
     };
-    let out = displace::tessellate(&mesh, &Mat4::IDENTITY, false, &params, 0.02, &BoxFrame::default());
-    // Coordinate (già con il mapping) viste da ogni triangolo in ogni vertice.
-    let mut seen: HashMap<[i64; 3], Vec<Vec2>> = HashMap::new();
+    let frame = BoxFrame::default();
+    let out = displace::tessellate(&mesh, &Mat4::IDENTITY, false, &params, 0.02, &frame);
+    assert!(out.iter().all(|t| t.flags == displace::FLAG_DISPLACED_BOX));
+    let mut seen: HashMap<[i64; 3], Vec<(f32, f32)>> = HashMap::new();
+    let (mut off_sphere, mut exact, mut count) = (0.0f32, 0usize, 0usize);
     for t in &out {
         for k in 0..3 {
-            seen.entry(key(t.p[k])).or_default().push(params.mapping.apply(t.uv[k], true));
+            let (h, code) = (t.uv[k].x, t.uv[k].y);
+            seen.entry(key(t.p[k])).or_default().push((h, code));
+            let d = displace::unpack_dir(code);
+            let orig = t.p[k] - d * h;
+            off_sphere = off_sphere.max((orig.length() - 0.5).abs());
+            count += 1;
+            if (params.height_box(&frame, orig, d) - h).abs() < 5e-5 {
+                exact += 1;
+            }
         }
     }
     let total = seen.len();
-    let broken = seen
-        .values()
-        .filter(|uvs| uvs.iter().any(|u| (*u - uvs[0]).length() > 1e-4))
+    let broken = seen.values().filter(|v| v.iter().any(|x| *x != v[0])).count();
+    // Crepe: i lati che non hanno il gemello in verso opposto sono giunzioni a T (triangoli
+    // vicini suddivisi diversamente). Senza crepe il punto medio di ognuno sta su un lato
+    // dell'altra parte.
+    let mut edges: HashMap<EdgeKey, (i32, Vec3, Vec3)> = HashMap::new();
+    for t in &out {
+        for e in 0..3 {
+            let (pa, pb) = (t.p[e], t.p[(e + 1) % 3]);
+            let (a, b) = (key(pa), key(pb));
+            edges.entry((a, b)).or_insert((0, pa, pb)).0 += 1;
+            edges.entry((b, a)).or_insert((0, pb, pa)).0 -= 1;
+        }
+    }
+    let open: Vec<(Vec3, Vec3)> = edges.values().filter(|e| e.0 > 0).map(|e| (e.1, e.2)).collect();
+    let on_segment = |p: Vec3, a: Vec3, b: Vec3| {
+        let ab = b - a;
+        let t = ((p - a).dot(ab) / ab.length_squared().max(1e-20)).clamp(0.0, 1.0);
+        (a + ab * t - p).length()
+    };
+    let cracks = open
+        .iter()
+        .filter(|(a, b)| {
+            let m = (*a + *b) * 0.5;
+            !open.iter().any(|(c, d)| (*c, *d) != (*a, *b) && on_segment(m, *c, *d) < 1e-5)
+        })
         .count();
-    let axes: std::collections::BTreeSet<usize> = out.iter().map(|t| displace::box_axis(t.flags)).collect();
     eprintln!(
-        "{} triangoli, assi usati {:?}, vertici con coordinate diverse: {broken} su {total} ({:.1} %)",
+        "{} triangoli; vertici con dati diversi: {broken} su {total}; punto originale fuori sfera \
+         {off_sphere:.2e} m; altezza esatta in {exact} vertici su {count}; giunzioni a T {}, crepe {cracks}",
         out.len(),
-        axes,
-        100.0 * broken as f64 / total as f64
+        open.len()
     );
     assert_eq!(broken, 0);
+    // La sfera a 48 × 24 è un poliedro: i punti interni dei triangoli stanno sotto la sfera
+    // ideale di al massimo la freccia delle corde (circa 0,5 × (1 − cos 7,5°) = 4,3 mm).
+    assert!(off_sphere < 5e-3, "{off_sphere}");
+    // I vertici calcolati hanno l'altezza della proiezione sfumata nel loro punto; fanno
+    // eccezione i punti di raccordo delle giunzioni a T, interpolati tra due campioni del lato
+    // (su questa sfera sono fitti vicino ai poli, dove i triangoli cambiano dimensione: circa
+    // l'11 % delle occorrenze). Lo shading li ricostruisce comunque sulla superficie originale.
+    assert!(exact as f64 > 0.85 * count as f64, "{exact} su {count}");
+    assert_eq!(cracks, 0, "{cracks} crepe");
 }
 
 /// Componente con un cubo da 0,8 m nella scena, con trasformazioni sorgente e utente.

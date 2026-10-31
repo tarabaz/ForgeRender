@@ -220,6 +220,10 @@ struct Origin<'a> {
     directx: bool,
     /// Nodi procedurali scartati lungo la strada (es. rumore mescolato all'immagine).
     procedural: Vec<String>,
+    /// Nodo Bump: rilievo in metri per unità di height (Strength × Distance).
+    bump_m: Option<f32>,
+    /// Normal Map collegata all'ingresso Normal del nodo Bump (in Blender si sommano).
+    chained_normal: Option<Box<Origin<'a>>>,
 }
 
 impl<'a> Origin<'a> {
@@ -235,6 +239,8 @@ impl<'a> Origin<'a> {
             coords: None,
             directx: false,
             procedural: Vec::new(),
+            bump_m: None,
+            chained_normal: None,
         }
     }
 
@@ -258,6 +264,59 @@ fn input<'a>(node: &Inst<'a>, name: &str) -> Option<Inst<'a>> {
 
 fn default_values(socket: &Inst) -> Vec<f32> {
     socket.deref("default_value").map(|v| v.f32s("value")).unwrap_or_default()
+}
+
+/// Rilievo massimo accettato dalla conversione (mm): oltre si limita e si segnala.
+const MAX_RELIEF_MM: f32 = 100.0;
+
+/// Metodo di displacement del materiale Blender (`Material.displacement_method`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Displacement {
+    /// "Bump only" (predefinito di Blender): la height agisce solo sulle normali.
+    Bump,
+    /// "Displacement only": la geometria si sposta.
+    Displace,
+    /// "Displacement and bump".
+    Both,
+}
+
+impl Displacement {
+    fn label(self) -> &'static str {
+        match self {
+            Displacement::Bump => "metodo Bump only",
+            Displacement::Displace => "metodo Displacement only",
+            Displacement::Both => "metodo Displacement and Bump",
+        }
+    }
+}
+
+/// Metodo del materiale; i file senza il campo (versioni vecchie) usano il predefinito, Bump.
+fn displacement_method(m: &Inst) -> Displacement {
+    // Il campo è un `char`: conta il primo byte.
+    match m.i32("displacement_method").map(|v| v & 0xFF) {
+        Some(1) => Displacement::Displace,
+        Some(2) => Displacement::Both,
+        _ => Displacement::Bump,
+    }
+}
+
+/// Nodo collegato all'ingresso (attraversando i Reroute).
+fn linked_node<'a>(socket: &Inst<'a>) -> Option<Inst<'a>> {
+    let mut node = socket.deref("link")?.deref("fromnode")?;
+    for _ in 0..16 {
+        if node.str("idname") != "NodeReroute" {
+            return Some(node);
+        }
+        node = input(&node, "Input")?.deref("link")?.deref("fromnode")?;
+    }
+    None
+}
+
+/// Valore scritto in un ingresso numerico del nodo (`None` se manca o se è collegato).
+fn socket_number(node: &Inst, name: &str) -> Option<f32> {
+    input(node, name)
+        .filter(|s| s.deref("link").is_none())
+        .and_then(|s| default_values(&s).first().copied())
 }
 
 fn id_name(i: &Inst) -> String {
@@ -349,7 +408,21 @@ fn trace<'a>(node: &Inst<'a>, out: &str, stack: &mut Vec<Inst<'a>>, depth: u32) 
             o.normal_strength = Some(strength.unwrap_or(1.0));
             o
         }
-        "ShaderNodeBump" | "ShaderNodeDisplacement" => {
+        "ShaderNodeBump" => {
+            let mut o = follow("Height", stack);
+            o.bump = true;
+            // Rilievo del nodo: Strength × Distance (in unità della scena, cioè metri).
+            o.bump_m = Some(socket_number(node, "Strength").unwrap_or(1.0) * socket_number(node, "Distance").unwrap_or(1.0));
+            // Normal Map collegata al Normal del Bump: in Blender il rilievo si somma a lei.
+            if let Some(n) = input(node, "Normal").filter(|s| s.deref("link").is_some()) {
+                let n = resolve(&n, stack, depth);
+                if n.normal_strength.is_some() {
+                    o.chained_normal = Some(Box::new(n));
+                }
+            }
+            o
+        }
+        "ShaderNodeDisplacement" => {
             let mut o = follow("Height", stack);
             o.bump = true;
             o
@@ -631,7 +704,7 @@ pub fn read_all(path: &Path) -> anyhow::Result<(Vec<Extracted>, Vec<String>)> {
             continue;
         };
         match shader_of(&tree) {
-            Some((shader, stack, output)) => match convert(&name, &shader, stack, &output, &blend, dir) {
+            Some((shader, stack, output)) => match convert(&name, &shader, stack, &output, displacement_method(&m), &blend, dir) {
                 Ok(x) => out.push(x),
                 Err(e) => skipped.push(format!("{name}: {e:#}")),
             },
@@ -655,6 +728,7 @@ fn convert<'a>(
     shader: &Inst<'a>,
     stack: Vec<Inst<'a>>,
     output: &Inst<'a>,
+    method: Displacement,
     blend: &Blend,
     dir: &Path,
 ) -> anyhow::Result<Extracted> {
@@ -823,7 +897,8 @@ fn convert<'a>(
     if let Some(v) = handle("Roughness", get("Roughness"), Slot::Roughness, &mut x) {
         x.material.roughness = v.first().copied().unwrap_or(1.0);
     }
-    // Normal: Normal Map → mappa normal; Bump → mappa di rilievo.
+    // Normal: Normal Map → mappa normal; Bump → mappa di rilievo (con l'eventuale Normal Map
+    // collegata al Normal del Bump: in Blender si sommano, qui vanno nei due slot).
     if let Some(o) = get("Normal").filter(|o| !matches!(o.kind, Kind::Constant(_))) {
         let slot = if o.bump || o.normal_strength.is_none() {
             Slot::Height
@@ -831,24 +906,81 @@ fn convert<'a>(
             Slot::Normal
         };
         let label = if slot == Slot::Height { "Rilievo (Bump)" } else { "Normal map" };
+        let bump_m = o.bump_m;
+        if let Some(n) = o.chained_normal.clone() {
+            handle("Normal map (nel Bump)", Some(*n), Slot::Normal, &mut x);
+        }
         handle(label, Some(o), slot, &mut x);
         if slot == Slot::Height && x.images.iter().any(|i| i.slot == Slot::Height) {
-            x.material.bump_mm = 0.3;
+            // Strength × Distance in metri → millimetri di rilievo (senza nodo: 0,3 mm).
+            let mm = bump_m.map(|m| m * 1000.0).unwrap_or(0.3);
+            x.material.bump_mm = mm.clamp(0.0, MAX_RELIEF_MM);
+            x.params.push(Param {
+                name: "Profondità del rilievo",
+                blender: bump_m.map_or("nodo Bump senza valori".into(), |m| format!("Strength × Distance = {m:.4}")),
+                forge: format!("rilievo {:.2} mm", x.material.bump_mm),
+                status: if bump_m.is_some() && mm <= MAX_RELIEF_MM {
+                    Status::Exact
+                } else {
+                    Status::Approximate
+                },
+                note: if mm > MAX_RELIEF_MM {
+                    format!("limitato a {MAX_RELIEF_MM} mm")
+                } else {
+                    String::new()
+                },
+            });
         }
     }
-    // Displacement del Material Output: la mappa si salva nello slot rilievo, spenta (come
-    // per i materiali scaricati), così non si perde e si attiva dall'editor se serve.
+    // Displacement del Material Output: nodo Displacement con Scale (escursione in metri per
+    // unità di height) e Midlevel; il metodo del materiale dice se in Blender agisce come
+    // rilievo (Bump only), come geometria spostata (Displacement only) o in entrambi i modi.
     if !x.images.iter().any(|i| i.slot == Slot::Height) {
-        let disp = input(output, "Displacement").map(|s| resolve(&s, &mut Vec::new(), 0));
+        let socket = input(output, "Displacement");
+        let node = socket.as_ref().and_then(|s| linked_node(s));
+        let disp = socket.map(|s| resolve(&s, &mut Vec::new(), 0));
         if let Some(o) = disp.filter(|o| matches!(o.kind, Kind::Image(_) | Kind::Procedural(_))) {
             let before = x.params.len();
             handle("Displacement", Some(o), Slot::Height, &mut x);
-            // Rilievo spento: la mappa resta disponibile nello slot.
-            x.material.bump_mm = 0.0;
-            x.material.displacement_mm = 0.0;
-            if let Some(p) = x.params.get_mut(before).filter(|p| p.status == Status::Exact) {
-                p.status = Status::Approximate;
-                p.note = "mappa salvata nello slot rilievo, displacement spento: attivalo nell'editor se serve".into();
+            let is_node = node.as_ref().is_some_and(|n| n.str("idname") == "ShaderNodeDisplacement");
+            let scale = node.as_ref().filter(|_| is_node).and_then(|n| socket_number(n, "Scale"));
+            let mid = node.as_ref().filter(|_| is_node).and_then(|n| socket_number(n, "Midlevel"));
+            if x.images.iter().any(|i| i.slot == Slot::Height) {
+                let mm = scale.unwrap_or(0.0) * 1000.0;
+                let relief = mm.clamp(0.0, MAX_RELIEF_MM);
+                let (bump, displace) = match method {
+                    Displacement::Bump => (relief, 0.0),
+                    Displacement::Displace => (0.0, relief),
+                    Displacement::Both => (relief, relief),
+                };
+                x.material.bump_mm = bump;
+                x.material.displacement_mm = displace;
+                x.material.displacement_mid = mid.unwrap_or(0.5).clamp(0.0, 1.0);
+                let exact = scale.is_some() && mid.is_some() && mm <= MAX_RELIEF_MM;
+                if !exact {
+                    if let Some(p) = x.params.get_mut(before).filter(|p| p.status == Status::Exact) {
+                        p.status = Status::Approximate;
+                    }
+                }
+                x.params.push(Param {
+                    name: "Profondità del rilievo",
+                    blender: match (scale, mid) {
+                        (Some(s), Some(m)) => format!("Displacement Scale {s:.4} · Midlevel {m:.2} · {}", method.label()),
+                        _ => format!("Displacement senza Scale/Midlevel scritti · {}", method.label()),
+                    },
+                    forge: format!(
+                        "rilievo {bump:.2} mm · displacement {displace:.2} mm · livello medio {:.2}",
+                        x.material.displacement_mid
+                    ),
+                    status: if exact { Status::Exact } else { Status::Approximate },
+                    note: if mm > MAX_RELIEF_MM {
+                        format!("limitato a {MAX_RELIEF_MM} mm")
+                    } else if scale.is_none() {
+                        "Scale non leggibile (collegata o nodo diverso): rilievo spento, si regola nell'editor".into()
+                    } else {
+                        String::new()
+                    },
+                });
             }
         }
     }
@@ -1192,6 +1324,106 @@ mod tests {
                         }
                         _ => {}
                     }
+                }
+                println!("{line}");
+            }
+        }
+    }
+
+    /// Conversione del rilievo sui file di Valerio (`dist/MCP/blender material`, saltato se
+    /// mancano): Scale del nodo Displacement × 1000 = mm, Midlevel = livello medio, e il metodo
+    /// del materiale sceglie rilievo (Bump only), displacement (Displacement only) o entrambi.
+    #[test]
+    fn relief_from_displacement_node_and_method() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../dist/MCP/blender material");
+        if !root.is_dir() {
+            eprintln!("cartella dei .blend assente: test saltato");
+            return;
+        }
+        let mut found: std::collections::HashMap<String, Vec<Material>> = std::collections::HashMap::new();
+        for p in scan(&root) {
+            if let Ok((all, _)) = read_all(&p) {
+                for x in all {
+                    found.entry(x.name.clone()).or_default().push(x.material);
+                }
+            }
+        }
+        // (nome, bump mm, displacement mm): valori letti nei file (vedi survey_relief_values).
+        let expected = [
+            ("Aged Gunmetal Steel", 0.0, 10.0),           // metodo 1, Scale 0,010
+            ("Golden Scratched Painted Steel", 1.0, 0.0), // metodo 0, Scale 0,001
+            ("Heavily Scratched Rusty Iron", 40.0, 0.0),  // metodo 0, Scale 0,040
+            ("Metal Rusty Grate Weave.004", 10.0, 10.0),  // metodo 2, Scale 0,010
+            ("Brushed Steel", 0.0, 0.0),                  // metodo 2, Scale 0
+        ];
+        for (name, bump, disp) in expected {
+            let Some(ms) = found.get(name) else { panic!("{name} non trovato") };
+            assert!(
+                ms.iter()
+                    .any(|m| (m.bump_mm - bump).abs() < 1e-3 && (m.displacement_mm - disp).abs() < 1e-3),
+                "{name}: {:?}",
+                ms.iter()
+                    .map(|m| (m.bump_mm, m.displacement_mm, m.displacement_mid))
+                    .collect::<Vec<_>>()
+            );
+            assert!(ms.iter().all(|m| (m.displacement_mid - 0.5).abs() < 1e-6));
+        }
+        // "Black steel": due file, metodo 2 con Scale 0,002 e 0,003.
+        let black: Vec<(f32, f32)> = found["Black steel"].iter().map(|m| (m.bump_mm, m.displacement_mm)).collect();
+        assert!(
+            black.iter().any(|&(b, d)| (b - 2.0).abs() < 1e-3 && (d - 2.0).abs() < 1e-3),
+            "{black:?}"
+        );
+        assert!(
+            black.iter().any(|&(b, d)| (b - 3.0).abs() < 1e-3 && (d - 3.0).abs() < 1e-3),
+            "{black:?}"
+        );
+    }
+
+    /// Contrasto delle mappe normal e height dentro i .blend di Valerio (immagini originali,
+    /// prima della conversione): inclinazione media della normal e deviazione della height.
+    #[test]
+    #[ignore = "legge i file .blend di Valerio"]
+    fn survey_relief_maps_in_sources() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../dist/MCP/blender material");
+        for p in scan(&root) {
+            let Ok((all, _)) = read_all(&p) else { continue };
+            for x in all {
+                let mut line = x.name.clone();
+                for img in &x.images {
+                    if !matches!(img.slot, Slot::Normal | Slot::Height) {
+                        continue;
+                    }
+                    let Ok(dec) = img.encoded().and_then(|(b, _)| Ok(image::load_from_memory(&b)?)) else {
+                        line += &format!(" | {:?} non decodificata", img.slot);
+                        continue;
+                    };
+                    let rgb = dec.to_rgb32f();
+                    let (w, h) = rgb.dimensions();
+                    let (mut sum, mut sq, mut tilt, mut n) = (0.0f64, 0.0f64, 0.0f64, 0.0f64);
+                    for y in (0..h).step_by(4) {
+                        for xx in (0..w).step_by(4) {
+                            let c = rgb.get_pixel(xx, y).0;
+                            let v = c[0] as f64;
+                            sum += v;
+                            sq += v * v;
+                            let (nx, ny, nz) = (c[0] * 2.0 - 1.0, c[1] * 2.0 - 1.0, (c[2] * 2.0 - 1.0).max(1e-3));
+                            tilt += ((nx * nx + ny * ny).sqrt().atan2(nz) as f64).to_degrees();
+                            n += 1.0;
+                        }
+                    }
+                    let mean = sum / n;
+                    let dev = (sq / n - mean * mean).max(0.0).sqrt() * 255.0;
+                    line += &format!(
+                        " | {:?} {w}x{h} {:?}: {}",
+                        img.slot,
+                        dec.color(),
+                        if img.slot == Slot::Normal {
+                            format!("inclinazione media {:.1}°", tilt / n)
+                        } else {
+                            format!("deviazione {dev:.1} livelli")
+                        }
+                    );
                 }
                 println!("{line}");
             }

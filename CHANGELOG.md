@@ -11,6 +11,24 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.16.0 — 31/10/2026
+
+**Fase 1 della revisione: correttezza di materiali e texture**
+- Displacement con proiezione Box sfumata: l'altezza di ogni punto è la media delle tre
+  proiezioni secondo la direzione di spostamento, come per le altre mappe. Spariscono i tagli
+  netti sulle superfici curve con il displacement acceso; la superficie resta chiusa (niente
+  crepe) e CPU e GPU coincidono. Ogni vertice spostato porta l'altezza applicata e la
+  direzione: lo shading ricostruisce la superficie originale e legge colore, rilievo e altezza
+  negli stessi punti.
+- Soglia dei pesi Box continua: le proiezioni deboli spariscono senza salti (prima un gradino
+  dell'1 % del peso).
+- Importatore Blender: il nodo Displacement si converte con i suoi valori (Scale × 1000 = mm,
+  Midlevel = livello medio) e il metodo del materiale (Bump only → rilievo, Displacement only →
+  displacement, entrambi → tutti e due). Il nodo Bump usa Strength × Distance; la Normal Map
+  collegata al Normal del Bump non si perde più.
+- Materiali BlenderKit predefiniti riconvertiti: 30 su 38 cambiano solo nei valori di rilievo e
+  displacement (mappe identiche); copia degli originali in `reports/revisione-0.16/`.
+
 ## 0.15.0 — 31/10/2026
 
 **Texture a proiezione Box**

@@ -502,5 +502,12 @@
 - Anteprime: dimensione dell'oggetto (Reale 9 cm / 30 cm / 1 m), miniature v6.
 - "Appoggia" sul pezzo subito sotto (`contact::drop_onto_below`).
 
+### 0.16.0: Fase 1 della revisione (31/10/2026)
+- Displacement con proiezione Box sfumata (`Params::height_box`, `FLAG_DISPLACED_BOX`, altezza e
+  direzione per vertice negli UV con `pack_dir`), soglia dei pesi continua, conversione del nodo
+  Displacement di Blender (Scale, Midlevel, metodo) e riconversione dei 38 predefiniti BlenderKit.
+- Fase 2 (ancoraggio Component / Assembly / World) e Fase 3 (Appoggia) in attesa di approvazione:
+  piano in `reports/chatgpt/CLAUDE_HANDOFF.md`.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

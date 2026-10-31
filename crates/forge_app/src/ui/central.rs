@@ -1151,15 +1151,26 @@ mod tests {
         if let Some(mm) = std::env::var("FORGE_REVIEW_DISP_MM").ok().and_then(|v| v.parse().ok()) {
             oak.displacement_mm = mm;
         }
+        // `FORGE_REVIEW_BUMP_MM` cambia il rilievo, `FORGE_REVIEW_NO_NORMAL` toglie la normal map.
+        if let Some(mm) = std::env::var("FORGE_REVIEW_BUMP_MM").ok().and_then(|v| v.parse().ok()) {
+            oak.bump_mm = mm;
+        }
+        if std::env::var_os("FORGE_REVIEW_NO_NORMAL").is_some() {
+            oak.normal_texture = None;
+        }
         s.materials.upsert(oak.clone());
         for id in ["sfera-acciaio", "box-plastica", "toro-rame"] {
             s.assignments.insert(ComponentId(format!("test/Scena/{id}")), oak.id.clone());
         }
-        // `FORGE_REVIEW_CLOSE`: inquadratura ravvicinata della sfera (cuciture tra le proiezioni).
-        if std::env::var_os("FORGE_REVIEW_CLOSE").is_some() {
-            if let Some(i) = s.find(&ComponentId("test/Scena/sfera-acciaio".into())) {
-                let c = s.exact_bounds_of(i).center();
-                s.camera.position = c + Vec3::new(0.35, 0.25, 0.9);
+        // `FORGE_REVIEW_CLOSE` = sfera-acciaio, toro-rame o box-plastica: inquadratura ravvicinata
+        // del pezzo (cuciture tra le proiezioni); `FORGE_REVIEW_GPU` rende con la GPU.
+        let close = std::env::var("FORGE_REVIEW_CLOSE").ok();
+        if let Some(id) = &close {
+            if let Some(i) = s.find(&ComponentId(format!("test/Scena/{id}"))) {
+                let b = s.exact_bounds_of(i);
+                let c = b.center();
+                let r = b.extent().max_element();
+                s.camera.position = c + Vec3::new(0.35, 0.3, 0.9) * r;
                 s.camera.target = c;
             }
         }
@@ -1174,24 +1185,30 @@ mod tests {
         let mut acc = Accumulator::new(w, h);
         let mut pass = vec![[0.0; 3]; acc.pixel_count()];
         let cancel = std::sync::atomic::AtomicBool::new(false);
-        let mut be = forge_render_cpu::CpuBackend::new(0).unwrap();
-        for i in 0..48 {
-            if let Ok(n @ 1..) = be.render_pass(&rs, &settings, i, 1, &mut pass, &cancel) {
-                acc.add_samples(&pass, n);
+        let gpu = std::env::var_os("FORGE_REVIEW_GPU").is_some();
+        let mut be: Box<dyn RenderBackend> = if gpu {
+            Box::new(forge_render_gpu::GpuBackend::new().unwrap())
+        } else {
+            Box::new(forge_render_cpu::CpuBackend::new(0).unwrap())
+        };
+        let spp = if gpu { 512 } else { 48 };
+        while acc.samples < spp {
+            match be.render_pass(&rs, &settings, acc.samples, spp - acc.samples, &mut pass, &cancel) {
+                Ok(n @ 1..) => acc.add_samples(&pass, n),
+                _ => break,
             }
         }
         let px = forge_render_core::tonemap_to_rgba8(&acc.resolve(), settings.tone_mapping, 0.0);
         image::RgbaImage::from_raw(w, h, px)
             .unwrap()
             .save(std::path::Path::new(&dir).join(format!(
-                "scena_{}_{}{}.png",
+                "{}_disp{}_bump{}{}_{}_{}.png",
                 oak.id.0,
                 oak.displacement_mm,
-                if std::env::var_os("FORGE_REVIEW_CLOSE").is_some() {
-                    "_vicino"
-                } else {
-                    ""
-                }
+                oak.bump_mm,
+                if oak.normal_texture.is_none() { "_senza-normal" } else { "" },
+                close.as_deref().unwrap_or("scena"),
+                if gpu { "gpu" } else { "cpu" }
             )))
             .unwrap();
     }

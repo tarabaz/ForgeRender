@@ -7,9 +7,12 @@
 //!   in più vengono interpolati sul lato più grossolano: niente crepe.
 //! - I vertici coincidenti (saldati per posizione) si spostano tutti insieme
 //!   lungo la normale media: niente crepe neanche sugli spigoli vivi.
-//! - Le coordinate texture restano quelle della superficie originale: con la
-//!   proiezione box le coordinate di base finiscono negli UV del triangolo e
-//!   un flag dice a `coordinates` di usarle con l'asse indicato.
+//! - Con la proiezione box l'altezza di ogni punto è la media delle tre
+//!   proiezioni sfumate secondo la direzione di spostamento (come le altre
+//!   mappe): dipende solo da posizione e direzione, che sui vertici e sui lati
+//!   condivisi sono le stesse per tutti i triangoli, quindi il campo è continuo.
+//!   Ogni vertice porta negli UV l'altezza applicata e la direzione: lo shading
+//!   ricostruisce la superficie originale e usa la stessa sfumatura.
 
 use crate::texture::Texture;
 use forge_math::{Mat3, Mat4, Vec2, Vec3};
@@ -17,28 +20,38 @@ use forge_scene::{Mesh, TextureMapping};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// Gli UV del triangolo sono coordinate di proiezione box (in metri) lungo l'asse nei bit 1-2.
-pub const FLAG_BOX_UV: u32 = 1;
+/// Triangolo della superficie spostata con proiezione box: l'UV di ogni vertice contiene
+/// l'altezza applicata (m) e la direzione dello spostamento ([`pack_dir`]).
+pub const FLAG_DISPLACED_BOX: u32 = 1;
 
-pub fn box_flags(axis: usize) -> u32 {
-    FLAG_BOX_UV | ((axis as u32) << 1)
-}
-
-/// Asse della proiezione box di un triangolo con flag [`FLAG_BOX_UV`].
-pub fn box_axis(flags: u32) -> usize {
-    ((flags >> 1) & 3) as usize
-}
-
-/// Coordinate box di base (prima del mapping) e asse dominante della normale.
-pub fn box_base(p: Vec3, n: Vec3) -> (Vec2, usize) {
-    let a = n.abs();
-    if a.x >= a.y && a.x >= a.z {
-        (Vec2::new(p.z, p.y), 0)
-    } else if a.y >= a.z {
-        (Vec2::new(p.x, p.z), 1)
+/// Direzione unitaria in un `f32` intero esatto (ottaedrica, 12 + 12 bit): passa intatta nei
+/// buffer della GPU e si decodifica allo stesso modo nello shader.
+pub fn pack_dir(d: Vec3) -> f32 {
+    let s = d.x.abs() + d.y.abs() + d.z.abs();
+    let n = if s > 0.0 { d / s } else { Vec3::Z };
+    let sign = |v: f32| if v >= 0.0 { 1.0 } else { -1.0 };
+    let (x, y) = if n.z >= 0.0 {
+        (n.x, n.y)
     } else {
-        (Vec2::new(p.x, p.y), 2)
-    }
+        ((1.0 - n.y.abs()) * sign(n.x), (1.0 - n.x.abs()) * sign(n.y))
+    };
+    let q = |v: f32| ((v.clamp(-1.0, 1.0) * 0.5 + 0.5) * 4095.0).round() as u32;
+    (q(x) * 4096 + q(y)) as f32
+}
+
+/// Inverso di [`pack_dir`].
+pub fn unpack_dir(v: f32) -> Vec3 {
+    let c = v.max(0.0) as u32;
+    let x = (c / 4096) as f32 / 4095.0 * 2.0 - 1.0;
+    let y = (c % 4096) as f32 / 4095.0 * 2.0 - 1.0;
+    let z = 1.0 - x.abs() - y.abs();
+    let sign = |v: f32| if v >= 0.0 { 1.0 } else { -1.0 };
+    let (x, y) = if z < 0.0 {
+        ((1.0 - y.abs()) * sign(x), (1.0 - x.abs()) * sign(y))
+    } else {
+        (x, y)
+    };
+    Vec3::new(x, y, z).normalize_or(Vec3::Z)
 }
 
 /// Riferimento tangente (t, b) della proiezione box per l'asse indicato.
@@ -63,8 +76,12 @@ pub fn box_coords(p: Vec3, axis: usize) -> Vec2 {
 /// immagini sovrapposte sulle facce), ma senza il taglio netto da un triangolo all'altro.
 pub const BOX_BLEND_POWER: i32 = 8;
 
-/// Pesi delle tre proiezioni box per una normale (nello spazio dell'oggetto); quelli sotto
-/// l'1 % si azzerano, così quasi ovunque basta una lettura della texture.
+/// Sotto questo peso una proiezione non si legge (quasi ovunque basta una lettura).
+pub const BOX_WEIGHT_CUT: f32 = 0.01;
+
+/// Pesi delle tre proiezioni box per una normale (nello spazio dell'oggetto). Ai pesi si toglie
+/// [`BOX_WEIGHT_CUT`] (sotto zero diventano 0) e poi si rinormalizza: le proiezioni deboli
+/// spariscono senza salti, perché il peso arriva a zero con continuità.
 pub fn box_weights(n: Vec3) -> [f32; 3] {
     let a = n.abs();
     let mut w = [a.x, a.y, a.z].map(|v| v.powi(BOX_BLEND_POWER));
@@ -73,11 +90,9 @@ pub fn box_weights(n: Vec3) -> [f32; 3] {
         return [0.0, 1.0, 0.0];
     }
     for v in &mut w {
-        *v /= sum;
-        if *v < 0.01 {
-            *v = 0.0;
-        }
+        *v = (*v / sum - BOX_WEIGHT_CUT).max(0.0);
     }
+    // Il peso maggiore è almeno 1/3: la somma resta positiva.
     let sum: f32 = w.iter().sum();
     w.map(|v| v / sum)
 }
@@ -134,9 +149,22 @@ pub struct Params {
 }
 
 impl Params {
+    /// Spostamento (m) con le coordinate UV della mesh.
     fn height_at(&self, base: Vec2) -> f32 {
-        let uv = self.mapping.apply(base, !self.use_uv);
+        let uv = self.mapping.apply(base, false);
         (self.height.sample(uv).x - self.mid) * self.amount_m
+    }
+
+    /// Spostamento (m) con la proiezione box sfumata, nel punto `pos` del mondo con direzione
+    /// di spostamento `dir`: le stesse letture pesate della mappa height nello shading.
+    pub fn height_box(&self, frame: &BoxFrame, pos: Vec3, dir: Vec3) -> f32 {
+        let pl = frame.to_local(pos);
+        let w = box_weights(frame.dir_to_local(dir));
+        let h: f32 = (0..3)
+            .filter(|&k| w[k] > 0.0)
+            .map(|k| self.height.sample(self.mapping.apply(box_coords(pl, k), true)).x * w[k])
+            .sum();
+        (h - self.mid) * self.amount_m
     }
 
     /// Lato dei triangoli desiderato (metri): circa due texel e mezzo della mappa height.
@@ -240,11 +268,28 @@ pub fn tessellate(mesh: &Mesh, xf: &Mat4, mirrored: bool, params: &Params, targe
         *n = n.normalize_or_zero();
     }
 
-    // Vertici prodotti (condivisi tra triangoli dove serve) e normali accumulate.
+    // Vertici prodotti (condivisi tra triangoli dove serve), con altezza applicata e direzione
+    // di spostamento di ognuno (per lo shading della proiezione box).
     let mut verts: Vec<Vec3> = Vec::new();
+    let mut attrs: Vec<(f32, Vec3)> = Vec::new();
     let mut corner_cache: HashMap<u32, u32> = HashMap::new();
     let mut edge_cache: HashMap<(u32, u32, u32), u32> = HashMap::new();
-    let mut tris: Vec<([u32; 3], [Vec2; 3], u32)> = Vec::new();
+    let mut tris: Vec<([u32; 3], [Vec2; 3])> = Vec::new();
+    // Spostamento nel punto: UV della mesh, oppure proiezione box sfumata secondo la direzione
+    // (dipende solo da posizione e direzione: uguale per tutti i triangoli che condividono il punto).
+    let height = |pos: Vec3, dir: Vec3, uv: Vec2| {
+        if has_uv {
+            params.height_at(uv)
+        } else {
+            params.height_box(frame, pos, dir)
+        }
+    };
+    let push = |verts: &mut Vec<Vec3>, attrs: &mut Vec<(f32, Vec3)>, pos: Vec3, dir: Vec3, uv: Vec2| -> u32 {
+        let h = height(pos, dir, uv);
+        verts.push(pos + dir * h);
+        attrs.push((h, dir));
+        verts.len() as u32 - 1
+    };
 
     // Direzione di spostamento dei punti interni: normali della mesh o della faccia.
     let dirs_of = |idx: &[u32; 3], fnrm: Vec3| {
@@ -289,11 +334,11 @@ pub fn tessellate(mesh: &Mesh, xf: &Mat4, mirrored: bool, params: &Params, targe
         }
         let p = idx.map(|k| wp[k as usize]);
         let dirs = dirs_of(idx, fnrm);
-        let (base, flags) = if has_uv {
-            (idx.map(|k| mesh.uvs[k as usize]), 0)
+        // UV della mesh (solo con la proiezione UV; con la box non servono).
+        let base = if has_uv {
+            idx.map(|k| mesh.uvs[k as usize])
         } else {
-            let axis = box_base(Vec3::ZERO, frame.dir_to_local(fnrm)).1;
-            (p.map(|v| box_coords(frame.to_local(v), axis)), box_flags(axis))
+            [Vec2::ZERO; 3]
         };
         let seg = [0, 1, 2].map(|e| segments((p[(e + 1) % 3] - p[e]).length(), target));
         let n = seg.iter().copied().max().unwrap_or(1);
@@ -316,9 +361,14 @@ pub fn tessellate(mesh: &Mesh, xf: &Mat4, mirrored: bool, params: &Params, targe
                 } else {
                     None
                 };
+                let mut corner = |verts: &mut Vec<Vec3>, attrs: &mut Vec<(f32, Vec3)>, wv: u32| -> u32 {
+                    *corner_cache
+                        .entry(wv)
+                        .or_insert_with(|| push(verts, attrs, wpos[wv as usize], wnorm[wv as usize], uv_of(wv, &w, &base)))
+                };
                 let id = match edge {
-                    Some((u, _, 0)) => corner(&mut verts, &mut corner_cache, w[u], &wpos, &wnorm, params, base[u]),
-                    Some((_, v, s)) if s == n => corner(&mut verts, &mut corner_cache, w[v], &wpos, &wnorm, params, base[v]),
+                    Some((u, _, 0)) => corner(&mut verts, &mut attrs, w[u]),
+                    Some((_, v, s)) if s == n => corner(&mut verts, &mut attrs, w[v]),
                     Some((u, v, s)) => {
                         let e = if (u, v) == (0, 1) {
                             0
@@ -337,12 +387,12 @@ pub fn tessellate(mesh: &Mesh, xf: &Mat4, mirrored: bool, params: &Params, targe
                             (wb, wa)
                         };
                         let step = MAX_SEGMENTS / ne;
-                        let mut sample = |q: u32, verts: &mut Vec<Vec3>| -> u32 {
+                        let mut sample = |q: u32, verts: &mut Vec<Vec3>, attrs: &mut Vec<(f32, Vec3)>| -> u32 {
                             if q == 0 {
-                                return corner(verts, &mut corner_cache, wa, &wpos, &wnorm, params, uv_of(wa, &w, &base));
+                                return corner(verts, attrs, wa);
                             }
                             if q == MAX_SEGMENTS {
-                                return corner(verts, &mut corner_cache, wb, &wpos, &wnorm, params, uv_of(wb, &w, &base));
+                                return corner(verts, attrs, wb);
                             }
                             *edge_cache.entry((wa, wb, q)).or_insert_with(|| {
                                 let t = q as f32 / MAX_SEGMENTS as f32;
@@ -352,19 +402,21 @@ pub fn tessellate(mesh: &Mesh, xf: &Mat4, mirrored: bool, params: &Params, targe
                                 // UV dal triangolo corrente, nel verso originale del lato.
                                 let uva = uv_of(wa, &w, &base);
                                 let uvb = uv_of(wb, &w, &base);
-                                verts.push(pos + dir * params.height_at(uva.lerp(uvb, t)));
-                                verts.len() as u32 - 1
+                                push(verts, attrs, pos, dir, uva.lerp(uvb, t))
                             })
                         };
                         if q % step == 0 {
-                            sample(q, &mut verts)
+                            sample(q, &mut verts, &mut attrs)
                         } else {
                             // Punto in più rispetto al lato: sulla retta tra i due campioni del lato.
                             let (q0, q1) = (q / step * step, q / step * step + step);
-                            let (v0, v1) = (sample(q0, &mut verts), sample(q1, &mut verts));
+                            let (v0, v1) = (sample(q0, &mut verts, &mut attrs), sample(q1, &mut verts, &mut attrs));
                             let t = (q - q0) as f32 / step as f32;
                             *edge_cache.entry((wa, wb, q)).or_insert_with(|| {
+                                let (h0, d0) = attrs[v0 as usize];
+                                let (h1, d1) = attrs[v1 as usize];
                                 verts.push(verts[v0 as usize].lerp(verts[v1 as usize], t));
+                                attrs.push((h0 + (h1 - h0) * t, d0.lerp(d1, t).normalize_or(d0)));
                                 verts.len() as u32 - 1
                             })
                         }
@@ -372,8 +424,7 @@ pub fn tessellate(mesh: &Mesh, xf: &Mat4, mirrored: bool, params: &Params, targe
                     None => {
                         let pos = p[0] * a + p[1] * b + p[2] * c;
                         let dir = (dirs[0] * a + dirs[1] * b + dirs[2] * c).normalize_or(fnrm);
-                        verts.push(pos + dir * params.height_at(bary_uv(a, b, c)));
-                        verts.len() as u32 - 1
+                        push(&mut verts, &mut attrs, pos, dir, bary_uv(a, b, c))
                     }
                 };
                 grid[gi(i, j)] = id;
@@ -388,13 +439,11 @@ pub fn tessellate(mesh: &Mesh, xf: &Mat4, mirrored: bool, params: &Params, targe
                 tris.push((
                     [grid[gi(i, j)], grid[gi(i + 1, j)], grid[gi(i, j + 1)]],
                     [uv_at(i, j), uv_at(i + 1, j), uv_at(i, j + 1)],
-                    flags,
                 ));
                 if i + j + 1 < n {
                     tris.push((
                         [grid[gi(i + 1, j)], grid[gi(i + 1, j + 1)], grid[gi(i, j + 1)]],
                         [uv_at(i + 1, j), uv_at(i + 1, j + 1), uv_at(i, j + 1)],
-                        flags,
                     ));
                 }
             }
@@ -403,7 +452,7 @@ pub fn tessellate(mesh: &Mesh, xf: &Mat4, mirrored: bool, params: &Params, targe
 
     // Normali di shading della superficie spostata (media pesata per area).
     let mut vn = vec![Vec3::ZERO; verts.len()];
-    for (t, ..) in &tris {
+    for (t, _) in &tris {
         let p = t.map(|k| verts[k as usize]);
         let mut n = (p[1] - p[0]).cross(p[2] - p[0]);
         if mirrored {
@@ -414,13 +463,25 @@ pub fn tessellate(mesh: &Mesh, xf: &Mat4, mirrored: bool, params: &Params, targe
         }
     }
     tris.into_iter()
-        .map(|(t, uv, flags)| {
+        .map(|(t, uv)| {
             let p = t.map(|k| verts[k as usize]);
             let mut g = (p[1] - p[0]).cross(p[2] - p[0]);
             if mirrored {
                 g = -g;
             }
             let g = g.normalize_or_zero();
+            // Box: nell'UV di ogni vertice altezza applicata e direzione di spostamento.
+            let (uv, flags) = if has_uv {
+                (uv, 0)
+            } else {
+                (
+                    t.map(|k| {
+                        let (h, d) = attrs[k as usize];
+                        Vec2::new(h, pack_dir(d))
+                    }),
+                    FLAG_DISPLACED_BOX,
+                )
+            };
             OutTri {
                 p,
                 n: t.map(|k| vn[k as usize].normalize_or(g)),
@@ -431,17 +492,10 @@ pub fn tessellate(mesh: &Mesh, xf: &Mat4, mirrored: bool, params: &Params, targe
         .collect()
 }
 
-/// UV (o coordinate box) del triangolo corrente nel vertice saldato `wv`.
+/// UV del triangolo corrente nel vertice saldato `wv`.
 fn uv_of(wv: u32, w: &[u32; 3], base: &[Vec2; 3]) -> Vec2 {
     let i = w.iter().position(|x| *x == wv).unwrap_or(0);
     base[i]
-}
-
-fn corner(verts: &mut Vec<Vec3>, cache: &mut HashMap<u32, u32>, wv: u32, wpos: &[Vec3], wnorm: &[Vec3], params: &Params, uv: Vec2) -> u32 {
-    *cache.entry(wv).or_insert_with(|| {
-        verts.push(wpos[wv as usize] + wnorm[wv as usize] * params.height_at(uv));
-        verts.len() as u32 - 1
-    })
 }
 
 #[cfg(test)]
@@ -470,6 +524,27 @@ mod tests {
             })
             .collect();
         Texture::from_rgb8(n, n, data, false)
+    }
+
+    /// La direzione compressa torna uguale entro mezzo millesimo di radiante, in tutte le
+    /// direzioni (anche sugli spigoli dell'ottaedro), e il valore è un intero esatto in f32.
+    #[test]
+    fn packed_directions_round_trip() {
+        let mut worst = 0.0f32;
+        for i in 0..64 {
+            for j in 0..32 {
+                let (th, ph) = (i as f32 / 64.0 * std::f32::consts::TAU, j as f32 / 31.0 * std::f32::consts::PI);
+                let d = Vec3::new(ph.sin() * th.cos(), ph.cos(), ph.sin() * th.sin());
+                let code = pack_dir(d);
+                assert_eq!(code, code.round());
+                assert!(code < 16_777_216.0);
+                worst = worst.max(unpack_dir(code).angle_between(d.normalize()));
+            }
+        }
+        for d in [Vec3::X, -Vec3::X, Vec3::Y, -Vec3::Y, Vec3::Z, -Vec3::Z, Vec3::new(1.0, -1.0, -1.0)] {
+            worst = worst.max(unpack_dir(pack_dir(d)).angle_between(d.normalize()));
+        }
+        assert!(worst < 1e-3, "{worst}");
     }
 
     /// Ogni lato dei triangoli prodotti è condiviso da due triangoli (cubo chiuso → superficie chiusa).
