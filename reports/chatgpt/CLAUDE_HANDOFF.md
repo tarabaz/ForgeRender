@@ -1871,3 +1871,23 @@ Valerio ha approvato le due fasi insieme ("procedi fase 2 e 3 insieme e poi cont
 - Il fascio è rumoroso: servono molti campioni o il denoiser. Il campionamento equiangolare
   verso le luci puntiformi nei volumi è il miglioramento naturale.
 - Il fascio non illumina gli oggetti con la luce diffusa dalla foschia (scelta voluta).
+
+
+## Claude Code — 31/10/2026: scala dei materiali BlenderKit (diagnosi, nessuna modifica al motore)
+
+- Valerio: sfera da 5 cm con "Acciaio zincato 2": a 1 m per ripetizione la texture è
+  enorme e sfocata; a 2 cm i dettagli ci sono ma si vedono ripetizione e simmetria.
+- Causa: tutti i predefiniti BlenderKit partono con una ripetizione di 1 m. Il valore viene
+  dal nodo Mapping (Scale 1) e non dice niente della dimensione reale.
+- In Blender quei materiali sono pensati per gli UV dell'oggetto. Sull'anteprima di
+  BlenderKit (sfera UV) una ripetizione copre tutta la circonferenza, quindi l'aspetto
+  dipende dalla dimensione dell'oggetto, non da una misura in metri.
+- Censimento (`survey_texture_size_values`): la proprietà BlenderKit
+  `texture_size_meters` c'è solo in 4 file su 38:
+  - Galvanized steel: 3,0 m;
+  - Metal Rusty Grate: 0,15 m;
+  - Oak Wood2: 1,0 m;
+  - Stainless Steel: 0,8 m.
+  Pochi dati e poco affidabili: 3 m per la zincatura sono troppi.
+- Proposta a Valerio: ripetizione adattata all'oggetto (come nell'anteprima BlenderKit) oltre
+  alla scala reale in metri, scelta per materiale; in attesa del suo ok.

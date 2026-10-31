@@ -1429,4 +1429,80 @@ mod tests {
             }
         }
     }
+
+    /// Cerca nei .blend di Valerio i metadati di BlenderKit sulla dimensione reale della
+    /// texture (es. `texture_size_meters`), con il testo attorno (solo lettura).
+    #[test]
+    #[ignore = "legge i file .blend di Valerio"]
+    fn survey_texture_size_metadata() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../dist/MCP/blender material");
+        for p in scan(&root).into_iter().take(40) {
+            let Ok(b) = Blend::open(&p) else { continue };
+            let data = &b.data;
+            let name = p.file_name().unwrap().to_string_lossy().to_string();
+            let mut found = Vec::new();
+            for needle in [
+                &b"texture_size"[..],
+                b"size_meters",
+                b"blenderkit",
+                b"asset_data",
+                b"real_size",
+                b"dimensions",
+            ] {
+                let mut start = 0;
+                let mut n = 0;
+                while let Some(i) = data[start..].windows(needle.len()).position(|w| w == needle) {
+                    let at = start + i;
+                    n += 1;
+                    if n <= 2 {
+                        let ctx: String = data[at.saturating_sub(24)..(at + 64).min(data.len())]
+                            .iter()
+                            .map(|&c| if (32..127).contains(&c) { c as char } else { '.' })
+                            .collect();
+                        found.push(format!("{}: «{ctx}»", String::from_utf8_lossy(needle)));
+                    }
+                    start = at + 1;
+                }
+                if n > 2 {
+                    found.push(format!("{}: {n} volte", String::from_utf8_lossy(needle)));
+                }
+            }
+            println!("== {name}");
+            for f in found {
+                println!("   {f}");
+            }
+        }
+    }
+
+    /// Valore di `texture_size_meters` (proprietà personalizzata di BlenderKit) in ogni file.
+    #[test]
+    #[ignore = "legge i file .blend di Valerio"]
+    fn survey_texture_size_values() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../dist/MCP/blender material");
+        for p in scan(&root) {
+            let Ok(b) = Blend::open(&p) else { continue };
+            let values: Vec<String> = b
+                .blocks
+                .iter()
+                .filter(|blk| b.struct_name(blk) == "IDProperty")
+                .map(|blk| b.at(blk))
+                .filter(|i| i.str("name") == "texture_size_meters")
+                .map(|i| {
+                    let ty = i.i32("type").map(|v| v & 0xFF).unwrap_or(-1);
+                    let d = i.sub("data");
+                    let (v1, v2) = (
+                        d.as_ref().and_then(|d| d.i32("val")).unwrap_or(0),
+                        d.as_ref().and_then(|d| d.i32("val2")).unwrap_or(0),
+                    );
+                    let dbl = f64::from_bits((v1 as u32 as u64) | ((v2 as u32 as u64) << 32));
+                    format!("tipo {ty} → double {dbl:.4} / float {:.4} / int {v1}", f32::from_bits(v1 as u32))
+                })
+                .collect();
+            println!(
+                "{} | {}",
+                p.file_name().unwrap().to_string_lossy(),
+                if values.is_empty() { "—".into() } else { values.join("; ") }
+            );
+        }
+    }
 }

@@ -34,7 +34,7 @@ pub struct Field {
 }
 
 pub struct Blend {
-    data: Vec<u8>,
+    pub(crate) data: Vec<u8>,
     pub blocks: Vec<Block>,
     by_old: HashMap<u64, usize>,
     /// Nome di ogni struttura (indice SDNA) e i suoi campi.
