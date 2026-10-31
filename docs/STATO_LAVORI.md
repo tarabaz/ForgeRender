@@ -557,5 +557,12 @@
 - Opzioni di prova: `--sequenza <cartella>` (con `--sequenza-viste`, `-passo`, `-campioni`,
   `-passaggi`) e `--sequenze`.
 
+
+### 0.23.0: denoiser al 100% e soglia di rumore 0,03 di base (31/10/2026)
+- `presets::apply_simple_base`: `noise_threshold` 0,03 e `denoise.strength` 1,0;
+  `Preferences::new_project_settings`: `noise_threshold` 0,03. `RenderSettings::default`
+  (motore, CLI, test) non cambia.
+- Su richiesta di Valerio solo sul branch, non su main.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
