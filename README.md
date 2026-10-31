@@ -92,9 +92,8 @@ For the full technical notes, see [CHANGELOG.md](CHANGELOG.md) (Italian, authori
   Full PBR maps: base colour, roughness/gloss, metallic, normal (OpenGL/DirectX), height (bump),
   **true displacement**, ambient occlusion, opacity cutout; UV mapping or world-space box
   projection in metres for CAD models without UVs, with repeat size, rotation and offset.
-- **Library**: ~120 ready-made materials, plus materials and HDRIs downloaded from
-  ambientCG and Poly Haven or imported from folders/zip files, kept in a local `Library`
-  folder with previews.
+- **Library**: built-in materials, plus materials and HDRIs downloaded from ambientCG and
+  Poly Haven or imported from folders/ZIP files, kept in a local `Library` folder with previews.
 - **Lights and environment**: area, point, spot and directional lights, studio presets;
   uniform, gradient or HDRI environment (.hdr/.exr) with importance sampling. Point and spot
   lights have a **range** with edge falloff, independent of the intensity, drawn as a bubble in
