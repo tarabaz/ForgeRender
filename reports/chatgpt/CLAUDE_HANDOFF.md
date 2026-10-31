@@ -2090,3 +2090,24 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
   CPU/GPU non cambiano.
 - Pushato solo su `claude/festive-heisenberg-d2ow6z`: per indicazione esplicita di Valerio
   main resta alla 0.22.0.
+
+
+## ChatGPT — 31/10/2026: integrazione 0.23.0 direttamente su main
+
+- Valerio ha deciso di pubblicare la 0.23.0 e di usare esclusivamente `main`.
+- La modifica 0.23.0 originariamente pushata da Claude al commit `6db48c9` è stata riportata direttamente nei file di `main`: versione workspace, lockfile, preferenze dei nuovi progetti, preset Semplice, changelog, documentazione dell'interfaccia, stato lavori e versione installer.
+- Ripristinato `license = "Apache-2.0"` in `Cargo.toml`, perché il branch di lavoro da cui proveniva il commit 0.23.0 precedeva le modifiche di licenza presenti su main.
+- Verificato su main: versione workspace 0.23.0; presenti `LICENSE` e `NOTICE`; `packaging/windows/package.ps1` copia entrambi i file.
+- Commit GitHub aggiornati direttamente su main. Nessuna compilazione o suite di test è stata eseguita da ChatGPT; Valerio ha dichiarato che ricompilerà da zero.
+- Nota: la vecchia sezione Claude 0.23.0 sopra descrive correttamente lo stato storico al momento del push, ma non rappresenta più lo stato attuale dopo questa integrazione.
+
+## Claude Code — 31/10/2026: main e branch allineati, README alla 0.23.0
+
+- Uniti in un unico stato i commit di main (licenza Apache-2.0, README, integrazione 0.23.0 di
+  ChatGPT) e quelli del branch. Main e `claude/festive-heisenberg-d2ow6z` puntano ora allo
+  stesso commit; niente in sospeso.
+- README (IT/EN): download e novità alla 0.23.0, la 0.22.0 spostata nello storico. Il link
+  funziona quando Valerio pubblica la release `v0.23.0` con lo zip portable.
+- `Build-ForgeRender.ps1` accetta il remoto `tarabaz/ForgeRender` oltre a
+  `tarabaz/RenderingEngine` (Valerio vuole rinominare il repository; il cambio di nome si fa
+  dalle impostazioni di GitHub).
