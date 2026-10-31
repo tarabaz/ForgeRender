@@ -1282,7 +1282,7 @@ lettore `.blend` senza Blender, anteprime sullo USD Shader Ball). Ho scaricato t
 - `forge_scene/src/scene.rs`: `texture_frame` (assi dell'oggetto; origine = radice mossa con
   le trasformazioni utente del pezzo, così pezzi accostati restano continui).
 - `forge_render_core/src/displace.rs`: `BoxFrame`, `box_coords`, `box_weights`
-  (esponente `BOX_BLEND_POWER` = 8, pesi < 1 %% azzerati); `tessellate` con il frame.
+  (esponente `BOX_BLEND_POWER` = 8, pesi < 1 % azzerati); `tessellate` con il frame.
 - `render_scene.rs`: `RenderGeometry::node_frames`; test `box_mapping_follows_the_object`.
 - `forge_render_cpu/src/textures.rs`: letture multiple (`taps`) per colore, AO, rugosità,
   metallo, opacità; normal map e bump per proiezione e poi normali sfumate.
