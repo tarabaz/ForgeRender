@@ -2090,3 +2090,13 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
   CPU/GPU non cambiano.
 - Pushato solo su `claude/festive-heisenberg-d2ow6z`: per indicazione esplicita di Valerio
   main resta alla 0.22.0.
+
+
+## ChatGPT — 31/10/2026: integrazione 0.23.0 direttamente su main
+
+- Valerio ha deciso di pubblicare la 0.23.0 e di usare esclusivamente `main`.
+- La modifica 0.23.0 originariamente pushata da Claude al commit `6db48c9` è stata riportata direttamente nei file di `main`: versione workspace, lockfile, preferenze dei nuovi progetti, preset Semplice, changelog, documentazione dell'interfaccia, stato lavori e versione installer.
+- Ripristinato `license = "Apache-2.0"` in `Cargo.toml`, perché il branch di lavoro da cui proveniva il commit 0.23.0 precedeva le modifiche di licenza presenti su main.
+- Verificato su main: versione workspace 0.23.0; presenti `LICENSE` e `NOTICE`; `packaging/windows/package.ps1` copia entrambi i file.
+- Commit GitHub aggiornati direttamente su main. Nessuna compilazione o suite di test è stata eseguita da ChatGPT; Valerio ha dichiarato che ricompilerà da zero.
+- Nota: la vecchia sezione Claude 0.23.0 sopra descrive correttamente lo stato storico al momento del push, ma non rappresenta più lo stato attuale dopo questa integrazione.
