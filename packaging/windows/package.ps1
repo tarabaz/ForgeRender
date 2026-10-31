@@ -72,9 +72,6 @@ Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $staging "manuale\in
 Copy-Item -Recurse (Join-Path $root "assets\materiali") (Join-Path $staging "materiali")
 # Scena delle anteprime dei materiali (USD Shader Ball, CC-BY 4.0: vedi assets\anteprima\LEGGIMI.md).
 Copy-Item -Recurse (Join-Path $root "assets\anteprima") (Join-Path $staging "anteprima")
-# Metalli BlenderKit (licenza Royalty Free: solo uso personale, vedi assets\materiali-blenderkit\LEGGIMI.md).
-$bk = Join-Path $root "assets\materiali-blenderkit"
-if (Test-Path $bk) { Copy-Item -Recurse $bk (Join-Path $staging "materiali-blenderkit") }
 New-Item -ItemType Directory -Force -Path (Join-Path $staging "licenze") | Out-Null
 Copy-Item (Join-Path $root "packaging\licenses\*") (Join-Path $staging "licenze")
 foreach ($dll in $oidnDlls) { Copy-Item (Join-Path $OidnDir "bin\$dll") $staging }
