@@ -2118,3 +2118,17 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
   `tarabaz/RenderingEngine`). Remoto locale aggiornato; link di README (IT/EN) e STATO_LAVORI
   aggiornati. `Build-ForgeRender.ps1` accetta entrambi i nomi. Le note storiche di questo file
   restano con il nome vecchio (i link reindirizzano).
+
+
+## ChatGPT — 31/10/2026: preparazione release 0.23.0 su main
+
+- Repository rinominato e verificato come `tarabaz/ForgeRender`; il branch usato per la release è `main`.
+- Controllati `Cargo.toml` (0.23.0 e Apache-2.0), README IT/EN, CHANGELOG, script portable, script installer, LICENSE, NOTICE e CONTRIBUTING.
+- Correzioni applicate direttamente su `main`:
+  - aggiornato il repository URL in `NOTICE` a `https://github.com/tarabaz/ForgeRender`;
+  - esclusa la cartella `assets/materiali-blenderkit` sia dal pacchetto portable sia dall'installer: il suo LEGGIMI dichiara esplicitamente che i file BlenderKit sono per uso nei propri render e non ridistribuibili;
+  - README IT/EN non dichiarano più circa 120 materiali pronti, numero che includeva materiali non distribuibili.
+- Verificato che lo script portable continua a copiare `LICENSE` e `NOTICE` nella root del pacchetto e che il pacchetto include separatamente `packaging/licenses/` e le licenze OIDN.
+- Stato release GitHub al controllo: esiste ancora solo una bozza `v0.22.0` con il vecchio ZIP; non esiste ancora `v0.23.0`. Non pubblicare la bozza 0.22.0. La creazione/modifica/upload della release non è stata eseguita tramite questo collegamento.
+- Non sono stati eseguiti build, test o packaging; Valerio deve ricompilare e generare il nuovo ZIP dopo aver aggiornato la copia locale da main.
+- Da verificare prima della pubblicazione: testare che l'app senza `materiali-blenderkit` non mostri preset rotti o riferimenti a mappe mancanti; controllare contenuto dello ZIP, DLL, LICENSE, NOTICE e licenze terze parti. Il branch predefinito GitHub risulta ancora `claude/festive-heisenberg-d2ow6z` anche se la release va preparata da `main`; impostarlo su `main` dalle impostazioni repository, se desiderato.
