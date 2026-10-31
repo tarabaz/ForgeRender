@@ -493,12 +493,12 @@ impl PresetBackup {
 /// colore del fondale (se c'è). Non crea il fondale: lo fa [`prepare_scene`].
 /// Valori di base della modalità Semplice, applicati sempre (nel pannello Semplice non si vedono;
 /// in Avanzata sono nella scheda Render):
-/// - arresto a soglia di rumore 0,05 con almeno 32 campioni;
+/// - arresto a soglia di rumore 0,03 con almeno 32 campioni;
 /// - denoiser anche sull'anteprima durante il render, CUDA se la scheda lo permette (altrimenti
 ///   il denoiser usa da solo la CPU), qualità finale alta e anteprima veloce, prima anteprima a 8
-///   campioni, intensità 90 %, dettagli preservati (albedo e normali).
+///   campioni, intensità 100 %, dettagli preservati (albedo e normali).
 pub fn apply_simple_base(s: &mut RenderSettings) {
-    s.noise_threshold = 0.05;
+    s.noise_threshold = 0.03;
     s.adaptive_min_samples = 32;
     let d = &mut s.denoise;
     d.mode = DenoiseMode::Progressive;
@@ -506,7 +506,7 @@ pub fn apply_simple_base(s: &mut RenderSettings) {
     d.quality = DenoiseQuality::High;
     d.preview_quality = DenoiseQuality::Fast;
     d.first_preview_samples = 8;
-    d.strength = 0.9;
+    d.strength = 1.0;
     d.use_guides = true;
 }
 
@@ -777,7 +777,7 @@ mod tests {
         let mut s = RenderSettings::default();
         Quality::High.apply(&mut s);
         apply_simple_base(&mut s);
-        assert_eq!((s.noise_threshold, s.adaptive_min_samples), (0.05, 32));
+        assert_eq!((s.noise_threshold, s.adaptive_min_samples), (0.03, 32));
         let d = &s.denoise;
         assert_eq!(d.mode, DenoiseMode::Progressive);
         assert!(d.use_cuda && d.use_guides);
@@ -785,7 +785,7 @@ mod tests {
             (d.quality, d.preview_quality, d.first_preview_samples),
             (DenoiseQuality::High, DenoiseQuality::Fast, 8)
         );
-        assert!((d.strength - 0.9).abs() < 1e-6);
+        assert!((d.strength - 1.0).abs() < 1e-6, "denoiser al 100%");
         assert_eq!(Quality::matching(&s), Some(Quality::High));
         let before = s.clone();
         apply_simple_base(&mut s);

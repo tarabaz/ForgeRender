@@ -43,12 +43,12 @@ scheda Render, e tornando in Semplice si riapplicano — `presets::apply_simple_
 
 | Impostazione | Valore |
 |---|---|
-| Arresto a soglia di rumore | attivo, soglia 0,050, campioni minimi 32 |
+| Arresto a soglia di rumore | attivo, soglia 0,030 (da 0.23.0; prima 0,050), campioni minimi 32 |
 | Denoiser: modalità | Anteprima veloce + finale (ripulisce anche durante il render) |
 | Denoiser: CUDA | attivo (se la scheda non lo supporta, il denoiser usa da solo la CPU) |
 | Denoiser: qualità finale / anteprima | Alta / Veloce |
 | Denoiser: prima anteprima | a 8 campioni |
-| Denoiser: intensità | 90 % |
+| Denoiser: intensità | 100 % (da 0.23.0; prima 90 %) |
 | Denoiser: preserva i dettagli (albedo e normali) | sì |
 
 Nota sull'arresto a soglia di rumore: nella scena del cocktail (nebbia, scena scura) era più

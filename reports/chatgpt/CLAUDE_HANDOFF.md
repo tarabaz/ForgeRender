@@ -2080,3 +2080,13 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
   - Sfarfallio: PSNR di 61 dB sul fondale fermo tra fotogrammi consecutivi.
 - Limite: i passaggi (CPU, 8 campioni) attraverso il vetro hanno albedo rumoroso, come le guide
   del denoiser.
+
+## Claude Code — 31/10/2026: 0.23.0, valori di partenza (solo branch)
+
+- Richiesta di Valerio: di default denoiser attivo al 100% (non 90%) e soglia di rumore 0,03.
+- Modificati `apply_simple_base` (Semplice: 0,05 → 0,03, intensità 0,9 → 1,0) e
+  `new_project_settings` (progetti nuovi in Avanzata: soglia 0,03, prima spenta). Il default
+  del motore (`RenderSettings::default`) resta senza soglia, così CLI e test di confronto
+  CPU/GPU non cambiano.
+- Pushato solo su `claude/festive-heisenberg-d2ow6z`: per indicazione esplicita di Valerio
+  main resta alla 0.22.0.
