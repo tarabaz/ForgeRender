@@ -331,3 +331,20 @@ file di output e le immagini. Poi aggiungi una riga all'indice in `reports/READM
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architettura, scelte tecniche, rischi
 - [docs/BENCHMARK.md](docs/BENCHMARK.md) — misure eseguite (solo dati reali)
 - [docs/STATO_LAVORI.md](docs/STATO_LAVORI.md) — diario dello sviluppo
+
+## Licenza e contributi
+
+ForgeRender è distribuito con **Apache License 2.0**. La licenza consente di
+utilizzare, modificare, ridistribuire e distribuire commercialmente il progetto,
+nel rispetto delle sue condizioni. I file modificati devono essere identificati
+come tali e gli avvisi applicabili di copyright, licenza e attribuzione devono
+essere conservati. La licenza **non** concede diritti sul nome o sul logo
+ForgeRender oltre al limitato uso descrittivo previsto dalla licenza.
+
+- [Apache License 2.0](LICENSE)
+- [Avvisi di attribuzione del progetto](NOTICE)
+- [Come contribuire](CONTRIBUTING.md)
+
+Librerie, materiali, asset di esempio e altri contenuti di terze parti possono
+essere soggetti a licenze separate: consulta gli avvisi allegati e
+`packaging/licenses/`.
