@@ -132,6 +132,8 @@ impl Preferences {
             backend: self.new_backend,
             target_samples: self.new_samples,
             threads: self.new_threads,
+            // Arresto a soglia di rumore 0,03 (come la modalità Semplice); denoiser al 100 %.
+            noise_threshold: 0.03,
             ..Default::default()
         }
     }
