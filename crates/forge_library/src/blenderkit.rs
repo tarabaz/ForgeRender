@@ -964,15 +964,34 @@ pub fn scan(root: &Path) -> Vec<PathBuf> {
     out
 }
 
-/// Provenienza salvata nel materiale: cartella BlenderKit (con l'identificativo dell'asset)
-/// e nome del materiale nel file.
+/// Il file viene da un download BlenderKit (cartella `nome_<identificativo>` o percorso con
+/// "blenderkit"): di solito licenza Royalty Free.
+pub fn is_blenderkit_download(path: &Path) -> bool {
+    let folder = path
+        .parent()
+        .and_then(|p| p.file_name())
+        .map(|f| f.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    path.to_string_lossy().to_lowercase().contains("blenderkit")
+        || folder
+            .rsplit('_')
+            .next()
+            .is_some_and(|id| id.len() == 36 && id.matches('-').count() == 4)
+}
+
+/// Provenienza salvata nel materiale: cartella del file e nome del materiale (con la nota sulla
+/// licenza per i download BlenderKit).
 pub fn source_of(path: &Path, material: &str) -> String {
     let folder = path
         .parent()
         .and_then(|p| p.file_name())
         .map(|f| f.to_string_lossy().into_owned())
         .unwrap_or_default();
-    format!("Blender {folder} / {material} (BlenderKit Royalty Free: solo uso personale)")
+    if is_blenderkit_download(path) {
+        format!("Blender {folder} / {material} (BlenderKit Royalty Free: solo uso personale)")
+    } else {
+        format!("Blender {folder} / {material}")
+    }
 }
 
 /// Esito dell'import di un file.
@@ -1016,7 +1035,7 @@ pub fn save_to_library(
     let saved = result?;
     let mut notes = x.notes.clone();
     for p in x.params.iter().filter(|p| p.status != Status::Exact) {
-        notes.push(format!("{}: {} → {} ({})", p.name, p.blender, p.forge, p.note));
+        notes.push(format!("{}: {} -> {} ({})", p.name, p.blender, p.forge, p.note));
     }
     let saved = store::set_notes(&saved.dir, &notes)?;
     store::set_catalog_info(&saved.dir, categories, &["blender".to_string()])

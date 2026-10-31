@@ -44,6 +44,10 @@ fn parse_args() -> StartupOptions {
                 o.screenshot_after_samples = args.get(i).and_then(|s| s.parse().ok()).unwrap_or(0);
             }
             "--library" => o.library = true,
+            "--importa-blend" => {
+                i += 1;
+                o.import_blend = args.get(i).map(PathBuf::from);
+            }
             "--settings" => o.settings = true,
             "--iso" => o.iso = true,
             "--controllo-ia" | "--mcp" => o.mcp = true,

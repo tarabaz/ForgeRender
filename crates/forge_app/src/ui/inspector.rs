@@ -564,7 +564,7 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
 }
 
 /// Scala, proiezione, rotazione e spostamento delle texture del materiale.
-fn mapping_controls(ui: &mut egui::Ui, m: &mut Material, obj_size: Option<f32>) -> bool {
+pub(crate) fn mapping_controls(ui: &mut egui::Ui, m: &mut Material, obj_size: Option<f32>) -> bool {
     let mut changed = false;
     let mp = &mut m.mapping;
     ui.horizontal(|ui| {
@@ -717,7 +717,7 @@ fn mtlx_values(ui: &mut egui::Ui, m: &mut Material) -> bool {
 }
 
 /// Normal map, bump e displacement vero.
-fn relief_controls(ui: &mut egui::Ui, m: &mut Material) -> bool {
+pub(crate) fn relief_controls(ui: &mut egui::Ui, m: &mut Material) -> bool {
     let mut changed = false;
     egui::Grid::new("relief-grid").num_columns(2).spacing([10.0, 6.0]).show(ui, |ui| {
         if m.normal_texture.is_some() {

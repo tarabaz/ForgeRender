@@ -60,6 +60,7 @@ pub enum Cmd {
     // Libreria
     LibraryMine,
     LibraryOnline,
+    LibraryImportBlend,
     LibraryFolder,
     // Strumenti
     AiControl,
@@ -327,6 +328,13 @@ pub fn spec(cmd: Cmd) -> Spec {
             None,
             tk("Cerca e scarica materiali e HDRI gratuiti"),
         ),
+        Cmd::LibraryImportBlend => s(
+            "library.import_blend",
+            tk("Importa materiale da Blender…"),
+            icons::LIBRARY,
+            None,
+            tk("Estrae mappe e valori di un materiale da un file .blend (anche BlenderKit), con anteprima, e lo salva nella libreria"),
+        ),
         Cmd::LibraryFolder => s(
             "library.folder",
             tk("Cartella della libreria…"),
@@ -563,6 +571,7 @@ pub fn run_confirmed(app: &mut ForgeApp, ctx: &egui::Context, cmd: Cmd) {
         }
         Cmd::LibraryMine => app.library.open_on(false),
         Cmd::LibraryOnline => app.library.open_on(true),
+        Cmd::LibraryImportBlend => app.blend_import.open = true,
         Cmd::LibraryFolder => crate::ui::settings::open_paths(app, ctx),
         Cmd::AiControl => {
             let on = app.mcp.is_some();
@@ -671,6 +680,7 @@ mod tests {
             Cmd::AutoRestart,
             Cmd::LibraryMine,
             Cmd::LibraryOnline,
+            Cmd::LibraryImportBlend,
             Cmd::LibraryFolder,
             Cmd::AiControl,
             Cmd::Manual,

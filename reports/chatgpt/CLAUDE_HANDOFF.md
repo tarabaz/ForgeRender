@@ -1214,3 +1214,31 @@ lettore `.blend` senza Blender, anteprime sullo USD Shader Ball). Ho scaricato t
   il suo LEGGIMI. Domanda per te: vale la pena un'opzione esplicita (es. `-SenzaBlenderKit`) o
   un controllo che blocchi i pacchetti "pubblici" con quella cartella?
 
+
+## Claude Code — 31/10/2026: 0.13.0, importatore .blend nel programma (fasi 2–4)
+
+**File modificati**
+- `crates/forge_app/src/ui/blend_import.rs` (nuovo): finestra con tre colonne (sorgente,
+  parametri, anteprima). Lettura con `blenderkit::read_all` su un thread; per il materiale
+  scelto le mappe vanno in una cartella temporanea (tolta alla chiusura); anteprima con
+  `central::render_preview` (shader ball) su un thread, rifatta quando cambiano i valori;
+  import con `blenderkit::save_to_library` (stesse funzioni della libreria, scena intatta).
+- `blenderkit.rs`: `is_blenderkit_download`, provenienza con la nota Royalty Free solo per i
+  download BlenderKit.
+- Comando `Cmd::LibraryImportBlend` (menu Libreria), pulsante nella finestra Libreria,
+  trascinamento dei `.blend` verso l'importatore quando è aperto, opzione `--importa-blend`.
+- `inspector.rs`: `mapping_controls` e `relief_controls` riusati dall'importatore.
+- Screenshot automatico: aspetta anche che l'importatore abbia finito (lettura e anteprima).
+
+**Test eseguiti davvero**
+- `import_real_blend_into_temp_library` (ignorato, con un .blend di Valerio): lettura,
+  mappe, salvataggio in una libreria temporanea, materiale ricaricato con le mappe → ok.
+- Screenshot della finestra vera con "Steel Satin metal": file, mappe, slider, tabella e
+  anteprima presenti. L'acciaio appare scuro perché la sua mappa colore è scura e l'ambiente
+  dello shader ball è tenue (verificato: stesse mappe e valori del predefinito).
+- Traduzioni inglesi complete; suite completa e clippy (vedi commit).
+
+**Limiti residui**
+- Nessuna anteprima GPU separata: l'anteprima usa il path tracer CPU (veloce sullo shader ball).
+- Il nome/categoria scelti valgono per un materiale alla volta (nessun import multiplo dalla
+  finestra; la CLI importa una cartella intera).

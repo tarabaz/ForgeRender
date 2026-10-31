@@ -621,6 +621,15 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
             }
         }
         if ui
+            .button(tr("Importa da Blender…"))
+            .on_hover_text(tr(
+                "Un materiale da un file .blend (anche BlenderKit), con anteprima prima di salvarlo",
+            ))
+            .clicked()
+        {
+            app.blend_import.open = true;
+        }
+        if ui
             .button(tr("Importa zip…"))
             .on_hover_text(tr("Archivi scaricati da ambientCG, Poly Haven, ecc."))
             .clicked()

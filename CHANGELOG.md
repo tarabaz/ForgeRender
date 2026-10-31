@@ -11,6 +11,24 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.13.0 — 31/10/2026
+
+**Libreria → Importa materiale da Blender…**
+- Finestra nel programma (anche dal pulsante "Importa da Blender…" della Libreria): si sceglie
+  o si **trascina** un file `.blend` (con la finestra aperta il `.blend` non viene importato
+  come modello). Lettura in background, senza Blender.
+- **Sorgente**: materiali del file (si sceglie quale), shader, mappe trovate e mancanti,
+  immagini del file non usate, avvisi; i materiali interamente procedurali non si mostrano e
+  non si importano, quelli in parte procedurali sì con l'avviso.
+- **Parametri**: nome, categoria, colore base, metallic, roughness/glossiness, IOR, scala e
+  posizionamento texture, rilievo (gli stessi controlli dell'editor dei materiali), più la
+  tabella "Da Blender a ForgeRender" con lo stato (esatto, approssimato, non supportato) e la
+  nota della conversione.
+- **Anteprima** sullo shader ball delle anteprime, renderizzata dal vero motore su un thread a
+  parte; si rifà quando cambia un valore.
+- **Importa nella libreria**: mappe e valori salvati con le funzioni della libreria; la scena
+  aperta non cambia. Avvio con `--importa-blend FILE`.
+
 ## 0.12.0 — 31/10/2026
 
 **Anteprime dei materiali sullo shader ball, materiali della scena**

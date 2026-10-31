@@ -114,6 +114,8 @@ pub struct StartupOptions {
     pub screenshot_after_samples: u32,
     /// Apre la finestra della libreria.
     pub library: bool,
+    /// Apre l'importatore di materiali Blender su questo file.
+    pub import_blend: Option<PathBuf>,
     /// Apre la finestra delle impostazioni.
     pub settings: bool,
     /// Modalità dell'interfaccia per questa sessione (non salvata): "semplice" o "avanzata".
@@ -242,6 +244,8 @@ pub struct ForgeApp {
     denoise_sent: Option<forge_render_core::DenoiseSettings>,
     pub gizmo: crate::ui::gizmo::Gizmo,
     pub library: crate::ui::library::LibraryUi,
+    /// Finestra "Importa materiale da Blender".
+    pub blend_import: crate::ui::blend_import::BlendImportUi,
     /// Impostazioni dell'app (menu Impostazioni) e finestra aperta.
     pub prefs: crate::prefs::Preferences,
     pub prefs_open: bool,
@@ -362,6 +366,7 @@ impl ForgeApp {
             denoise_sent: None,
             gizmo: Default::default(),
             library: Default::default(),
+            blend_import: Default::default(),
             prefs: Default::default(),
             prefs_open: false,
             prefs_error: None,
@@ -468,6 +473,9 @@ impl ForgeApp {
             app.tab = InspectorTab::Camera;
         }
         app.library.open = startup.library;
+        if let Some(p) = startup.import_blend.clone() {
+            app.blend_import.open_file(p);
+        }
         app.prefs_open = startup.settings;
         if let Some(m) = startup.ui_mode {
             app.prefs.ui_mode = m;
@@ -2050,7 +2058,8 @@ impl ForgeApp {
             return;
         }
         let ready = self.frames > 30
-            && (self.startup.screenshot_after_samples == 0 || self.session.progress().samples >= self.startup.screenshot_after_samples);
+            && (self.startup.screenshot_after_samples == 0 || self.session.progress().samples >= self.startup.screenshot_after_samples)
+            && (!self.blend_import.open || self.blend_import.is_settled());
         if ready && !self.screenshot_requested {
             self.screenshot_requested = true;
             let done = self.screenshot_done.clone();

@@ -23,6 +23,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
         ui.menu_button(tr("Libreria"), |ui| {
             item(app, ui, Cmd::LibraryMine);
             item(app, ui, Cmd::LibraryOnline);
+            item(app, ui, Cmd::LibraryImportBlend);
             ui.separator();
             item(app, ui, Cmd::LibraryFolder);
         });

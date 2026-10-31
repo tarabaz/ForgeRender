@@ -4,6 +4,7 @@
 //! pannello destro (proprietà), pannello inferiore (progressi, statistiche,
 //! log), area centrale (viewport o render).
 
+pub(crate) mod blend_import;
 pub mod central;
 pub mod gizmo;
 pub mod icons;
@@ -156,7 +157,15 @@ impl ForgeApp {
     }
 
     fn handle_dropped_files(&mut self, ctx: &egui::Context) {
-        let files: Vec<std::path::PathBuf> = ctx.input(|i| i.raw.dropped_files.iter().map(|f| f.path().to_path_buf()).collect());
+        let mut files: Vec<std::path::PathBuf> = ctx.input(|i| i.raw.dropped_files.iter().map(|f| f.path().to_path_buf()).collect());
+        // Con l'importatore di materiali aperto un .blend va lì (non si importa come modello).
+        if self.blend_import.open {
+            let is_blend = |f: &std::path::PathBuf| f.extension().is_some_and(|e| e.eq_ignore_ascii_case("blend"));
+            if let Some(b) = files.iter().find(|f| is_blend(f)).cloned() {
+                self.blend_import.open_file(b);
+            }
+            files.retain(|f| !is_blend(f));
+        }
         let (projects, models): (Vec<_>, Vec<_>) = files.into_iter().partition(|f| {
             f.extension()
                 .and_then(|e| e.to_str())
@@ -249,6 +258,7 @@ impl ForgeApp {
         self.confirm_discard_window(ctx);
         self.toast_area(ctx);
         crate::ui::library::window(self, ctx);
+        crate::ui::blend_import::window(self, ctx);
         crate::ui::manual::window(self, ctx);
         crate::ui::settings::window(self, ctx);
         crate::ui::splash::show(self, ctx);

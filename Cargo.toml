@@ -24,7 +24,7 @@ default-members = [
 ]
 
 [workspace.package]
-version = "0.12.0"
+version = "0.13.0"
 edition = "2021"
 publish = false
 authors = ["FrancyStore3D"]

@@ -477,5 +477,13 @@
   farà prima una libreria buona con l'importatore, poi si deciderà come integrarla.
 - Prossimo: fase 2 (anteprima nella finestra dell'importatore), poi fasi 3–5.
 
+### 0.13.0: importatore .blend nel programma (31/10/2026, fasi 2–4)
+- Libreria → "Importa materiale da Blender…" (e pulsante nella finestra Libreria): sorgente
+  (scelta o trascinamento del file, materiali, mappe), parametri (slider dell'editor + tabella
+  Blender → ForgeRender con lo stato), anteprima sullo shader ball, import nella libreria.
+  `crates/forge_app/src/ui/blend_import.rs`. La scena aperta non cambia.
+- Resta la fase 5 ("Esporta come predefinito" con controllo della licenza) e la decisione su
+  come integrare nel programma la libreria che Valerio costruirà con l'importatore.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
