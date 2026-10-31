@@ -93,8 +93,8 @@ Per le note tecniche complete consulta [CHANGELOG.md](CHANGELOG.md) (in italiano
   height (bump), **displacement vero**, occlusione ambientale, ritaglio con opacità; mapping UV o
   proiezione box in metri per i modelli CAD senza UV, con dimensione della ripetizione, rotazione
   e spostamento.
-- **Libreria**: ~120 materiali pronti, più materiali e HDRI scaricati da ambientCG e Poly Haven
-  o importati da cartelle/zip, conservati nella cartella locale `Libreria` con anteprime.
+- **Libreria**: materiali predefiniti inclusi, più materiali e HDRI scaricati da ambientCG e
+  Poly Haven o importati da cartelle/ZIP, conservati nella cartella locale `Libreria` con anteprime.
 - **Luci e ambiente**: luci ad area, puntiformi, spot e direzionali, preset da studio; ambiente
   uniforme, a gradiente o HDRI (.hdr/.exr) con importance sampling. Puntiformi e spot hanno un
   **raggio d'azione** con sfumatura del bordo, indipendente dall'intensità, disegnato come una
