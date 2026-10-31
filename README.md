@@ -316,14 +316,16 @@ Then add a row to the index in `reports/README.md`.
 
 ## Documentation
 
+- [Documentation home](docs/README.md) — English reference and Italian language index.
+
 - [CHANGELOG.md](CHANGELOG.md) — what changed in each version (Italian)
 - [reports/](reports/README.md) — measurement reports with raw data, images and the commands to reproduce them (Italian)
 - [docs/MCP.md](docs/MCP.md) — controlling ForgeRender from Claude Code (MCP): setup, tools,
   safety (Italian)
 - [docs/ROADMAP.md](docs/ROADMAP.md) — status, next steps with complexity, technical plans
   ([italiano](docs/ROADMAP.it.md))
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architecture, technical choices, risks (Italian)
-- [docs/BENCHMARK.md](docs/BENCHMARK.md) — measurements actually performed (Italian)
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architecture, technical choices and known limitations (English; [Italian](docs/ARCHITECTURE.it.md))
+- [docs/BENCHMARK.md](docs/BENCHMARK.md) — measured performance results (Italian version currently available at [docs/BENCHMARK.it.md](docs/BENCHMARK.it.md))
 - [docs/STATO_LAVORI.md](docs/STATO_LAVORI.md) — development log (Italian)
 
 ## License and contributions
