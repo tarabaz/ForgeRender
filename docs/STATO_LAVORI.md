@@ -516,5 +516,11 @@
 - `contact::drop_onto_below`: caduta indipendente per pezzo, `Contact::edge_hit` (spigolo
   contro spigolo, griglia 2D), pezzi nascosti scelti.
 
+### 0.18.0: integrazione AI con un clic (31/10/2026)
+- `forge_app/src/mcp/setup.rs` (rilevamento, Collega/Scollega per Claude Desktop, Claude Code,
+  Codex; ponte in cartella fissa), `ui/ai_setup.rs` (finestra), saluto del ponte con il nome
+  dell'assistente (`rpc::client_name`, `link::Client::connect(assistant)`).
+- Prossimo: luci spot volumetriche con fascio regolabile.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

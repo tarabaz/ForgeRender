@@ -37,6 +37,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             {
                 run(app, ui, Cmd::AiControl);
             }
+            item(app, ui, Cmd::AiSetup);
         });
         ui.menu_button(tr("Guida"), |ui| {
             item(app, ui, Cmd::Manual);
@@ -286,7 +287,22 @@ pub fn ai_control(app: &mut ForgeApp, ui: &mut egui::Ui) {
     }
     if let Some(s) = app.mcp.as_ref().filter(|s| s.connected()) {
         let last = s.last.clone().unwrap_or_else(|| "—".into());
-        ui.label(egui::RichText::new(tr("Controllato da IA")).color(style::ACCENT).strong())
+        // Chi è collegato, se l'assistente si è presentato al ponte.
+        let mut names: Vec<&str> = s
+            .assistants
+            .lock()
+            .map(|a| a.clone())
+            .unwrap_or_default()
+            .iter()
+            .filter_map(|n| crate::mcp::setup::Assistant::from_client_name(n).map(|a| a.name()))
+            .collect();
+        names.dedup();
+        let text = if names.is_empty() {
+            tr("Controllato da IA").to_string()
+        } else {
+            tf("Controllato da {}", &[names.join(", ")])
+        };
+        ui.label(egui::RichText::new(text).color(style::ACCENT).strong())
             .on_hover_text(tf("Comandi eseguiti: {}, ultimo: {}", &[s.calls.to_string(), last]));
     }
 }

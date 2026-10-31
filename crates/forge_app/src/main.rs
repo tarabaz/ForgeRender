@@ -8,6 +8,7 @@
 //!     --screenshot-after N attende N campioni prima dello screenshot
 //!     --modalita semplice|avanzata   modalità dell'interfaccia per questa sessione
 //!     --mesh               viewport in vista Mesh (wireframe) all'avvio
+//!     --integrazione-ai    apre la finestra Integrazione AI (collegamento degli assistenti)
 //!     --prepara studio|chiaro|scuro|scenografico   "Prepara scena prodotto" all'avvio
 
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
@@ -52,6 +53,7 @@ fn parse_args() -> StartupOptions {
             "--settings" => o.settings = true,
             "--iso" => o.iso = true,
             "--mesh" => o.mesh = true,
+            "--integrazione-ai" => o.ai_setup = true,
             "--controllo-ia" | "--mcp" => o.mcp = true,
             "--prepara" => {
                 i += 1;

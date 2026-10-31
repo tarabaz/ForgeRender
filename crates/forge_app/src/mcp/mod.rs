@@ -11,6 +11,7 @@
 
 pub mod inspect;
 pub mod ops;
+pub mod setup;
 pub mod tools;
 
 use crate::app::ForgeApp;
@@ -44,6 +45,9 @@ pub struct Server {
     streams: Arc<Mutex<Vec<TcpStream>>>,
     /// Ponti collegati in questo momento ("Controllato da IA" nella barra).
     pub clients: Arc<AtomicUsize>,
+    /// Nomi con cui si sono presentati gli assistenti collegati (`clientInfo.name`; vuoto se
+    /// il ponte non lo sa, es. un ponte di una versione precedente).
+    pub assistants: Arc<Mutex<Vec<String>>>,
     /// Strumenti eseguiti e ultimo nome (suggerimento dell'indicatore).
     pub calls: u64,
     pub last: Option<String>,
@@ -69,22 +73,31 @@ pub fn start(ctx: egui::Context) -> Result<Server, String> {
     let (tx, rx) = channel::<Call>();
     let stop = Arc::new(AtomicBool::new(false));
     let clients = Arc::new(AtomicUsize::new(0));
+    let assistants: Arc<Mutex<Vec<String>>> = Arc::default();
     let streams: Arc<Mutex<Vec<TcpStream>>> = Arc::default();
     {
-        let (stop, clients, streams, token) = (stop.clone(), clients.clone(), streams.clone(), token.clone());
+        let (stop, clients, streams, token, assistants) =
+            (stop.clone(), clients.clone(), streams.clone(), token.clone(), assistants.clone());
         std::thread::Builder::new()
             .name("forge-ia-ascolto".into())
             .spawn(move || {
                 while !stop.load(Ordering::Acquire) {
                     match listener.accept() {
                         Ok((stream, _)) => {
-                            let (tx, ctx, stop, clients, token) = (tx.clone(), ctx.clone(), stop.clone(), clients.clone(), token.clone());
+                            let (tx, ctx, stop, clients, token, assistants) = (
+                                tx.clone(),
+                                ctx.clone(),
+                                stop.clone(),
+                                clients.clone(),
+                                token.clone(),
+                                assistants.clone(),
+                            );
                             if let Ok(s) = stream.try_clone() {
                                 streams.lock().expect("collegamenti").push(s);
                             }
                             let _ = std::thread::Builder::new()
                                 .name("forge-ia-collegamento".into())
-                                .spawn(move || serve(stream, &token, &tx, &ctx, &stop, &clients));
+                                .spawn(move || serve(stream, &token, &tx, &ctx, &stop, &clients, &assistants));
                         }
                         Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => std::thread::sleep(Duration::from_millis(100)),
                         Err(e) => {
@@ -104,6 +117,7 @@ pub fn start(ctx: egui::Context) -> Result<Server, String> {
         token,
         streams,
         clients,
+        assistants,
         calls: 0,
         last: None,
     })
@@ -130,7 +144,15 @@ impl Server {
 }
 
 /// Un collegamento del ponte: saluto con la chiave, poi richieste e risposte una per riga.
-fn serve(stream: TcpStream, token: &str, tx: &Sender<Call>, ctx: &egui::Context, stop: &AtomicBool, clients: &AtomicUsize) {
+fn serve(
+    stream: TcpStream,
+    token: &str,
+    tx: &Sender<Call>,
+    ctx: &egui::Context,
+    stop: &AtomicBool,
+    clients: &AtomicUsize,
+    assistants: &Mutex<Vec<String>>,
+) {
     let _ = stream.set_nonblocking(false);
     let _ = stream.set_nodelay(true);
     let Ok(read) = stream.try_clone() else { return };
@@ -144,7 +166,11 @@ fn serve(stream: TcpStream, token: &str, tx: &Sender<Call>, ctx: &egui::Context,
         .ok()
         .filter(|&n| n > 0)
         .map(|_| link::check_hello(&line, token));
-    let ok = matches!(hello, Some(Ok(())));
+    let ok = matches!(hello, Some(Ok(_)));
+    let name = match &hello {
+        Some(Ok(n)) => n.clone().unwrap_or_default(),
+        _ => String::new(),
+    };
     let answer = if ok {
         serde_json::json!({"ok": true, "version": env!("CARGO_PKG_VERSION")})
     } else {
@@ -155,6 +181,7 @@ fn serve(stream: TcpStream, token: &str, tx: &Sender<Call>, ctx: &egui::Context,
     }
     let _ = writer.set_read_timeout(None);
     clients.fetch_add(1, Ordering::AcqRel);
+    assistants.lock().expect("assistenti").push(name.clone());
     tracing::info!("controllo IA: assistente collegato");
     ctx.request_repaint();
     loop {
@@ -175,6 +202,12 @@ fn serve(stream: TcpStream, token: &str, tx: &Sender<Call>, ctx: &egui::Context,
         }
     }
     clients.fetch_sub(1, Ordering::AcqRel);
+    {
+        let mut a = assistants.lock().expect("assistenti");
+        if let Some(i) = a.iter().position(|x| *x == name) {
+            a.remove(i);
+        }
+    }
     tracing::info!("controllo IA: assistente scollegato");
     ctx.request_repaint();
 }
@@ -276,18 +309,21 @@ mod tests {
         let contact: link::Contact = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
         let rx = &server.rx;
         let bridge = std::thread::spawn(|| {
-            let mut c = link::Client::connect().expect("collegamento");
+            let mut c = link::Client::connect(Some("claude-code")).expect("collegamento");
             assert!(c.is_alive());
             c.call("scene_info", &serde_json::json!({"max_components": 1})).unwrap()
         });
         let call = rx.recv_timeout(Duration::from_secs(10)).expect("chiamata");
         assert_eq!(call.name, "scene_info");
+        // Collegato adesso: si è presentato come Claude Code.
+        assert_eq!(*server.assistants.lock().unwrap(), vec!["claude-code".to_string()]);
         assert_eq!(call.args["max_components"], 1);
         call.reply.send(ToolOutput::ok(serde_json::json!({"ok": 1}))).unwrap();
         let result = bridge.join().unwrap();
         assert_eq!(result["isError"], false);
         assert!(result["content"][0]["text"].as_str().unwrap().contains("ok"));
         assert!(server.connected() || server.clients.load(Ordering::Acquire) == 0);
+
         // Chiave sbagliata.
         let mut s = TcpStream::connect(("127.0.0.1", contact.port)).unwrap();
         writeln!(s, "{}", serde_json::json!({"token": "sbagliata"})).unwrap();
@@ -296,7 +332,7 @@ mod tests {
         assert!(answer.contains("\"ok\":false"), "{answer}");
         server.shutdown();
         assert!(!file.exists(), "file di contatto tolto");
-        let err = link::Client::connect().err().expect("spento");
+        let err = link::Client::connect(None).err().expect("spento");
         assert!(err.contains("Controllo IA"), "{err}");
         std::env::remove_var(link::ENV_CONTACT);
     }

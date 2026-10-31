@@ -68,6 +68,20 @@ Non sovrascrivere file esistenti senza che l'utente lo chieda (overwrite). \
 ForgeRender lo apre l'utente e decide lui quando accettare comandi (\"Controllo IA\" nella \
 barra in alto): se un comando risponde che non è collegato, chiedigli di aprirlo e di attivarlo.";
 
+/// Nome dell'assistente (`params.clientInfo.name`) se la riga è la richiesta `initialize`.
+pub fn client_name(line: &str) -> Option<String> {
+    let msg: Value = serde_json::from_str(line).ok()?;
+    if msg.get("method").and_then(Value::as_str) != Some("initialize") {
+        return None;
+    }
+    Some(
+        msg.pointer("/params/clientInfo/name")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string(),
+    )
+}
+
 /// Gestisce una riga ricevuta. Restituisce la risposta da scrivere (nessuna per le notifiche).
 /// `call` esegue uno strumento e restituisce il risultato MCP (vedi [`ToolOutput::to_json`]).
 pub fn handle_line(line: &str, tools: &Value, call: &mut dyn FnMut(&str, &Value) -> Value) -> Option<String> {

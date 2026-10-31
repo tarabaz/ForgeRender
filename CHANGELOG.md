@@ -11,6 +11,25 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.18.0 — 31/10/2026
+
+**Integrazione AI con un clic**
+- Strumenti → Integrazione AI…: stato del server MCP di ForgeRender e di ogni assistente
+  (Non installato, Non configurato, Da aggiornare, Configurato, Connesso) con i pulsanti
+  Collega, Aggiorna e Scollega. Niente terminale né percorsi da copiare.
+- Claude Desktop (anche versione Microsoft Store e cartella Claude-Data), Claude Code
+  (terminale e app, con il comando claude o il file utente), Codex di OpenAI. ChatGPT risulta
+  non supportato: collega solo server remoti su internet.
+- Il ponte forgerender-mcp.exe si copia da solo in %LOCALAPPDATA%\ForgeRender\mcp: i
+  collegamenti restano validi quando aggiorni o sposti il programma.
+- Prima di modificare una configurazione se ne fa una copia (.backup-forgerender); si scrive
+  solo la voce forgerender; un file rovinato non si tocca.
+- Al primo clic su "Controllo IA" senza assistenti collegati si apre la finestra; al primo
+  collegamento riuscito il controllo si accende da solo. Dopo il collegamento di Claude Desktop,
+  pulsante "Riavvia Claude Desktop" (serve una volta sola, con conferma).
+- Nella barra: "Controllato da Claude Code" (o Claude Desktop, Codex): il ponte dice al
+  programma quale assistente si è collegato.
+
 ## 0.17.1 — 31/10/2026
 
 **Correzioni**

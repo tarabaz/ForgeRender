@@ -64,6 +64,8 @@ pub enum Cmd {
     LibraryFolder,
     // Strumenti
     AiControl,
+    /// Finestra "Integrazione AI": collega Claude Desktop, Claude Code, Codex con un clic.
+    AiSetup,
     // Pannelli della modalità Avanzata
     Tab(InspectorTab),
     // Guida
@@ -349,6 +351,13 @@ pub fn spec(cmd: Cmd) -> Spec {
             None,
             tk("Permette a Claude di comandare questa finestra (tramite forgerender-mcp)"),
         ),
+        Cmd::AiSetup => s(
+            "tools.ai_setup",
+            tk("Integrazione AI…"),
+            icons::AI,
+            None,
+            tk("Collega Claude Desktop, Claude Code o Codex a ForgeRender con un clic e controlla i collegamenti"),
+        ),
         Cmd::Tab(t) => s(tab_id(t), tab_label(t), tab_icon(t), None, ""),
         Cmd::Manual => s(
             "help.manual",
@@ -575,8 +584,15 @@ pub fn run_confirmed(app: &mut ForgeApp, ctx: &egui::Context, cmd: Cmd) {
         Cmd::LibraryFolder => crate::ui::settings::open_paths(app, ctx),
         Cmd::AiControl => {
             let on = app.mcp.is_some();
-            crate::mcp::set_enabled(app, ctx, !on);
+            // Prima volta, nessun assistente collegato: si apre la configurazione, e il
+            // controllo si accende da solo al primo collegamento riuscito.
+            if !on && !app.ai_setup.any_configured() {
+                app.ai_setup.open_for_first_use();
+            } else {
+                crate::mcp::set_enabled(app, ctx, !on);
+            }
         }
+        Cmd::AiSetup => app.ai_setup.open(),
         Cmd::Tab(t) => open_tab(app, t),
         Cmd::Manual => {
             let target = crate::ui::manual::context_target(app, ctx);
@@ -683,6 +699,7 @@ mod tests {
             Cmd::LibraryImportBlend,
             Cmd::LibraryFolder,
             Cmd::AiControl,
+            Cmd::AiSetup,
             Cmd::Manual,
             Cmd::Shortcuts,
             Cmd::Welcome,

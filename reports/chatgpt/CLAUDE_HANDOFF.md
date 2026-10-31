@@ -1796,3 +1796,42 @@ Valerio ha approvato le due fasi insieme ("procedi fase 2 e 3 insieme e poi cont
   picking e i gizmo. Test `camera_frame_always_fits_the_viewport`. Screenshot reale con
   `--camera-test attraverso`: cornice intera dentro la viewport.
 - Suite: 252 passati, 0 falliti; clippy e fmt puliti. Prossimo: registrazione MCP con i pulsanti.
+
+
+## Claude Code — 31/10/2026: 0.18.0, integrazione AI con un clic
+
+**File**
+- `crates/forge_app/src/mcp/setup.rs`:
+  - `Env` (cartelle sostituibili nei test), `install_bridge`: copia in
+    `%LOCALAPPDATA%\ForgeRender\mcp`, lasciata com'è se è in uso;
+  - `state`, `connect`, `disconnect` per Claude Desktop (`Claude-Data\claude_*`,
+    `Packages\Claude_*\LocalCache\Roaming\Claude`, `%APPDATA%\Claude`; si saltano le
+    cartelle con `.user-data-left*`), Claude Code (`claude mcp add --scope user` senza finestra
+    di console, altrimenti `~/.claude.json`) e Codex (sezione `[mcp_servers.forgerender]` di
+    `~/.codex/config.toml`, lasciando le altre); ChatGPT è `Unsupported`;
+  - scrittura con copia `.backup-forgerender` e rinomina atomica; un file non valido non si
+    modifica;
+  - `restart_claude_desktop` chiude solo i processi in `WindowsApps\Claude_*` o
+    `AnthropicClaude` e riapre con `Get-StartApps`.
+- `ui/ai_setup.rs`: la finestra "Integrazione AI". `Cmd::AiSetup` (menu Strumenti) e
+  `Cmd::AiControl`: senza assistenti configurati apre la finestra; al primo collegamento
+  accende il controllo.
+- Ponte: `rpc::client_name` legge `clientInfo.name` da `initialize`; il ponte si collega
+  subito e manda `assistant` nel saluto. `Server::assistants` alimenta "Controllato da …" e
+  lo stato "Connesso".
+
+**Test**
+- Sei test in `mcp::setup`: cartella fissa; Claude Desktop con cartella nuova e vecchia,
+  unione e copia di sicurezza; file rotto non toccato; percorso vecchio "da aggiornare"; Codex
+  con le altre sezioni intatte e niente duplicati; nomi degli assistenti.
+  `claude_code_without_cli_uses_the_user_config` si salta da solo sui PC con il comando
+  `claude`, come questo.
+- `bridge_talks_to_the_window`: con il ponte collegato la finestra sa che è "claude-code".
+- Suite 258 passati, 0 falliti; clippy e fmt puliti.
+- Programma vero (`--integrazione-ai`) sui file reali, solo in lettura: Claude Desktop "Non
+  configurato", Claude Code "Da aggiornare" (puntava al ponte della 0.8.2), Codex "Non
+  configurato", ChatGPT "Non supportato"; ponte copiato nella cartella fissa.
+
+**Non provato dal vivo**
+- I pulsanti sui file reali di Valerio e il riavvio di Claude Desktop: chiuderebbe anche questa
+  sessione di Claude Code, che gira dentro l'app. Coperti dai test su cartelle finte.

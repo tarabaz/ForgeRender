@@ -107,7 +107,7 @@ pub struct Client {
 
 impl Client {
     /// Si collega alla finestra indicata dal file di contatto.
-    pub fn connect() -> Result<Client, String> {
+    pub fn connect(assistant: Option<&str>) -> Result<Client, String> {
         let path = contact_file().ok_or(NOT_CONNECTED)?;
         let c = read_contact_at(&path)?;
         let addr = SocketAddr::from(([127, 0, 0, 1], c.port));
@@ -120,7 +120,12 @@ impl Client {
         };
         // Saluto con la chiave, con un tempo massimo: una finestra bloccata non blocca il ponte.
         client.writer.set_read_timeout(Some(Duration::from_secs(10))).ok();
-        client.send(&json!({"token": c.token, "client": "forgerender-mcp", "version": env!("CARGO_PKG_VERSION")}))?;
+        client.send(&json!({
+            "token": c.token,
+            "client": "forgerender-mcp",
+            "version": env!("CARGO_PKG_VERSION"),
+            "assistant": assistant,
+        }))?;
         let hello = client.recv()?;
         if hello["ok"] != true {
             return Err(hello["error"].as_str().unwrap_or(NOT_CONNECTED).to_string());
@@ -168,11 +173,12 @@ impl Client {
     }
 }
 
-/// Lato finestra: legge il saluto del ponte e controlla la chiave.
-pub fn check_hello(line: &str, token: &str) -> Result<(), String> {
+/// Lato finestra: legge il saluto del ponte e controlla la chiave. Restituisce il nome con cui
+/// l'assistente si è presentato al ponte (`clientInfo.name` dell'MCP), se lo conosce.
+pub fn check_hello(line: &str, token: &str) -> Result<Option<String>, String> {
     let v: Value = serde_json::from_str(line).map_err(|_| "saluto non valido".to_string())?;
     if v["token"].as_str() == Some(token) {
-        Ok(())
+        Ok(v["assistant"].as_str().filter(|s| !s.is_empty()).map(str::to_string))
     } else {
         Err("chiave non valida".into())
     }

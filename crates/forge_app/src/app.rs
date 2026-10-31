@@ -124,6 +124,8 @@ pub struct StartupOptions {
     pub iso: bool,
     /// Viewport in vista Mesh all'avvio (`--mesh`, test e screenshot).
     pub mesh: bool,
+    /// Finestra "Integrazione AI" aperta all'avvio (`--integrazione-ai`).
+    pub ai_setup: bool,
     /// "Controllo IA" acceso all'avvio (`--controllo-ia`, prove automatiche).
     pub mcp: bool,
     /// Esegue "Prepara scena prodotto" all'avvio con l'aspetto indicato (test e screenshot).
@@ -250,6 +252,8 @@ pub struct ForgeApp {
     pub library: crate::ui::library::LibraryUi,
     /// Finestra "Importa materiale da Blender".
     pub blend_import: crate::ui::blend_import::BlendImportUi,
+    /// Finestra "Integrazione AI" (collegamento degli assistenti).
+    pub ai_setup: crate::ui::ai_setup::AiSetupUi,
     /// Impostazioni dell'app (menu Impostazioni) e finestra aperta.
     pub prefs: crate::prefs::Preferences,
     pub prefs_open: bool,
@@ -379,6 +383,7 @@ impl ForgeApp {
             gizmo: Default::default(),
             library: Default::default(),
             blend_import: Default::default(),
+            ai_setup: crate::ui::ai_setup::AiSetupUi::new(),
             prefs: Default::default(),
             prefs_open: false,
             prefs_error: None,
@@ -496,6 +501,9 @@ impl ForgeApp {
             app.prefs.ui_mode = m;
         }
         app.viewport_mesh = startup.mesh;
+        if startup.ai_setup {
+            app.ai_setup.open();
+        }
         if startup.iso {
             app.orbit.lens.ortho = true;
             app.orbit.yaw = std::f32::consts::FRAC_PI_4;

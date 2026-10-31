@@ -50,7 +50,33 @@ installation over `target\release`: a new build cannot replace the bridge while 
 it. On an external drive the drive letter can change between computers;
 update it in the configuration (or give the drive a fixed letter in Disk Management).
 
-## 2. Connect it to Claude (once)
+## 2. Connect it with one click (from version 0.18.0)
+
+No terminal needed. In ForgeRender: **Tools → AI integration…** (it also opens by itself on the
+first click on "AI control" if no assistant is connected).
+
+- At the top, the state of the **ForgeRender MCP server** (AI control on or off) and the bridge
+  `forgerender-mcp.exe`, which the program copies by itself to a fixed folder
+  (`%LOCALAPPDATA%\ForgeRender\mcp\`): connections stay valid when you update or move ForgeRender.
+- Below, one row per assistant with its state: *Not installed*, *Not configured*, *Needs update*
+  (registered with an old version's bridge), *Configured*, **Connected** (connected right now).
+- **Connect** / **Update** / **Disconnect**: one click. The program writes only the `forgerender`
+  entry in the assistant's configuration, makes a copy first (`.backup-forgerender`) and never
+  touches a damaged file.
+
+| Assistant | After "Connect" |
+|---|---|
+| **Claude Desktop** | Restart it once ("Restart Claude Desktop" button: closes and reopens the app, chats stay saved). Then every chat, new or old, sees ForgeRender. |
+| **Claude Code** (terminal and desktop app) | Open a new session. |
+| **Codex** (OpenAI) | Open a new session. |
+| **ChatGPT** | Not supported: ChatGPT only connects remote servers on the internet, not programs on the PC. For OpenAI use Codex. |
+
+On the first successful connection AI control turns on by itself; after that the "AI control"
+button is a plain on/off switch. The bar shows who is in control: "Controlled by Claude Code" (or
+Claude Desktop, Codex).
+
+## 3. Connect it by hand (fallback)
+
 
 ### Claude Code: user-level registration (recommended)
 
@@ -113,7 +139,7 @@ Settings → Developer → Edit config; in `claude_desktop_config.json` (double 
 
 Then restart Claude Desktop.
 
-## 3. Use
+## 4. Use
 
 1. Open ForgeRender (double-click, as usual).
 2. Click **"AI control"** in the top bar: it turns orange.
@@ -154,7 +180,7 @@ time: it reads the scene again with `scene_info` before changing it.
 "in progress", ForgeRender finishes and saves it by itself, and Claude then calls
 `render_status` to get the image.
 
-## 4. Available tools
+## 5. Available tools
 
 Measurements in **metres**, y up. "Right", "left", "front" are relative to the render framing.
 
@@ -187,7 +213,7 @@ Measurements in **metres**, y up. "Right", "left", "front" are relative to the r
 Renders without a path go to a `render` folder next to the project, or to `renders` next to the
 logs (portable: program folder; installed: `%LOCALAPPDATA%\ForgeRender\renders`).
 
-## 5. Security
+## 6. Security
 
 - Nobody can control ForgeRender until you turn "AI control" on; turning it off closes the
   connections immediately.
@@ -202,12 +228,12 @@ logs (portable: program folder; installed: `%LOCALAPPDATA%\ForgeRender\renders`)
   (id `ia-…`).
 - Transforms and presets can be undone like manual ones (Ctrl+Z, "Undo preset").
 
-## 6. Troubleshooting
+## 7. Troubleshooting
 
 - **Claude says "ForgeRender is not connected"** (in Italian): open ForgeRender and turn on
   "AI control".
 - **Only the first command works, then Claude says the connection was lost**: the bridge is
-  registered through a folder `.mcp.json`. Register it at user level (section 2), rename the
+  registered through a folder `.mcp.json`. Register it at user level (section 2 or 3), rename the
   `.mcp.json` and open a new session. The bridge never closes by itself: it stays up until
   Claude closes it, even with "AI control" off or ForgeRender closed.
 - **"ForgeRender does not respond: the window is minimised…"**: commands run like clicks, at each
@@ -229,7 +255,7 @@ logs (portable: program folder; installed: `%LOCALAPPDATA%\ForgeRender\renders`)
 
   ![Command log](img/mcp/en/registro.png)
 
-## 7. Developer notes
+## 8. Developer notes
 
 - `crates/forge_mcp`: MCP protocol (`rpc.rs`, JSON-RPC 2.0, protocol 2025-06-18, also accepts
   2025-03-26 and 2024-11-05), tool list (`tools.rs`), local bridge ↔ window link (`link.rs`:

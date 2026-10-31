@@ -4,6 +4,7 @@
 //! pannello destro (proprietà), pannello inferiore (progressi, statistiche,
 //! log), area centrale (viewport o render).
 
+pub(crate) mod ai_setup;
 pub(crate) mod blend_import;
 pub mod central;
 pub mod gizmo;
@@ -259,6 +260,7 @@ impl ForgeApp {
         self.toast_area(ctx);
         crate::ui::library::window(self, ctx);
         crate::ui::blend_import::window(self, ctx);
+        crate::ui::ai_setup::window(self, ctx);
         crate::ui::manual::window(self, ctx);
         crate::ui::settings::window(self, ctx);
         crate::ui::splash::show(self, ctx);

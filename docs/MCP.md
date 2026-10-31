@@ -53,7 +53,35 @@ compilazione non riesce a sostituire il ponte mentre Claude lo sta usando. Se il
 lettera del disco può cambiare da un PC all'altro: in quel caso va aggiornata nella
 configurazione (oppure assegna al disco una lettera fissa da Gestione disco).
 
-## 2. Collegarlo a Claude (una volta)
+## 2. Collegarlo con un clic (dalla versione 0.18.0)
+
+Non serve il terminale. In ForgeRender: **Strumenti → Integrazione AI…** (si apre da sola anche
+al primo clic su "Controllo IA", se nessun assistente è collegato).
+
+- In alto lo stato del **server MCP di ForgeRender** (Controllo IA acceso o spento) e il ponte
+  `forgerender-mcp.exe`, che il programma copia da solo in una cartella fissa
+  (`%LOCALAPPDATA%\ForgeRender\mcp\`): i collegamenti restano validi anche quando aggiorni o
+  sposti ForgeRender.
+- Sotto, una riga per assistente con lo stato: *Non installato*, *Non configurato*, *Da
+  aggiornare* (registrato con il ponte di una versione vecchia), *Configurato*, **Connesso**
+  (collegato in questo momento).
+- **Collega** / **Aggiorna** / **Scollega**: un clic. Il programma scrive solo la voce
+  `forgerender` nella configurazione dell'assistente, ne fa prima una copia
+  (`.backup-forgerender`) e non tocca un file rovinato.
+
+| Assistente | Dopo "Collega" |
+|---|---|
+| **Claude Desktop** | Riavvialo una volta (pulsante "Riavvia Claude Desktop": chiude e riapre l'app, le chat restano salvate). Poi ogni chat, nuova o vecchia, vede ForgeRender. |
+| **Claude Code** (terminale e app desktop) | Apri una sessione nuova. |
+| **Codex** (OpenAI) | Apri una sessione nuova. |
+| **ChatGPT** | Non supportato: ChatGPT collega solo server remoti su internet, non programmi del PC. Per OpenAI usa Codex. |
+
+Al primo collegamento riuscito il Controllo IA si accende da solo; dalla volta dopo il pulsante
+"Controllo IA" è un semplice acceso/spento. Nella barra compare chi comanda: "Controllato da
+Claude Code" (o Claude Desktop, Codex).
+
+## 3. Collegarlo a mano (riserva)
+
 
 ### Claude Code: registrazione a livello utente (consigliata)
 
@@ -118,7 +146,7 @@ Impostazioni → Sviluppatore → Modifica configurazione; nel file `claude_desk
 
 Poi riavvia Claude Desktop.
 
-## 3. Come si usa
+## 4. Come si usa
 
 1. Apri ForgeRender (doppio clic, come sempre).
 2. Clicca **"Controllo IA"** in alto: diventa arancione.
@@ -159,7 +187,7 @@ qualsiasi momento: lui rilegge la scena con `scene_info` prima di modificare.
 risponde "in corso" e ForgeRender lo finisce e lo salva da solo; Claude poi chiede
 `render_status` e riceve l'immagine.
 
-## 4. I comandi disponibili
+## 5. I comandi disponibili
 
 Misure in **metri**, y verso l'alto. "Destra", "sinistra", "davanti" sono rispetto
 all'inquadratura del render.
@@ -194,7 +222,7 @@ Dove finiscono i render senza un percorso: nella cartella `render` accanto al pr
 in `renders` accanto ai log (portable: cartella del programma; installata:
 `%LOCALAPPDATA%\ForgeRender\renders`).
 
-## 5. Sicurezza
+## 6. Sicurezza
 
 - Nessuno può comandare ForgeRender finché non accendi "Controllo IA"; spegnendolo, i
   collegamenti si chiudono subito.
@@ -209,11 +237,11 @@ in `renders` accanto ai log (portable: cartella del programma; installata:
   del progetto (id `ia-…`).
 - Trasformazioni e preset si annullano come quelli fatti a mano (Ctrl+Z, "Annulla preset").
 
-## 6. Se qualcosa non va
+## 7. Se qualcosa non va
 
 - **Claude dice "ForgeRender non è collegato"**: apri ForgeRender e accendi "Controllo IA".
 - **Funziona solo il primo comando, poi Claude dice che il collegamento si è interrotto**: il
-  ponte è registrato con un `.mcp.json` di cartella. Registralo a livello utente (punto 2),
+  ponte è registrato con un `.mcp.json` di cartella. Registralo a livello utente (punto 2 o 3),
   rinomina il `.mcp.json` e apri una sessione nuova. Il ponte da solo non si chiude mai: resta
   acceso finché Claude non lo chiude, anche con "Controllo IA" spento o ForgeRender chiuso.
 - **"ForgeRender non risponde: la finestra è ridotta a icona…"**: i comandi si eseguono come
@@ -236,7 +264,7 @@ in `renders` accanto ai log (portable: cartella del programma; installata:
 
   ![Registro dei comandi](img/mcp/it/registro.png)
 
-## 7. Per sviluppatori
+## 8. Per sviluppatori
 
 - `crates/forge_mcp`: protocollo MCP (`rpc.rs`, JSON-RPC 2.0, protocollo 2025-06-18, accetta
   anche 2025-03-26 e 2024-11-05), elenco degli strumenti (`tools.rs`), collegamento locale
