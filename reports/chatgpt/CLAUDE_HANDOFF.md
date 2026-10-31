@@ -1945,3 +1945,68 @@ Le modalità 3 e 4 sono entrambe richieste: non scegliere una sola variante. La 
     0,7508, GPU 0,7506.
 - Render: `reports/scala-materiali/`, zincato 2 su sfere da 5 cm e 1 m, stesso aspetto.
 - Suite completa verde.
+
+## Proposta di ChatGPT — 31/10/2026: esplosi, callout, distinta e strumenti di presentazione tecnica
+
+Valerio chiede di raccogliere in un'unica specifica le funzionalità discusse per rendere ForgeRender utile anche alla documentazione visiva di assiemi e prodotti. Questa è una richiesta di **analisi e pianificazione**, non un'autorizzazione a implementare subito. Claude Code deve leggere questa sezione e la roadmap, confrontarle con il codice reale e restituire una valutazione con dipendenze, priorità, milestone, rischi e test di accettazione.
+
+### Principio di prodotto e limiti
+- ForgeRender deve restare un renderer e uno strumento leggero di presentazione/documentazione visiva; **non deve diventare un CAD** e non deve cercare di replicare integralmente SolidWorks Composer.
+- Non sono richiesti disegni quotati, quote lineari, raggi o diametri. L'obiettivo è produrre immagini e PDF chiari con componenti identificabili e, quando serve, una distinta.
+- La geometria triangolare importata è sufficiente per esplosi, callout e tavole illustrate, a condizione che l'import conservi la gerarchia dei componenti e i metadati CAD disponibili. La distinta deve basarsi su gerarchia/metadati, non dedurre codici dalla geometria.
+- Prima di progettare l'interfaccia, verificare quali formati d'import conservano già nomi, gerarchia, quantità, codici articolo e proprietà personalizzate. Evidenziare ciò che viene perso nei flussi GLB/OBJ/STL e ciò che richiede STEP/SolidWorks.
+
+### 1. Esplosione controllata degli assiemi
+- Consentire di selezionare l'assieme, un sottoassieme, gruppi o singoli componenti da spostare.
+- Supportare esplosione lungo X, Y e Z, con direzione e distanza controllabili.
+- Supportare anche esplosione radiale/circolare, oltre a quella cartesiana.
+- La strategia di esplosione deve poter variare per gruppo/componente: componenti differenti possono richiedere direzioni o metodi diversi. Non imporre un unico algoritmo a tutto l'assieme.
+- Prevedere regolazione manuale e, se possibile, generazione automatica iniziale; preservare la possibilità di tornare alla posizione originale e modificare/ripristinare la configurazione.
+- Valutare una sequenza di fasi di montaggio/esplosione come estensione successiva, non come requisito per la prima milestone.
+
+### 2. Callout e identificazione dei componenti
+- Callout collegati a componenti reali/stabili dell'assieme, con numerazione progressiva oppure nome/codice direttamente nell'etichetta.
+- Linee di richiamo, etichette e campi informativi configurabili (numero, nome, codice articolo e altri metadati disponibili).
+- Supportare sia callout sovrapposti al rendering sia una tavola/legenda separata, mantenendo un'unica sorgente dati e identificatori coerenti.
+- ID interni stabili: la numerazione visibile può cambiare secondo ordinamento o tavola, ma il collegamento deve restare associato al componente corretto.
+- Priorità alta alla leggibilità: evitare sovrapposizioni tra etichette e linee, gestione automatica delle collisioni, possibilità di riposizionamento manuale e blocco della posizione quando l'utente la sistema.
+- Valutare come mantenere leggibili i callout in viste diverse e dopo modifiche all'esploso; non promettere un layout perfetto automatico senza test su assiemi densi.
+
+### 3. BOM / distinta componenti
+- Generare una distinta dalla gerarchia dell'assieme e dai metadati importati.
+- Raggruppare componenti con lo stesso codice articolo e sommare le quantità; conservare, se utile, anche il dettaglio delle occorrenze.
+- Segnalare componenti privi di codice o con metadati incompleti, senza inventare codici.
+- Collegare le righe della distinta ai callout e ai componenti della scena, con ordinamento configurabile.
+- Valutare esportazione PDF e Excel; la prima versione può concentrarsi su una tabella affidabile e coerente con i callout.
+
+### 4. Output e tavole
+Prevedere, idealmente dalla stessa scena e dalla stessa configurazione di identificazione:
+- render pulito senza annotazioni;
+- render annotato con callout;
+- tavola illustrata con legenda/BOM;
+- PDF multipagina, eventualmente con una pagina per vista o fase di montaggio;
+- distinta esportabile separatamente (ad esempio CSV/XLSX, se sostenibile).
+La prima versione non deve necessariamente includere un editor di impaginazione complesso: valutare un layout semplice con template e dimensioni pagina predefinite.
+
+### 5. Altre funzioni di presentazione da valutare
+Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con funzioni già presenti e non accorparle artificialmente al sistema esplosi.
+- **Viste multiple automatiche**: generare viste frontale, posteriore, laterale, tre quarti e dall'alto, con inquadratura coerente.
+- **Varianti di prodotto**: salvare/confrontare varianti di materiali, colori o configurazioni della stessa scena.
+- **Sezioni / cutaway**: piani di sezione e viste di taglio per mostrare l'interno, distinguendo una semplice sezione visiva da eventuali operazioni geometriche più complesse.
+- **Match fotografico / compositing**: allineare camera e prospettiva a una fotografia e comporre il render nella foto; valutarne costi e limiti separatamente.
+- **Render passes / AOV**: esportare pass distinti (colore, ombre, normali, emissione, profondità e altri realmente supportabili) per compositing e post-produzione.
+- **Turntable e sequenze animate**: rotazione prodotto automatica e, in una fase successiva, sequenze di esplosione/montaggio.
+- **Decal/adesivi**: già presenti come voce 5 della roadmap; non duplicare il task, ma valutarne le dipendenze rispetto a varianti e tavole.
+
+### Valutazione tecnica richiesta a Claude Code
+1. Ispezionare import CAD e pipeline di conversione: gerarchia, identificatori, metadati, codici, quantità e limiti per ciascun formato.
+2. Ispezionare selezione, trasformazioni, gerarchia scena, salvataggio progetto, camera, output PNG e pipeline CPU/GPU.
+3. Proporre un modello dati per esplosi, identificatori/callout e BOM che non dipenda dall'ordine temporaneo dei nodi e che resti compatibile con i progetti esistenti.
+4. Separare una prima milestone minima (esplosione manuale selettiva + callout stabili + distinta aggregata + tavola/PDF semplice) dalle estensioni automatiche e animate.
+5. Indicare cosa è fattibile con mesh triangolari e metadati esistenti, cosa richiede migliorare gli import e cosa non è realistico senza un kernel CAD.
+6. Definire test su assiemi con componenti ripetuti, codici mancanti, sottoassiemi, componenti ruotati, esplosioni miste XYZ/radiali, callout ravvicinati, salvataggio/riapertura e coerenza tra render pulito/annotato/BOM.
+7. Riportare stime e priorità, evidenziando rischi di prestazioni e complessità dell'impaginazione.
+
+**Vincolo esplicito**: non implementare queste funzionalità durante la sola analisi. Prima restituire il piano e attendere l'approvazione di Valerio. Nessun test o comportamento va dichiarato implementato finché non esiste codice e non è stato effettivamente verificato.
+
+**Stato al 31/10/2026**: specifica consolidata nel passaggio di consegne; non implementata e non testata.
