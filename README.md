@@ -7,24 +7,23 @@
 **A photorealistic CAD & 3D rendering engine for Windows 11 · 64-bit.**  
 Written in Rust, with progressive CPU/GPU path tracing for CAD models, mechanical assemblies and general 3D scenes.
 
-## Download ForgeRender 0.22.0
+## Download ForgeRender 0.23.0
 
 <sub><strong>STABLE RELEASE</strong> · Windows 11 · x64 · Portable ZIP</sub>
 
-[⬇️ **DOWNLOAD FORGERENDER 0.22.0 — PORTABLE ZIP**](https://github.com/tarabaz/RenderingEngine/releases/download/v0.22.0/ForgeRender-0.22.0-portable-x64.zip)
+[⬇️ **DOWNLOAD FORGERENDER 0.23.0 — PORTABLE ZIP**](https://github.com/tarabaz/RenderingEngine/releases/download/v0.23.0/ForgeRender-0.23.0-portable-x64.zip)
 
 No installation required: extract the ZIP and run `forgerender.exe`.  
 The package is distributed through GitHub Releases.
 
-### What's new in 0.22.0
+### What's new in 0.23.0
 
-- **Automatic multiple views**: generate front, rear, side, top and three-quarter product views, each framed automatically.
-- **Turntable video**: create a rotating product animation and export it as MP4 (H.264).
-- **Render passes**: export albedo, normals, depth, product mask and component IDs.
+- **Cleaner default renders:** the denoiser now runs at 100% and the noise threshold starts at 0.03.
 
 <details>
 <summary><strong>Previous versions — complete release history</strong></summary>
 
+- **0.22.0 — Multiple views, turntable and render passes:** automatic front, rear, side, top and three-quarter views; rotating product video exported as MP4 (H.264) with adjustable rotation and duration; albedo, normals, depth, product mask and component ID passes.
 - **0.21.0 — Material editor and ZIP export:** edit library materials, adjust maps and values, rotate the live preview, apply changes, save materials and export portable material ZIPs. Also fixes draft sample defaults and repeated backdrop scaling.
 - **0.20.0 — Adaptive material scale:** scale Box-projected textures to each object or assembly; keep bump and displacement at the same scale, consistently on CPU and GPU.
 - **0.19.0 — Volumetric spotlights:** visible light beams with adjustable density and length, cone-shaped shadows, and matching CPU/GPU results.

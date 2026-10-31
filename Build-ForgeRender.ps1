@@ -75,14 +75,15 @@ foreach ($tool in 'git', 'cargo') {
     }
 }
 
-# Repository giusto: radice Git = cartella dello script, remoto tarabaz/RenderingEngine, workspace ForgeRender.
+# Repository giusto: radice Git = cartella dello script, remoto tarabaz/ForgeRender (prima
+# tarabaz/RenderingEngine: dopo il cambio di nome GitHub reindirizza, valgono entrambi).
 $top = (Run 'git rev-parse --show-toplevel' { git rev-parse --show-toplevel }) | Select-Object -First 1
 if ((Resolve-Path $top).Path.TrimEnd('\') -ne (Resolve-Path $Root).Path.TrimEnd('\')) {
     Fail "lo script non è nella radice del repository Git ($top)"
 }
 $origin = (Run 'git remote get-url origin' { git remote get-url origin }) | Select-Object -First 1
-if ($origin -notmatch 'tarabaz/RenderingEngine(\.git)?/?$') {
-    Fail "il remoto 'origin' ($origin) non è tarabaz/RenderingEngine"
+if ($origin -notmatch 'tarabaz/(ForgeRender|RenderingEngine)(\.git)?/?$') {
+    Fail "il remoto 'origin' ($origin) non è tarabaz/ForgeRender"
 }
 if (-not (Test-Path (Join-Path $Root 'crates\forge_app\Cargo.toml')) -or
     -not (Test-Path (Join-Path $Root 'packaging\windows\package.ps1'))) {

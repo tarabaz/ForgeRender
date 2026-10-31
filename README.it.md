@@ -7,24 +7,23 @@
 **Motore di rendering fotorealistico per CAD e 3D, per Windows 11 · 64 bit.**  
 Scritto in Rust, con path tracing progressivo su CPU e GPU per modelli CAD, assiemi meccanici e scene 3D.
 
-## Scarica ForgeRender 0.22.0
+## Scarica ForgeRender 0.23.0
 
 <sub><strong>VERSIONE STABILE</strong> · Windows 11 · x64 · ZIP portable</sub>
 
-[⬇️ **SCARICA FORGERENDER 0.22.0 — ZIP PORTABLE**](https://github.com/tarabaz/RenderingEngine/releases/download/v0.22.0/ForgeRender-0.22.0-portable-x64.zip)
+[⬇️ **SCARICA FORGERENDER 0.23.0 — ZIP PORTABLE**](https://github.com/tarabaz/RenderingEngine/releases/download/v0.23.0/ForgeRender-0.23.0-portable-x64.zip)
 
 Nessuna installazione richiesta: estrai lo ZIP e avvia `forgerender.exe`.  
 Il pacchetto viene distribuito tramite GitHub Releases.
 
-### Novità della versione 0.22.0
+### Novità della versione 0.23.0
 
-- **Viste multiple automatiche:** genera viste frontali, posteriori, laterali, dall'alto e a tre quarti, con inquadratura automatica.
-- **Video turntable:** crea un'animazione del prodotto in rotazione ed esportala in MP4 (H.264).
-- **Passaggi di render:** esporta albedo, normali, profondità, maschera del prodotto e ID dei componenti.
+- **Render più puliti di base:** il denoiser lavora al 100% e la soglia di rumore parte da 0,03.
 
 <details>
 <summary><strong>Versioni precedenti — storico completo delle release</strong></summary>
 
+- **0.22.0 — Viste multiple, turntable e passaggi di render:** viste frontale, posteriore, laterali, dall'alto e a tre quarti automatiche; video del prodotto in rotazione in MP4 (H.264) con rotazione e durata regolabili; passaggi albedo, normali, profondità, maschera del prodotto e ID dei componenti.
 - **0.21.0 — Editor materiali ed esportazione ZIP:** modifica materiali e mappe, ruota l'anteprima in tempo reale, applica e salva le modifiche ed esporta materiali portabili in ZIP. Corretti anche i campioni di Bozza e il ridimensionamento ripetuto dei fondali.
 - **0.20.0 — Scala dei materiali adattata:** le texture con proiezione Box si adattano al singolo oggetto o all'assieme; rilievo e displacement mantengono la stessa scala su CPU e GPU.
 - **0.19.0 — Luci spot volumetriche:** fasci di luce visibili con densità e lunghezza regolabili, ombre coniche e risultati coerenti tra CPU e GPU.
