@@ -2,21 +2,58 @@
 
 🇮🇹 [Leggi in italiano](README.it.md)
 
-A photorealistic renderer for CAD models, mechanical assemblies and general 3D scenes,
-written in Rust. Physically based progressive path tracing on the CPU and on the GPU,
-desktop interface, designed for Windows 11 (developed for a Ryzen 9 9900X + RTX 5070)
-but also working without a dedicated GPU.
+![ForgeRender — CAD & 3D Rendering Engine](assets/readme-hero.png)
 
-> **Control ForgeRender with AI — MCP**
->
-> Open ForgeRender, turn on **AI control** and ask Claude to prepare a scene, import a CAD model, position studio lights, assign materials, set the camera and render. 26 tools, live changes and render previews sent back to the assistant. You decide when the AI may take control: when it disconnects, ForgeRender stays open with your work.
->
-> ![AI control on and Claude connected](docs/img/mcp/en/barra_controllato.png)
->
-> **[Set up Claude Code or Claude Desktop →](docs/MCP.en.md)** · [Italian guide](docs/MCP.md)
+**A photorealistic CAD & 3D rendering engine for Windows 11 · 64-bit.**  
+Written in Rust, with progressive CPU/GPU path tracing for CAD models, mechanical assemblies and general 3D scenes.
 
-> See [docs/ROADMAP.md](docs/ROADMAP.md) for what really works today, what comes next and
-> how complex each next step is.
+## Download ForgeRender 0.22.0
+
+<sub><strong>STABLE RELEASE</strong> · Windows 11 · x64 · Portable ZIP</sub>
+
+[⬇️ **DOWNLOAD FORGERENDER 0.22.0 — PORTABLE ZIP**](https://francystore3d.it/download/ForgeRender-0.22.0-portable-x64.zip)
+
+No installation required: extract the ZIP and run `forgerender.exe`.  
+The download package will be published at the link above.
+
+### What's new in 0.22.0
+
+- **Automatic multiple views**: generate front, rear, side, top and three-quarter product views, each framed automatically.
+- **Turntable video**: create a rotating product animation and export it as MP4 (H.264).
+- **Render passes**: export albedo, normals, depth, product mask and component IDs.
+
+<details>
+<summary><strong>Previous versions — complete release history</strong></summary>
+
+- **0.21.0 — Material editor and ZIP export:** edit library materials, adjust maps and values, rotate the live preview, apply changes, save materials and export portable material ZIPs. Also fixes draft sample defaults and repeated backdrop scaling.
+- **0.20.0 — Adaptive material scale:** scale Box-projected textures to each object or assembly; keep bump and displacement at the same scale, consistently on CPU and GPU.
+- **0.19.0 — Volumetric spotlights:** visible light beams with adjustable density and length, cone-shaped shadows, and matching CPU/GPU results.
+- **0.18.0 — One-click AI integration:** configure and manage the ForgeRender MCP bridge for Claude Desktop, Claude Code and Codex, with connection status and safer configuration updates.
+- **0.17.1 — Viewport and camera fixes:** automatic render restart only in Render view; improved camera framing and viewport navigation.
+- **0.17.0 — Box texture anchoring and placement:** choose Piece, Assembly or World anchoring; improved multi-object placement with undo and collision-aware stacking.
+- **0.16.0 — Material and texture correctness:** smoother Box displacement, consistent CPU/GPU results, improved Blender displacement and bump-node import.
+- **0.15.0 — Box projection and material previews:** object-aligned triplanar textures, smoother projections on curved surfaces, scalable previews and contact placement.
+- **0.14.0 — Object-axis dimensions and GPU-first rendering:** dimensions and scaling follow local object axes; GPU previews and improved interface.
+- **0.13.0 — Blender material importer:** inspect and import materials, maps and supported shader values from `.blend` files without requiring Blender for the reading step.
+- **0.12.0 — Shader-ball previews:** render material thumbnails and previews on a real shader-ball scene; show only materials used by the current scene in the Material panel.
+- **0.11.0 — Unified material library:** combine built-in and downloaded materials; add BlenderKit-derived metal and wood presets (subject to their stated license restrictions).
+- **0.10.0 — Mapped material presets:** first mapped presets for oak, black leather and polished white marble.
+- **0.9.0 — AI component inspection:** MCP tool to generate numbered component previews and identify repeated parts in CAD assemblies.
+- **0.8.3 — Rendering and placement fixes:** fix orthographic self-shadow artefacts and improve accurate placement on the base.
+- **0.8.2 — Corrections:** stability and rendering fixes.
+- **0.8.1 — Corrections:** additional fixes to the application.
+- **0.8.0 — Documentation and build improvements:** internal manual, compilation workflow and corrections.
+- **0.7.0 — Interface redesign:** separate menu bar and toolbar, new functions, corrections and first manual phase.
+- **0.6.0 — Simple mode and onboarding:** simplified product-photo workflow, statistics, welcome screen, AI control and guides.
+- **0.5.0 — Standalone AI control:** separate the AI control bridge from the main application.
+- **0.4.0 — Claude control via MCP:** initial natural-language control integration and related improvements.
+- **0.3.0 — Product photography workflow:** product-photo tools, viewport/camera, lighting and interface improvements.
+- **0.2.0 — First workflow and library improvements:** Simple mode, material library, rendering improvements, portable samples and build tools.
+- **0.1.0 — First release:** CPU/GPU path tracer, CAD/3D import, material library, OIDN denoiser, professional camera, lights, volumetric fog, projects, portable package and installer.
+
+For the full technical notes, see [CHANGELOG.md](CHANGELOG.md) (Italian, authoritative release log).
+
+</details>
 
 ## What it does today
 
