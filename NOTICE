@@ -1,0 +1,17 @@
+ForgeRender
+Copyright 2026 Valerio Tarabella
+
+ForgeRender is an original software project created by Valerio Tarabella.
+
+Project repository:
+https://github.com/tarabaz/RenderingEngine
+
+This NOTICE file records project-origin and attribution information.
+Redistributions must preserve the applicable copyright, license, and
+attribution notices as required by the Apache License, Version 2.0.
+
+Third-party libraries, materials, sample assets, and other bundled content
+may be subject to their own licenses and terms. Apache-2.0 applies to the
+ForgeRender project code and material expressly identified as distributed
+under that license; it does not replace or override third-party licenses.
+See packaging/licenses/, assets/, and material-specific notices.
