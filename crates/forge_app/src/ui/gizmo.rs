@@ -216,7 +216,7 @@ struct Frame {
 
 impl Frame {
     fn pt(&self, app: &ForgeApp, rect: egui::Rect, p: Vec3) -> Option<egui::Pos2> {
-        project(&app.scene.camera, rect, p)
+        project(&app.view_camera, rect, p)
     }
 
     fn ring(&self, app: &ForgeApp, rect: egui::Rect, k: usize) -> Vec<egui::Pos2> {
@@ -302,7 +302,7 @@ fn frame_for(app: &ForgeApp, rect: egui::Rect, t: Target, sel: &[usize]) -> Opti
             (c, [Vec3::X, Vec3::Y, Vec3::Z])
         }
     };
-    let cam = &app.scene.camera;
+    let cam = &app.view_camera;
     let dist = (center - cam.position).length().max(1e-4);
     let len = dist * 2.0 * (cam.vfov_deg.to_radians() * 0.5).tan() * GIZMO_PX / rect.height().max(1.0);
     let c2 = project(cam, rect, center)?;
@@ -322,7 +322,7 @@ fn frame(app: &ForgeApp, rect: egui::Rect, sel: &[usize]) -> Option<Frame> {
         }
         b.center()
     };
-    let cam = &app.scene.camera;
+    let cam = &app.view_camera;
     let local = sel.len() == 1 && (app.gizmo.local || app.gizmo.mode == GizmoMode::Scale);
     let axes = if local {
         local_axes(&app.scene, sel[0])
@@ -383,7 +383,7 @@ fn hit_test(app: &ForgeApp, rect: egui::Rect, f: &Frame, p: egui::Pos2) -> Optio
 }
 
 fn mouse_ray(app: &ForgeApp, rect: egui::Rect, p: egui::Pos2) -> (Vec3, Vec3) {
-    let cam = &app.scene.camera;
+    let cam = &app.view_camera;
     let nx = (p.x - rect.left()) / rect.width() * 2.0 - 1.0;
     let ny = 1.0 - (p.y - rect.top()) / rect.height() * 2.0;
     cam.ray(nx, ny, rect.width() / rect.height().max(1.0))
@@ -442,7 +442,7 @@ pub fn update(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::
         if let Some(origin) = ui.input(|i| i.pointer.press_origin()) {
             if let Some(h) = hit_test(app, rect, &f, origin) {
                 let (o, d) = mouse_ray(app, rect, origin);
-                let cam_fwd = app.scene.camera.forward();
+                let cam_fwd = app.view_camera.forward();
                 let (start_param, start_hit, axis_px) = match h {
                     Handle::Axis(k) => (axis_param(o, d, f.center, f.axes[k]).unwrap_or(0.0), Vec3::ZERO, 0.0),
                     Handle::Plane(k) => (0.0, plane_hit(o, d, f.center, f.axes[k]).unwrap_or(f.center), 0.0),
@@ -535,7 +535,7 @@ fn apply_drag(app: &mut ForgeApp, rect: egui::Rect, drag: &Drag, pos: egui::Pos2
     let (o, d) = mouse_ray(app, rect, pos);
     let g = &app.gizmo;
     let step_m = if snapping { g.snap_move_mm / 1000.0 } else { 0.0 };
-    let c2 = project(&app.scene.camera, rect, drag.center).unwrap_or(drag.origin);
+    let c2 = project(&app.view_camera, rect, drag.center).unwrap_or(drag.origin);
     enum Op {
         World(Mat4),
         Scale(Vec3),
@@ -554,7 +554,7 @@ fn apply_drag(app: &mut ForgeApp, rect: egui::Rect, drag: &Drag, pos: egui::Pos2
         Handle::Plane(_) | Handle::Screen => {
             let n = match drag.handle {
                 Handle::Plane(k) => drag.axes[k],
-                _ => app.scene.camera.forward(),
+                _ => app.view_camera.forward(),
             };
             let Some(hit) = plane_hit(o, d, drag.center, n) else { return };
             let mut delta = hit - drag.start_hit;
@@ -583,7 +583,7 @@ fn apply_drag(app: &mut ForgeApp, rect: egui::Rect, drag: &Drag, pos: egui::Pos2
             let mut ang = screen_angle(c2, pos) - drag.start_param;
             ang = (ang + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI;
             // L'angolo a schermo cresce in senso orario (y verso il basso): verso dell'asse rispetto alla camera.
-            if drag.axes[k].dot(app.scene.camera.forward()) < 0.0 {
+            if drag.axes[k].dot(app.view_camera.forward()) < 0.0 {
                 ang = -ang;
             }
             // Verso della rotazione rispetto al trascinamento lungo l'anello.
@@ -598,7 +598,7 @@ fn apply_drag(app: &mut ForgeApp, rect: egui::Rect, drag: &Drag, pos: egui::Pos2
             )
         }
         Handle::ScaleAxis(k) => {
-            let e = project(&app.scene.camera, rect, drag.center + drag.axes[k] * 1.0).unwrap_or(c2);
+            let e = project(&app.view_camera, rect, drag.center + drag.axes[k] * 1.0).unwrap_or(c2);
             let dir = (e - c2).normalized();
             let mut factor = 1.0 + ((pos - c2).dot(dir) - drag.start_param) / drag.axis_px;
             if snapping {
@@ -848,7 +848,7 @@ pub fn cone_handles(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &
         return false;
     };
     let cone = SpotCone::of(l);
-    let cam = &app.scene.camera;
+    let cam = &app.view_camera;
     let az = cone.front_az(cam.position);
     let (Some(po), Some(pi)) = (project(cam, rect, cone.point(outer, az)), project(cam, rect, cone.point(inner, az))) else {
         return false;

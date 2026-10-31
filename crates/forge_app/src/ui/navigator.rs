@@ -144,7 +144,7 @@ pub fn show(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, painter: &egui:
     let center = egui::pos2(rect.right() - RADIUS - 14.0, rect.top() + RADIUS + 14.0);
     let area = egui::Rect::from_center_size(center, egui::vec2(2.0 * (RADIUS + BALL), 2.0 * (RADIUS + BALL)));
     let resp = ui.interact(area, egui::Id::NULL.with("navigatore-assi"), egui::Sense::click_and_drag());
-    let cam = app.scene.camera.clone();
+    let cam = app.view_camera.clone();
     let (r, u, f) = cam.basis();
 
     // Posizioni a schermo; prima le palline più lontane (dietro).

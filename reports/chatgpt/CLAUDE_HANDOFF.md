@@ -1782,3 +1782,17 @@ Valerio ha approvato le due fasi insieme ("procedi fase 2 e 3 insieme e poi cont
   accettabile (172 ms su 1,2 milioni di triangoli).
 - Ancora da decidere: le normal e le height a 2048 px nella conversione BlenderKit (vedi la nota
   della 0.16.0).
+
+
+## Claude Code — 31/10/2026: 0.17.1, riavvio automatico solo nella vista Render e inquadratura intera della camera
+
+- `app.rs`: `should_auto_restart(auto, stale, preparing, in_render_view)` e
+  `should_stop_stale_render`: nella viewport niente riavvio (né passaggio al Render); con il
+  riavvio acceso il render vecchio si ferma e riparte tornando nel Render. Test
+  `viewport_edits_never_start_the_render`.
+- Guarda camera: `camera_frame_fraction` (inquadratura al 90 % del lato che la limita, per la
+  rotella `camera_view_zoom`) e `overscan_camera` (campo visivo o altezza ortografica
+  allargati); `ForgeApp::view_camera` usata per disegnare la viewport, la cornice, il
+  picking e i gizmo. Test `camera_frame_always_fits_the_viewport`. Screenshot reale con
+  `--camera-test attraverso`: cornice intera dentro la viewport.
+- Suite: 252 passati, 0 falliti; clippy e fmt puliti. Prossimo: registrazione MCP con i pulsanti.

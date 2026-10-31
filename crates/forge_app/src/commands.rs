@@ -312,7 +312,7 @@ pub fn spec(cmd: Cmd) -> Spec {
             tk("Riavvio automatico"),
             icons::RESTART,
             None,
-            tk("Quando cambi materiali, luci o camera il rendering riparte senza riutilizzare campioni incompatibili"),
+            tk("Quando cambi materiali, luci o camera il rendering riparte senza riutilizzare campioni incompatibili: solo nella vista Render, nella viewport puoi lavorare senza che parta"),
         ),
         Cmd::LibraryMine => s(
             "library.mine",

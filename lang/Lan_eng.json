@@ -744,7 +744,7 @@
     "Viewport": "Viewport",
     "Modalità sicura": "Safe mode",
     "Avviato senza accelerazione GPU: viewport 3D disattivata": "Started without GPU acceleration: 3D viewport disabled",
-    "Quando cambi materiali, luci o camera il rendering riparte senza riutilizzare campioni incompatibili": "When you change materials, lights or camera the render restarts without reusing incompatible samples",
+    "Quando cambi materiali, luci o camera il rendering riparte senza riutilizzare campioni incompatibili: solo nella vista Render, nella viewport puoi lavorare senza che parta": "When you change materials, lights or camera the render restarts without reusing incompatible samples: only in the Render view, in the viewport you can work without it starting",
     "Importa un modello (Ctrl+I): glTF/GLB, OBJ, STL, Blender .blend (con Blender installato), STEP (con il convertitore forgerender-step), SolidWorks SLDPRT/SLDASM (su Windows, con SolidWorks installato)": "Import a model (Ctrl+I): glTF/GLB, OBJ, STL, Blender .blend (with Blender installed), STEP (with the forgerender-step converter), SolidWorks SLDPRT/SLDASM (on Windows, with SolidWorks installed)",
     "Lingua dell'interfaccia (file nella cartella lang accanto al programma)": "Interface language (files in the lang folder next to the program)",
     "Semplice": "Simple",

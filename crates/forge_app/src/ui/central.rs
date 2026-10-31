@@ -49,6 +49,12 @@ fn camera_input(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui
     if resp.hovered() {
         let scroll = ui.input(|i| i.smooth_scroll_delta.y);
         if scroll != 0.0 {
+            if app.viewing_through_active() && !app.camera_follow && !moved {
+                // Guardando attraverso la camera la rotella ingrandisce o rimpicciolisce la
+                // vista attorno all'inquadratura, senza muovere la camera di render.
+                app.camera_view_zoom = (app.camera_view_zoom * (scroll * 0.0015).exp()).clamp(0.15, 1.1);
+                return;
+            }
             app.orbit.zoom((-scroll * 0.0015).exp());
             moved = true;
         }
@@ -69,7 +75,7 @@ fn move_selection(app: &mut ForgeApp, rect: egui::Rect, from: egui::Pos2, to: eg
         return;
     }
     let center = bounds.center();
-    let cam = app.scene.camera.clone();
+    let cam = app.view_camera.clone();
     let aspect = rect.width() / rect.height().max(1.0);
     let ray = |p: egui::Pos2| {
         let nx = (p.x - rect.left()) / rect.width() * 2.0 - 1.0;
@@ -129,6 +135,8 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
         (rect.height() * ppp).round().max(1.0) as u32,
     ];
     let painter = ui.painter_at(rect);
+    // Guardando attraverso la camera la vista si allarga: l'inquadratura intera sta dentro.
+    app.update_view_camera(rect.width() / rect.height().max(1.0));
     match app.viewport_texture(frame, size) {
         Some(tex) => {
             painter.image(
@@ -192,7 +200,7 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
             if let Some(pos) = resp.interact_pointer_pos() {
                 let ndc_x = (pos.x - rect.left()) / rect.width() * 2.0 - 1.0;
                 let ndc_y = 1.0 - (pos.y - rect.top()) / rect.height() * 2.0;
-                let view = app.scene.camera.clone();
+                let view = app.view_camera.clone();
                 let (o, dir) = view.ray(ndc_x, ndc_y, rect.width() / rect.height());
                 let geo = app.geometry_now();
                 if let Some((node, _)) = forge_render_core::pick(&geo, o, dir) {
@@ -212,7 +220,7 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
             if let Some(pos) = resp.interact_pointer_pos() {
                 let ndc_x = (pos.x - rect.left()) / rect.width() * 2.0 - 1.0;
                 let ndc_y = 1.0 - (pos.y - rect.top()) / rect.height() * 2.0;
-                let view = app.scene.camera.clone();
+                let view = app.view_camera.clone();
                 let (o, dir) = view.ray(ndc_x, ndc_y, rect.width() / rect.height());
                 let geo = app.geometry_now();
                 if let Some((_, t)) = forge_render_core::pick(&geo, o, dir) {
@@ -229,7 +237,7 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
         if let Some(pos) = resp.interact_pointer_pos() {
             let ndc_x = (pos.x - rect.left()) / rect.width() * 2.0 - 1.0;
             let ndc_y = 1.0 - (pos.y - rect.top()) / rect.height() * 2.0;
-            let cam = app.scene.camera.clone();
+            let cam = app.view_camera.clone();
             let (origin, dir) = cam.ray(ndc_x, ndc_y, rect.width() / rect.height());
             // Luci ed emettitori di nebbia: si scelgono cliccando vicino all'icona.
             let near = |p: Vec3| project(&cam, rect, p).map(|q| q.distance(pos)).filter(|d| *d < 10.0);
@@ -303,24 +311,24 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
 /// Camere di rendering come piramidi; guardando attraverso la camera attiva, la
 /// cornice con le proporzioni esatte dell'immagine renderizzata.
 fn draw_cameras(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
-    let cam = &app.scene.camera;
+    let cam = &app.view_camera;
     let aspect = app.settings.aspect();
     if app.viewing_through_active() {
-        let h = rect.height();
+        // Inquadratura intera dentro la viewport (la vista ha il campo visivo allargato
+        // apposta): fuori dalla cornice la scena si vede, più scura.
+        let h = rect.height() * app.camera_frame_fraction(rect.width() / rect.height().max(1.0));
         let w = h * aspect;
         let frame = egui::Rect::from_center_size(rect.center(), egui::vec2(w, h));
         let shade = egui::Color32::from_black_alpha(110);
-        if frame.left() > rect.left() {
-            painter.rect_filled(
-                egui::Rect::from_min_max(rect.left_top(), egui::pos2(frame.left(), rect.bottom())),
-                0.0,
-                shade,
-            );
-            painter.rect_filled(
-                egui::Rect::from_min_max(egui::pos2(frame.right(), rect.top()), rect.right_bottom()),
-                0.0,
-                shade,
-            );
+        for r in [
+            egui::Rect::from_min_max(rect.left_top(), egui::pos2(frame.left(), rect.bottom())),
+            egui::Rect::from_min_max(egui::pos2(frame.right(), rect.top()), rect.right_bottom()),
+            egui::Rect::from_min_max(egui::pos2(frame.left(), rect.top()), egui::pos2(frame.right(), frame.top())),
+            egui::Rect::from_min_max(egui::pos2(frame.left(), frame.bottom()), egui::pos2(frame.right(), rect.bottom())),
+        ] {
+            if r.width() > 0.0 && r.height() > 0.0 {
+                painter.rect_filled(r, 0.0, shade);
+            }
         }
         painter.rect_stroke(frame, 0.0, egui::Stroke::new(1.5, style::ACCENT), egui::StrokeKind::Inside);
         // Terzi: aiuto alla composizione.
@@ -404,7 +412,7 @@ fn draw_depth_of_field(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect
     if !rc.lens.dof {
         return;
     }
-    let view = &app.scene.camera;
+    let view = &app.view_camera;
     let (r, u, f) = rc.basis();
     let aspect = app.settings.aspect();
     let th = (rc.vfov_deg.to_radians() * 0.5).tan();
@@ -491,7 +499,7 @@ fn draw_depth_of_field(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect
 
 /// Nebbie: riquadro della zona simulata (tratteggiato) ed emettitore con la caduta.
 fn draw_fogs(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
-    let cam = &app.scene.camera;
+    let cam = &app.view_camera;
     let color = egui::Color32::from_rgb(140, 210, 255);
     let geo = app.compiled_geometry();
     for f in &app.scene.fogs {
@@ -554,7 +562,7 @@ fn draw_fogs(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
 }
 
 fn draw_lights(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
-    let cam = &app.scene.camera;
+    let cam = &app.view_camera;
     for (i, l) in app.scene.lights.iter().enumerate() {
         let selected = app.selected_light == Some(i);
         let color = if !l.enabled {

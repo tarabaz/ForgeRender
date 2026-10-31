@@ -11,6 +11,18 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.17.1 — 31/10/2026
+
+**Correzioni**
+- Riavvio automatico solo nella vista Render: nella viewport puoi spostare pezzi, luci e camera
+  senza che il render riparta né che la vista passi al Render. Un render in corso diventato
+  vecchio si ferma e riparte quando torni nella vista Render (con il riavvio spento continua
+  come prima).
+- Guarda camera: la viewport mostra l'inquadratura intera della camera di render (prima con
+  immagini larghe veniva tagliata ai lati), con il resto della scena più scuro tutto attorno.
+  La rotella ingrandisce o rimpicciolisce la vista attorno all'inquadratura senza muovere la
+  camera (con "Pilota" la rotella muove la camera come prima).
+
 ## 0.17.0 — 31/10/2026
 
 **Fase 2: ancoraggio delle texture Box**

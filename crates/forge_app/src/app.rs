@@ -270,6 +270,13 @@ pub struct ForgeApp {
     pub simple_msg: Option<String>,
     /// "Pilota": la camera di rendering attiva segue la vista della viewport.
     pub camera_follow: bool,
+    /// Camera con cui si disegna la viewport (e si proiettano gizmo e sovrapposizioni): è la
+    /// vista, oppure, guardando attraverso la camera di render, la stessa con il campo visivo
+    /// allargato perché l'inquadratura intera stia dentro la viewport.
+    pub view_camera: forge_scene::Camera,
+    /// Guardando attraverso la camera: quanto è grande l'inquadratura nella viewport (1 = il
+    /// 90 % del lato che la limita). La rotella la cambia senza muovere la camera.
+    pub camera_view_zoom: f32,
     /// Animazione della vista avviata dal navigatore degli assi.
     pub nav_anim: Option<crate::ui::navigator::NavAnim>,
     /// Il prossimo clic nella viewport sceglie la distanza di messa a fuoco.
@@ -385,6 +392,8 @@ impl ForgeApp {
             preset_backup: None,
             simple_msg: None,
             camera_follow: false,
+            view_camera: forge_scene::Camera::default(),
+            camera_view_zoom: 1.0,
             nav_anim: None,
             focus_pick: false,
             aim_pick: false,
@@ -1034,6 +1043,22 @@ impl ForgeApp {
         self.shading_changed();
     }
 
+    /// Guardando attraverso la camera: frazione dell'altezza della viewport occupata
+    /// dall'inquadratura, scelta perché l'inquadratura intera stia dentro la viewport (con un
+    /// margine) qualunque siano le proporzioni dell'immagine e della finestra. 1 fuori da quella vista.
+    pub fn camera_frame_fraction(&self, viewport_aspect: f32) -> f32 {
+        if !self.viewing_through_active() {
+            return 1.0;
+        }
+        camera_frame_fraction(self.settings.aspect(), viewport_aspect, self.camera_view_zoom)
+    }
+
+    /// Ricalcola [`ForgeApp::view_camera`] per una viewport con queste proporzioni.
+    pub fn update_view_camera(&mut self, viewport_aspect: f32) {
+        let frac = self.camera_frame_fraction(viewport_aspect);
+        self.view_camera = overscan_camera(&self.scene.camera, frac);
+    }
+
     /// Vero se la viewport mostra esattamente l'inquadratura della camera attiva.
     pub fn viewing_through_active(&self) -> bool {
         self.scene.active_camera.is_some() && self.scene.render_camera() == &self.scene.camera
@@ -1262,8 +1287,13 @@ impl ForgeApp {
             job.adaptive = adaptive;
             self.session.set_adaptive(adaptive.0, adaptive.1);
         }
-        if should_auto_restart(self.auto_restart, self.render_is_stale(), self.is_preparing()) {
+        // Si riparte solo guardando il Render: nella viewport le modifiche non lo fanno partire.
+        let in_render = self.view == View::Render;
+        let stale = self.render_is_stale();
+        if should_auto_restart(self.auto_restart, stale, self.is_preparing(), in_render) {
             self.start_render();
+        } else if should_stop_stale_render(self.auto_restart, stale, self.render_state() == SessionState::Rendering, in_render) {
+            self.session.cancel();
         }
     }
 
@@ -1954,7 +1984,7 @@ impl ForgeApp {
         let radius = self.scene.bounds().radius().max(1e-3);
         vp.render(
             rs,
-            &self.scene.camera,
+            &self.view_camera,
             radius,
             size,
             forge_math::Vec3::splat(0.045),
@@ -2140,14 +2170,23 @@ pub fn export_format_label(f: forge_image_io::ExportFormat) -> &'static str {
 }
 
 /// Riavvio automatico del render quando la scena o la vista cambiano (casella "Riavvio
-/// automatico"): acceso = riparte sempre, in qualunque vista e in qualunque stato (in corso,
-/// in pausa, finito, fermato); spento = non riparte mai. Serve un render già avviato almeno
-/// una volta (`stale` è falso finché non c'è).
+/// automatico"): acceso = riparte, in qualunque stato (in corso, in pausa, finito, fermato), ma
+/// **solo mentre si guarda la vista Render**; spento = non riparte mai. Nella viewport si
+/// lavora sulla scena (si spostano pezzi, luci, camera) senza che il render riparta né che la
+/// vista passi al Render: si riparte tornando nella vista Render. Serve un render già avviato
+/// almeno una volta (`stale` è falso finché non c'è).
 ///
 /// Con una camera di render attiva (senza "Pilota") muovere la vista non cambia l'inquadratura
 /// del render, quindi il render non diventa vecchio e non riparte.
-pub fn should_auto_restart(auto: bool, stale: bool, preparing: bool) -> bool {
-    auto && stale && !preparing
+pub fn should_auto_restart(auto: bool, stale: bool, preparing: bool, in_render_view: bool) -> bool {
+    auto && stale && !preparing && in_render_view
+}
+
+/// Nella viewport, con il riavvio automatico acceso, un render diventato vecchio si ferma
+/// (calcolerebbe una scena che non c'è più): ripartirà tornando nella vista Render. Con il
+/// riavvio spento il render in corso continua come prima.
+pub fn should_stop_stale_render(auto: bool, stale: bool, rendering: bool, in_render_view: bool) -> bool {
+    auto && stale && rendering && !in_render_view
 }
 
 #[cfg(test)]
@@ -2156,9 +2195,79 @@ mod auto_restart_tests {
 
     #[test]
     fn auto_restart_is_on_or_off() {
-        assert!(should_auto_restart(true, true, false), "acceso: riparte sempre");
-        assert!(!should_auto_restart(false, true, false), "spento: mai");
-        assert!(!should_auto_restart(true, false, false), "immagine aggiornata");
-        assert!(!should_auto_restart(true, true, true), "scena in preparazione: si aspetta");
+        assert!(should_auto_restart(true, true, false, true), "acceso: riparte");
+        assert!(!should_auto_restart(false, true, false, true), "spento: mai");
+        assert!(!should_auto_restart(true, false, false, true), "immagine aggiornata");
+        assert!(!should_auto_restart(true, true, true, true), "scena in preparazione: si aspetta");
+    }
+
+    /// Nella viewport le modifiche non fanno partire il render (né cambiano vista): con il
+    /// riavvio acceso il render vecchio si ferma e riparte quando si torna nella vista Render.
+    #[test]
+    fn viewport_edits_never_start_the_render() {
+        assert!(!should_auto_restart(true, true, false, false), "viewport: non riparte");
+        assert!(
+            should_stop_stale_render(true, true, true, false),
+            "viewport: il render vecchio si ferma"
+        );
+        assert!(!should_stop_stale_render(false, true, true, false), "riavvio spento: continua");
+        assert!(
+            !should_stop_stale_render(true, true, true, true),
+            "vista Render: riparte, non si ferma"
+        );
+        assert!(!should_stop_stale_render(true, false, true, false), "render aggiornato: continua");
+    }
+}
+
+/// Frazione dell'altezza della viewport occupata dall'inquadratura della camera: al massimo il
+/// 90 % (× `zoom`) del lato che la limita, così l'immagine intera resta dentro con un margine.
+pub fn camera_frame_fraction(image_aspect: f32, viewport_aspect: f32, zoom: f32) -> f32 {
+    let fit = 0.9 * zoom.clamp(0.15, 1.1);
+    let by_width = fit * viewport_aspect.max(1e-3) / image_aspect.max(1e-3);
+    fit.min(by_width).max(1e-3)
+}
+
+/// La stessa camera con il campo visivo allargato: l'inquadratura originale occupa `frac`
+/// dell'altezza dell'immagine (attorno c'è il resto della scena).
+pub fn overscan_camera(camera: &forge_scene::Camera, frac: f32) -> forge_scene::Camera {
+    let mut c = camera.clone();
+    if (frac - 1.0).abs() < 1e-6 {
+        return c;
+    }
+    if c.lens.ortho {
+        c.lens.ortho_height = 2.0 * camera.ortho_half_height() / frac;
+    } else {
+        let t = (camera.vfov_deg.to_radians() * 0.5).tan() / frac;
+        c.vfov_deg = (2.0 * t.atan()).to_degrees().min(179.0);
+    }
+    c
+}
+
+#[cfg(test)]
+mod camera_view_tests {
+    use super::*;
+
+    /// L'inquadratura sta sempre intera nella viewport: immagine larga in finestra stretta,
+    /// immagine verticale in finestra larga; e il campo visivo allargato la proietta proprio lì.
+    #[test]
+    fn camera_frame_always_fits_the_viewport() {
+        for (image, view) in [(16.0 / 9.0, 0.8), (0.8, 16.0 / 9.0), (1.0, 1.0), (2.39, 1.33)] {
+            let frac = camera_frame_fraction(image, view, 1.0);
+            let (h, w) = (frac, frac * image / view);
+            assert!(h <= 0.9 + 1e-6 && w <= 0.9 + 1e-6, "{image} in {view}: {w} × {h}");
+            assert!(h > 0.89 || w > 0.89, "deve riempire il lato che limita");
+        }
+        let cam = forge_scene::Camera {
+            vfov_deg: 40.0,
+            ..Default::default()
+        };
+        let wide = overscan_camera(&cam, 0.5);
+        // Il bordo superiore dell'inquadratura originale cade a metà dell'altezza della vista.
+        let ratio = (cam.vfov_deg.to_radians() * 0.5).tan() / (wide.vfov_deg.to_radians() * 0.5).tan();
+        assert!((ratio - 0.5).abs() < 1e-5, "{ratio}");
+        let mut ortho = cam.clone();
+        ortho.lens.ortho = true;
+        let o = overscan_camera(&ortho, 0.5);
+        assert!((o.ortho_half_height() - 2.0 * ortho.ortho_half_height()).abs() < 1e-5);
     }
 }
