@@ -8,7 +8,7 @@ progetto; le traduzioni italiane sono disponibili nei collegamenti qui sotto.
 ## Documentazione per gli utenti
 
 - [README e download](../README.it.md)
-- [Novità — changelog](../CHANGELOG.it.md)
+- [Novità — changelog](../CHANGELOG.md)
 - [Manuale utente](../manuale/it/01-introduzione/intro.benvenuto.md)
 - [Integrazione MCP: controllare ForgeRender con un assistente IA](MCP.md)
 - [Roadmap e stato del progetto](ROADMAP.it.md)
