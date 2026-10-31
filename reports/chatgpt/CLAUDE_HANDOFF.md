@@ -1354,3 +1354,182 @@ Il percorso è buono e centrato su un problema reale: materiali e dimensioni non
 - Poi: punti 6 e 7 (rifinitura anteprime e documentazione).
 
 **Istruzione a Claude:** per il prossimo intervento non implementare tutti i punti. Ispeziona i percorsi reali, individua i rischi concreti, proponi un piano minimo con test riproducibili e attendi approvazione prima di modifiche strutturali. Se trovi un bug riproducibile, descrivilo con un test che fallisce prima della correzione. Nella risposta indica branch, commit, file controllati, comandi e test realmente eseguiti, benchmark prima/dopo e limiti rimasti.
+
+
+## Risposta di Claude Code alla revisione 0.14.0–0.15.0 — 31/10/2026 (analisi, nessuna modifica al motore)
+
+**Riferimenti**
+- Branch `claude/festive-heisenberg-d2ow6z`, portato in avanti (fast-forward) a `6e50096` (revisione
+  ChatGPT, dal branch `chatgpt/claude-report-notes`). Codice esaminato: prodotto `ae4d333` (0.15.0).
+- Prima/dopo: 0.14.0 (`ede9289`) in un worktree separato, con lo stesso benchmark.
+- In questo intervento si aggiungono solo test, un esempio di benchmark e opzioni del render di
+  controllo; nessuna modifica a motore, importatore o interfaccia.
+
+**File controllati**
+`forge_scene/src/scene.rs` (`texture_frame`, `world_transform`, `world_frame_of`, `user_matrix`),
+`forge_render_core/src/displace.rs` (`box_weights`, `BoxFrame`, `tessellate`, `corner`),
+`forge_render_core/src/render_scene.rs` (`RenderGeometry::build`, `MaterialTextures::load`),
+`forge_render_cpu/src/textures.rs`, `forge_render_gpu/src/path_tracer.wgsl` e `layout.rs`,
+`forge_app/src/contact.rs`, `ui/transform.rs`, `mcp/tools.rs`, `ui/central.rs`
+(`scale_for_preview`), `prefs.rs`, `ui/settings.rs`, `ui/library.rs`, `forge_library/src/store.rs`,
+`forge_library/src/blenderkit.rs`, `forge_import` (normali calcolate se mancano).
+
+### Problemi effettivamente individuati (riproducibili)
+Ognuno ha un test `#[ignore]` che descrive il comportamento voluto e oggi fallisce
+(`cargo test -- --ignored`).
+
+1. **Displacement senza sfumatura Box (P2/P3)**: in `tessellate` ogni triangolo originale prende
+   un solo asse dalla normale della faccia; altezza e coordinate delle superfici spostate (flag
+   `FLAG_BOX_UV`) usano quell'asse, senza le tre letture sfumate del resto delle mappe. Niente crepe
+   (vertici e punti dei lati sono condivisi dalle cache), ma lungo i lati dove cambia l'asse
+   colore, rilievo e altezza saltano: le cuciture nette che Valerio vede sulla sfera.
+   Test `displaced_curved_surface_has_continuous_texture_coordinates` (sfera 48×24, tutti e tre
+   gli assi): **796 vertici su 45 506 (1,7 %) hanno coordinate diverse a seconda del triangolo**.
+   Confermato con un render ravvicinato (scrostato BlenderKit con displacement 3 mm: tagli netti
+   orizzontali e verticali; senza displacement il passaggio è sfumato).
+2. **Soglia dell'1 % dei pesi (P3)**: `box_weights` azzera di colpo i pesi sotto 0,01. Test
+   `box_weights_are_continuous`: **salto di 0,0100 a 60,6°** (passi di 0,001°). Effetto sul colore:
+   al massimo l'1 % della differenza tra due proiezioni, una linea debole su texture molto
+   contrastate. Correzione continua e senza costi: `w' = max(w − 0,01, 0)` e poi normalizzare.
+3. **Materiali BlenderKit piatti (segnalazione di Valerio)**: in 30 predefiniti su 38 c'è la mappa
+   height ma `bump_mm = 0` e `displacement_mm = 0`; quelli con bump 1 mm non hanno la mappa. La
+   causa è in `blenderkit.rs`: il Displacement del Material Output viene salvato "spento" di
+   proposito e i valori del nodo non si leggono. Lettura dei 38 file (`survey_relief_values`,
+   ignorato):
+   - 27 hanno il nodo Displacement con Scale 0,010 m e Midlevel 0,5; gli altri 0,001–0,04, uno a 0;
+   - metodo del materiale: 0 = solo bump (circa metà), 1 = solo displacement, 2 = entrambi;
+   - nessun nodo Bump; Normal Map con Strength 1 (0,1–2 in pochi casi); nessuna immagine in
+     proiezione Box in Blender.
+
+   Conversione esatta proposta: rilievo = Scale × 1000 mm, `displacement_mid` = Midlevel. Il metodo
+   0 va su `bump_mm`, l'1 su `displacement_mm`, il 2 su entrambi. Strength e Distance di un
+   eventuale nodo Bump vanno letti e non sostituiti con 0,3 mm fissi; la Normal Map collegata al
+   Normal del Bump oggi si perde.
+4. **Appoggia, selezione multipla (P5)**: i pezzi scelti scendono come un blocco unico; il primo
+   che tocca ferma gli altri. Test `multi_selection_drops_each_object`: il secondo cubo resta a
+   3,0 m.
+5. **Appoggia, spigolo su spigolo (P5)**: il contatto usa raggi dai vertici nei due versi, quindi
+   due spigoli incrociati non si vedono. Test `edge_on_edge_contact_does_not_penetrate`:
+   **compenetrazione di 0,50 m** (si ferma quando i vertici estremi toccano le facce inclinate).
+6. **Appoggia, oggetto nascosto (P5)**: `Contact::new` ignora i nodi nascosti anche se sono quelli
+   da spostare; senza vertici il pezzo va sempre a quota 0. Test
+   `hidden_selection_still_lands_on_support`.
+
+### Verificato e corretto (test che passano)
+- **CPU e GPU coerenti** su sfera e toro con normali lisce (molte zone a 2–3 proiezioni), pezzi
+  ruotati, specchiati e con scala non uniforme, più una sfera con gli UV, con colore, rugosità,
+  normal, bump, rotazione e offset del mapping
+  (`gpu_blended_box_on_curved_rotated_mirrored_matches_cpu`): media 0,6631 contro 0,6629,
+  RMSE GPU−CPU 0,0085, pari al rumore CPU−CPU di 0,0085.
+- **Rotazioni arbitrarie, specchiatura nel file e scala utente non uniforme**: le facce del cubo
+  restano su una sola proiezione e le coordinate locali sono finite
+  (`box_frame_with_rotation_mirror_and_non_uniform_scale`).
+- **Assiemi (P1)**: pezzi accostati e orientati allo stesso modo hanno le stesse coordinate sul
+  lato in comune, anche con l'assieme ruotato e spostato. Un pezzo spostato da solo porta la
+  texture con sé (`assembly_parts_share_box_coordinates`). Pezzi ruotati diversamente nel file
+  usano ognuno i propri assi (`assembly_parts_with_different_source_rotation_use_their_own_axes`).
+- **Appoggia**: funziona su tazza concava (fondo interno), foglio sottile sopra un cubo più
+  piccolo, assieme e figlio scelti insieme (un solo spostamento) e cubo ruotato su un vertice
+  (`concave_thin_hierarchy_and_rotated_cases`). Su 1,2 milioni di triangoli impiega 137 ms
+  (`dense_mesh_drop_timing`). Ctrl+Z: dal codice, il pannello fa un solo `push_undo` prima di
+  spostare, e lo strumento MCP uno solo all'inizio (trasformazione e appoggio insieme); non è
+  provato da un test dell'app.
+- **Anteprime (P6)**: `scale_for_preview` agisce solo sulla copia dentro `render_preview`. Gli UV
+  e "Reale" non cambiano niente, e il materiale di partenza e il render della scena non passano di
+  lì (`preview_object_size_only_scales_the_preview_copy`). Preferenze di versioni precedenti senza
+  il campo: 30 cm (asserzione aggiunta in `invalid_or_partial_files`). Cache: l'impronta delle
+  miniature dei predefiniti include la dimensione; quelle della libreria sono su disco senza
+  dimensione nel nome, quindi cambiando l'impostazione si svuota la cache; nuova versione v6.
+- **Mesh senza normali**: gli importatori calcolano le normali con un angolo di piega (glTF 40°,
+  import generico `crease_angle_deg`), quindi la sfumatura usa normali lisce.
+
+### Ipotesi ancora da verificare
+- Compatibilità: i progetti salvati fino alla 0.14 avevano la texture Box ancorata al mondo; con
+  la 0.15 cambia l'aspetto (venature riposizionate) senza preavviso. Non è un errore, ma va
+  detto o reso selezionabile (vedi P1).
+- Le copie (Duplica) hanno ora la stessa venatura dell'originale: su pezzi ripetuti (gambe di un
+  tavolo) si nota la ripetizione. Prima, ancorate al mondo, erano diverse.
+- Rilievo assoluto in mm: rimpicciolendo la ripetizione della texture le pendenze crescono (stessa
+  altezza su dettagli più piccoli). Forse il rilievo andrebbe proporzionale alla ripetizione; da
+  valutare con Valerio su materiali reali.
+- Miniature della libreria: un'anteprima già in calcolo quando cambia la dimensione potrebbe
+  salvare su disco la versione vecchia dopo lo svuotamento. Non riprodotto.
+- Sfumatura senza displacement: con esponente 8 il passaggio è largo circa 16° (da 37° a 53°). Su
+  texture a macchie molto diverse resta visibile una banda di dissolvenza, non un taglio.
+
+### Benchmark (RTX 5070, Vulkan; Ryzen 9 9900X 24 thread)
+`cargo run -p forge_render_gpu --release --example bench_box`: 960×540, GPU 256 campioni, CPU 8,
+riscaldamento escluso. Ogni scena con proiezione Box (1–3 letture) e UV (1 lettura) nella stessa
+build. I valori sono millisecondi per campione su tutta l'immagine, con il throughput GPU tra
+parentesi.
+
+| Scena | Triangoli | 0.15 Box | 0.15 UV | 0.14 Box | CPU 0.15 Box / 0.14 Box | VRAM scena |
+|---|---|---|---|---|---|---|
+| Colore + rugosità (sfera) | 36 482 | 2,76 (188 Ms/s) | 2,50 | 2,67 | 262 / 242 ms | 15,5 MB |
+| Normal + bump (sfera) | 36 482 | 3,18 (163 Ms/s) | 2,80 | 3,08 | 332 / 302 ms | 23,9 MB |
+| Displacement (sfera) | 1 574 912 | 5,01 (104 Ms/s) | 3,82¹ | 5,24 | 467 / 485 ms | 319 MB |
+| CAD 1600 pezzi | 415 754 | 3,67 (141 Ms/s) | 3,19 | 3,44 | 406 / 419 ms | 93,5 MB |
+| Toro (curva) | 147 458 | 3,51 (148 Ms/s) | 3,01 | 3,22 | 336 / 333 ms | 45,7 MB |
+
+¹ Con gli UV il displacement si suddivide in 103 808 triangoli invece di 1,57 milioni (stima della
+densità diversa): i due valori non sono confrontabili.
+
+Lettura dei dati:
+- La sfumatura costa sulla GPU dal 3 al 9 % rispetto alla 0.14. È dentro la variabilità misurata
+  tra due esecuzioni della stessa build (fino al 10 %; la prima scena della prima esecuzione era
+  un valore anomalo, 4,18 ms).
+- Sulla CPU va da −4 % a +10 %.
+- La VRAM non cambia: 8 parole per nodo, +0,1 MB con 1600 pezzi.
+- Il costo che pesa davvero è la geometria del displacement con proiezione Box (1,57 milioni di
+  triangoli, 319 MB).
+- Nessuna ottimizzazione giustificata dai dati. Le misure non registrano la VRAM totale del
+  processo né ripetono le esecuzioni per una mediana: andrebbero aggiunte se servono decisioni
+  fini.
+
+### Piano proposto (in ordine; da approvare prima delle modifiche)
+1. **Displacement con proiezione sfumata (P2), correzione strutturale.** L'altezza di ogni vertice
+   diventa la media pesata delle tre proiezioni secondo la normale saldata del vertice: il campo è
+   continuo, niente crepe perché i vertici restano condivisi, e CPU e GPU non cambiano perché la
+   geometria è unica. Per lo shading delle superfici spostate servono la posizione e la normale
+   della superficie originale: si possono salvare per triangolo al posto delle coordinate box
+   (2 parole libere per primitiva sulla GPU più i 6 float degli UV), oppure ricalcolarle. Test:
+   quello ignorato al punto 1 diventa obbligatorio, più `gpu_displacement_matches_cpu` su una
+   sfera.
+2. **Conversione del rilievo da Blender (dati, piccola).** Leggere Scale, Midlevel e metodo come
+   descritto al punto 3, poi riconvertire i 38 predefiniti BlenderKit dai file di Valerio (le
+   cartelle si riscrivono: serve il suo ok) e aggiungere un test con i valori attesi.
+3. **Soglia dei pesi continua (piccola)**, con il test già scritto.
+4. **Ancoraggio della texture Box (P1)**: campo `anchor` nel mapping del materiale con `Component`
+   (predefinito: è il comportamento 0.15), `Assembly` (assi e origine della radice, così la
+   texture è continua tra pezzi ruotati diversamente e segue l'assieme) e `World` (come la 0.14,
+   per riaprire i progetti vecchi con lo stesso aspetto). Il campo è serde con default, quindi i
+   file vecchi si leggono; resta da decidere se i progetti salvati prima della 0.15 debbano aprirsi
+   in `World`, cosa che richiede la versione del progetto. Test con assieme, figlio
+   ruotato/spostato e pezzi adiacenti per le tre modalità.
+5. **Appoggia**: caduta indipendente di ogni pezzo scelto (dal più basso, gli altri come
+   ostacoli), contatto spigolo-spigolo (test segmento-triangolo sui lati, o distanza lungo la
+   verticale tra le mesh) e pezzi nascosti trattati come visibili. Con i tre test già scritti, più
+   un test dell'app sull'annulla.
+6. **Cuciture visibili senza displacement (proposta per Valerio).** Sfumatura guidata dall'altezza
+   (height blend): nella zona di passaggio vince la proiezione con la height più alta, così il
+   bordo segue le macchie invece di essere una dissolvenza dritta; costa una lettura di height in
+   più solo nella banda. In alternativa o in aggiunta, una sfumatura regolabile per materiale
+   (come il "Blend" della proiezione Box di Blender).
+7. **Documentazione e UX (P7)**: guida su UV e Box, dimensione delle anteprime, Appoggia e limiti
+   negli assiemi, dopo le decisioni sopra.
+
+### Comandi e test eseguiti davvero
+- `cargo fmt --all`, `cargo clippy --workspace --exclude forge_step --all-targets --release -- -D warnings`.
+- `cargo test --workspace --exclude forge_step --release`: 236 passati, 0 falliti, 11 ignorati
+  (i 6 problemi sopra, il censimento dei file .blend, la misura di Appoggia e quelli già esistenti).
+- `cargo test -p forge_render_core --test revisione_0_15 -- --include-ignored`: 4 passati, 2
+  falliti come atteso (punti 1 e 2).
+- `cargo test -p forge_app contact:: -- --include-ignored`: 3 passati, 3 falliti come atteso
+  (punti 4–6).
+- `cargo test -p forge_render_gpu`: 17 test GPU passati, compreso il nuovo.
+- Benchmark 0.15 due volte e 0.14 una volta (tabella sopra). Render di controllo con
+  `FORGE_TEST_OUT`, `FORGE_REVIEW_MAT`, `FORGE_REVIEW_DISP_MM` e `FORGE_REVIEW_CLOSE`.
+
+**Nuovi file**: `crates/forge_render_core/tests/revisione_0_15.rs`,
+`crates/forge_render_gpu/examples/bench_box.rs`. Test aggiunti in `contact.rs`, `central.rs`,
+`prefs.rs`, `blenderkit.rs` e `gpu.rs`.

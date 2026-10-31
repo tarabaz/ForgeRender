@@ -1134,4 +1134,67 @@ mod tests {
         );
         assert!(failed.is_empty());
     }
+
+    /// Rilievo nei file di Valerio (`dist/MCP/blender material`): valori dei nodi Displacement,
+    /// Bump e Normal Map, metodo di displacement del materiale e sfumatura Box delle immagini.
+    /// Solo lettura, per decidere la conversione (`cargo test -- --ignored --nocapture`).
+    #[test]
+    #[ignore = "legge i file .blend di Valerio"]
+    fn survey_relief_values() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../dist/MCP/blender material");
+        let mut files = Vec::new();
+        let mut stack = vec![root];
+        while let Some(d) = stack.pop() {
+            for e in std::fs::read_dir(&d).into_iter().flatten().flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    stack.push(p);
+                } else if p.extension().is_some_and(|x| x == "blend") {
+                    files.push(p);
+                }
+            }
+        }
+        files.sort();
+        let val = |n: &Inst, s: &str| input(n, s).map(|s| fmt_values(&default_values(&s))).unwrap_or("-".into());
+        let linked = |n: &Inst, s: &str| input(n, s).is_some_and(|s| s.deref("link").is_some());
+        for path in files {
+            let Ok(blend) = Blend::open(&path) else { continue };
+            for m in blend.blocks.iter().filter(|b| &b.code[..2] == b"MA").map(|b| blend.at(b)) {
+                let Some(tree) = m.deref("nodetree") else { continue };
+                let method = m.i32("displacement_method").map(|v| v & 0xFF);
+                let mut line = format!("{} | metodo {:?}", id_name(&m), method);
+                for n in tree.list("nodes") {
+                    match n.str("idname").as_str() {
+                        "ShaderNodeDisplacement" => {
+                            line += &format!(
+                                " | Displacement scale {} mid {} (height collegata {})",
+                                val(&n, "Scale"),
+                                val(&n, "Midlevel"),
+                                linked(&n, "Height")
+                            )
+                        }
+                        "ShaderNodeBump" => {
+                            line += &format!(
+                                " | Bump strength {} distance {} (normal collegata {})",
+                                val(&n, "Strength"),
+                                val(&n, "Distance"),
+                                linked(&n, "Normal")
+                            )
+                        }
+                        "ShaderNodeNormalMap" => line += &format!(" | NormalMap strength {}", val(&n, "Strength")),
+                        "ShaderNodeTexImage" => {
+                            if let Some(st) = n.deref("storage") {
+                                let proj = st.i32("projection").unwrap_or(-1);
+                                if proj != 0 {
+                                    line += &format!(" | Image proj {proj} blend {:?}", st.f32("projection_blend"));
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                println!("{line}");
+            }
+        }
+    }
 }

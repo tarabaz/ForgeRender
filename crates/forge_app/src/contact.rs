@@ -237,4 +237,178 @@ mod tests {
         drop_onto_below(&mut s, &[far]);
         assert!(s.exact_bounds_of(far).min.y.abs() < 1e-5, "D a quota 0");
     }
+
+    /// Scena con pavimento a quota 0 e cubi da 1 m nei punti dati (centri).
+    fn floor_and_cubes(centers: &[(Vec3, Mat4)]) -> (Scene, Vec<usize>) {
+        let mut s = Scene::default();
+        let cube = s.add_mesh(primitives::cuboid(Vec3::ONE));
+        let floor = s.add_mesh(primitives::plane(20.0, 20.0));
+        s.add_node(None, ComponentId("pavimento".into()), "Pavimento", Mat4::IDENTITY, Some(floor));
+        let ids = centers
+            .iter()
+            .enumerate()
+            .map(|(k, (c, r))| {
+                let xf = Mat4::from_translation(*c) * *r;
+                s.add_node(None, ComponentId(format!("c{k}")), "C", xf, Some(cube))
+            })
+            .collect();
+        s.refresh_pivots();
+        (s, ids)
+    }
+
+    /// Selezione multipla di oggetti separati: ognuno deve scendere fino al proprio appoggio.
+    /// Oggi si muovono come un blocco unico: il primo che tocca ferma anche gli altri.
+    #[test]
+    #[ignore = "problema riproducibile: la selezione multipla scende come un blocco unico"]
+    fn multi_selection_drops_each_object() {
+        let (mut s, ids) = floor_and_cubes(&[
+            (Vec3::new(-3.0, 1.0, 0.0), Mat4::IDENTITY),
+            (Vec3::new(3.0, 4.0, 0.0), Mat4::IDENTITY),
+        ]);
+        drop_onto_below(&mut s, &ids);
+        for &i in &ids {
+            let y = s.exact_bounds_of(i).min.y;
+            assert!(y.abs() < 1e-3, "cubo {i} a quota {y}");
+        }
+    }
+
+    /// Spigolo su spigolo (cubi ruotati di 45° con gli spigoli incrociati): il contatto è tra
+    /// due lati, non tra un vertice e una faccia. Il cubo sopra deve fermarsi sullo spigolo
+    /// di quello sotto senza compenetrarlo.
+    #[test]
+    #[ignore = "problema riproducibile: il contatto spigolo-spigolo non viene visto"]
+    fn edge_on_edge_contact_does_not_penetrate() {
+        let q = std::f32::consts::FRAC_PI_4;
+        let (mut s, ids) = floor_and_cubes(&[
+            (Vec3::new(0.0, 0.7072, 0.0), Mat4::from_rotation_x(q)),
+            (Vec3::new(0.0, 4.0, 0.0), Mat4::from_rotation_z(q)),
+        ]);
+        drop_onto_below(&mut s, &[ids[1]]);
+        let top_low = s.exact_bounds_of(ids[0]).max.y;
+        let low_high = s.exact_bounds_of(ids[1]).min.y;
+        eprintln!("cresta sotto {top_low:.4}, spigolo sopra {low_high:.4}");
+        assert!(low_high > top_low - 1e-3, "compenetrazione di {:.4} m", top_low - low_high);
+    }
+
+    /// Oggetto nascosto scelto: oggi non ha vertici per il contatto e va a quota 0 anche se
+    /// sotto c'è un appoggio. Deve comportarsi come se fosse visibile (o non muoversi).
+    #[test]
+    #[ignore = "problema riproducibile: un oggetto nascosto va sempre a quota 0"]
+    fn hidden_selection_still_lands_on_support() {
+        let (mut s, ids) = floor_and_cubes(&[
+            (Vec3::new(0.0, 0.5, 0.0), Mat4::IDENTITY),
+            (Vec3::new(0.0, 4.0, 0.0), Mat4::IDENTITY),
+        ]);
+        s.nodes[ids[1]].visible = false;
+        drop_onto_below(&mut s, &[ids[1]]);
+        let y = s.exact_bounds_of(ids[1]).min.y;
+        assert!((y - 1.0).abs() < 1e-3, "quota {y}");
+    }
+
+    /// Superficie concava: una sfera dentro una tazza si ferma sul fondo interno; un
+    /// oggetto sottile (piano senza spessore) sopra un cubo più piccolo si ferma sul cubo;
+    /// assieme e figlio scelti insieme si muovono una volta sola; oggetto ruotato.
+    #[test]
+    fn concave_thin_hierarchy_and_rotated_cases() {
+        // Tazza (fondo interno a quota `wall`) e sfera sopra il centro.
+        let mut s = Scene::default();
+        let wall = 0.01;
+        let cup = s.add_mesh(primitives::cup(0.2, 0.3, wall, 64));
+        let ball = s.add_mesh(primitives::uv_sphere(0.05, 32, 16));
+        s.add_node(None, ComponentId("tazza".into()), "Tazza", Mat4::IDENTITY, Some(cup));
+        let b = s.add_node(
+            None,
+            ComponentId("palla".into()),
+            "Palla",
+            Mat4::from_translation(Vec3::new(0.0, 1.0, 0.0)),
+            Some(ball),
+        );
+        s.refresh_pivots();
+        drop_onto_below(&mut s, &[b]);
+        let y = s.exact_bounds_of(b).min.y;
+        let inner_floor = s.exact_bounds_of(0).min.y + wall;
+        assert!(
+            y > inner_floor - 2e-3 && y < inner_floor + 0.02,
+            "palla a {y}, fondo interno {inner_floor}"
+        );
+
+        // Piano sottile 2 × 2 m sopra un cubo da 0,5 m: tocca la faccia superiore del cubo.
+        let mut s = Scene::default();
+        let small = s.add_mesh(primitives::cuboid(Vec3::splat(0.5)));
+        let sheet = s.add_mesh(primitives::plane(2.0, 2.0));
+        let c = s.add_node(
+            None,
+            ComponentId("cubo".into()),
+            "Cubo",
+            Mat4::from_translation(Vec3::new(0.0, 0.25, 0.0)),
+            Some(small),
+        );
+        let p = s.add_node(
+            None,
+            ComponentId("foglio".into()),
+            "Foglio",
+            Mat4::from_translation(Vec3::new(0.0, 2.0, 0.0)),
+            Some(sheet),
+        );
+        s.refresh_pivots();
+        drop_onto_below(&mut s, &[p]);
+        let top = s.exact_bounds_of(c).max.y;
+        assert!((s.exact_bounds_of(p).min.y - top).abs() < 1e-3);
+
+        // Assieme e suo figlio scelti insieme: lo spostamento si applica una volta sola.
+        let mut s = Scene::default();
+        let cube = s.add_mesh(primitives::cuboid(Vec3::ONE));
+        let asm = s.add_node(
+            None,
+            ComponentId("a".into()),
+            "A",
+            Mat4::from_translation(Vec3::new(0.0, 3.0, 0.0)),
+            None,
+        );
+        let child = s.add_node(Some(asm), ComponentId("a/b".into()), "B", Mat4::IDENTITY, Some(cube));
+        s.refresh_pivots();
+        drop_onto_below(&mut s, &[asm, child]);
+        assert!(s.exact_bounds_of(child).min.y.abs() < 1e-5);
+
+        // Cubo ruotato su un vertice: il vertice più basso tocca il cubo sotto.
+        let (mut s, ids) = floor_and_cubes(&[
+            (Vec3::new(0.0, 0.5, 0.0), Mat4::IDENTITY),
+            (
+                Vec3::new(0.1, 4.0, 0.05),
+                Mat4::from_quat(forge_math::Quat::from_euler(forge_math::glam::EulerRot::XYZ, 0.6, 0.3, 0.8)),
+            ),
+        ]);
+        drop_onto_below(&mut s, &[ids[1]]);
+        assert!(
+            (s.exact_bounds_of(ids[1]).min.y - 1.0).abs() < 1e-3,
+            "{}",
+            s.exact_bounds_of(ids[1]).min.y
+        );
+    }
+
+    /// Costo su una mesh densa (sfera da circa 1,2 milioni di triangoli sopra un pavimento).
+    #[test]
+    #[ignore = "misura di prestazioni (cargo test -- --ignored --nocapture)"]
+    fn dense_mesh_drop_timing() {
+        let mut s = Scene::default();
+        let floor = s.add_mesh(primitives::plane(20.0, 20.0));
+        let ball = s.add_mesh(primitives::uv_sphere(0.5, 1100, 550));
+        s.add_node(None, ComponentId("pavimento".into()), "Pavimento", Mat4::IDENTITY, Some(floor));
+        let b = s.add_node(
+            None,
+            ComponentId("palla".into()),
+            "Palla",
+            Mat4::from_translation(Vec3::new(0.0, 3.0, 0.0)),
+            Some(ball),
+        );
+        s.refresh_pivots();
+        let t = std::time::Instant::now();
+        drop_onto_below(&mut s, &[b]);
+        eprintln!(
+            "{} triangoli: Appoggia in {:.0} ms",
+            s.triangle_count(),
+            t.elapsed().as_secs_f64() * 1e3
+        );
+        assert!(s.exact_bounds_of(b).min.y.abs() < 1e-3);
+    }
 }

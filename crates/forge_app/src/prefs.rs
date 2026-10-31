@@ -262,6 +262,8 @@ mod tests {
         assert!(err.is_none());
         assert_eq!(d.library_card_size, 512);
         assert_eq!((d.preview_samples, d.preview_resolution), (4, 256));
+        // Preferenze di versioni precedenti alla 0.15.0: dimensione delle anteprime predefinita.
+        assert_eq!(d.preview_object_cm, 30);
         assert_eq!(d.download_resolution, forge_library::online::RESOLUTIONS.len() - 1);
         assert_eq!(d.download_provider, "ambientcg");
         assert!(d.auto_restart);

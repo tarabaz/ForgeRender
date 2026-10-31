@@ -1135,19 +1135,33 @@ mod tests {
         }
     }
 
-    /// Con `FORGE_TEST_OUT`: scena di test con il rovere su sfera, cubo ruotato e toro (proiezione
-    /// box sugli assi dell'oggetto e sfumata), per controllare a occhio la resa.
+    /// Con `FORGE_TEST_OUT`: scena di test con un materiale (`FORGE_REVIEW_MAT`, predefinito il
+    /// rovere; `FORGE_REVIEW_DISP_MM` accende il displacement) su sfera, cubo ruotato e toro
+    /// (proiezione box sugli assi dell'oggetto e sfumata), per controllare a occhio la resa.
     #[test]
     fn box_mapping_render_for_review() {
         let Ok(dir) = std::env::var("FORGE_TEST_OUT") else { return };
         let mut s = Scene::test_scene();
         let presets = forge_scene::material::presets();
-        let Some(oak) = presets.iter().find(|m| m.id.0 == "legno-rovere") else {
+        let want = std::env::var("FORGE_REVIEW_MAT").unwrap_or_else(|_| "legno-rovere".into());
+        let Some(oak) = presets.iter().find(|m| m.id.0 == want) else {
             return;
         };
+        let mut oak = oak.clone();
+        if let Some(mm) = std::env::var("FORGE_REVIEW_DISP_MM").ok().and_then(|v| v.parse().ok()) {
+            oak.displacement_mm = mm;
+        }
         s.materials.upsert(oak.clone());
         for id in ["sfera-acciaio", "box-plastica", "toro-rame"] {
             s.assignments.insert(ComponentId(format!("test/Scena/{id}")), oak.id.clone());
+        }
+        // `FORGE_REVIEW_CLOSE`: inquadratura ravvicinata della sfera (cuciture tra le proiezioni).
+        if std::env::var_os("FORGE_REVIEW_CLOSE").is_some() {
+            if let Some(i) = s.find(&ComponentId("test/Scena/sfera-acciaio".into())) {
+                let c = s.exact_bounds_of(i).center();
+                s.camera.position = c + Vec3::new(0.35, 0.25, 0.9);
+                s.camera.target = c;
+            }
         }
         let rs = RenderScene::compile(&s);
         let (w, h) = (640, 400);
@@ -1169,7 +1183,48 @@ mod tests {
         let px = forge_render_core::tonemap_to_rgba8(&acc.resolve(), settings.tone_mapping, 0.0);
         image::RgbaImage::from_raw(w, h, px)
             .unwrap()
-            .save(std::path::Path::new(&dir).join("scena_rovere.png"))
+            .save(std::path::Path::new(&dir).join(format!(
+                "scena_{}_{}{}.png",
+                oak.id.0,
+                oak.displacement_mm,
+                if std::env::var_os("FORGE_REVIEW_CLOSE").is_some() {
+                    "_vicino"
+                } else {
+                    ""
+                }
+            )))
             .unwrap();
+    }
+
+    /// La dimensione dell'oggetto delle anteprime cambia solo la copia usata per l'anteprima:
+    /// con la proiezione box scala texture, rilievo e displacement in proporzione, con gli UV o
+    /// "Reale" non tocca niente; il materiale di partenza resta com'è.
+    #[test]
+    fn preview_object_size_only_scales_the_preview_copy() {
+        let presets = forge_scene::material::presets();
+        let oak = presets.iter().find(|m| m.id.0 == "legno-rovere").expect("rovere").clone();
+        let before = format!("{oak:?}");
+        let prev = preview_object_cm();
+        set_preview_object_cm(30);
+        let mut m = oak.clone();
+        scale_for_preview(&mut m, 0.09);
+        let k = 0.09 / 0.30;
+        assert!((m.mapping.scale - oak.mapping.scale * k).abs() < 1e-6);
+        assert!((m.bump_mm - oak.bump_mm * k).abs() < 1e-6);
+        assert!((m.displacement_mm - oak.displacement_mm * k).abs() < 1e-6);
+        set_preview_object_cm(0);
+        let mut m = oak.clone();
+        scale_for_preview(&mut m, 0.09);
+        assert_eq!(format!("{m:?}"), before);
+        set_preview_object_cm(30);
+        let mut uv = oak.clone();
+        uv.mapping.projection = forge_scene::Projection::Uv;
+        let uv_before = format!("{uv:?}");
+        scale_for_preview(&mut uv, 0.09);
+        assert_eq!(format!("{uv:?}"), uv_before);
+        // render_preview lavora su una copia.
+        let _ = render_preview(&oak, 32);
+        assert_eq!(format!("{oak:?}"), before);
+        set_preview_object_cm(prev);
     }
 }
