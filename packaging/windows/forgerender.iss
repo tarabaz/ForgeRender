@@ -57,7 +57,6 @@ Source: "..\..\lang\*.json"; DestDir: "{app}\lang"; Flags: ignoreversion
 Source: "..\..\manuale\*"; DestDir: "{app}\manuale"; Excludes: "inventario.json,INVENTARIO.md"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\..\assets\materiali\*"; DestDir: "{app}\materiali"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\..\assets\anteprima\*"; DestDir: "{app}\anteprima"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\..\assets\materiali-blenderkit\*"; DestDir: "{app}\materiali-blenderkit"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
 
 [Icons]
 Name: "{group}\ForgeRender"; Filename: "{app}\forgerender.exe"
