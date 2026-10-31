@@ -11,6 +11,14 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.23.0 — 31/10/2026
+
+**Valori di partenza del render**
+- Denoiser attivo al 100% (prima 90%) nella modalità Semplice.
+- Soglia di rumore 0,03 (prima 0,05) nella modalità Semplice e nei progetti nuovi in modalità
+  Avanzata (prima l'arresto a soglia lì era spento). Immagini più pulite, render un po' più
+  lunghi.
+
 ## 0.22.0 — 31/10/2026
 
 **Viste multiple e turntable con video MP4** (Rendering → Viste e turntable…)
