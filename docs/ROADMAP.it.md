@@ -30,6 +30,8 @@ La complessità è una stima di lavoro e rischio per questo codice:
 | 15 | Utilizzo GPU / VRAM tramite NVML | Bassa | ✅ 0.6.0 (solo NVIDIA) | — |
 | 16 | Import di volumi OpenVDB (fumo/fuoco simulati in Blender Mantaflow, EmberGen, Houdini) | Media | renderer della nebbia ✅ | Lettore VDB in Rust puro; il renderer gestisce già griglie di densità |
 
+| 17 | Modalità di rendering aggiuntive: silhouette, linee tecniche, cel-shading a colori e monocromatico, illustrazione stilizzata | Da stimare | renderer CPU/GPU, materiali, pipeline di output | Il rendering fotorealistico attuale resta invariato e sempre disponibile. Proposta da valutare prima di implementare; dettagli in `reports/chatgpt/CLAUDE_HANDOFF.md`. |
+
 Ordine consigliato per ciò che resta: 4 → 3 → 5, poi il resto secondo necessità.
 
 ## Nebbia volumetrica da ghiaccio secco: progetto (implementato)
