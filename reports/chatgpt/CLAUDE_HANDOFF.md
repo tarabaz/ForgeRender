@@ -2132,3 +2132,17 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
 - Stato release GitHub al controllo: esiste ancora solo una bozza `v0.22.0` con il vecchio ZIP; non esiste ancora `v0.23.0`. Non pubblicare la bozza 0.22.0. La creazione/modifica/upload della release non è stata eseguita tramite questo collegamento.
 - Non sono stati eseguiti build, test o packaging; Valerio deve ricompilare e generare il nuovo ZIP dopo aver aggiornato la copia locale da main.
 - Da verificare prima della pubblicazione: testare che l'app senza `materiali-blenderkit` non mostri preset rotti o riferimenti a mappe mancanti; controllare contenuto dello ZIP, DLL, LICENSE, NOTICE e licenze terze parti. Il branch predefinito GitHub risulta ancora `claude/festive-heisenberg-d2ow6z` anche se la release va preparata da `main`; impostarlo su `main` dalle impostazioni repository, se desiderato.
+
+
+## ChatGPT — 31/10/2026: policy documentazione bilingue e main-only
+
+- Valerio ha stabilito la regola permanente: tutte le pagine di documentazione destinate agli utenti devono avere l'inglese come lingua di riferimento e una traduzione italiana completa, selezionabile tramite link esplicito in entrambe le direzioni.
+- Creati `docs/README.md` e `docs/README.it.md` come indici bilingui.
+- Convertita `docs/ARCHITECTURE.md` in inglese e conservata la versione italiana in `docs/ARCHITECTURE.it.md`; entrambe hanno link reciproci.
+- README principale e README italiano restano bilingui e linkano la documentazione.
+- Roadmap e guida MCP hanno già una versione inglese e una italiana.
+- Restano da completare la conversione bilingue di `docs/BENCHMARK.md`, `docs/INTERFACCIA_SEMPLICE.md` e `CHANGELOG.md`. Le note interne (`docs/STATO_LAVORI.md`, piani interni, report storici, handoff) non sono pagine utente: vanno mantenute come registri interni, senza traduzioni automatiche che rischino di alterare fatti e misure.
+- Manuale: i capitoli attualmente presenti sotto `manuale/en/` e `manuale/it/` hanno già una struttura parallela; verificare in seguito la copertura completa dei capitoli.
+- Regola operativa richiesta: usare esclusivamente `main`; non creare né usare branch di lavoro. Le note storiche che dicono il contrario sono superate da questa decisione.
+- Limite degli strumenti: la connessione GitHub disponibile permette lettura e scrittura dei file, ma non espone azioni amministrative per cambiare il default branch o cancellare branch. Al controllo il default branch era ancora `claude/festive-heisenberg-d2ow6z`; branch elencati: `main`, `claude/festive-heisenberg-d2ow6z`, `chatgpt/claude-report-notes`, `tools/polyhaven-material-library`. Nessun branch è stato cancellato e il default non è stato cambiato.
+- Nessuna compilazione, test o verifica manuale UI eseguita in questa attività.
