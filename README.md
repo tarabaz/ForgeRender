@@ -327,3 +327,20 @@ Then add a row to the index in `reports/README.md`.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architecture, technical choices, risks (Italian)
 - [docs/BENCHMARK.md](docs/BENCHMARK.md) — measurements actually performed (Italian)
 - [docs/STATO_LAVORI.md](docs/STATO_LAVORI.md) — development log (Italian)
+
+## License and contributions
+
+ForgeRender is licensed under the **Apache License 2.0**. You may use, modify,
+redistribute, and commercially distribute the project under its terms. Modified
+files must be identified as changed, and applicable copyright, license, and
+attribution notices must be preserved. The license does **not** grant rights to
+the ForgeRender name or logo beyond the limited customary use described in the
+license.
+
+- [Apache License 2.0](LICENSE)
+- [Project attribution notices](NOTICE)
+- [How to contribute](CONTRIBUTING.md)
+
+Third-party libraries, materials, sample assets, and other bundled content may
+have separate license terms; see their accompanying notices and
+`packaging/licenses/`.
