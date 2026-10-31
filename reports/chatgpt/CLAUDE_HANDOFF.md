@@ -2111,3 +2111,10 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
 - `Build-ForgeRender.ps1` accetta il remoto `tarabaz/ForgeRender` oltre a
   `tarabaz/RenderingEngine` (Valerio vuole rinominare il repository; il cambio di nome si fa
   dalle impostazioni di GitHub).
+
+## Claude Code — 31/10/2026: repository rinominato in ForgeRender
+
+- Valerio ha rinominato il repository: ora è `tarabaz/ForgeRender` (GitHub reindirizza il vecchio
+  `tarabaz/RenderingEngine`). Remoto locale aggiornato; link di README (IT/EN) e STATO_LAVORI
+  aggiornati. `Build-ForgeRender.ps1` accetta entrambi i nomi. Le note storiche di questo file
+  restano con il nome vecchio (i link reindirizzano).

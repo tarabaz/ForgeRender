@@ -11,7 +11,7 @@ Written in Rust, with progressive CPU/GPU path tracing for CAD models, mechanica
 
 <sub><strong>STABLE RELEASE</strong> · Windows 11 · x64 · Portable ZIP</sub>
 
-[⬇️ **DOWNLOAD FORGERENDER 0.23.0 — PORTABLE ZIP**](https://github.com/tarabaz/RenderingEngine/releases/download/v0.23.0/ForgeRender-0.23.0-portable-x64.zip)
+[⬇️ **DOWNLOAD FORGERENDER 0.23.0 — PORTABLE ZIP**](https://github.com/tarabaz/ForgeRender/releases/download/v0.23.0/ForgeRender-0.23.0-portable-x64.zip)
 
 No installation required: extract the ZIP and run `forgerender.exe`.  
 The package is distributed through GitHub Releases.

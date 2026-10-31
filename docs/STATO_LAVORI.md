@@ -163,7 +163,7 @@
 - `.\Build-ForgeRender.ps1` dalla radice del repository (oppure `.\Build-ForgeRender.cmd` se
   Windows blocca gli script; `-SkipInstaller` per il solo portable, `-NoOpen` per non aprire dist).
 - Controlli: git e cargo presenti; radice Git = cartella dello script; remoto
-  `tarabaz/RenderingEngine`; branch `claude/festive-heisenberg-d2ow6z` (non cambia branch da
+  `tarabaz/ForgeRender`; branch `claude/festive-heisenberg-d2ow6z` (non cambia branch da
   solo); nessuna modifica ai file tracciati (se ce ne sono si ferma senza toccarle).
 - `git pull --ff-only origin claude/festive-heisenberg-d2ow6z`: se fallisce si ferma.
 - `cargo build --release -p forge_app -p forge_cli` (cache riutilizzata, forge_step escluso),
