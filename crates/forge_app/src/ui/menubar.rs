@@ -114,6 +114,7 @@ fn file_menu(app: &mut ForgeApp, ui: &mut egui::Ui) {
     ui.separator();
     item(app, ui, Cmd::Import);
     item(app, ui, Cmd::Export);
+    item(app, ui, Cmd::ExportPasses);
     ui.separator();
     item(app, ui, Cmd::Exit);
 }
@@ -266,7 +267,9 @@ fn render_menu(app: &mut ForgeApp, ui: &mut egui::Ui) {
     ui.separator();
     tab_item(app, ui, InspectorTab::Render, tk("Impostazioni di render e denoiser…"));
     ui.separator();
+    item(app, ui, Cmd::Sequences);
     item(app, ui, Cmd::Export);
+    item(app, ui, Cmd::ExportPasses);
 }
 
 /// "Controllo IA": l'utente decide quando un assistente (Claude, tramite `forgerender-mcp`)

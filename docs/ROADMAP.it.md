@@ -33,11 +33,11 @@ La complessità è una stima di lavoro e rischio per questo codice:
 | 17 | Modalità di rendering aggiuntive: silhouette, linee tecniche, cel-shading a colori e monocromatico, illustrazione stilizzata | Da stimare | renderer CPU/GPU, materiali, pipeline di output | Il rendering fotorealistico attuale resta invariato e sempre disponibile. Proposta da valutare prima di implementare; dettagli in `reports/chatgpt/CLAUDE_HANDOFF.md`. |
 
 | 18 | Esplosi e documentazione visiva: esplosione selettiva XYZ/radiale, callout, BOM aggregata e tavole/PDF | Da stimare | gerarchia e metadati CAD, trasformazioni, output | Modulo leggero di documentazione; niente quote CAD. Specifica e criteri in `reports/chatgpt/CLAUDE_HANDOFF.md`. |
-| 19 | Viste multiple automatiche e varianti di prodotto | Da valutare | camere, configurazioni scena/materiali | Viste standard con inquadratura coerente; confronto di materiali/colori/configurazioni. |
+| 19 | Viste multiple automatiche e varianti di prodotto | 🟡 Viste fatte (0.22.0), varianti da fare | camere, configurazioni scena/materiali | Viste standard con inquadratura coerente; confronto di materiali/colori/configurazioni. |
 | 20 | Sezioni e cutaway | Da valutare | geometria, clipping/sezioni, CPU/GPU | Valutare prima una sezione visiva tramite piano di taglio; distinguere da operazioni CAD. |
 | 21 | Match fotografico e compositing | Da valutare | camera, HDRI/illuminazione, output | Allineamento prospettico a una foto e compositing; analisi separata per complessità. |
-| 22 | Render passes / AOV | Da valutare | pipeline renderer, output PNG | Pass separati per colore, ombre, normali, emissione, profondità e altri supportati. |
-| 23 | Turntable e sequenze animate | Da valutare | camera, timeline/configurazioni | Rotazione automatica del prodotto; in seguito sequenze di esplosione e montaggio. |
+| 22 | Render passes / AOV | 🟡 Base fatta (0.22.0): albedo, normali, profondità, maschera, ID; ombre ed emissione separate da fare | pipeline renderer, output PNG | Pass separati per colore, ombre, normali, emissione, profondità e altri supportati. |
+| 23 | Turntable e sequenze animate | 🟡 Turntable con video MP4 fatto (0.22.0); sequenze di esplosione da fare | camera, timeline/configurazioni | Rotazione automatica del prodotto; in seguito sequenze di esplosione e montaggio. |
 
 Ordine consigliato per ciò che resta: 4 → 3 → 5, poi il resto secondo necessità.
 

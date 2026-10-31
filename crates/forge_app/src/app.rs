@@ -77,6 +77,8 @@ struct JobInfo {
     target: u32,
     /// Soglia di rumore e campioni minimi inviati alla sessione.
     adaptive: (f32, u32),
+    /// Numero del job nella sessione di rendering.
+    session_job: u64,
 }
 
 /// Compilazione della geometria in corso su un thread separato.
@@ -144,6 +146,16 @@ pub struct StartupOptions {
     pub gizmo: Option<String>,
     /// Crea una camera di rendering: "lato" sposta la vista per mostrarla, "attraverso" la guarda.
     pub camera_test: Option<String>,
+    /// Finestra "Viste e turntable" aperta all'avvio (`--sequenze`).
+    pub sequences_window: bool,
+    /// Prova automatica: sequenza salvata in questa cartella, poi il programma si chiude
+    /// (`--sequenza <cartella>`, con `--sequenza-viste`, `--sequenza-passo`, `--sequenza-campioni`,
+    /// `--sequenza-passaggi`).
+    pub sequence: Option<PathBuf>,
+    pub sequence_views: bool,
+    pub sequence_passes: bool,
+    pub sequence_step: Option<f32>,
+    pub sequence_samples: Option<u32>,
 }
 
 /// Stato di un componente salvato per annulla/ripeti (trasformazione e visibilità).
@@ -254,6 +266,8 @@ pub struct ForgeApp {
     pub blend_import: crate::ui::blend_import::BlendImportUi,
     /// Finestra "Integrazione AI" (collegamento degli assistenti).
     pub ai_setup: crate::ui::ai_setup::AiSetupUi,
+    /// Finestra "Viste e turntable" e sequenza in corso.
+    pub sequence: crate::sequence::SequenceUi,
     /// Finestra "Modifica materiale" (clic su un materiale della libreria).
     pub material_editor: crate::ui::material_editor::MaterialEditorUi,
     /// Impostazioni dell'app (menu Impostazioni) e finestra aperta.
@@ -302,10 +316,10 @@ pub struct ForgeApp {
     pub system: SystemInfo,
     pub monitor: ResourceMonitor,
     pub safe_mode: bool,
-    startup: StartupOptions,
+    pub(crate) startup: StartupOptions,
     screenshot_requested: bool,
     screenshot_done: Arc<std::sync::atomic::AtomicBool>,
-    frames: u64,
+    pub(crate) frames: u64,
     /// "Controllo IA" acceso: Claude può comandare la finestra (`docs/MCP.md`).
     pub mcp: Option<crate::mcp::Server>,
     /// Modalità Semplice: la GPU è già stata proposta come dispositivo predefinito (una volta
@@ -387,6 +401,7 @@ impl ForgeApp {
             blend_import: Default::default(),
             ai_setup: crate::ui::ai_setup::AiSetupUi::new(),
             material_editor: Default::default(),
+            sequence: Default::default(),
             prefs: Default::default(),
             prefs_open: false,
             prefs_error: None,
@@ -507,6 +522,7 @@ impl ForgeApp {
         if startup.ai_setup {
             app.ai_setup.open();
         }
+        app.sequence.open = startup.sequences_window;
         if startup.iso {
             app.orbit.lens.ortho = true;
             app.orbit.yaw = std::f32::consts::FRAC_PI_4;
@@ -1223,7 +1239,7 @@ impl ForgeApp {
             _ => Arc::new(RenderScene::compile_with_geometry(&self.scene, geometry)),
         };
         self.last_render_scene = Some((self.geometry_rev, self.shading_rev, rs.clone()));
-        self.session.start(rs, self.settings.clone(), backend);
+        let session_job = self.session.start(rs, self.settings.clone(), backend);
         self.job = Some(JobInfo {
             geometry_rev: self.geometry_rev,
             shading_rev: self.shading_rev,
@@ -1232,6 +1248,7 @@ impl ForgeApp {
             threads: self.settings.effective_threads(),
             target: self.settings.target_samples,
             adaptive: (self.settings.noise_threshold, self.settings.adaptive_min_samples),
+            session_job,
             backend: self.settings.backend,
         });
         self.view = View::Render;
@@ -1262,6 +1279,21 @@ impl ForgeApp {
             self.gpu = Some(forge_render_gpu::SharedGpu::new().map_err(|e| format!("{e:#}")));
         }
         self.gpu.clone().expect("gpu")
+    }
+
+    /// Numero (nella sessione) dell'ultimo render avviato.
+    pub fn job_id(&self) -> Option<u64> {
+        self.job.as_ref().map(|j| j.session_job)
+    }
+
+    /// Scena compilata dell'ultimo render avviato.
+    pub fn last_render_scene_arc(&self) -> Option<Arc<RenderScene>> {
+        self.last_render_scene.as_ref().map(|(_, _, s)| s.clone())
+    }
+
+    /// Cambiata l'inquadratura del render senza segnare il progetto come modificato.
+    pub fn camera_rev_bump(&mut self) {
+        self.camera_rev += 1;
     }
 
     pub fn render_state(&self) -> SessionState {
@@ -2063,11 +2095,21 @@ impl ForgeApp {
                 self.gpu_warmup = None;
             }
         }
-        self.apply_simple_defaults();
+        // Durante una sequenza valgono le sue impostazioni (campioni fissi, niente adattivo).
+        if !self.sequence_running() {
+            self.apply_simple_defaults();
+        }
         self.update_render_job();
+        self.tick_sequence();
+        self.auto_sequence(ctx);
         self.monitor.tick();
         let state = self.render_state();
-        if state == SessionState::Rendering || self.is_preparing() || self.pending.is_some() {
+        if state == SessionState::Rendering
+            || self.is_preparing()
+            || self.pending.is_some()
+            || self.sequence_running()
+            || self.sequence.passes_job.is_some()
+        {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
         crate::mcp::process(self, ctx);

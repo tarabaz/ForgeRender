@@ -541,5 +541,21 @@
   (esclude la scenografia selezionata: i fondali rifatti non crescono più).
 - Prossimo: quando Valerio consegna la cartella di zip, inserirli come predefiniti.
 
+
+### 0.22.0: viste multiple, turntable con video, passaggi di render (31/10/2026)
+- `forge_app/src/sequence.rs`:
+  - piano dei fotogrammi;
+  - rotazione delle radici del prodotto tramite `UserTransform::from_matrix`;
+  - `fit_camera` / `plan_cameras` (inquadratura che contiene i punti del prodotto ruotati);
+  - `top_camera`;
+  - macchina a stati in `tick_sequence` (identificata dal numero di job della sessione,
+    `JobInfo::session_job`);
+  - ripristino finale.
+- `forge_app/src/video.rs`: MP4 con Media Foundation (`windows` 0.62), ffmpeg come riserva.
+- `forge_render_cpu::passes`: profondità, maschera, ID.
+- `ui/sequence.rs`: finestre e modale di avanzamento.
+- Opzioni di prova: `--sequenza <cartella>` (con `--sequenza-viste`, `-passo`, `-campioni`,
+  `-passaggi`) e `--sequenze`.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

@@ -11,6 +11,36 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.22.0 — 31/10/2026
+
+**Viste multiple e turntable con video MP4** (Rendering → Viste e turntable…)
+- Viste multiple automatiche: frontale, tre quarti destra e sinistra, destra, sinistra,
+  posteriore, dall'alto (si scelgono con le caselle). Il prodotto gira su se stesso, mentre
+  camera, luci e fondale restano fermi come in uno studio. Ogni vista viene inquadrata da sola,
+  con il prodotto sempre tutto dentro.
+- Turntable: si sceglie la rotazione tra due immagini (es. 2°) oppure la durata di un giro in
+  secondi; la finestra mostra quante immagini servono e quanto dura il video. Si regolano anche
+  i fotogrammi al secondo (24–60), i giri ripetuti nel video e il senso orario o antiorario.
+  Il giro si chiude senza ripetere la prima immagine, così il video gira in loop senza scatti.
+  L'inquadratura è una sola e contiene il prodotto in ogni posizione del giro.
+- Video MP4 H.264 creato con l'encoder incluso in Windows (anche quello hardware della scheda
+  video): niente da installare. Se manca, si usa ffmpeg quando è installato.
+- Contro lo sfarfallio, ogni immagine usa:
+  - gli stessi campioni per pixel, quindi il rumore residuo resta fermo;
+  - un numero di campioni fisso, senza campionamento adattivo;
+  - il denoiser solo sull'immagine finale.
+  Misurato sul fondale fermo di due immagini consecutive: 61 dB di PSNR, meno di un livello
+  su 255 di differenza media.
+- Camera: si usa quella di render attiva; se non c'è, la vista attuale, con il pulsante "Crea
+  una camera da questa vista". Alla fine, o se si interrompe, scena, camera e impostazioni
+  tornano come prima.
+
+**Passaggi di render** (File → Esporta passaggi di render…, oppure per ogni immagine delle
+sequenze)
+- Albedo, normali, profondità (PNG 16 bit con bianco = vicino, più EXR in metri), maschera del
+  prodotto per scontornare e ID dei pezzi (un colore per pezzo). Sono calcolati sulla CPU
+  dall'ultimo render, con la stessa inquadratura.
+
 ## 0.21.0 — 31/10/2026
 
 **Editor del materiale ed esportazione in zip**

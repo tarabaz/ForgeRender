@@ -270,6 +270,35 @@ pub fn product_bounds(scene: &Scene) -> Aabb {
     b
 }
 
+/// Punti del prodotto visibile (al più `max`, presi a intervalli regolari tra i vertici): per
+/// inquadrarlo da qualunque lato senza scorrere milioni di vertici a ogni prova.
+pub fn product_points(scene: &Scene, max: usize) -> Vec<Vec3> {
+    let total: usize = product_mesh_nodes(scene).map(|(_, m)| scene.meshes[m].positions.len()).sum();
+    let step = total.div_ceil(max.max(1)).max(1);
+    let mut out = Vec::with_capacity(total / step + 1);
+    let mut k = 0usize;
+    for (i, m) in product_mesh_nodes(scene) {
+        let w = scene.world_transform(i);
+        // Gli estremi di ogni pezzo lungo gli assi ci sono sempre (punte sottili comprese).
+        let mut ext = [(f32::INFINITY, Vec3::ZERO); 6];
+        for p in &scene.meshes[m].positions {
+            let q = w.transform_point3(*p);
+            for (a, e) in ext.iter_mut().enumerate() {
+                let v = if a < 3 { q[a] } else { -q[a - 3] };
+                if v < e.0 {
+                    *e = (v, q);
+                }
+            }
+            if k.is_multiple_of(step) {
+                out.push(q);
+            }
+            k += 1;
+        }
+        out.extend(ext.iter().filter(|e| e.0.is_finite()).map(|e| e.1));
+    }
+    out
+}
+
 /// Ingombro su cui dimensionare gli oggetti del menu Aggiungi: la selezione senza la scenografia
 /// (fondali, pavimento, pareti), altrimenti il prodotto. Con il fondale appena creato ancora
 /// selezionato, il secondo si dimensionava sul primo e cresceva a ogni nuova aggiunta.

@@ -2040,3 +2040,43 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
   - test `regenerated_backdrop_does_not_grow` (curvo e fotografico, 3 volte).
 - Da fare: inserire come predefiniti gli zip che consegnerà Valerio. La finestra è stata
   verificata con compilazione e test, non provata a mano nell'interfaccia.
+
+## Claude Code — 31/10/2026: 0.22.0, viste multiple, turntable con video, passaggi di render
+
+- Valerio ha approvato e chiesto tre funzioni della proposta "Altre funzioni di presentazione":
+  viste multiple automatiche, turntable con video MP4 e render passes di base su richiesta.
+  Esplosi, callout, BOM e stili restano da approvare.
+- Scelte tecniche:
+  - Gira il prodotto, non la camera: con la camera in orbita si vedrebbero il retro e i
+    bordi del fondale. Sulle radici del prodotto si compone una rotazione attorno all'asse
+    verticale del centro, `UserTransform::from_matrix(spin * user_matrix)`, e i pezzi figli
+    seguono. Le texture con ancoraggio Pezzo o Assieme girano con l'oggetto; con
+    l'ancoraggio Mondo scorrerebbero.
+  - La geometria si ricompila a ogni fotogramma (non c'è instancing). Sulla scena di prova
+    costa circa 0,1 s.
+  - Anti-sfarfallio: stesso seed (rumore fermo sullo schermo), campioni fissi, niente
+    adattivo, denoiser solo finale. Durante la sequenza `apply_simple_base` è sospeso
+    (avrebbe riacceso l'adattivo).
+  - L'immagine si salva solo quando lo stato è Completed, il numero di job coincide con
+    quello avviato e, se il denoiser c'è, l'immagine ripulita ha gli stessi campioni
+    (attesa massima 30 s).
+  - Inquadratura: ricerca binaria della distanza perché i punti del prodotto ruotati stiano
+    nell'85% dell'immagine, contando anche il decentramento della lente. I punti sono un
+    campione di 20.000 vertici più gli estremi di ogni pezzo.
+  - Video:
+    - Media Foundation, sink writer da RGB32 (passo positivo, righe dall'alto) a H.264
+      High, bitrate di 0,2 bit per pixel per fotogramma;
+    - si scrive su un file `.mp4.tmp` (contenitore impostato esplicitamente), poi si
+      rinomina;
+    - ffmpeg dal PATH come riserva.
+- Prove fatte:
+  - test unitari: tempi del giro, chiusura del loop, angoli delle viste, inquadratura che
+    contiene il prodotto, vista dall'alto, video con 6 fotogrammi, orientamento dritto
+    verificato decodificando con ffmpeg, colori ID distinti;
+  - eseguibile vero con `--sequenza`:
+    - turntable di 12 immagini a 128 campioni con tutti i passaggi in 33 s;
+    - MP4 H.264 High 1280×720, 30 fps, 12 fotogrammi;
+    - 7 viste in 15 s, controllate a occhio.
+  - Sfarfallio: PSNR di 61 dB sul fondale fermo tra fotogrammi consecutivi.
+- Limite: i passaggi (CPU, 8 campioni) attraverso il vetro hanno albedo rumoroso, come le guide
+  del denoiser.

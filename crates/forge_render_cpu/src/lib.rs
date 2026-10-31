@@ -11,6 +11,7 @@ mod guides;
 mod integrator;
 pub mod lights;
 pub mod medium;
+pub mod passes;
 mod textures;
 
 pub use guides::{render_guides, GUIDE_SAMPLES};

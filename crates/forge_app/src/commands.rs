@@ -20,6 +20,8 @@ pub enum Cmd {
     SaveAs,
     Import,
     Export,
+    /// Finestra "Passaggi di render" (albedo, normali, profondità, maschera, ID).
+    ExportPasses,
     Exit,
     // Modifica
     Undo,
@@ -57,6 +59,8 @@ pub enum Cmd {
     Stop,
     Restart,
     AutoRestart,
+    /// Finestra "Viste e turntable".
+    Sequences,
     // Libreria
     LibraryMine,
     LibraryOnline,
@@ -158,6 +162,20 @@ pub fn spec(cmd: Cmd) -> Spec {
             icons::EXPORT,
             key(CMD, Key::E),
             tk("Salva il render: PNG, JPG, TIFF 16 bit o EXR (si sceglie nella finestra)"),
+        ),
+        Cmd::ExportPasses => s(
+            "file.export_passes",
+            tk("Esporta passaggi di render…"),
+            icons::IMAGE,
+            None,
+            tk("Albedo, normali, profondità, maschera del prodotto e ID dei pezzi dell'ultimo render, per la post-produzione"),
+        ),
+        Cmd::Sequences => s(
+            "render.sequences",
+            tk("Viste e turntable…"),
+            icons::VIEWS,
+            None,
+            tk("Viste multiple automatiche (frontale, laterali, tre quarti, dall'alto) o un giro completo del prodotto con video MP4"),
         ),
         Cmd::Exit => s(
             "file.exit",
@@ -463,6 +481,7 @@ pub fn enabled(app: &ForgeApp, cmd: Cmd) -> bool {
         Cmd::Stop => app.render_state().is_active(),
         Cmd::RenderToggle => !app.is_preparing(),
         Cmd::Export => app.session.latest_frame().is_some(),
+        Cmd::Sequences | Cmd::ExportPasses => !app.sequence_running(),
         Cmd::Duplicate | Cmd::Delete | Cmd::Hide | Cmd::Isolate | Cmd::FrameSelection => !app.selection.is_empty(),
         Cmd::UndoPreset => app.preset_backup.is_some(),
         Cmd::OpenRecent(i) => i < app.prefs.recent_projects.len(),
@@ -523,6 +542,8 @@ pub fn run_confirmed(app: &mut ForgeApp, ctx: &egui::Context, cmd: Cmd) {
         Cmd::SaveAs => app.save_project(true),
         Cmd::Import => app.import_dialog(),
         Cmd::Export => app.export_dialog(),
+        Cmd::ExportPasses => app.sequence.passes_open = true,
+        Cmd::Sequences => app.sequence.open = true,
         Cmd::Exit => {
             app.exit_confirmed = true;
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
@@ -665,6 +686,8 @@ mod tests {
             Cmd::SaveAs,
             Cmd::Import,
             Cmd::Export,
+            Cmd::ExportPasses,
+            Cmd::Sequences,
             Cmd::Exit,
             Cmd::Undo,
             Cmd::Redo,

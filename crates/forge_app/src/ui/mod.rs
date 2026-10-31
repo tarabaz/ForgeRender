@@ -16,6 +16,7 @@ pub(crate) mod material_editor;
 pub mod menubar;
 pub mod navigator;
 mod quickbar;
+pub(crate) mod sequence;
 pub(crate) mod settings;
 mod simple;
 mod splash;
@@ -263,6 +264,7 @@ impl ForgeApp {
         crate::ui::blend_import::window(self, ctx);
         crate::ui::ai_setup::window(self, ctx);
         crate::ui::material_editor::window(self, ctx);
+        crate::ui::sequence::window(self, ctx);
         crate::ui::manual::window(self, ctx);
         crate::ui::settings::window(self, ctx);
         crate::ui::splash::show(self, ctx);

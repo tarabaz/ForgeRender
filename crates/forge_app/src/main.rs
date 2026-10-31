@@ -20,9 +20,11 @@ mod i18n;
 mod mcp;
 mod prefs;
 mod presets;
+mod sequence;
 #[cfg(test)]
 mod texts;
 mod ui;
+mod video;
 mod viewport;
 
 use app::{ForgeApp, StartupOptions};
@@ -100,6 +102,21 @@ fn parse_args() -> StartupOptions {
             "--camera-test" => {
                 i += 1;
                 o.camera_test = args.get(i).cloned();
+            }
+            "--sequenze" => o.sequences_window = true,
+            "--sequenza" => {
+                i += 1;
+                o.sequence = args.get(i).map(PathBuf::from);
+            }
+            "--sequenza-viste" => o.sequence_views = true,
+            "--sequenza-passaggi" => o.sequence_passes = true,
+            "--sequenza-passo" => {
+                i += 1;
+                o.sequence_step = args.get(i).and_then(|s| s.parse().ok());
+            }
+            "--sequenza-campioni" => {
+                i += 1;
+                o.sequence_samples = args.get(i).and_then(|s| s.parse().ok());
             }
             other if !other.starts_with("--") => o.open = Some(PathBuf::from(other)),
             other => eprintln!("opzione sconosciuta ignorata: {other}"),
