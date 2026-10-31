@@ -50,7 +50,7 @@ The package is distributed through GitHub Releases.
 - **0.2.0 — First workflow and library improvements:** Simple mode, material library, rendering improvements, portable samples and build tools.
 - **0.1.0 — First release:** CPU/GPU path tracer, CAD/3D import, material library, OIDN denoiser, professional camera, lights, volumetric fog, projects, portable package and installer.
 
-For the full technical notes, see [CHANGELOG.md](CHANGELOG.md) (Italian, authoritative release log).
+For the full technical notes, see [CHANGELOG.en.md](CHANGELOG.en.md) (Italian, authoritative release log).
 
 </details>
 
