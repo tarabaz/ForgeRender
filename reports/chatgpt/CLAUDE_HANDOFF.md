@@ -2010,3 +2010,33 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
 **Vincolo esplicito**: non implementare queste funzionalità durante la sola analisi. Prima restituire il piano e attendere l'approvazione di Valerio. Nessun test o comportamento va dichiarato implementato finché non esiste codice e non è stato effettivamente verificato.
 
 **Stato al 31/10/2026**: specifica consolidata nel passaggio di consegne; non implementata e non testata.
+
+## Claude Code — 31/10/2026: 0.21.0, editor del materiale ed esportazione zip
+
+- Richieste di Valerio:
+  - il clic su un materiale della libreria non deve applicarlo ma aprire un editor come
+    l'importatore, dove modificarlo, salvarlo ed esportarlo;
+  - l'esportazione crea uno zip con impostazioni e mappe, che diventerà la base dei
+    predefiniti;
+  - l'anteprima si deve poter girare mentre si modifica.
+- `ui/material_editor.rs`:
+  - a sinistra il modulo del materiale (`inspector::material_form`, estratto dal pannello
+    Materiali, che ora lo usa);
+  - a destra l'anteprima girevole (trascinamento: imbardata e beccheggio ±70°, 8 campioni a
+    metà risoluzione durante il trascinamento);
+  - pulsanti Applica alla selezione / Salva nella libreria (`store::update` o `store::save_as`)
+    / Esporta zip / Annulla modifiche.
+- Libreria: clic → editor, doppio clic → applica.
+- `forge_library::export::material_zip`:
+  - `materiale.json` con percorsi relativi più le mappe (nomi uguali numerati, mappa condivisa
+    tra più slot copiata una volta sola);
+  - scrittura su un file `.zip.tmp` poi rinominato; una mappa mancante ferma l'esportazione.
+  - Test: lo zip scompattato si rilegge con `data_presets`.
+- Campioni: l'unico 64 era `Quality::Draft`, ora 128. Le preferenze di Valerio erano già a 128.
+- Bug dei fondali che crescono:
+  - `add_object` usava `anchor_bounds()`, cioè la selezione, che dopo l'aggiunta è il fondale
+    stesso, quindi il nuovo fondale era 12 volte il precedente;
+  - ora `presets::sizing_bounds` esclude la scenografia, altrimenti prende il prodotto;
+  - test `regenerated_backdrop_does_not_grow` (curvo e fotografico, 3 volte).
+- Da fare: inserire come predefiniti gli zip che consegnerà Valerio. La finestra è stata
+  verificata con compilazione e test, non provata a mano nell'interfaccia.

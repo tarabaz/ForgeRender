@@ -254,6 +254,8 @@ pub struct ForgeApp {
     pub blend_import: crate::ui::blend_import::BlendImportUi,
     /// Finestra "Integrazione AI" (collegamento degli assistenti).
     pub ai_setup: crate::ui::ai_setup::AiSetupUi,
+    /// Finestra "Modifica materiale" (clic su un materiale della libreria).
+    pub material_editor: crate::ui::material_editor::MaterialEditorUi,
     /// Impostazioni dell'app (menu Impostazioni) e finestra aperta.
     pub prefs: crate::prefs::Preferences,
     pub prefs_open: bool,
@@ -384,6 +386,7 @@ impl ForgeApp {
             library: Default::default(),
             blend_import: Default::default(),
             ai_setup: crate::ui::ai_setup::AiSetupUi::new(),
+            material_editor: Default::default(),
             prefs: Default::default(),
             prefs_open: false,
             prefs_error: None,
@@ -776,7 +779,7 @@ impl ForgeApp {
     pub fn add_object(&mut self, kind: AddKind) {
         use forge_math::{Mat4, Vec3};
         use forge_scene::AddedKind as K;
-        let b = self.anchor_bounds();
+        let b = crate::presets::sizing_bounds(&self.scene, self.selection.iter().copied());
         let (c, ground, e, back, right) = if b.is_empty() {
             (Vec3::ZERO, 0.0, 1.0, -0.5, 0.5)
         } else {

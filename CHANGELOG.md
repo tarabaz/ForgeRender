@@ -11,6 +11,24 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.21.0 — 31/10/2026
+
+**Editor del materiale ed esportazione in zip**
+- Libreria materiali: un clic non applica più il materiale, apre la finestra "Modifica
+  materiale" (doppio clic: applica come prima). Si modificano tutti i valori e le mappe, poi:
+  "Applica alla selezione", "Salva nella libreria" (un predefinito diventa un materiale della
+  libreria), "Esporta zip…", "Annulla modifiche".
+- "Esporta zip…" crea uno zip con `materiale.json` (tutte le impostazioni) e le mappe, con i nomi
+  dei file resi relativi: scompattato in una cartella è un materiale predefinito pronto.
+- L'anteprima della finestra si gira trascinandola con il mouse (doppio clic: vista iniziale);
+  mentre si trascina è più leggera, poi torna alla qualità piena.
+
+**Correzioni**
+- Qualità "Bozza" a 128 campioni (prima 64): nessuna partenza sotto i 128.
+- Fondale da studio e fondale fotografico: aggiunti più volte con il precedente selezionato,
+  ognuno si dimensionava sul precedente e cresceva ogni volta. Ora si dimensionano sempre sul
+  prodotto (la scenografia nella selezione non conta).
+
 ## 0.20.0 — 31/10/2026
 
 **Scala dei materiali adattata all'oggetto**

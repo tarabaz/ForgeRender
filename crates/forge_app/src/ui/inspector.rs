@@ -379,6 +379,16 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
     let Some(m) = app.scene.materials.get_mut(&app.selected_material) else {
         return;
     };
+    if material_form(ui, m, obj_size) {
+        app.appearance_changed();
+    }
+    crate::ui::central::material_preview(app, ui);
+}
+
+/// Parametri del materiale (nome, mapping, rilievo, valori, texture): pannello Materiali e
+/// finestra "Modifica materiale". `obj_size`: lato più lungo della selezione (ripetizioni).
+/// Restituisce se qualcosa è cambiato.
+pub(crate) fn material_form(ui: &mut egui::Ui, m: &mut Material, obj_size: Option<f32>) -> bool {
     let mut changed = false;
     ui.horizontal(|ui| {
         ui.label(tr("Nome"));
@@ -557,10 +567,7 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
         changed |= texture_slot(ui, &mut m.opacity_texture, "opacity");
         ui.end_row();
     });
-    if changed {
-        app.appearance_changed();
-    }
-    crate::ui::central::material_preview(app, ui);
+    changed
 }
 
 /// Scala, proiezione, rotazione e spostamento delle texture del materiale.

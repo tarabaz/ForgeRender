@@ -983,7 +983,8 @@ fn material_card(
     } else {
         main.join(" · ")
     };
-    let r = thumb_card(ui, tex, egui::vec2(card, card), &m.material.name, &sub, false);
+    let selected = app.material_editor.current_id() == Some(&m.material.id);
+    let r = thumb_card(ui, tex, egui::vec2(card, card), &m.material.name, &sub, selected);
     let notes = if m.notes.is_empty() {
         String::new()
     } else {
@@ -1025,8 +1026,12 @@ fn material_card(
             ],
         ))
     };
-    if r.clicked() {
+    // Clic: si apre "Modifica materiale" (non si applica); doppio clic: si applica subito.
+    if r.double_clicked() {
         *apply = Some(m.clone());
+    } else if r.clicked() {
+        let in_project = app.scene.materials.get(&m.material.id).cloned();
+        app.material_editor.open_library(m, in_project.as_ref());
     }
     r.context_menu(|ui| {
         if ui.button(tr("Apri cartella")).clicked() {
@@ -1040,7 +1045,7 @@ fn material_card(
     });
 }
 
-/// Tessera di un materiale della libreria ufficiale (predefinito): clic = applica.
+/// Tessera di un materiale della libreria ufficiale (predefinito): clic = modifica, doppio clic = applica.
 fn preset_card(
     app: &mut ForgeApp,
     ctx: &egui::Context,
@@ -1057,11 +1062,15 @@ fn preset_card(
     } else {
         tr_dyn(&m.category)
     };
-    let selected = app.selected_material == m.id;
+    let selected = app.material_editor.current_id() == Some(&m.id);
     let r = thumb_card(ui, tex, egui::vec2(card, card), &tr_dyn(&m.name), &sub, selected)
         .on_hover_text(tf("{}\nMateriale predefinito di ForgeRender", &[tr_dyn(&m.category).to_string()]));
-    if r.clicked() {
+    // Clic: si apre "Modifica materiale" (non si applica); doppio clic: si applica subito.
+    if r.double_clicked() {
         *apply = Some(m.clone());
+    } else if r.clicked() {
+        let in_project = app.scene.materials.get(&m.id).cloned();
+        app.material_editor.open_preset(m, in_project.as_ref());
     }
 }
 

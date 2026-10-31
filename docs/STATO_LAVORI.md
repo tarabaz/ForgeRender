@@ -532,5 +532,14 @@
   `box_frames`; CPU e GPU (parola 7 del riferimento) e displacement (`Params::box_unit_m`);
   predefiniti BlenderKit e importatore in modalità adattata.
 
+
+### 0.21.0: editor del materiale, esportazione zip, correzioni (31/10/2026)
+- `ui/material_editor.rs` (finestra Modifica materiale, anteprima girevole con
+  `central::render_preview_view` / `orbit_camera`), `inspector::material_form` condiviso con il
+  pannello Materiali, `forge_library::export::material_zip` (zip = formato dei predefiniti a dati).
+- `Quality::Draft` a 128 campioni; `presets::sizing_bounds` per gli oggetti del menu Aggiungi
+  (esclude la scenografia selezionata: i fondali rifatti non crescono più).
+- Prossimo: quando Valerio consegna la cartella di zip, inserirli come predefiniti.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

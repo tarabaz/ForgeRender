@@ -1003,8 +1003,14 @@ pub fn preview_device() -> &'static str {
 /// Anteprima del materiale, `size` × `size` pixel (RGBA8), con i campioni delle impostazioni:
 /// sullo shader ball del progetto delle anteprime, oppure (se manca) su una sfera.
 pub(crate) fn render_preview(mat: &Material, size: u32) -> Vec<u8> {
+    render_preview_view(mat, size, 0.0, 0.0, preview_samples())
+}
+
+/// Come [`render_preview`], con la camera girata attorno all'oggetto di `yaw_deg` (in pianta)
+/// e `pitch_deg` (in alto/basso) e con `samples` campioni (pochi mentre si trascina).
+pub(crate) fn render_preview_view(mat: &Material, size: u32, yaw_deg: f32, pitch_deg: f32, samples: u32) -> Vec<u8> {
     let size = size.clamp(32, 1024);
-    let samples = preview_samples();
+    let samples = samples.clamp(1, 4096);
     // Le anteprime piccole usano 2 thread (se ne fanno tante insieme), le grandi metà dei core.
     let threads = if size <= PREVIEW_SIZE {
         2
@@ -1019,6 +1025,9 @@ pub(crate) fn render_preview(mat: &Material, size: u32) -> Vec<u8> {
     let rs = match preview_stage() {
         Some(stage) => {
             let mut s = stage.scene.clone();
+            if yaw_deg != 0.0 || pitch_deg != 0.0 {
+                s.camera = orbit_camera(&s.camera, yaw_deg, pitch_deg);
+            }
             s.materials.upsert(m);
             s.assignments
                 .insert(stage.target.clone(), forge_scene::MaterialId::new("__preview"));
@@ -1066,6 +1075,20 @@ pub(crate) fn render_preview(mat: &Material, size: u32) -> Vec<u8> {
         }
     }
     forge_render_core::tonemap_to_rgba8(&acc.resolve(), settings.tone_mapping, 0.0)
+}
+
+/// La camera girata attorno al suo bersaglio: `yaw_deg` attorno alla verticale, `pitch_deg`
+/// verso l'alto/basso (l'elevazione resta tra −80° e +80°).
+pub(crate) fn orbit_camera(cam: &Camera, yaw_deg: f32, pitch_deg: f32) -> Camera {
+    let mut c = cam.clone();
+    let off = cam.position - cam.target;
+    let dist = off.length().max(1e-6);
+    let elev = (off.y / dist).clamp(-1.0, 1.0).asin();
+    let az = off.z.atan2(off.x);
+    let elev = (elev + pitch_deg.to_radians()).clamp(-80f32.to_radians(), 80f32.to_radians());
+    let az = az - yaw_deg.to_radians();
+    c.position = cam.target + Vec3::new(elev.cos() * az.cos(), elev.sin(), elev.cos() * az.sin()) * dist;
+    c
 }
 
 /// Scena di riserva: sfera alla scala della texture, piano e luce da studio.

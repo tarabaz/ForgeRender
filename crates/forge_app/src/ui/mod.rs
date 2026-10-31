@@ -12,6 +12,7 @@ pub mod icons;
 pub(crate) mod inspector;
 pub mod library;
 pub mod manual;
+pub(crate) mod material_editor;
 pub mod menubar;
 pub mod navigator;
 mod quickbar;
@@ -261,6 +262,7 @@ impl ForgeApp {
         crate::ui::library::window(self, ctx);
         crate::ui::blend_import::window(self, ctx);
         crate::ui::ai_setup::window(self, ctx);
+        crate::ui::material_editor::window(self, ctx);
         crate::ui::manual::window(self, ctx);
         crate::ui::settings::window(self, ctx);
         crate::ui::splash::show(self, ctx);

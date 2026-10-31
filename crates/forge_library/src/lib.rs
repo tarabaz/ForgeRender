@@ -12,6 +12,7 @@
 //! - [`blend`] e [`blenderkit`]: lettura dei file `.blend` (senza Blender) e import dei materiali
 //!   BlenderKit scaricati sul PC nella libreria locale.
 //! - [`categories`]: nomi in italiano delle categorie dei siti (solo per l'interfaccia).
+//! - [`export`]: esportazione di un materiale in uno zip (impostazioni + mappe).
 //! - [`polyhaven_local`]: import dei materiali Poly Haven scaricati in locale con lo script
 //!   di `tools/material-library-polyhaven`.
 
@@ -19,6 +20,7 @@ pub mod blend;
 pub mod blenderkit;
 pub mod categories;
 pub mod detect;
+pub mod export;
 pub mod mtlx;
 pub mod online;
 pub mod paths;

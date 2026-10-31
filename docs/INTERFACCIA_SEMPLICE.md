@@ -114,6 +114,6 @@ può cambiare con la libreria come ogni altro materiale.
 
 - Serve un quarto aspetto, per esempio **"Su tavolo di legno"** (pavimento con materiale legno
   della libreria)? Va bene solo se il materiale è nella libreria del PC.
-- Bozza a 64 campioni: sulla RTX 5070 è quasi istantanea. Va bene così, o la preferite più alta?
+- Bozza a 128 campioni (da 0.21.0; prima 64, giudicata troppo bassa da Valerio).
 - L'aspetto "Sfondo scuro" mette l'ambiente a 0: i metalli riflettono solo luci e fondale. Va bene,
   o preferite un riflesso leggero (ambiente 0,05)?

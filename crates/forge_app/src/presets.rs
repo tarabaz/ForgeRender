@@ -162,7 +162,7 @@ impl Quality {
     /// (campioni per pixel, rimbalzi massimi). Il denoiser resta sull'immagine finale.
     pub fn values(self) -> (u32, u32) {
         match self {
-            Quality::Draft => (64, 8),
+            Quality::Draft => (128, 8),
             Quality::Balanced => (256, 12),
             Quality::High => (1024, 16),
         }
@@ -266,6 +266,22 @@ pub fn product_bounds(scene: &Scene) -> Aabb {
         for p in &scene.meshes[m].positions {
             b.grow_point(w.transform_point3(*p));
         }
+    }
+    b
+}
+
+/// Ingombro su cui dimensionare gli oggetti del menu Aggiungi: la selezione senza la scenografia
+/// (fondali, pavimento, pareti), altrimenti il prodotto. Con il fondale appena creato ancora
+/// selezionato, il secondo si dimensionava sul primo e cresceva a ogni nuova aggiunta.
+pub fn sizing_bounds(scene: &Scene, selection: impl IntoIterator<Item = usize>) -> Aabb {
+    let mut b = Aabb::EMPTY;
+    for s in selection {
+        if s < scene.nodes.len() && !is_scenery_node(scene, s) {
+            b.grow(&scene.bounds_of(s));
+        }
+    }
+    if b.is_empty() {
+        b = product_bounds(scene);
     }
     b
 }
@@ -970,5 +986,23 @@ mod tests {
         assert_eq!(width, 12.0);
         assert_eq!(height, 3.5);
         assert!(m.w_axis.z < b.min.z + 0.6, "dietro il prodotto");
+    }
+
+    /// Rifare il fondale con il precedente ancora selezionato (com'è dopo averlo aggiunto) dà
+    /// sempre la stessa misura: prima ogni fondale si dimensionava sul precedente e cresceva.
+    #[test]
+    fn regenerated_backdrop_does_not_grow() {
+        for style in [BackdropStyle::Curved, BackdropStyle::Sweep] {
+            let mut scene = product_scene();
+            let mut sizes = Vec::new();
+            let mut selection: Vec<usize> = Vec::new();
+            for _ in 0..3 {
+                let (kind, m) = backdrop_for(&sizing_bounds(&scene, selection.iter().copied()), style);
+                let i = scene.add_object(kind, m);
+                selection = vec![i];
+                sizes.push(scene.bounds_of(i).max - scene.bounds_of(i).min);
+            }
+            assert!(sizes.windows(2).all(|w| (w[0] - w[1]).length() < 1e-4), "{style:?}: {sizes:?}");
+        }
     }
 }
