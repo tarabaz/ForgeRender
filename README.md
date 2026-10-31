@@ -325,7 +325,7 @@ Then add a row to the index in `reports/README.md`.
 - [docs/ROADMAP.md](docs/ROADMAP.md) — status, next steps with complexity, technical plans
   ([italiano](docs/ROADMAP.it.md))
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architecture, technical choices and known limitations (English; [Italian](docs/ARCHITECTURE.it.md))
-- [docs/BENCHMARK.md](docs/BENCHMARK.md) — measured performance results (Italian version currently available at [docs/BENCHMARK.it.md](docs/BENCHMARK.it.md))
+- [docs/BENCHMARK.md](docs/BENCHMARK.md) — measured performance results (Italian version currently available at [docs/BENCHMARK.md](docs/BENCHMARK.it.md))
 - [docs/STATO_LAVORI.md](docs/STATO_LAVORI.md) — development log (Italian)
 
 ## License and contributions
