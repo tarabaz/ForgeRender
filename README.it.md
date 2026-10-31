@@ -321,14 +321,16 @@ file di output e le immagini. Poi aggiungi una riga all'indice in `reports/READM
 
 ## Documentazione
 
+- [Indice della documentazione](docs/README.it.md) — scegli la lingua e consulta le guide.
+
 - [CHANGELOG.md](CHANGELOG.md) — novità di ogni versione e regola per i numeri di versione
 - [reports/](reports/README.md) — report delle misure con dati grezzi, immagini e comandi per rifarle
 - [docs/MCP.md](docs/MCP.md) — comandare ForgeRender con Claude Code (MCP): installazione,
   comandi, sicurezza
 - [docs/ROADMAP.it.md](docs/ROADMAP.it.md) — stato, prossimi passi con la complessità, piani tecnici
   ([English](docs/ROADMAP.md))
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architettura, scelte tecniche, rischi
-- [docs/BENCHMARK.md](docs/BENCHMARK.md) — misure eseguite (solo dati reali)
+- [docs/ARCHITECTURE.it.md](docs/ARCHITECTURE.it.md) — architettura, scelte tecniche e limiti noti ([English](docs/ARCHITECTURE.md))
+- [docs/BENCHMARK.it.md](docs/BENCHMARK.it.md) — misure eseguite (solo dati reali; traduzione inglese da completare)
 - [docs/STATO_LAVORI.md](docs/STATO_LAVORI.md) — diario dello sviluppo
 
 ## Licenza e contributi
