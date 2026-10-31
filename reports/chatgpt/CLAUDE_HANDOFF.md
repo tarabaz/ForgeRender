@@ -1871,3 +1871,30 @@ Valerio ha approvato le due fasi insieme ("procedi fase 2 e 3 insieme e poi cont
 - Il fascio è rumoroso: servono molti campioni o il denoiser. Il campionamento equiangolare
   verso le luci puntiformi nei volumi è il miglioramento naturale.
 - Il fascio non illumina gli oggetti con la luce diffusa dalla foschia (scelta voluta).
+
+## Proposta di ChatGPT — 31/10/2026: modalità di rendering stilizzate e tecniche
+
+Valerio approva l'aggiunta alla roadmap come **opzioni aggiuntive**: il rendering fotorealistico attuale deve restare invariato, disponibile e selezionabile. Le nuove modalità non devono sostituirlo né degradarne qualità o percorso.
+
+### Obiettivo
+Valutare un gruppo di stili di rendering alternativi, selezionabili dall'utente come modalità di presentazione. Devono essere applicabili allo stesso progetto/scena e, dove tecnicamente possibile, funzionare sia su CPU sia su GPU.
+
+### Modalità richieste
+1. **Silhouette**: profilo esterno del modello, senza riempimento o con riempimento opzionale; colore linea e sfondo configurabili.
+2. **Linee tecniche**: contorno esterno più spigoli/dettagli geometrici visibili e significativi. Non disegnare indiscriminatamente tutti gli edge dei triangoli di una mesh triangolata: ricostruire linee utili da silhouette, discontinuità delle normali/angoli, occlusione e altri criteri robusti.
+3. **Cel-shading a colori**: colori dei materiali originali mantenuti, illuminazione semplificata in poche fasce tonali e contorni regolabili; look illustrato, non necessariamente fumettistico.
+4. **Cel-shading monocromatico**: stessa logica, ma palette neutra/scala di grigi o bianco e nero.
+5. **Illustrazione stilizzata**: superfici e materiali riconoscibili, ombreggiatura semplificata e contorni selettivi; resa pulita ed elegante per cataloghi e presentazioni.
+
+Le modalità 3 e 4 sono entrambe richieste: non scegliere una sola variante. La modalità fotorealistica corrente resta sempre disponibile come percorso separato.
+
+### Indicazioni di prodotto e valutazione richiesta
+- Presentare gli stili come opzioni aggiuntive nella selezione del tipo/modalità di render, senza confonderli con il selettore CPU/GPU.
+- Valutare quali modalità richiedano un vero percorso nel renderer e quali possano usare un passaggio dedicato; evitare di ridurle a un filtro post-processo se questo impedisce di ottenere correttamente contorni, visibilità e ombre.
+- Valutare separatamente silhouette view-dependent e linee tecniche: sono risultati diversi e hanno requisiti diversi.
+- Mantenere la coerenza tra CPU e GPU, oppure documentare chiaramente eventuali limiti iniziali.
+- Considerare fin dall'architettura l'esportazione PNG e il futuro uso nelle tavole PDF con esplosi e callout.
+- Ispezionare prima renderer, pipeline CPU/GPU, materiali, UI e salvataggio progetto. Individuare sovrapposizioni con funzioni esistenti, dipendenze, costi e rischi.
+- **Non implementare ancora**: prima Claude Code deve restituire una valutazione tecnica, una proposta di milestone/priorità e test di accettazione. L'implementazione sarà approvata separatamente.
+
+**Stato**: proposta approvata per essere inserita nella roadmap e valutata; non implementata e non testata. Il render fotorealistico esistente non va modificato o rimosso.
