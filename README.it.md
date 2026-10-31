@@ -7,14 +7,16 @@
 **Motore di rendering fotorealistico per CAD e 3D, per Windows 11 · 64 bit.**  
 Scritto in Rust, con path tracing progressivo su CPU e GPU per modelli CAD, assiemi meccanici e scene 3D.
 
-## Scarica ForgeRender 0.23.0
+## Scarica ForgeRender
 
-<sub><strong>VERSIONE STABILE</strong> · Windows 11 · x64 · ZIP portable</sub>
+<sub><strong>ULTIMA VERSIONE STABILE</strong> · Windows 11 · x64</sub>
 
-[⬇️ **SCARICA FORGERENDER 0.23.0 — ZIP PORTABLE**](https://github.com/tarabaz/ForgeRender/releases/download/v0.23.0/ForgeRender-0.23.0-portable-x64.zip)
+[⬇️ **SCARICA L'ULTIMA VERSIONE**](https://github.com/tarabaz/ForgeRender/releases/latest)
 
-Nessuna installazione richiesta: estrai lo ZIP e avvia `forgerender.exe`.  
-Il pacchetto viene distribuito tramite GitHub Releases.
+Apri la pagina dell'ultima release per scaricare il pacchetto Windows e leggere le note di rilascio.  
+Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgerender.exe`.
+
+[Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
 ### Novità della versione 0.23.0
 
