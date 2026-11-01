@@ -92,8 +92,25 @@ fn tab_item(app: &mut ForgeApp, ui: &mut egui::Ui, tab: InspectorTab, text: &'st
 
 fn file_menu(app: &mut ForgeApp, ui: &mut egui::Ui) {
     item(app, ui, Cmd::NewEmpty);
-    item(app, ui, Cmd::NewTest);
-    item(app, ui, Cmd::NewPrismDemo);
+    ui.menu_button(format!("{}  {}", icons::NEW, tr("Scene demo")), |ui| {
+        // Raggruppate per che cosa mostrano; aprendone una compare la scheda che la spiega.
+        for (c, cat) in crate::demos::CATEGORIES.iter().copied().enumerate() {
+            if c > 0 {
+                ui.separator();
+            }
+            ui.label(egui::RichText::new(tr(cat)).small().weak());
+            for (i, d) in crate::demos::DEMOS.iter().enumerate().filter(|(_, d)| d.category == c) {
+                let r = ui
+                    .add_enabled(commands::enabled(app, Cmd::OpenDemo(i)), egui::Button::new(tr(d.title)))
+                    .on_hover_text(tr(d.summary))
+                    .on_disabled_hover_text(tr("Scena non trovata: manca la cartella samples accanto al programma"));
+                if r.clicked() {
+                    run(app, ui, Cmd::OpenDemo(i));
+                    ui.close();
+                }
+            }
+        }
+    });
     ui.separator();
     item(app, ui, Cmd::Open);
     let recent = app.prefs.recent_projects.clone();

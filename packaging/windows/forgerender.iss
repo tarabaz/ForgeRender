@@ -57,6 +57,8 @@ Source: "..\..\lang\*.json"; DestDir: "{app}\lang"; Flags: ignoreversion
 Source: "..\..\manuale\*"; DestDir: "{app}\manuale"; Excludes: "inventario.json,INVENTARIO.md"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\..\assets\materiali\*"; DestDir: "{app}\materiali"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\..\assets\anteprima\*"; DestDir: "{app}\anteprima"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Scene demo (File, Scene demo): il programma le copia nella cartella dell'utente alla prima apertura.
+Source: "..\..\samples\*"; DestDir: "{app}\samples"; Excludes: "*_texture,.gitignore"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\ForgeRender"; Filename: "{app}\forgerender.exe"

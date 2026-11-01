@@ -13,9 +13,8 @@ use forge_render_core::SessionState;
 pub enum Cmd {
     // File
     NewEmpty,
-    NewTest,
-    /// Scena demo "Prisma e luce" (laser, dispersione, render spettrale).
-    NewPrismDemo,
+    /// Scena demo `i` di `demos::DEMOS` (con la sua scheda descrittiva).
+    OpenDemo(usize),
     Open,
     OpenRecent(usize),
     Save,
@@ -128,20 +127,7 @@ pub fn spec(cmd: Cmd) -> Spec {
             key(CMD, Key::N),
             tk("Scena senza oggetti né luci"),
         ),
-        Cmd::NewTest => s(
-            "file.new_test",
-            tk("Nuova scena di test"),
-            icons::NEW,
-            None,
-            tk("Sfere, cubo e toro su fondale, con luci da studio: per provare materiali e impostazioni"),
-        ),
-        Cmd::NewPrismDemo => s(
-            "file.new_prism_demo",
-            tk("Nuova scena demo: prisma e luce"),
-            icons::NEW,
-            None,
-            tk("Un fascio di luce bianca entra in un prisma di vetro su fondo nero ed esce aperto in un arcobaleno: render spettrale con laser e dispersione"),
-        ),
+        Cmd::OpenDemo(_) => s("file.demo", tk("Scene demo"), icons::NEW, None, ""),
         Cmd::Open => s(
             "file.open",
             tk("Apri progetto…"),
@@ -494,6 +480,7 @@ pub fn enabled(app: &ForgeApp, cmd: Cmd) -> bool {
         Cmd::Duplicate | Cmd::Delete | Cmd::Hide | Cmd::Isolate | Cmd::FrameSelection => !app.selection.is_empty(),
         Cmd::UndoPreset => app.preset_backup.is_some(),
         Cmd::OpenRecent(i) => i < app.prefs.recent_projects.len(),
+        Cmd::OpenDemo(i) => crate::demos::DEMOS.get(i).is_some_and(crate::demos::available),
         _ => true,
     }
 }
@@ -510,10 +497,7 @@ pub fn render_label(app: &ForgeApp) -> &'static str {
 
 /// Comandi che buttano via la scena attuale: con modifiche non salvate si chiede prima.
 fn discards_scene(cmd: Cmd) -> bool {
-    matches!(
-        cmd,
-        Cmd::NewEmpty | Cmd::NewTest | Cmd::NewPrismDemo | Cmd::Open | Cmd::OpenRecent(_) | Cmd::Exit
-    )
+    matches!(cmd, Cmd::NewEmpty | Cmd::OpenDemo(_) | Cmd::Open | Cmd::OpenRecent(_) | Cmd::Exit)
 }
 
 /// Esegue un comando (da menu, toolbar o tastiera).
@@ -533,8 +517,7 @@ pub fn run_confirmed(app: &mut ForgeApp, ctx: &egui::Context, cmd: Cmd) {
     let msg_before = app.simple_msg.clone();
     match cmd {
         Cmd::NewEmpty => app.new_empty_scene(),
-        Cmd::NewTest => app.new_test_scene(),
-        Cmd::NewPrismDemo => app.new_prism_demo(),
+        Cmd::OpenDemo(i) => app.open_demo(i),
         Cmd::Open => app.open_project_dialog(),
         Cmd::OpenRecent(i) => {
             if let Some(p) = app.prefs.recent_projects.get(i).cloned() {
@@ -693,8 +676,6 @@ mod tests {
     fn ids_are_unique_and_shortcuts_match_specs() {
         let all = [
             Cmd::NewEmpty,
-            Cmd::NewTest,
-            Cmd::NewPrismDemo,
             Cmd::Open,
             Cmd::Save,
             Cmd::SaveAs,

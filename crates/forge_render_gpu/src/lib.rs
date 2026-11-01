@@ -23,6 +23,8 @@ const SHADER: &str = concat!(include_str!("path_tracer.wgsl"), "\n", include_str
 /// Durata obiettivo di una passata GPU.
 pub const TARGET_PASS_MS: f64 = 60.0;
 const MAX_SAMPLES_PER_PASS: u32 = 64;
+/// Con le caustiche: una mappa di fotoni ogni pochi campioni.
+const MAX_SAMPLES_PER_CAUSTIC_PASS: u32 = 4;
 
 /// Informazioni sul dispositivo scelto.
 #[derive(Clone, Debug)]
@@ -101,6 +103,8 @@ pub struct GpuBackend {
     spectral_dummy: wgpu::Buffer,
     /// RT core (ray query): `None` se la scheda o il driver non le hanno, o se spente.
     rt: Option<RtPipelines>,
+    /// Fotoni delle caustiche della passata (`PhotonMap::gpu_words`).
+    photons: wgpu::Buffer,
 }
 
 /// Shader e pipeline con le ray query; `None` (si resta sulla BVH) se la validazione fallisce.
@@ -236,6 +240,16 @@ fn mask_buffer(device: &wgpu::Device, words: usize) -> wgpu::Buffer {
     device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("forge-gpu-mask"),
         size: (words.max(1) * 4) as u64,
+        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    })
+}
+
+/// Buffer dei fotoni con posto per `words` parole.
+fn photon_buffer(device: &wgpu::Device, words: usize) -> wgpu::Buffer {
+    device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("forge-gpu-photons"),
+        size: (words.max(4) * 4) as u64,
         usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
     })
@@ -399,6 +413,15 @@ impl GpuBackend {
                     min_binding_size: None,
                 },
             ),
+            // Fotoni delle caustiche (senza caustiche: buffer minimo, 0 fotoni).
+            entry(
+                6,
+                wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+            ),
         ];
         let bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("forge-gpu-bgl"),
@@ -439,6 +462,7 @@ impl GpuBackend {
             None => tracing::info!("RT core spenti (FORGE_GPU_RT=0): tracciamento con la BVH dello shader"),
         }
         let mask = mask_buffer(&device, 1);
+        let photons = photon_buffer(&device, 4);
         let spectral_dummy = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("forge-gpu-spectral-dummy"),
             size: 16,
@@ -461,6 +485,7 @@ impl GpuBackend {
             spectral: None,
             spectral_dummy,
             rt,
+            photons,
         })
     }
 
@@ -662,11 +687,25 @@ impl GpuBackend {
         }
         // La prima passata di un render è di un solo campione: muovendo la vista l'immagine
         // nuova compare subito, poi le passate crescono fino a ~TARGET_PASS_MS.
-        let n = if first_sample == 0 {
+        let mut n = if first_sample == 0 {
             1
         } else {
             self.samples_per_pass.clamp(1, max_samples.max(1))
         };
+        // Caustiche: i fotoni li segue la CPU (una mappa per passata, con il raggio che si
+        // restringe); passate brevi, così le mappe si rinnovano spesso e il rumore si media.
+        let caustics = forge_render_cpu::caustic_map(scene, settings, first_sample);
+        let photon_words = match &caustics {
+            Some(map) => map.gpu_words(),
+            None => vec![0; 4],
+        };
+        if caustics.is_some() {
+            n = n.min(MAX_SAMPLES_PER_CAUSTIC_PASS);
+        }
+        if (self.photons.size() as usize) < photon_words.len() * 4 {
+            self.photons = photon_buffer(&self.device, photon_words.len());
+        }
+        self.queue.write_buffer(&self.photons, 0, bytemuck::cast_slice(&photon_words));
 
         let sg = self.scene.as_ref().expect("scena");
         let mut p = sg.params;
@@ -690,6 +729,9 @@ impl GpuBackend {
             self.queue.write_buffer(&self.mask, 0, bytemuck::cast_slice(&bits));
             p[P_FLAGS] |= 2;
             p[P_TILES_X] = m.tiles_x;
+        }
+        if caustics.is_some() {
+            p[P_FLAGS] |= 4;
         }
         fv(&mut p, P_CLAMP, settings.clamp_indirect);
         for k in 0..3 {
@@ -736,6 +778,10 @@ impl GpuBackend {
                     (Some((_, b)), true) => b.as_entire_binding(),
                     _ => self.spectral_dummy.as_entire_binding(),
                 },
+            },
+            wgpu::BindGroupEntry {
+                binding: 6,
+                resource: self.photons.as_entire_binding(),
             },
         ];
         if let Some(a) = accel {

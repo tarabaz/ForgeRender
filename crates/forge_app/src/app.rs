@@ -72,7 +72,7 @@ struct JobInfo {
     geometry_rev: u64,
     shading_rev: u64,
     camera_rev: u64,
-    key: (u32, u32, u32, u32, u32, u64, bool, forge_render_core::ColorMode),
+    key: (u32, u32, u32, u32, u32, u64, bool, forge_render_core::ColorMode, u64),
     threads: usize,
     target: u32,
     /// Soglia di rumore e campioni minimi inviati alla sessione.
@@ -287,6 +287,10 @@ pub struct ForgeApp {
     /// Finestra "Come vuoi lavorare?" (scelta della modalità all'avvio) e la sua casella.
     pub mode_choice_open: bool,
     pub mode_choice_dont_ask: bool,
+    /// Scheda della scena demo aperta (indice in `demos::DEMOS`) e quella da mostrare quando
+    /// finisce di caricarsi il progetto demo.
+    pub demo_info: Option<usize>,
+    pub demo_after_load: Option<usize>,
     pub splash_texture: Option<egui::TextureHandle>,
     pub logo_texture: Option<egui::TextureHandle>,
     /// Modalità Semplice: aspetto e qualità scelti, valori prima dell'ultimo preset.
@@ -416,6 +420,8 @@ impl ForgeApp {
             language_errors: Vec::new(),
             splash_open: false,
             mode_choice_open: false,
+            demo_info: None,
+            demo_after_load: None,
             mode_choice_dont_ask: false,
             splash_texture: None,
             logo_texture: None,
@@ -541,7 +547,7 @@ impl ForgeApp {
         }
         app.sequence.open = startup.sequences_window;
         if startup.prism_demo {
-            app.new_prism_demo();
+            app.open_demo(0);
         }
         if startup.iso {
             app.orbit.lens.ortho = true;
@@ -815,7 +821,15 @@ impl ForgeApp {
     pub fn add_object(&mut self, kind: AddKind) {
         use forge_math::{Mat4, Vec3};
         use forge_scene::AddedKind as K;
-        let b = crate::presets::sizing_bounds(&self.scene, self.selection.iter().copied());
+        let scenery = matches!(kind, AddKind::Floor | AddKind::Backdrop | AddKind::StudioSweep | AddKind::Wall);
+        // Pavimento, fondali e parete: sempre sotto e dietro tutto il prodotto (ingombro sui vertici
+        // veri), qualunque cosa sia selezionata. Con un oggetto piccolo selezionato sopra gli altri il
+        // fondale finiva alla sua base e tagliava il resto. Gli altri oggetti vanno accanto alla selezione.
+        let b = if scenery {
+            crate::presets::scenery_bounds(&self.scene, self.selection.iter().copied())
+        } else {
+            crate::presets::sizing_bounds(&self.scene, self.selection.iter().copied())
+        };
         let (c, ground, e, back, right) = if b.is_empty() {
             (Vec3::ZERO, 0.0, 1.0, -0.5, 0.5)
         } else {
@@ -856,6 +870,21 @@ impl ForgeApp {
                 K::Cup {
                     radius: 0.6 * r,
                     height: 1.4 * r,
+                },
+                at(side, c.z),
+            ),
+            AddKind::Prism => (
+                K::Prism {
+                    side: 2.0 * r,
+                    length: 2.0 * r,
+                },
+                at(side, c.z),
+            ),
+            AddKind::Gem => (K::Gem { diameter: r }, at(side, c.z)),
+            AddKind::Pendant => (
+                K::Pendant {
+                    width: 0.5 * r,
+                    length: 1.2 * r,
                 },
                 at(side, c.z),
             ),
@@ -1511,24 +1540,44 @@ impl ForgeApp {
         self.geometry_changed();
         self.unsaved = false;
         self.view = View::Viewport;
+        self.demo_info = None;
     }
 
-    /// Scena demo "Prisma e luce" (laser bianco, prisma dispersivo, render spettrale).
-    pub fn new_prism_demo(&mut self) {
-        let (scene, demo) = crate::presets::prism_demo_scene();
-        let mut settings = self.prefs.new_project_settings();
-        settings.color_mode = demo.color_mode;
-        settings.target_samples = demo.target_samples;
-        settings.max_bounces = demo.max_bounces;
-        settings.environment_visible = demo.environment_visible;
-        self.replace_scene(
-            scene,
-            ProjectMeta {
-                test_scene: true,
-                ..Default::default()
+    /// Apre la scena demo `i` di `demos::DEMOS` e la sua scheda descrittiva.
+    pub fn open_demo(&mut self, i: usize) {
+        use crate::demos::{DemoSource, DEMOS};
+        let Some(d) = DEMOS.get(i) else { return };
+        match d.source {
+            DemoSource::Generated(build) => {
+                let (scene, demo) = build();
+                let mut settings = self.prefs.new_project_settings();
+                settings.color_mode = demo.color_mode;
+                settings.target_samples = demo.target_samples;
+                settings.max_bounces = demo.max_bounces;
+                settings.environment_visible = demo.environment_visible;
+                settings.caustics = demo.caustics;
+                self.replace_scene(
+                    scene,
+                    ProjectMeta {
+                        test_scene: true,
+                        ..Default::default()
+                    },
+                    Some(settings),
+                );
+                self.demo_info = Some(i);
+            }
+            DemoSource::Project(rel) => match crate::demos::writable_project(rel) {
+                Ok(p) => {
+                    self.open_project(&p);
+                    self.demo_after_load = Some(i);
+                }
+                Err(e) => self.error = Some(tf("Scena demo non disponibile: {}", &[format!("{e:#}")])),
             },
-            Some(settings),
-        );
+            DemoSource::TestScene => {
+                self.new_test_scene();
+                self.demo_info = Some(i);
+            }
+        }
     }
 
     pub fn new_test_scene(&mut self) {
@@ -2013,6 +2062,7 @@ impl ForgeApp {
         {
             let report = l.report;
             self.replace_scene(l.scene, l.meta, Some(l.settings));
+            self.demo_info = self.demo_after_load.take();
             if let Some(p) = self.meta.path.clone() {
                 self.remember_recent(&p);
             }
@@ -2279,6 +2329,9 @@ pub enum AddKind {
     Sphere,
     Cylinder,
     Cup,
+    Prism,
+    Gem,
+    Pendant,
 }
 
 pub const ADD_MENU: &[(&str, AddKind)] = &[
@@ -2290,6 +2343,9 @@ pub const ADD_MENU: &[(&str, AddKind)] = &[
     (tk("Sfera"), AddKind::Sphere),
     (tk("Cilindro"), AddKind::Cylinder),
     (tk("Tazza"), AddKind::Cup),
+    (tk("Prisma"), AddKind::Prism),
+    (tk("Diamante (taglio brillante)"), AddKind::Gem),
+    (tk("Pendente di cristallo"), AddKind::Pendant),
 ];
 
 /// Nome del formato nella finestra "Esporta…".

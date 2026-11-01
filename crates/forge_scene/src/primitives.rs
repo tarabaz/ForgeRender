@@ -460,3 +460,117 @@ mod backdrop_tests {
         }
     }
 }
+
+/// Mesh a facce piane dai triangoli `tris` (normali per faccia, rivolte via da `centre`).
+fn faceted(name: &str, tris: &[[Vec3; 3]], centre: Vec3) -> Mesh {
+    let mut m = Mesh {
+        name: name.into(),
+        ..Default::default()
+    };
+    for &[a, b, c] in tris {
+        let n = (b - a).cross(c - a);
+        if n.length_squared() < 1e-14 {
+            continue;
+        }
+        let (b, c) = if n.dot((a + b + c) / 3.0 - centre) >= 0.0 { (b, c) } else { (c, b) };
+        let n = (b - a).cross(c - a).normalize();
+        let base = m.positions.len() as u32;
+        for p in [a, b, c] {
+            m.positions.push(p);
+            m.normals.push(n);
+            m.uvs.push(Vec2::new(p.x, p.z));
+        }
+        m.indices.push([base, base + 1, base + 2]);
+    }
+    m
+}
+
+/// Punto dell'anello a raggio `r`, quota `y`, angolo `k`·`step` (+ `phase`).
+fn ring(r: f32, y: f32, k: usize, step: f32, phase: f32) -> Vec3 {
+    let a = k as f32 * step + phase;
+    Vec3::new(r * a.cos(), y, r * a.sin())
+}
+
+/// Diamante taglio brillante rotondo (proporzioni di Tolkowsky: tavola 53%, corona 16%, padiglione
+/// 43% del diametro), tavola in alto, cintura a quota 0: 8 facce di tavola e stella, 16 di
+/// cintura, 8 principali e 16 inferiori. Facce piane.
+pub fn brilliant(diameter: f32) -> Mesh {
+    let d = diameter;
+    let (table, crown, pavilion, girdle) = (0.53 * d * 0.5, 0.162 * d, 0.431 * d, 0.02 * d);
+    let (yt, yg, yb) = (girdle * 0.5 + crown, girdle * 0.5, -girdle * 0.5);
+    let e8 = TAU / 8.0;
+    let e16 = TAU / 16.0;
+    let t = |k: usize| ring(table, yt, k % 8, e8, 0.0);
+    let gu = |j: usize| ring(d * 0.5, yg, j % 16, e16, 0.0);
+    let gd = |j: usize| ring(d * 0.5, yb, j % 16, e16, 0.0);
+    // Anello delle facce inferiori di cintura (a metà dei principali del padiglione).
+    let lo = |k: usize| ring(d * 0.5 * 0.3, yb - pavilion * 0.7, k % 8, e8, e16);
+    let culet = Vec3::new(0.0, yb - pavilion, 0.0);
+    let top = Vec3::new(0.0, yt, 0.0);
+    let mut tris = Vec::new();
+    for k in 0..8 {
+        tris.push([top, t(k), t(k + 1)]);
+        // Stella e bezel della corona.
+        tris.push([t(k), t(k + 1), gu(2 * k + 1)]);
+        tris.push([t(k), gu(2 * k), gu(2 * k + 1)]);
+        tris.push([t(k + 1), gu(2 * k + 1), gu(2 * k + 2)]);
+        // Padiglione.
+        tris.push([gd(2 * k), gd(2 * k + 1), lo(k)]);
+        tris.push([gd(2 * k + 1), gd(2 * k + 2), lo(k)]);
+        tris.push([lo(k), gd(2 * k + 2), lo(k + 1)]);
+        tris.push([lo(k), lo(k + 1), culet]);
+    }
+    for j in 0..16 {
+        tris.push([gu(j), gd(j), gd(j + 1)]);
+        tris.push([gu(j), gd(j + 1), gu(j + 1)]);
+    }
+    faceted("Brillante", &tris, Vec3::new(0.0, (yt + yb - pavilion) * 0.5, 0.0))
+}
+
+/// Pendente di cristallo a goccia (come i ciondoli dei lampadari): 8 lati, punta corta in alto
+/// e lunga in basso con un secondo giro di faccette, alto `length`, largo `width`, con la
+/// cintura a quota 0.
+pub fn crystal_drop(width: f32, length: f32) -> Mesh {
+    let r = width * 0.5;
+    let e8 = TAU / 8.0;
+    let top = Vec3::new(0.0, length * 0.22, 0.0);
+    let bottom = Vec3::new(0.0, -length * 0.78, 0.0);
+    let gu = |k: usize| ring(r, length * 0.03, k % 8, e8, 0.0);
+    let gd = |k: usize| ring(r, -length * 0.03, k % 8, e8, 0.0);
+    let mid = |k: usize| ring(r * 0.62, -length * 0.38, k % 8, e8, e8 * 0.5);
+    let mut tris = Vec::new();
+    for k in 0..8 {
+        tris.push([top, gu(k), gu(k + 1)]);
+        tris.push([gu(k), gd(k), gd(k + 1)]);
+        tris.push([gu(k), gd(k + 1), gu(k + 1)]);
+        tris.push([gd(k), gd(k + 1), mid(k)]);
+        tris.push([mid(k), gd(k + 1), mid(k + 1)]);
+        tris.push([mid(k), mid(k + 1), bottom]);
+    }
+    faceted("Pendente", &tris, Vec3::new(0.0, -length * 0.25, 0.0))
+}
+
+#[cfg(test)]
+mod gem_tests {
+    use super::*;
+
+    /// Gemme chiuse (ogni spigolo condiviso da due facce) con le facce verso l'esterno.
+    #[test]
+    fn gems_are_closed_and_point_outwards() {
+        for m in [brilliant(1.0), crystal_drop(0.3, 1.0)] {
+            let key = |p: Vec3| (p * 1e4).round().as_ivec3().to_array();
+            let mut edges = std::collections::HashMap::new();
+            for t in &m.indices {
+                let v = t.map(|i| m.positions[i as usize]);
+                for k in 0..3 {
+                    let (a, b) = (key(v[k]), key(v[(k + 1) % 3]));
+                    *edges.entry(if a < b { (a, b) } else { (b, a) }).or_insert(0) += 1;
+                }
+                let n = (v[1] - v[0]).cross(v[2] - v[0]);
+                assert!(n.dot(m.normals[t[0] as usize]) > 0.0, "{}: winding", m.name);
+            }
+            assert!(edges.values().all(|&c| c == 2), "{}: mesh aperta", m.name);
+            assert!(m.indices.len() >= 48, "{}", m.name);
+        }
+    }
+}

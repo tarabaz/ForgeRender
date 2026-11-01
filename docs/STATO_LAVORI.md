@@ -597,5 +597,27 @@
 - Test: `forge_render_cpu/tests/laser.rs`, `gpu_laser_matches_cpu`, `prism_demo_scene_disperses_light`,
   costanti shader/layout. Test di sessione reso robusto al carico.
 
+
+### In sviluppo (branch `sviluppo`): caustiche con il photon mapping, scene demo, gemme (01/11/2026)
+- `forge_render_core::CausticSettings` (`enabled`, `photons_k`, `radius_mm`) in `RenderSettings`,
+  nella chiave di accumulo; `spectral::lambda_to_rgb`.
+- `forge_render_cpu::photons`: emissione verso la sfera dei vetri lisci (punto, spot, direzionale,
+  area), percorso nei vetri (Fresnel, Snell per lunghezza d'onda, riflessione totale, tinta,
+  Beer-Lambert), deposito alla prima superficie non speculare dopo almeno un vetro, griglia hash,
+  raccolta RGB e spettrale, raggio r0·(k+1)^(-1/6); `PhotonMap::gpu_words` (secchi ordinati).
+  `caustic_map`, `render_pixel_with`, `radiance_with`, `radiance_spectral_with`: raccolta al primo
+  vertice non speculare ed esclusione dei percorsi "vetri lisci → luce ad area" da lì in poi.
+- GPU: binding 6 (`PH`), bit 4 di `P_FLAGS`, `caustic_gather` in `path_tracer.wgsl` (secchi visti
+  una volta sola), `caustic_rgb` nello spettrale; al massimo 4 campioni per passata con le
+  caustiche.
+- Test: `forge_render_cpu/tests/caustics.rs` (punto: solo con i fotoni; area: fotoni = path
+  tracing, 0,4%; spettrale), `gpu_caustics_match_cpu` (entro 2%), `caustic_demos_produce_caustics`.
+- `forge_scene::primitives::{brilliant, crystal_drop}`; `AddedKind::{Prism, Gem, Pendant}` nel menu
+  Aggiungi e nello strumento MCP `add_object`.
+- `forge_app::demos`: catalogo per gruppi, `Cmd::OpenDemo(i)` (sostituisce `NewPrismDemo` e
+  `NewTest`), sottomenu File → Scene demo, scheda `ui::demo_info`; progetti di `samples/` copiati
+  nella cartella dell'utente (`writable_project`); `samples` anche nell'installer.
+- Fondale: `presets::scenery_bounds` (sotto tutti gli oggetti, non solo la selezione).
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

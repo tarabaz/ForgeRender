@@ -187,7 +187,7 @@ fn ggx_albedo(cos_o: f32, alpha: f32) -> f32 {
 }
 
 /// Rugosità oltre la quale il vetro diventa satinato (trasmissione microfacet).
-const ROUGH_GLASS: f32 = 0.03;
+pub(crate) const ROUGH_GLASS: f32 = 0.03;
 
 impl<'a, C: Channels> Bsdf<'a, C> {
     /// Componente non-delta presente (serve il campionamento delle luci).

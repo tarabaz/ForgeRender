@@ -48,6 +48,20 @@ pub enum AddedKind {
         radius: f32,
         height: f32,
     },
+    /// Prisma triangolare di vetro (spigolo in alto, lungo Z).
+    Prism {
+        side: f32,
+        length: f32,
+    },
+    /// Gemma taglio brillante rotondo.
+    Gem {
+        diameter: f32,
+    },
+    /// Pendente di cristallo a goccia.
+    Pendant {
+        width: f32,
+        length: f32,
+    },
 }
 
 impl AddedKind {
@@ -61,6 +75,9 @@ impl AddedKind {
             AddedKind::Sphere { .. } => "Sfera",
             AddedKind::Cylinder { .. } => "Cilindro",
             AddedKind::Cup { .. } => "Tazza",
+            AddedKind::Prism { .. } => "Prisma",
+            AddedKind::Gem { .. } => "Diamante",
+            AddedKind::Pendant { .. } => "Pendente",
         }
     }
 
@@ -110,8 +127,20 @@ impl AddedKind {
             }
             AddedKind::Cylinder { radius, height } => primitives::cylinder(radius, height, 192),
             AddedKind::Cup { radius, height } => primitives::cup(radius, height, (radius * 0.06).max(0.002), 192),
+            AddedKind::Prism { side, length } => on_ground(primitives::prism(side, length)),
+            AddedKind::Gem { diameter } => on_ground(primitives::brilliant(diameter)),
+            AddedKind::Pendant { width, length } => on_ground(primitives::crystal_drop(width, length)),
         }
     }
+}
+
+/// Sposta la mesh in alto finché il punto più basso sta a y = 0.
+fn on_ground(mut m: Mesh) -> Mesh {
+    let min = m.positions.iter().map(|p| p.y).fold(f32::INFINITY, f32::min);
+    for p in &mut m.positions {
+        p.y -= min;
+    }
+    m
 }
 
 /// Oggetto aggiunto: id del componente, nome, tipo e posizione iniziale.

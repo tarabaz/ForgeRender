@@ -130,16 +130,26 @@ fn keep_hero(w: &mut Wavelengths, beta: &mut Vec4, l: &mut Vec4) {
 }
 
 /// Radianza lungo il raggio alle lunghezze d'onda `w` (che possono ridursi alla sola hero).
-pub fn radiance_spectral(
+pub fn radiance_spectral(scene: &RenderScene, settings: &RenderSettings, o: Vec3, d: Vec3, rng: &mut Pcg32, w: &mut Wavelengths) -> Vec4 {
+    radiance_spectral_with(scene, settings, o, d, rng, w, None).0
+}
+
+/// Come [`radiance_spectral`], con le caustiche della mappa di fotoni `caustics`: restituisce anche
+/// la loro luce, già in RGB (ogni fotone ha la sua lunghezza d'onda).
+pub fn radiance_spectral_with(
     scene: &RenderScene,
     settings: &RenderSettings,
     mut o: Vec3,
     mut d: Vec3,
     rng: &mut Pcg32,
     w: &mut Wavelengths,
-) -> Vec4 {
+    caustics: Option<&crate::photons::PhotonMap>,
+) -> (Vec4, Vec3) {
     let geo = &*scene.geometry;
     let mut l = Vec4::ZERO;
+    let mut l_caustic = Vec3::ZERO;
+    let mut gather_pending = caustics.is_some();
+    let mut excl = false;
     let mut beta = Vec4::ONE;
     let mut specular_bounce = true;
     let mut camera_path = true;
@@ -266,7 +276,7 @@ pub fn radiance_spectral(
         }
 
         if let Some((_, le, light_pdf)) = light_hit {
-            if le != Vec3::ZERO {
+            if le != Vec3::ZERO && !(excl && specular_bounce) {
                 let wgt = if specular_bounce {
                     1.0
                 } else {
@@ -349,6 +359,30 @@ pub fn radiance_spectral(
             color: albedo(mat.base_color, w),
         };
 
+        // Caustiche: come nel render RGB; il throughput spettrale diventa un fattore unico (media
+        // delle lunghezze d'onda ancora attive).
+        let mut excl_after = false;
+        if bsdf.has_non_delta() {
+            if gather_pending {
+                if let Some(map) = caustics {
+                    let k = if w.secondary_terminated() {
+                        beta.x
+                    } else {
+                        (beta.x + beta.y + beta.z + beta.w) * 0.25
+                    };
+                    let mut c = map.gather_spectral(mat, bsdf.frame, ng, entering, wo, p) * k;
+                    let y = (c.x + c.y + c.z) / 3.0;
+                    if clamp > 0.0 && depth > 0 && y > clamp {
+                        c *= clamp / y;
+                    }
+                    l_caustic += c;
+                }
+                gather_pending = false;
+                excl_after = true;
+            }
+            excl = false;
+        }
+
         if !scene.lasers.is_empty() && bsdf.has_non_delta() {
             let c = laser_spots(scene, &bsdf, wo, p, geo.geometric_normals[prim], w);
             if c != Vec4::ZERO {
@@ -379,6 +413,9 @@ pub fn radiance_spectral(
 
         let (u_lobe, u1, u2) = (rng.next_f32(), rng.next_f32(), rng.next_f32());
         let Some(s) = bsdf.sample(wo, u_lobe, u1, u2) else { break };
+        if excl_after {
+            excl = true;
+        }
         beta *= s.weight;
         if !beta.is_finite() || beta == Vec4::ZERO {
             break;
@@ -401,17 +438,24 @@ pub fn radiance_spectral(
             beta /= q;
         }
     }
-    l
+    (l, l_caustic)
 }
 
 /// Un campione spettrale per il pixel `(x, y)`, già in RGB lineare della scena.
 #[inline]
-pub fn render_pixel_spectral(scene: &RenderScene, settings: &RenderSettings, x: u32, y: u32, sample: u32) -> [f32; 3] {
+pub fn render_pixel_spectral(
+    scene: &RenderScene,
+    settings: &RenderSettings,
+    x: u32,
+    y: u32,
+    sample: u32,
+    caustics: Option<&crate::photons::PhotonMap>,
+) -> [f32; 3] {
     let mut rng = Pcg32::for_pixel(settings.seed, x, y, sample);
     let (o, dir) = crate::camera_ray(&scene.camera, settings.width, settings.height, x, y, &mut rng);
     // Lunghezze d'onda da una sequenza a parte: i rimbalzi usano gli stessi numeri del render RGB.
     let mut wrng = Pcg32::for_pixel(settings.seed ^ 0x5BEC_7A11, x, y, sample);
     let mut w = Wavelengths::sample(wrng.next_f32());
-    let l = radiance_spectral(scene, settings, o, dir, &mut rng, &mut w);
-    w.to_rgb(l.to_array()).to_array()
+    let (l, c) = radiance_spectral_with(scene, settings, o, dir, &mut rng, &mut w, caustics);
+    (w.to_rgb(l.to_array()) + c).to_array()
 }

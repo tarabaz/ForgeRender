@@ -315,6 +315,18 @@ pub fn sizing_bounds(scene: &Scene, selection: impl IntoIterator<Item = usize>) 
     b
 }
 
+/// Ingombro su cui posare pavimento, fondali e parete: tutto il prodotto (vertici veri), qualunque
+/// cosa sia selezionata, così la scenografia sta sempre sotto e dietro a tutti gli oggetti. Senza
+/// prodotto, la selezione.
+pub fn scenery_bounds(scene: &Scene, selection: impl IntoIterator<Item = usize>) -> Aabb {
+    let b = product_bounds(scene);
+    if b.is_empty() {
+        sizing_bounds(scene, selection)
+    } else {
+        b
+    }
+}
+
 /// Fondale dimensionato e posizionato dietro un prodotto con questo ingombro (stessa regola
 /// dei menu Aggiungi → Fondale da studio / Fondale fotografico).
 pub fn backdrop_for(b: &Aabb, style: BackdropStyle) -> (AddedKind, Mat4) {
@@ -1089,6 +1101,40 @@ mod tests {
         assert_eq!(width, 12.0);
         assert_eq!(height, 3.5);
         assert!(m.w_axis.z < b.min.z + 0.6, "dietro il prodotto");
+    }
+
+    /// Fondale aggiunto con un oggetto piccolo selezionato sopra un altro: va sotto tutto il
+    /// prodotto (prima si posava alla base dell'oggetto selezionato e tagliava il resto).
+    #[test]
+    fn backdrop_goes_under_all_objects_whatever_is_selected() {
+        // Tavolo basso e largo, vaso piccolo appoggiato sopra: selezionato il vaso.
+        let mut s = Scene::default();
+        let table = s.add_mesh(forge_scene::primitives::cuboid(Vec3::new(1.0, 0.7, 0.6)));
+        s.add_node(
+            None,
+            ComponentId("tavolo".into()),
+            "Tavolo",
+            Mat4::from_translation(Vec3::new(0.0, 0.35, 0.0)),
+            Some(table),
+        );
+        let vase = s.add_mesh(forge_scene::primitives::uv_sphere(0.1, 16, 8));
+        let v = s.add_node(
+            None,
+            ComponentId("vaso".into()),
+            "Vaso",
+            Mat4::from_translation(Vec3::new(0.2, 0.8, 0.0)),
+            Some(vase),
+        );
+        for style in [BackdropStyle::Curved, BackdropStyle::Sweep] {
+            let b = scenery_bounds(&s, [v]);
+            let (kind, m) = backdrop_for(&b, style);
+            let mut scene = s.clone();
+            let i = scene.add_object(kind, m);
+            let floor_y = scene.bounds_of(i).min.y;
+            assert!(floor_y.abs() < 1e-3, "{style:?}: fondale a y = {floor_y}, il tavolo poggia a 0");
+            // Il fondale contiene in larghezza tutto il prodotto, non solo il vaso.
+            assert!(scene.bounds_of(i).min.x < -0.5 && scene.bounds_of(i).max.x > 0.5);
+        }
     }
 
     /// Rifare il fondale con il precedente ancora selezionato (com'è dopo averlo aggiunto) dà

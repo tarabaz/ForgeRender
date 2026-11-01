@@ -10,6 +10,8 @@
 @group(0) @binding(2) var<storage, read_write> OUT: array<vec4<f32>>;
 // Campionamento adattivo: un bit per riquadro di 16×16 pixel (1 = riceve ancora campioni).
 @group(0) @binding(3) var<storage, read> MASK: array<u32>;
+// Fotoni delle caustiche della passata (vedi `PhotonMap::gpu_words`); attivi col bit 4 di P_FLAGS.
+@group(0) @binding(6) var<storage, read> PH: array<u32>;
 
 const PI: f32 = 3.14159265358979;
 const INV_PI: f32 = 0.318309886183791;
@@ -1445,6 +1447,56 @@ fn laser_spots_rgb(bs: Bsdf, wo: vec3<f32>, p: vec3<f32>, ng: vec3<f32>) -> vec3
     return c;
 }
 
+// ---------------------------------------------------------------- Caustiche (photon mapping)
+const PHOTON_WORDS: u32 = 12u;
+
+fn caustics_on() -> bool { return (pu(P_FLAGS) & 4u) != 0u; }
+fn phf(i: u32) -> f32 { return bitcast<f32>(PH[i]); }
+fn phv3(i: u32) -> vec3<f32> { return vec3<f32>(phf(i), phf(i + 1u), phf(i + 2u)); }
+
+fn photon_bucket(c: vec3<i32>, size: u32) -> u32 {
+    let u = bitcast<vec3<u32>>(c);
+    return ((u.x * 73856093u) ^ (u.y * 19349663u) ^ (u.z * 83492791u)) & (size - 1u);
+}
+
+// Radianza riflessa verso `wo` dai fotoni entro il raggio da `p` (stessa faccia di `ng`).
+fn caustic_gather(bs: Bsdf, wo: vec3<f32>, p: vec3<f32>, ng: vec3<f32>) -> vec3<f32> {
+    let r = phf(0u);
+    let cell = phf(1u);
+    let size = PH[2u];
+    if (PH[3u] == 0u) { return vec3<f32>(0.0); }
+    let base = 4u + 2u * size;
+    let c0 = vec3<i32>(floor(p / cell));
+    var seen: array<u32, 27>;
+    var n_seen = 0u;
+    var sum = vec3<f32>(0.0);
+    for (var dz = -1; dz <= 1; dz = dz + 1) {
+        for (var dy = -1; dy <= 1; dy = dy + 1) {
+            for (var dx = -1; dx <= 1; dx = dx + 1) {
+                let b = photon_bucket(c0 + vec3<i32>(dx, dy, dz), size);
+                // Due celle vicine nello stesso secchio: i suoi fotoni si contano una volta sola.
+                var dup = false;
+                for (var k = 0u; k < n_seen; k = k + 1u) { if (seen[k] == b) { dup = true; } }
+                if (dup) { continue; }
+                seen[n_seen] = b;
+                n_seen = n_seen + 1u;
+                let start = PH[4u + 2u * b];
+                let cnt = PH[5u + 2u * b];
+                for (var i = 0u; i < cnt; i = i + 1u) {
+                    let q = base + (start + i) * PHOTON_WORDS;
+                    let pp = phv3(q);
+                    let dp = pp - p;
+                    if (dot(dp, dp) <= r * r && abs(dot(phv3(q + 6u), ng)) > 0.7) {
+                        let e = bsdf_eval(bs, wo, phv3(q + 3u));
+                        sum = sum + e.xyz * phv3(q + 9u);
+                    }
+                }
+            }
+        }
+    }
+    return sum / (PI * r * r);
+}
+
 // ---------------------------------------------------------------- Integratore
 fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
     media_n = 0u;
@@ -1456,6 +1508,10 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
     // Ancora "visto dalla camera" (solo rimbalzi speculari): i fasci delle spot contano solo così.
     var camera_path = true;
     var prev_pdf = 0.0;
+    // Caustiche: raccolta al primo vertice non speculare; poi i percorsi "vetri lisci → luce ad
+    // area" non contano (li danno i fotoni).
+    var gather_pending = caustics_on();
+    var excl = false;
     let n_lights = pu(P_N_LIGHTS);
     let n_select = pu(P_N_SELECT);
     let has_env_map = pu(P_ENV_KIND) == 2u;
@@ -1570,7 +1626,7 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
         }
 
         if (lt > 0.0) {
-            if (lfront > 0.0) {
+            if (lfront > 0.0 && !(excl && specular)) {
                 var w = 1.0;
                 if (!specular) { w = power_heuristic(prev_pdf, lpdf * sel_pdf); }
                 var c = beta * lem * w;
@@ -1633,6 +1689,18 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
         bs.m = m;
         bs.entering = entering;
 
+        var excl_after = false;
+        if (has_non_delta(bs)) {
+            if (gather_pending) {
+                var c = beta * caustic_gather(bs, wo, p, ng);
+                if (clamp_v > 0.0 && depth > 0u && luminance(c) > clamp_v) { c = c * (clamp_v / luminance(c)); }
+                l = l + c;
+                gather_pending = false;
+                excl_after = true;
+            }
+            excl = false;
+        }
+
         // Macchie dei laser (luce dal percorso del fascio già calcolato).
         if (pu(P_N_LASERS) > 0u && has_non_delta(bs)) {
             l = l + beta * laser_spots_rgb(bs, wo, p, sv3(pb + 12u));
@@ -1680,6 +1748,7 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
         let u2 = rnd();
         let s = bsdf_sample(bs, wo, ul, u1, u2);
         if (!s.ok) { break; }
+        if (excl_after) { excl = true; }
         beta = beta * s.weight;
         if (!(beta.x < INF && beta.y < INF && beta.z < INF) || (beta.x == 0.0 && beta.y == 0.0 && beta.z == 0.0)) { break; }
         specular = s.delta;

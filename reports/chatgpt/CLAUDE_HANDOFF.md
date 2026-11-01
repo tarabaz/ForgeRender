@@ -2292,3 +2292,18 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
 - Su richiesta di Valerio: luci puntate su un oggetto, fascio laser visibile nel vetro e pannello
   Luci scorrevole e ridimensionabile passano su main come **0.27.0**. Versione, changelog IT/EN e
   README IT/EN aggiornati. Main e `sviluppo` sullo stesso commit.
+
+## Claude Code — 01/11/2026: caustiche, scene demo, prisma e gemme nel menu Aggiungi (branch `sviluppo`)
+
+- Richiesta di Valerio: implementare la proposta di ChatGPT sulle caustiche "su tutte le luci";
+  scelto il photon mapping progressivo solo per le caustiche (Knaus-Zwicker), non BDPT/VCM:
+  - fotoni dalle luci verso i vetri lisci, raccolti al primo vertice non speculare della camera;
+  - i percorsi vetro → luce ad area esclusi da quel vertice, per non contare due volte;
+  - la verifica è che con una luce ad area fotoni e path tracing danno la stessa energia;
+  - sulla GPU la mappa la costruisce la CPU a ogni passata e lo shader la raccoglie (binding 6);
+    tracciare i fotoni sulla GPU resta un possibile passo successivo.
+- Il laser resta analitico (deterministico), non passa dai fotoni.
+- Scene demo in un sottomenu per gruppi con una scheda descrittiva; tre scene nuove (diamante col
+  laser, ciondoli al sole, vetri sul tavolo) da migliorare in seguito, come detto da Valerio.
+- Valerio ha chiesto anche: prisma (e gemme) tra le forme da aggiungere; fondale sempre sotto gli
+  oggetti.

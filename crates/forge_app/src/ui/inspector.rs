@@ -2001,6 +2001,46 @@ fn render(app: &mut ForgeApp, ui: &mut egui::Ui) {
             );
         }
     }
+    // Caustiche con il photon mapping progressivo.
+    {
+        let c = &mut app.settings.caustics;
+        changed |= ui
+            .checkbox(&mut c.enabled, tr("Caustiche"))
+            .on_hover_text(tr(
+                "Photon mapping: la luce che passa da vetri, cristalli e gemme lisce si concentra sulle \
+                 superfici attorno (macchie luminose, arcobaleni dei pendenti). Funziona con tutte le \
+                 luci, anche puntiformi, spot e sole, dove il path tracing da solo non le trova",
+            ))
+            .changed();
+        if c.enabled {
+            ui.horizontal(|ui| {
+                ui.label(tr("Fotoni per passata"));
+                changed |= ui
+                    .add(egui::Slider::new(&mut c.photons_k, 20..=2000).logarithmic(true).suffix(" k"))
+                    .on_hover_text(tr("Più fotoni = caustiche meno rumorose a ogni passata, passate più lente"))
+                    .changed();
+            });
+            ui.horizontal(|ui| {
+                ui.label(tr("Raggio iniziale"));
+                changed |= ui
+                    .add(egui::DragValue::new(&mut c.radius_mm).range(0.0..=100.0).speed(0.1).suffix(" mm"))
+                    .on_hover_text(tr(
+                        "Raggio entro cui un punto raccoglie i fotoni alla prima passata (0 = automatico, \
+                         1% della scena); si restringe da solo a ogni passata, quindi le caustiche \
+                         diventano sempre più nitide. Più piccolo = più nitido ma più rumoroso all'inizio",
+                    ))
+                    .changed();
+            });
+            ui.label(
+                egui::RichText::new(tr(
+                    "Nascono da vetri lisci (trasmissione, ruvidità bassa). I rimbalzi dei fotoni sono \
+                     quelli del render (Rimbalzi massimi).",
+                ))
+                .weak()
+                .small(),
+            );
+        }
+    }
     let s = &mut app.settings;
     let max_t = app.system.logical_threads;
     ui.horizontal(|ui| {

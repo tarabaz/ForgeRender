@@ -13,6 +13,47 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## In sviluppo (branch `sviluppo`)
+
+**Caustiche (photon mapping progressivo)**
+- Scheda Render → **Caustiche**: la luce che passa da vetri, cristalli e gemme lisce si concentra
+  sulle superfici attorno (punti di fuoco luminosi, gli arcobaleni dei cristalli appesi). Funziona
+  con **tutte le luci**: puntiforme, spot, direzionale (sole) e ad area. Con puntiformi, spot e
+  sole il solo path tracing questi percorsi non li trova proprio.
+- Come funziona: a ogni passata si emettono fotoni dalle luci verso i vetri lisci della scena, li
+  attraversano (scelta di Fresnel tra riflessione e rifrazione, legge di Snell, riflessione
+  totale, tinta del vetro, assorbimento di Beer-Lambert) e si posano sulla prima superficie non
+  speculare. Il primo punto non speculare visto dalla camera li raccoglie entro un raggio che **si
+  restringe a ogni passata** (Knaus-Zwicker): le caustiche diventano sempre più nitide e
+  convergono al valore giusto; i percorsi "vetro → luce" non li conta più il path tracer, così
+  niente viene contato due volte.
+- Nel render **Spettrale** ogni fotone ha la sua lunghezza d'onda (l'indice del vetro dipende da
+  quella): le caustiche si aprono in arcobaleni.
+- Impostazioni: fotoni per passata (200 k di partenza) e raggio iniziale (0 = automatico, 1%
+  della scena).
+- CPU e GPU: sulla GPU i fotoni li segue la CPU e li raccoglie lo shader (RGB e spettrale, RT core
+  e BVH dello shader). Verificato dai test: con una luce ad area l'immagine con i fotoni coincide
+  con il solo path tracing (0,4% di differenza); CPU e GPU concordano entro il 2%.
+
+**Scene demo**
+- **File → Scene demo**, divise per che cosa mostrano: *Luce e dispersione* (Prisma e luce,
+  **Laser nel diamante**), *Caustiche* (**Ciondoli di cristallo al sole**, **Vetri e caustiche
+  sul tavolo**), *Effetti volumetrici* (Cocktail con ghiaccio secco), *Studio e materiali* (Scena
+  di test). La scena di test e la demo del prisma si spostano qui dal menu File.
+- Aprendo una demo compare una **scheda** che spiega che cosa mostra la scena, quali funzioni del
+  motore usa e come rifarla passo per passo (materiali, luci, impostazioni), con il pulsante
+  "Avvia il render".
+- Il progetto del cocktail ora è anche nell'installer; alla prima apertura viene copiato nella
+  cartella dell'utente.
+
+**Forme nuove**
+- Menu **Aggiungi**: **Prisma**, **Diamante (taglio brillante)** (proporzioni di Tolkowsky, 57
+  facce) e **Pendente di cristallo** (goccia sfaccettata).
+
+**Correzioni**
+- Aggiungendo pavimento, fondale o parete con oggetti già in scena, va **sotto tutti gli
+  oggetti**, non solo sotto quello selezionato (prima poteva finire sopra o dentro alcuni).
+
 ## 0.27.0 — 01/11/2026
 
 **Luci puntate su un oggetto**

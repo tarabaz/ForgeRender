@@ -7,6 +7,7 @@
 pub(crate) mod ai_setup;
 pub(crate) mod blend_import;
 pub mod central;
+mod demo_info;
 pub mod gizmo;
 pub mod icons;
 pub(crate) mod inspector;
@@ -270,6 +271,7 @@ impl ForgeApp {
         crate::ui::settings::window(self, ctx);
         crate::ui::splash::show(self, ctx);
         crate::ui::mode_choice::show(self, ctx);
+        crate::ui::demo_info::show(self, ctx);
         if self.show_import_options {
             self.import_options_window(ctx);
         }

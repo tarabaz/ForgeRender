@@ -10,6 +10,26 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## Unreleased (`sviluppo` branch)
+
+**Caustics (progressive photon mapping)**
+- Render tab → **Caustics**: light passing through smooth glass, crystals and gems gathers on the surfaces around them (bright focus spots, the rainbows of hanging crystals). Works with **every light**: point, spot, directional (sun) and area. With point, spot and sun lights plain path tracing cannot find these paths at all.
+- How it works: in every pass photons are emitted from the lights towards the smooth glass of the scene, follow it (Fresnel choice between reflection and refraction, Snell's law, total internal reflection, glass tint, Beer–Lambert absorption) and land on the first non-specular surface. The first non-specular point seen by the camera gathers them within a radius that **shrinks with every pass** (Knaus–Zwicker), so caustics become sharper and sharper and converge to the correct value; the "glass → light" paths are no longer counted by the path tracer, so nothing is counted twice.
+- In the **Spectral** render every photon carries its own wavelength (the glass index depends on it): caustics split into rainbows.
+- Settings: photons per pass (default 200 k) and initial radius (0 = automatic, 1% of the scene).
+- CPU and GPU: on the GPU photons are traced on the CPU and gathered by the shader (RGB and spectral, RT cores and shader BVH). Checked by tests: with an area light the photon-mapped image matches pure path tracing (0.4% difference); CPU and GPU agree within 2%.
+
+**Demo scenes**
+- **File → Demo scenes**, grouped by what they show: *Light and dispersion* (Prism and light, **Laser in a diamond**), *Caustics* (**Crystal pendants in the sun**, **Glass and caustics on the table**), *Volumetric effects* (Cocktail with dry ice), *Studio and materials* (Test scene). The test scene and the prism demo moved here from the File menu.
+- Opening a demo shows a **card** that explains what the scene shows, which engine features it uses and how to recreate it step by step (materials, lights, settings), with a "Start the render" button.
+- The cocktail project is now also included in the installer; it is copied into the user's folder the first time it is opened.
+
+**New shapes**
+- **Add** menu: **Prism**, **Diamond (brilliant cut)** (Tolkowsky proportions, 57 facets) and **Crystal pendant** (faceted drop).
+
+**Fixes**
+- Adding a floor, backdrop or wall with objects already in the scene places it **under all the objects**, not only under the selected one (before it could end up above or through some objects).
+
 ## 0.27.0 — 1 Nov 2026
 
 **Lights aimed at an object**

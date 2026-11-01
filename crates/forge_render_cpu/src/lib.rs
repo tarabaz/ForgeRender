@@ -12,6 +12,7 @@ mod integrator;
 pub mod lights;
 pub mod medium;
 pub mod passes;
+pub mod photons;
 pub mod spectral;
 mod textures;
 
@@ -90,12 +91,36 @@ pub fn camera_ray(cam: &Camera, width: u32, height: u32, x: u32, y: u32, rng: &m
 /// Calcola un campione per il pixel `(x, y)`.
 #[inline]
 pub fn render_pixel(scene: &RenderScene, settings: &RenderSettings, x: u32, y: u32, sample: u32) -> [f32; 3] {
+    render_pixel_with(scene, settings, x, y, sample, None)
+}
+
+/// Come [`render_pixel`], con le caustiche della mappa di fotoni della passata.
+#[inline]
+pub fn render_pixel_with(
+    scene: &RenderScene,
+    settings: &RenderSettings,
+    x: u32,
+    y: u32,
+    sample: u32,
+    caustics: Option<&photons::PhotonMap>,
+) -> [f32; 3] {
     if settings.color_mode == forge_render_core::ColorMode::Spectral {
-        return spectral::render_pixel_spectral(scene, settings, x, y, sample);
+        return spectral::render_pixel_spectral(scene, settings, x, y, sample, caustics);
     }
     let mut rng = Pcg32::for_pixel(settings.seed, x, y, sample);
     let (o, dir) = camera_ray(&scene.camera, settings.width, settings.height, x, y, &mut rng);
-    radiance(scene, settings, o, dir, &mut rng).to_array()
+    integrator::radiance_with(scene, settings, o, dir, &mut rng, caustics).to_array()
+}
+
+/// Mappa di fotoni delle caustiche per la passata `sample_index`, se attive e se la scena ha vetri
+/// lisci da cui possano nascere.
+pub fn caustic_map(scene: &RenderScene, settings: &RenderSettings, sample_index: u32) -> Option<photons::PhotonMap> {
+    if !settings.caustics.enabled || scene.lights.is_empty() {
+        return None;
+    }
+    let target = photons::specular_bounds(scene)?;
+    let spectral = settings.color_mode == forge_render_core::ColorMode::Spectral;
+    Some(photons::PhotonMap::build(scene, settings, target, sample_index, spectral))
 }
 
 impl RenderBackend for CpuBackend {
@@ -119,13 +144,15 @@ impl RenderBackend for CpuBackend {
         let w = settings.width as usize;
         anyhow::ensure!(out.len() == w * settings.height as usize, "buffer di uscita di dimensione errata");
         prepare(settings);
+        let map = self.pool.install(|| caustic_map(scene, settings, sample_index));
+        let map = map.as_ref();
         self.pool.install(|| {
             out.par_chunks_mut(w).enumerate().for_each(|(y, row)| {
                 if cancel.load(Ordering::Relaxed) {
                     return;
                 }
                 for (x, px) in row.iter_mut().enumerate() {
-                    *px = render_pixel(scene, settings, x as u32, y as u32, sample_index);
+                    *px = render_pixel_with(scene, settings, x as u32, y as u32, sample_index, map);
                 }
             });
         });
@@ -148,6 +175,8 @@ impl RenderBackend for CpuBackend {
         let w = settings.width as usize;
         anyhow::ensure!(out.len() == w * settings.height as usize, "buffer di uscita di dimensione errata");
         prepare(settings);
+        let map = self.pool.install(|| caustic_map(scene, settings, sample_index));
+        let map = map.as_ref();
         self.pool.install(|| {
             out.par_chunks_mut(w).enumerate().for_each(|(y, row)| {
                 if cancel.load(Ordering::Relaxed) {
@@ -155,7 +184,7 @@ impl RenderBackend for CpuBackend {
                 }
                 for (x, px) in row.iter_mut().enumerate() {
                     *px = if mask.pixel_active(x, y) {
-                        render_pixel(scene, settings, x as u32, y as u32, sample_index)
+                        render_pixel_with(scene, settings, x as u32, y as u32, sample_index, map)
                     } else {
                         [0.0; 3]
                     };

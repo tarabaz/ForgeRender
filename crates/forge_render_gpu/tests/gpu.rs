@@ -1423,3 +1423,78 @@ fn gpu_laser_matches_cpu() {
         }
     }
 }
+
+/// Caustiche (photon mapping): sfera di vetro sopra un pavimento con una luce puntiforme e una ad
+/// area; la GPU raccoglie gli stessi fotoni della CPU e dà la stessa immagine, RGB e spettrale.
+#[test]
+fn gpu_caustics_match_cpu() {
+    let Some(mut g) = gpu() else { return };
+    let mut s = Scene::default();
+    s.materials.upsert(Material {
+        id: MaterialId::new("vetro"),
+        base_color: [1.0; 3],
+        transmission: 1.0,
+        roughness: 0.0,
+        ior: 1.5,
+        abbe: 30.0,
+        ..Default::default()
+    });
+    s.materials.upsert(Material {
+        id: MaterialId::new("bianco"),
+        base_color: [0.8; 3],
+        roughness: 1.0,
+        ..Default::default()
+    });
+    let sphere = s.add_mesh(primitives::uv_sphere(0.1, 64, 32));
+    let sid = ComponentId("sfera".into());
+    s.add_node(
+        None,
+        sid.clone(),
+        "Sfera",
+        Mat4::from_translation(Vec3::new(0.0, 0.15, 0.0)),
+        Some(sphere),
+    );
+    s.assignments.insert(sid, MaterialId::new("vetro"));
+    let floor = s.add_mesh(primitives::plane(4.0, 4.0));
+    let fid = ComponentId("piano".into());
+    s.add_node(None, fid.clone(), "Piano", Mat4::IDENTITY, Some(floor));
+    s.assignments.insert(fid, MaterialId::new("bianco"));
+    s.environment = Environment::Uniform {
+        color: [1.0; 3],
+        strength: 0.0,
+    };
+    s.lights.push(Light::point("p", Vec3::new(0.0, 1.0, 0.0), 2.0));
+    s.lights
+        .push(Light::area("a", Vec3::new(0.5, 1.0, 0.0), Vec3::ZERO, 0.3, 0.3, 10.0));
+    s.camera = Camera {
+        position: Vec3::new(1.0, 0.35, 0.0),
+        target: Vec3::ZERO,
+        up: Vec3::Y,
+        vfov_deg: 12.0,
+        ..Default::default()
+    };
+    let mut cpu = CpuBackend::new(0).unwrap();
+    for mode in [forge_render_core::ColorMode::Rgb, forge_render_core::ColorMode::Spectral] {
+        let st = RenderSettings {
+            width: 64,
+            height: 48,
+            max_bounces: 8,
+            color_mode: mode,
+            caustics: forge_render_core::CausticSettings {
+                enabled: true,
+                photons_k: 50,
+                radius_mm: 4.0,
+            },
+            ..Default::default()
+        };
+        let spp = 64;
+        let a = render_with(&mut cpu, &s, &st, spp);
+        let b = render_with(&mut g, &s, &st, spp);
+        let sum = |x: &[[f32; 3]], k: usize| x.iter().map(|p| p[k] as f64).sum::<f64>();
+        for k in 0..3 {
+            let (ca, gb) = (sum(&a, k), sum(&b, k));
+            eprintln!("caustiche {mode:?} canale {k}: CPU {ca:.3}, GPU {gb:.3}");
+            assert!(ca > 0.0 && (ca - gb).abs() / ca < 0.05, "{mode:?} canale {k}: CPU {ca} vs GPU {gb}");
+        }
+    }
+}

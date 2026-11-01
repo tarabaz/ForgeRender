@@ -127,6 +127,22 @@ impl Wavelengths {
     }
 }
 
+/// RGB lineare della scena di un valore spettrale `value` (per nm) alla lunghezza d'onda `lambda`:
+/// il contributo di un solo campione (la divisione per la pdf della lunghezza d'onda la fa chi
+/// chiama). Serve ai fotoni, che portano una lunghezza d'onda ciascuno.
+pub fn lambda_to_rgb(lambda: f32, value: f32) -> Vec3 {
+    let t = tables();
+    let c = cie_xyz(lambda);
+    let s = value / t.y_integral;
+    let m = &t.xyz_to_rgb;
+    let (x, y, z) = (c[0] * s, c[1] * s, c[2] * s);
+    Vec3::new(
+        m[0][0] * x + m[0][1] * y + m[0][2] * z,
+        m[1][0] * x + m[1][1] * y + m[1][2] * z,
+        m[2][0] * x + m[2][1] * y + m[2][2] * z,
+    )
+}
+
 /// Gaussiana a tratti (σ diverse a sinistra e a destra del picco).
 #[inline]
 fn g(l: f64, mu: f64, s1: f64, s2: f64) -> f64 {

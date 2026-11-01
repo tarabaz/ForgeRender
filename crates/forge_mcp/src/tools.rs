@@ -60,7 +60,7 @@ pub fn list() -> Value {
         tool("fit_scene_to_product", "Dopo aver spostato o scalato il prodotto: rifà fondale e luci sulle sue misure (tiene materiale del fondale e colori delle luci) e inquadra.", json!({}), &[]),
         tool("undo_preset", "Annulla l'ultimo prepare_studio / fit_scene_to_product (luci, ambiente, qualità, fondale e posizione come prima).", json!({}), &[]),
         tool("add_object", "Aggiunge un oggetto vicino al prodotto: pavimento, fondale curvo, fondale fotografico (tela inclinata), parete o forme semplici.",
-            json!({"kind": {"type": "string", "enum": ["pavimento", "fondale", "fondale_fotografico", "parete", "cubo", "sfera", "cilindro", "tazza"]}}), &["kind"]),
+            json!({"kind": {"type": "string", "enum": ["pavimento", "fondale", "fondale_fotografico", "parete", "cubo", "sfera", "cilindro", "tazza", "prisma", "diamante", "pendente"]}}), &["kind"]),
         tool("transform_objects", "Sposta, ruota o scala componenti (predefinito: il prodotto). Annullabile con Ctrl+Z nella finestra.",
             json!({
                 "targets": targets,

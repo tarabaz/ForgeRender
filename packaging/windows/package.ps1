@@ -89,7 +89,7 @@ Set-Content -Path (Join-Path $staging "Libreria\Texture\LEGGIMI.txt") -Value "Te
 # Scene di esempio e progetti di benchmark pronti (samples\...\bench_*.frproject): lo zip
 # basta da solo per lanciare i benchmark, senza Python né il repository. Le texture estratte
 # dai .glb (*_texture) non si copiano: il programma le ricrea all'apertura del progetto.
-# Solo nella portable: nell'installata (Program Files) il programma non può scriverle.
+# Nell'installata (Program Files) il programma copia la scena nella cartella dell'utente prima di aprirla.
 $samples = Join-Path $staging "samples"
 Copy-Item -Recurse (Join-Path $root "samples") $samples
 Get-ChildItem -Path $samples -Recurse -Directory -Filter "*_texture" | Remove-Item -Recurse -Force

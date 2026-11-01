@@ -19,7 +19,20 @@ use crate::lights::{intersect_area, sample_light, LightSample};
 use forge_math::{luminance, offset_ray_origin, sampling::power_heuristic, Onb, Pcg32, Vec3};
 use forge_render_core::{RenderScene, RenderSettings};
 
-pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut d: Vec3, rng: &mut Pcg32) -> Vec3 {
+pub fn radiance(scene: &RenderScene, settings: &RenderSettings, o: Vec3, d: Vec3, rng: &mut Pcg32) -> Vec3 {
+    radiance_with(scene, settings, o, d, rng, None)
+}
+
+/// Come [`radiance`], con le caustiche della mappa di fotoni della passata (se accese): raccolte
+/// al primo vertice non speculare, dove il path tracer smette di contare i percorsi "vetro → luce".
+pub fn radiance_with(
+    scene: &RenderScene,
+    settings: &RenderSettings,
+    mut o: Vec3,
+    mut d: Vec3,
+    rng: &mut Pcg32,
+    caustics: Option<&crate::photons::PhotonMap>,
+) -> Vec3 {
     let geo = &*scene.geometry;
     let mut l = Vec3::ZERO;
     let mut beta = Vec3::ONE;
@@ -27,6 +40,10 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
                                     // Ancora "visto dalla camera" (solo rimbalzi speculari): i fasci delle spot contano solo così.
     let mut camera_path = true;
     let mut prev_pdf = 0.0f32;
+    // Caustiche: ancora da raccogliere al primo vertice non speculare; percorso partito da lì e
+    // proseguito solo tra vetri lisci (la luce che raggiunge così la conta la mappa di fotoni).
+    let mut gather_pending = caustics.is_some();
+    let mut excl = false;
     // L'ambiente (HDRI, o qualsiasi ambiente se ci sono portali) è una "luce" in più
     // nella scelta uniforme della NEE.
     let n_lights = scene.lights.len();
@@ -160,7 +177,7 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
         }
 
         if let Some((_, le, light_pdf)) = light_hit {
-            if le != Vec3::ZERO {
+            if le != Vec3::ZERO && !(excl && specular_bounce) {
                 let w = if specular_bounce {
                     1.0
                 } else {
@@ -241,6 +258,20 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
             color: mat.base_color,
         };
 
+        // Caustiche: al primo vertice non speculare si raccolgono i fotoni; da lì in poi i percorsi
+        // che arrivano a una luce passando solo da vetri lisci non contano (li contano i fotoni).
+        let mut excl_after = false;
+        if bsdf.has_non_delta() {
+            if gather_pending {
+                if let Some(map) = caustics {
+                    add(&mut l, beta * map.gather_rgb(&bsdf, wo, p, ng), depth);
+                }
+                gather_pending = false;
+                excl_after = true;
+            }
+            excl = false;
+        }
+
         // Macchie dei laser: luce calcolata dal percorso del fascio (deterministica).
         if !scene.lasers.is_empty() && bsdf.has_non_delta() {
             let c = laser_spots_rgb(scene, &bsdf, wo, p, geo.geometric_normals[prim]);
@@ -273,6 +304,9 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
         // Campionamento della BSDF.
         let (u_lobe, u1, u2) = (rng.next_f32(), rng.next_f32(), rng.next_f32());
         let Some(s) = bsdf.sample(wo, u_lobe, u1, u2) else { break };
+        if excl_after {
+            excl = true;
+        }
         beta *= s.weight;
         if !beta.is_finite() || beta == Vec3::ZERO {
             break;

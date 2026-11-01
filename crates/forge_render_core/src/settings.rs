@@ -157,6 +157,9 @@ pub struct RenderSettings {
     /// vetri, colori più fedeli; più lento e con più rumore di colore).
     #[serde(default)]
     pub color_mode: ColorMode,
+    /// Caustiche con le mappe di fotoni (vedi [`CausticSettings`]).
+    #[serde(default)]
+    pub caustics: CausticSettings,
 }
 
 fn default_adaptive_min() -> u32 {
@@ -182,6 +185,7 @@ impl Default for RenderSettings {
             noise_threshold: 0.0,
             adaptive_min_samples: default_adaptive_min(),
             color_mode: ColorMode::Rgb,
+            caustics: CausticSettings::default(),
         }
     }
 }
@@ -231,7 +235,7 @@ impl RenderSettings {
     /// Le impostazioni che, se cambiano, invalidano l'accumulo.
     /// (Tone mapping ed esposizione si applicano in visualizzazione, e anche
     /// il numero di campioni obiettivo si può cambiare senza ripartire.)
-    pub fn accumulation_key(&self) -> (u32, u32, u32, u32, u32, u64, bool, ColorMode) {
+    pub fn accumulation_key(&self) -> (u32, u32, u32, u32, u32, u64, bool, ColorMode, u64) {
         (
             self.width,
             self.height,
@@ -241,6 +245,7 @@ impl RenderSettings {
             self.seed,
             self.environment_visible,
             self.color_mode,
+            self.caustics.key(),
         )
     }
 }
@@ -261,5 +266,52 @@ impl ColorMode {
             ColorMode::Rgb => "RGB",
             ColorMode::Spectral => "Spettrale",
         }
+    }
+}
+
+/// Caustiche con il photon mapping progressivo (Knaus e Zwicker 2011, "Progressive Photon
+/// Mapping: A Probabilistic Approach"): a ogni passata si emettono fotoni dalle luci, che
+/// attraversano vetri lisci (Snell, Fresnel, riflessione totale, assorbimento; per lunghezza d'onda
+/// nel render spettrale) e si posano sulla prima superficie non speculare; la camera li raccoglie
+/// entro un raggio che si restringe a ogni passata, così le caustiche diventano sempre più nitide e
+/// la stima converge al valore esatto. Il path tracer smette di contare gli stessi percorsi.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct CausticSettings {
+    pub enabled: bool,
+    /// Fotoni emessi per passata, in migliaia.
+    pub photons_k: u32,
+    /// Raggio di raccolta iniziale in millimetri (0 = automatico dalla dimensione della scena).
+    pub radius_mm: f32,
+}
+
+impl Default for CausticSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            photons_k: 200,
+            radius_mm: 0.0,
+        }
+    }
+}
+
+impl CausticSettings {
+    /// Fotoni per passata (almeno mille).
+    pub fn photons(&self) -> u32 {
+        self.photons_k.clamp(1, 100_000) * 1000
+    }
+
+    /// Impronta per la chiave di accumulo (0 se spente).
+    pub fn key(&self) -> u64 {
+        if !self.enabled {
+            return 0;
+        }
+        1 | (self.photons_k as u64) << 1 | (self.radius_mm.to_bits() as u64) << 32
+    }
+
+    /// Raggio di raccolta alla passata `k` (0, 1, 2…): r₀ · (k + 1)^(−1/6), cioè α = 2/3 nello
+    /// schema di Knaus e Zwicker (varianza e distorsione scendono insieme, la stima converge).
+    pub fn radius_at(&self, r0: f32, k: u32) -> f32 {
+        r0 * ((k + 1) as f32).powf(-1.0 / 6.0)
     }
 }

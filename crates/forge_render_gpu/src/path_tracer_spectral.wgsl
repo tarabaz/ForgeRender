@@ -407,8 +407,13 @@ fn spectral_light_sample(n_lights: u32, n_select: u32, env_slot: u32, p: vec3<f3
     return emissive_sample(p, rnd(), u1, u2);
 }
 
+// Luce delle caustiche dell'ultimo `radiance_spectral`, già in RGB (fotoni con la loro lunghezza
+// d'onda, convertiti sulla CPU).
+var<private> caustic_rgb: vec3<f32>;
+
 fn radiance_spectral(o_in: vec3<f32>, d_in: vec3<f32>) -> vec4<f32> {
     media_n = 0u;
+    caustic_rgb = vec3<f32>(0.0);
     var o = o_in;
     var d = d_in;
     var l = vec4<f32>(0.0);
@@ -416,6 +421,8 @@ fn radiance_spectral(o_in: vec3<f32>, d_in: vec3<f32>) -> vec4<f32> {
     var specular = true;
     var camera_path = true;
     var prev_pdf = 0.0;
+    var gather_pending = caustics_on();
+    var excl = false;
     let n_lights = pu(P_N_LIGHTS);
     let n_select = pu(P_N_SELECT);
     let has_env_map = pu(P_ENV_KIND) == 2u;
@@ -511,7 +518,7 @@ fn radiance_spectral(o_in: vec3<f32>, d_in: vec3<f32>) -> vec4<f32> {
         }
 
         if (lt > 0.0) {
-            if (lfront > 0.0) {
+            if (lfront > 0.0 && !(excl && specular)) {
                 var w = 1.0;
                 if (!specular) { w = power_heuristic(prev_pdf, lpdf * sel_pdf); }
                 l = l + clamp_s(beta * illum4(lem) * w, depth, clamp_v);
@@ -582,6 +589,23 @@ fn radiance_spectral(o_in: vec3<f32>, d_in: vec3<f32>) -> vec4<f32> {
         bs.entering = entering;
         let col = albedo4(m.base);
 
+        // Caustiche: il throughput spettrale diventa un fattore unico (media delle lunghezze
+        // d'onda ancora attive), come nel backend CPU.
+        var excl_after = false;
+        if (has_non_delta(bs)) {
+            if (gather_pending) {
+                var k = beta.x;
+                if (!secondary_terminated()) { k = (beta.x + beta.y + beta.z + beta.w) * 0.25; }
+                var c = caustic_gather(bs, wo, p, ng) * k;
+                let y = (c.x + c.y + c.z) / 3.0;
+                if (clamp_v > 0.0 && depth > 0u && y > clamp_v) { c = c * (clamp_v / y); }
+                caustic_rgb = caustic_rgb + c;
+                gather_pending = false;
+                excl_after = true;
+            }
+            excl = false;
+        }
+
         if (pu(P_N_LASERS) > 0u && has_non_delta(bs)) {
             l = l + beta * laser_spots_s(bs, col, wo, p, sv3(pb + 12u));
         }
@@ -614,6 +638,7 @@ fn radiance_spectral(o_in: vec3<f32>, d_in: vec3<f32>) -> vec4<f32> {
         let u2 = rnd();
         let s = bsdf_sample_s(bs, col, wo, ul, u1, u2);
         if (!s.ok) { break; }
+        if (excl_after) { excl = true; }
         beta = beta * s.weight;
         if (!all(beta < vec4<f32>(INF)) || all(beta == vec4<f32>(0.0))) { break; }
         specular = s.delta;
@@ -680,7 +705,7 @@ fn main_spectral(@builtin(global_invocation_id) gid: vec3<u32>) {
             origin = cam_pos + r * a.x + u * a.y;
             dir = normalize(focus - origin);
         }
-        let c = spectral_to_rgb(radiance_spectral(origin, dir));
+        let c = spectral_to_rgb(radiance_spectral(origin, dir)) + caustic_rgb;
         if (c.x < INF && c.y < INF && c.z < INF && c.x > -INF && c.y > -INF && c.z > -INF && c.x == c.x && c.y == c.y && c.z == c.z) { sum = sum + c; }
     }
     OUT[idx] = vec4<f32>(sum, 0.0);

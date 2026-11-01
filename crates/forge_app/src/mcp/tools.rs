@@ -400,6 +400,9 @@ fn add_object(app: &mut ForgeApp, a: &Args) -> R {
         "sfera" | "sphere" => AddKind::Sphere,
         "cilindro" | "cylinder" => AddKind::Cylinder,
         "tazza" | "cup" => AddKind::Cup,
+        "prisma" | "prism" => AddKind::Prism,
+        "diamante" | "gemma" | "diamond" | "gem" => AddKind::Gem,
+        "pendente" | "ciondolo" | "pendant" => AddKind::Pendant,
         _ => return Err(format!("oggetto \"{k}\" sconosciuto")),
     };
     app.add_object(kind);

@@ -16,6 +16,7 @@
 mod app;
 mod commands;
 mod contact;
+mod demos;
 mod i18n;
 mod mcp;
 mod prefs;
