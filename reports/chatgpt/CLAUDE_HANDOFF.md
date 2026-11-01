@@ -2198,3 +2198,11 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
   il README di SlyZ1/Path-Tracer (MIT, stesso schema: hero 4λ, sigmoide di PBRT, Cauchy, Airy).
 - Correzione collaterale: la tabella si costruisce su un pool di thread dedicato (sul pool
   globale bloccava per circa 2 s la sessione di render e faceva fallire un test temporizzato).
+
+## Claude Code — 01/11/2026: 0.24.0 su main
+
+- Su richiesta di Valerio il lavoro del branch `sviluppo` è portato su main come **0.24.0**:
+  scelta della modalità all'avvio, materiali BlenderKit tolti, rendering spettrale opzionale.
+  Versione in `Cargo.toml` e nell'installer, changelog inglese e italiano, README (IT/EN) con
+  le novità della 0.24.0 e la 0.23.0 nello storico.
+- Prossimo lavoro, in corso: ray query con gli RT core sulla GPU (Vulkan), sul branch `sviluppo`.

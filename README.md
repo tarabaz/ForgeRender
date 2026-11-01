@@ -18,13 +18,16 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
-### What's new in 0.23.0
+### What's new in 0.24.0
 
-- **Cleaner default renders:** the denoiser now runs at 100% and the noise threshold starts at 0.03.
+- **Spectral rendering (optional):** Render → Colour: RGB (default) or Spectral, on CPU and GPU. Glass and gems can split light into rainbows (material Dispersion, Abbe number), with presets for crown, flint, lead crystal, polycarbonate and diamond. See [docs/SPECTRAL.md](docs/SPECTRAL.md).
+- **Startup mode choice:** pick Simple or Advanced mode at startup, until "Don't show at startup again" is ticked.
+- **BlenderKit materials removed** from the bundled presets (personal-use licence); the `.blend` importer is still available.
 
 <details>
 <summary><strong>Previous versions — complete release history</strong></summary>
 
+- **0.23.0 — Cleaner default renders:** the denoiser runs at 100% and the noise threshold starts at 0.03.
 - **0.22.0 — Multiple views, turntable and render passes:** automatic front, rear, side, top and three-quarter views; rotating product video exported as MP4 (H.264) with adjustable rotation and duration; albedo, normals, depth, product mask and component ID passes.
 - **0.21.0 — Material editor and ZIP export:** edit library materials, adjust maps and values, rotate the live preview, apply changes, save materials and export portable material ZIPs. Also fixes draft sample defaults and repeated backdrop scaling.
 - **0.20.0 — Adaptive material scale:** scale Box-projected textures to each object or assembly; keep bump and displacement at the same scale, consistently on CPU and GPU.

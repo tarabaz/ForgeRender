@@ -10,7 +10,7 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
-## Unreleased (development branch, not on main)
+## 0.24.0 — 1 Nov 2026
 
 **Spectral rendering (optional)**
 - Render → Colour: **RGB** (default, unchanged) or **Spectral**: four wavelengths per path (hero wavelength, PBRT v4 visible sampling), RGB colours converted to smooth spectra (sigmoid polynomial, own coefficient table), CIE 1931 reconstruction with the scene's white kept white. CPU and GPU, same result. About 2× slower than RGB, with more colour noise.

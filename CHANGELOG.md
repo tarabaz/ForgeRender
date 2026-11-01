@@ -13,7 +13,7 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
-## In sviluppo (branch di sviluppo, non su main)
+## 0.24.0 — 01/11/2026
 
 **Rendering spettrale (opzionale)**
 - Render → Colore: **RGB** (predefinito, invariato) o **Spettrale**: quattro lunghezze d'onda per
