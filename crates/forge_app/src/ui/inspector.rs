@@ -1871,6 +1871,15 @@ fn render(app: &mut ForgeApp, ui: &mut egui::Ui) {
                         .weak()
                         .small(),
                 );
+                if i.rt_cores {
+                    ui.label(
+                        egui::RichText::new(tr("RT core attivi: raggi tracciati in hardware"))
+                            .small()
+                            .color(style::OK),
+                    )
+                    .on_hover_text(tr("Le unità di ray tracing della scheda cercano i triangoli colpiti dai raggi: \
+                             stesso risultato, render molte volte più veloce"));
+                }
             }
             Err(e) => {
                 ui.colored_label(style::WARN, tf("GPU non disponibile: {e}", std::slice::from_ref(&e)));

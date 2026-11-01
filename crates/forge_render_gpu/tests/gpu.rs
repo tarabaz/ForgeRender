@@ -1315,3 +1315,38 @@ fn gpu_spectral_white_furnace_with_dispersion() {
     let c = mean_region(&img, 32, 12, 12, 20, 20);
     assert!((c - Vec3::ONE).abs().max_element() < 0.04, "{c}");
 }
+
+/// RT core contro BVH dello shader sulla stessa GPU: stessi triangoli e stessa sequenza casuale,
+/// quindi immagini praticamente uguali (differenze solo di arrotondamento nelle intersezioni).
+#[test]
+fn gpu_rt_cores_match_shader_bvh() {
+    let Ok(mut rt) = GpuBackend::with_rt(true) else { return };
+    if !rt.uses_rt_cores() {
+        eprintln!("RT core non disponibili su questa GPU: test saltato");
+        return;
+    }
+    let mut bvh = GpuBackend::with_rt(false).unwrap();
+    let s = Scene::test_scene();
+    for mode in [forge_render_core::ColorMode::Rgb, forge_render_core::ColorMode::Spectral] {
+        let st = RenderSettings {
+            width: 64,
+            height: 36,
+            color_mode: mode,
+            ..Default::default()
+        };
+        let a = render_with(&mut rt, &s, &st, 64);
+        let b = render_with(&mut bvh, &s, &st, 64);
+        let mean = |x: &[[f32; 3]]| x.iter().map(|p| (p[0] + p[1] + p[2]) as f64).sum::<f64>() / (x.len() * 3) as f64;
+        let (ma, mb) = (mean(&a), mean(&b));
+        // Pixel quasi identici: al più qualche percorso diverso per un'intersezione al limite.
+        let same = a
+            .iter()
+            .zip(&b)
+            .filter(|(p, q)| (0..3).all(|k| (p[k] - q[k]).abs() <= 1e-3 * (1.0 + q[k].abs())))
+            .count() as f64
+            / a.len() as f64;
+        eprintln!("{mode:?}: media RT {ma:.5}, BVH {mb:.5}, pixel uguali {:.1}%", same * 100.0);
+        assert!((ma - mb).abs() / mb < 0.01, "{mode:?}: media RT {ma} vs BVH {mb}");
+        assert!(same > 0.9, "{mode:?}: solo {:.1}% dei pixel uguali", same * 100.0);
+    }
+}

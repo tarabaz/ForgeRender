@@ -13,6 +13,21 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## In sviluppo (branch di sviluppo, non su main)
+
+**Ray tracing hardware (RT core)**
+- Sulle schede con unità di ray tracing (NVIDIA RTX, AMD RX 6000 e successive, con Vulkan) il
+  render GPU trova i triangoli colpiti dai raggi con l'hardware (ray query di wgpu) invece della
+  BVH dello shader. Stessa immagine: 99,9% dei pixel identici alla BVH sulla stessa GPU, e tutti
+  i test CPU/GPU invariati.
+- Misurato su una RTX 5070, 256 campioni a 1280×720: scena di prova da 2,62 s a 0,25 s
+  (**10,6×**), 1,6 milioni di triangoli da 7,69 s a 0,59 s (**13,0×**), 3,8 milioni da 8,86 s a
+  0,59 s (**14,9×**); spettrale da 7,7 a 12,6×.
+- Automatico: la scheda Render mostra "RT core attivi". Senza supporto (o con
+  `FORGE_GPU_RT=0`) si usa la BVH dello shader come prima. Le texture di ritaglio (opacità)
+  funzionano: il raggio riparte subito oltre i punti trasparenti.
+- Benchmark: `cargo run --release -p forge_render_gpu --example rt_bench`.
+
 ## 0.24.0 — 01/11/2026
 
 **Rendering spettrale (opzionale)**

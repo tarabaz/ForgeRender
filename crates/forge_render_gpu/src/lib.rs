@@ -31,6 +31,8 @@ pub struct GpuInfo {
     pub backend: String,
     pub device_type: String,
     pub driver: String,
+    /// Tracciamento dei raggi con gli RT core (ray query).
+    pub rt_cores: bool,
 }
 
 struct SceneGpu {
@@ -38,6 +40,38 @@ struct SceneGpu {
     buffer: wgpu::Buffer,
     params: [u32; PARAM_WORDS],
     bytes: u64,
+    /// Strutture di accelerazione per gli RT core (se disponibili e se la scena ci sta).
+    accel: Option<SceneAccel>,
+}
+
+/// Triangoli della scena nelle strutture di accelerazione hardware: un BLAS con tutti i triangoli
+/// (nell'ordine delle primitive) in un TLAS con una sola istanza.
+struct SceneAccel {
+    tlas: wgpu::Tlas,
+    _blas: wgpu::Blas,
+    _vertices: wgpu::Buffer,
+}
+
+/// Pipeline con le ray query (RT core): layout con il binding 5 (TLAS), shader con `trace` in
+/// hardware.
+struct RtPipelines {
+    bgl: wgpu::BindGroupLayout,
+    layout: wgpu::PipelineLayout,
+    module: wgpu::ShaderModule,
+    main: wgpu::ComputePipeline,
+    spectral: Option<wgpu::ComputePipeline>,
+}
+
+/// Shader con le ray query: lo stesso path tracer, con il `trace` della BVH rinominato e quello
+/// hardware al suo posto.
+fn rt_shader_source() -> String {
+    let base = SHADER.replacen("fn trace(o: vec3<f32>", "fn trace_bvh(o: vec3<f32>", 1);
+    format!("enable wgpu_ray_query;\n{base}\n{}", include_str!("path_tracer_rt.wgsl"))
+}
+
+/// Ray query volute? `FORGE_GPU_RT=0` le spegne (si usa la BVH dello shader).
+fn rt_wanted() -> bool {
+    std::env::var("FORGE_GPU_RT").map(|v| v != "0").unwrap_or(true)
 }
 
 struct Target {
@@ -65,6 +99,137 @@ pub struct GpuBackend {
     spectral: Option<(wgpu::ComputePipeline, wgpu::Buffer)>,
     /// Buffer minimo al posto dei dati spettrali nel render RGB.
     spectral_dummy: wgpu::Buffer,
+    /// RT core (ray query): `None` se la scheda o il driver non le hanno, o se spente.
+    rt: Option<RtPipelines>,
+}
+
+/// Shader e pipeline con le ray query; `None` (si resta sulla BVH) se la validazione fallisce.
+fn create_rt(device: &wgpu::Device, base_entries: &[wgpu::BindGroupLayoutEntry]) -> Option<RtPipelines> {
+    let t0 = Instant::now();
+    let scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
+    let mut entries = base_entries.to_vec();
+    entries.push(wgpu::BindGroupLayoutEntry {
+        binding: 5,
+        visibility: wgpu::ShaderStages::COMPUTE,
+        ty: wgpu::BindingType::AccelerationStructure { vertex_return: false },
+        count: None,
+    });
+    let bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("forge-gpu-bgl-rt"),
+        entries: &entries,
+    });
+    let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some("forge-gpu-layout-rt"),
+        bind_group_layouts: &[Some(&bgl)],
+        immediate_size: 0,
+    });
+    let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("path_tracer_rt.wgsl"),
+        source: wgpu::ShaderSource::Wgsl(rt_shader_source().into()),
+    });
+    let main = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+        label: Some("forge-gpu-pipeline-rt"),
+        layout: Some(&layout),
+        module: &module,
+        entry_point: Some("main"),
+        compilation_options: Default::default(),
+        cache: None,
+    });
+    if let Some(e) = pollster::block_on(scope.pop()) {
+        tracing::warn!("ray query non utilizzabili, si usa la BVH dello shader: {e}");
+        return None;
+    }
+    tracing::info!("pipeline RT pronta in {:.0} ms", t0.elapsed().as_secs_f64() * 1e3);
+    Some(RtPipelines {
+        bgl,
+        layout,
+        module,
+        main,
+        spectral: None,
+    })
+}
+
+/// Strutture di accelerazione hardware con i triangoli della scena (nell'ordine delle primitive).
+/// `None` se la scena è vuota o supera i limiti della scheda (si usa la BVH dello shader).
+fn build_accel(device: &wgpu::Device, queue: &wgpu::Queue, scene: &RenderScene) -> Option<SceneAccel> {
+    let geo = &scene.geometry;
+    let n = geo.prim_to_slot.len();
+    if n == 0 || n as u64 > device.limits().max_blas_primitive_count as u64 {
+        return None;
+    }
+    let t0 = Instant::now();
+    let mut verts: Vec<f32> = Vec::with_capacity(n * 9);
+    for prim in 0..n {
+        for v in geo.vertices(prim) {
+            verts.extend_from_slice(&v.to_array());
+        }
+    }
+    use wgpu::util::DeviceExt;
+    let scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
+    let vertices = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("forge-gpu-blas-vertici"),
+        contents: bytemuck::cast_slice(&verts),
+        usage: wgpu::BufferUsages::BLAS_INPUT,
+    });
+    let size = wgpu::BlasTriangleGeometrySizeDescriptor {
+        vertex_format: wgpu::VertexFormat::Float32x3,
+        vertex_count: (n * 3) as u32,
+        index_format: None,
+        index_count: None,
+        flags: wgpu::AccelerationStructureGeometryFlags::OPAQUE,
+    };
+    let blas = device.create_blas(
+        &wgpu::CreateBlasDescriptor {
+            label: Some("forge-gpu-blas"),
+            flags: wgpu::AccelerationStructureFlags::PREFER_FAST_TRACE,
+            update_mode: wgpu::AccelerationStructureUpdateMode::Build,
+        },
+        wgpu::BlasGeometrySizeDescriptors::Triangles {
+            descriptors: vec![size.clone()],
+        },
+    );
+    let mut tlas = device.create_tlas(&wgpu::CreateTlasDescriptor {
+        label: Some("forge-gpu-tlas"),
+        max_instances: 1,
+        flags: wgpu::AccelerationStructureFlags::PREFER_FAST_TRACE,
+        update_mode: wgpu::AccelerationStructureUpdateMode::Build,
+    });
+    tlas[0] = Some(wgpu::TlasInstance::new(
+        &blas,
+        [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+        0,
+        0xff,
+    ));
+    let mut enc = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        label: Some("forge-gpu-accel"),
+    });
+    enc.build_acceleration_structures(
+        std::iter::once(&wgpu::BlasBuildEntry {
+            blas: &blas,
+            geometry: wgpu::BlasGeometries::TriangleGeometries(vec![wgpu::BlasTriangleGeometry {
+                size: &size,
+                vertex_buffer: &vertices,
+                first_vertex: 0,
+                vertex_stride: 12,
+                index_buffer: None,
+                first_index: None,
+                transform_buffer: None,
+                transform_buffer_offset: None,
+            }]),
+        }),
+        std::iter::once(&tlas),
+    );
+    queue.submit(Some(enc.finish()));
+    if let Some(e) = pollster::block_on(scope.pop()) {
+        tracing::warn!("strutture RT non costruite, si usa la BVH dello shader: {e}");
+        return None;
+    }
+    tracing::info!("strutture RT: {} triangoli in {:.0} ms", n, t0.elapsed().as_secs_f64() * 1e3);
+    Some(SceneAccel {
+        tlas,
+        _blas: blas,
+        _vertices: vertices,
+    })
 }
 
 fn mask_buffer(device: &wgpu::Device, words: usize) -> wgpu::Buffer {
@@ -83,7 +248,14 @@ fn is_warp(info: &wgpu::AdapterInfo) -> bool {
 impl GpuBackend {
     /// Crea il backend sulla GPU ad alte prestazioni (la scheda dedicata invece
     /// della grafica integrata). Restituisce errore se non c'è una GPU adatta.
+    /// Usa gli RT core (ray query) se ci sono, salvo `FORGE_GPU_RT=0`.
     pub fn new() -> anyhow::Result<Self> {
+        Self::with_rt(rt_wanted())
+    }
+
+    /// Come [`GpuBackend::new`], scegliendo se provare le ray query (RT core). Senza supporto o
+    /// se la loro preparazione fallisce si usa la BVH dello shader.
+    pub fn with_rt(want_rt: bool) -> anyhow::Result<Self> {
         // Ordine dei backend: Vulkan (ottimo sui driver NVIDIA), poi DirectX 12, poi gli altri.
         // `FORGE_GPU_BACKEND=vulkan|dx12` forza una scelta.
         let order: Vec<wgpu::Backends> = match std::env::var("FORGE_GPU_BACKEND").ok().as_deref() {
@@ -123,6 +295,7 @@ impl GpuBackend {
             backend: format!("{:?}", ai.backend),
             device_type: format!("{:?}", ai.device_type),
             driver: format!("{} {}", ai.driver, ai.driver_info).trim().to_string(),
+            rt_cores: false,
         };
         if ai.backend == wgpu::Backend::Gl {
             return Err(anyhow!(
@@ -136,13 +309,44 @@ impl GpuBackend {
             max_buffer_size: al.max_buffer_size,
             ..wgpu::Limits::default()
         };
-        let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-            label: Some("forge-gpu"),
-            required_features: wgpu::Features::empty(),
-            required_limits: limits,
-            ..Default::default()
-        }))
-        .context("creazione del dispositivo GPU")?;
+        // RT core: ray query di wgpu (sperimentali, solo Vulkan).
+        let rt_supported = want_rt && adapter.features().contains(wgpu::Features::EXPERIMENTAL_RAY_QUERY);
+        let request = |rt: bool| {
+            pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+                label: Some("forge-gpu"),
+                required_features: if rt {
+                    wgpu::Features::EXPERIMENTAL_RAY_QUERY
+                } else {
+                    wgpu::Features::empty()
+                },
+                required_limits: if rt {
+                    limits.clone().using_acceleration_structure_values(al.clone())
+                } else {
+                    limits.clone()
+                },
+                // SAFETY: le ray query di wgpu sono sperimentali; si usano solo per il tracciamento
+                // dei raggi, con lo stesso risultato della BVH (verificato dai test GPU) e con il
+                // ritorno automatico alla BVH se la preparazione fallisce.
+                experimental_features: if rt {
+                    unsafe { wgpu::ExperimentalFeatures::enabled() }
+                } else {
+                    wgpu::ExperimentalFeatures::disabled()
+                },
+                ..Default::default()
+            }))
+        };
+        let (device, queue, rt_device) = match rt_supported.then(|| request(true)) {
+            Some(Ok((d, q))) => (d, q, true),
+            Some(Err(e)) => {
+                tracing::warn!("ray query non disponibili ({e}): si usa la BVH dello shader");
+                let (d, q) = request(false).context("creazione del dispositivo GPU")?;
+                (d, q, false)
+            }
+            None => {
+                let (d, q) = request(false).context("creazione del dispositivo GPU")?;
+                (d, q, false)
+            }
+        };
         let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("path_tracer.wgsl"),
             source: wgpu::ShaderSource::Wgsl(SHADER.into()),
@@ -153,51 +357,52 @@ impl GpuBackend {
             ty,
             count: None,
         };
+        let base_entries = [
+            entry(
+                0,
+                wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+            ),
+            entry(
+                1,
+                wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+            ),
+            entry(
+                2,
+                wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+            ),
+            entry(
+                3,
+                wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+            ),
+            // Dati del render spettrale (nel render RGB un buffer minimo).
+            entry(
+                4,
+                wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+            ),
+        ];
         let bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("forge-gpu-bgl"),
-            entries: &[
-                entry(
-                    0,
-                    wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                ),
-                entry(
-                    1,
-                    wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                ),
-                entry(
-                    2,
-                    wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: false },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                ),
-                entry(
-                    3,
-                    wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                ),
-                // Dati del render spettrale (nel render RGB un buffer minimo).
-                entry(
-                    4,
-                    wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                ),
-            ],
+            entries: &base_entries,
         });
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("forge-gpu-layout"),
@@ -225,6 +430,14 @@ impl GpuBackend {
             info.device_type,
             info.driver
         );
+        let rt = if rt_device { create_rt(&device, &base_entries) } else { None };
+        let mut info = info;
+        info.rt_cores = rt.is_some();
+        match &rt {
+            Some(_) => tracing::info!("RT core: ray query attive (tracciamento dei raggi in hardware)"),
+            None if want_rt => tracing::info!("RT core non disponibili: tracciamento con la BVH dello shader"),
+            None => tracing::info!("RT core spenti (FORGE_GPU_RT=0): tracciamento con la BVH dello shader"),
+        }
         let mask = mask_buffer(&device, 1);
         let spectral_dummy = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("forge-gpu-spectral-dummy"),
@@ -247,7 +460,13 @@ impl GpuBackend {
             pipeline_layout: layout,
             spectral: None,
             spectral_dummy,
+            rt,
         })
+    }
+
+    /// Vero se il tracciamento dei raggi usa gli RT core.
+    pub fn uses_rt_cores(&self) -> bool {
+        self.rt.is_some()
     }
 
     /// Pipeline e dati del render spettrale, creati la prima volta che servono.
@@ -277,6 +496,22 @@ impl GpuBackend {
             t0.elapsed().as_secs_f64() * 1e3
         );
         self.spectral = Some((pipeline, buffer));
+    }
+
+    /// Pipeline spettrale con le ray query, creata alla prima richiesta.
+    fn ensure_spectral_rt(&mut self) {
+        if let Some(rt) = &mut self.rt {
+            if rt.spectral.is_none() {
+                rt.spectral = Some(self.device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                    label: Some("forge-gpu-pipeline-spectral-rt"),
+                    layout: Some(&rt.layout),
+                    module: &rt.module,
+                    entry_point: Some("main_spectral"),
+                    compilation_options: Default::default(),
+                    cache: None,
+                }));
+            }
+        }
     }
 
     pub fn info(&self) -> &GpuInfo {
@@ -309,11 +544,17 @@ impl GpuBackend {
             bytes as f64 / 1e6,
             t0.elapsed().as_secs_f64() * 1e3
         );
+        let accel = if self.rt.is_some() {
+            build_accel(&self.device, &self.queue, scene)
+        } else {
+            None
+        };
         self.scene = Some(SceneGpu {
             scene_id: scene.content_id,
             buffer,
             params: sb.params,
             bytes,
+            accel,
         });
         Ok(())
     }
@@ -355,8 +596,11 @@ impl RenderBackend for GpuBackend {
 
     fn device_info(&self) -> String {
         format!(
-            "{} · {} · {} campioni/passata",
-            self.info.name, self.info.backend, self.samples_per_pass
+            "{} · {}{} · {} campioni/passata",
+            self.info.name,
+            self.info.backend,
+            if self.rt.is_some() { " · RT core" } else { "" },
+            self.samples_per_pass
         )
     }
 
@@ -411,6 +655,11 @@ impl GpuBackend {
         if spectral {
             self.ensure_spectral();
         }
+        // RT core se la scena ha le strutture di accelerazione hardware.
+        let use_rt = self.rt.is_some() && self.scene.as_ref().is_some_and(|s| s.accel.is_some());
+        if use_rt && spectral {
+            self.ensure_spectral_rt();
+        }
         // La prima passata di un render è di un solo campione: muovendo la vista l'immagine
         // nuova compare subito, poi le passate crescono fino a ~TARGET_PASS_MS.
         let n = if first_sample == 0 {
@@ -462,34 +711,43 @@ impl GpuBackend {
         self.queue.write_buffer(&self.uniform, 0, bytemuck::cast_slice(&p));
 
         let t = self.target.as_ref().expect("target");
+        let rt = self.rt.as_ref().filter(|_| use_rt);
+        let accel = sg.accel.as_ref().filter(|_| use_rt);
+        let mut entries = vec![
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: self.uniform.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: sg.buffer.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: t.out.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 3,
+                resource: self.mask.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 4,
+                resource: match (&self.spectral, spectral) {
+                    (Some((_, b)), true) => b.as_entire_binding(),
+                    _ => self.spectral_dummy.as_entire_binding(),
+                },
+            },
+        ];
+        if let Some(a) = accel {
+            entries.push(wgpu::BindGroupEntry {
+                binding: 5,
+                resource: a.tlas.as_binding(),
+            });
+        }
         let bind = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("forge-gpu-bg"),
-            layout: &self.bgl,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: self.uniform.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: sg.buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: t.out.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: self.mask.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 4,
-                    resource: match (&self.spectral, spectral) {
-                        (Some((_, b)), true) => b.as_entire_binding(),
-                        _ => self.spectral_dummy.as_entire_binding(),
-                    },
-                },
-            ],
+            layout: rt.map(|r| &r.bgl).unwrap_or(&self.bgl),
+            entries: &entries,
         });
         let t0 = Instant::now();
         let mut enc = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -500,10 +758,13 @@ impl GpuBackend {
                 label: Some("path-trace"),
                 timestamp_writes: None,
             });
-            match (&self.spectral, spectral) {
-                (Some((p, _)), true) => pass.set_pipeline(p),
-                _ => pass.set_pipeline(&self.pipeline),
-            }
+            let pipeline = match (rt, spectral) {
+                (Some(r), true) => r.spectral.as_ref().expect("pipeline spettrale RT"),
+                (Some(r), false) => &r.main,
+                (None, true) => &self.spectral.as_ref().expect("pipeline spettrale").0,
+                (None, false) => &self.pipeline,
+            };
+            pass.set_pipeline(pipeline);
             pass.set_bind_group(0, &bind, &[]);
             pass.dispatch_workgroups(w.div_ceil(8), h.div_ceil(8), 1);
         }
@@ -562,6 +823,7 @@ impl SharedGpu {
             backend: String::new(),
             device_type: String::new(),
             driver: String::new(),
+            rt_cores: false,
         })
     }
 }

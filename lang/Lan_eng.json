@@ -220,6 +220,8 @@
     "Box (CAD)": "Box (CAD)",
     "Proiezione cubica sfumata: non richiede UV, la scala è in metri reali": "Blended cubic projection: needs no UVs, the scale is in real meters",
     "Ancoraggio": "Anchor",
+    "RT core attivi: raggi tracciati in hardware": "RT cores active: rays traced in hardware",
+    "Le unità di ray tracing della scheda cercano i triangoli colpiti dai raggi: stesso risultato, render molte volte più veloce": "The card's ray tracing units find the triangles hit by the rays: same result, a render several times faster",
     "Cristallo al piombo": "Lead crystal",
     "Diamante": "Diamond",
     "Dispersione": "Dispersion",

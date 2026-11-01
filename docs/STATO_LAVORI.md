@@ -573,5 +573,15 @@
   materiali → Dispersione; MCP `color` e `abbe`. Documentazione: `docs/SPECTRAL.md`.
 - Test di sessione `pause_resume_cancel_and_retarget` reso robusto al carico.
 
+
+### In sviluppo (branch `sviluppo`): RT core con le ray query (01/11/2026)
+- `forge_render_gpu`: `GpuBackend::with_rt`, dispositivo con `EXPERIMENTAL_RAY_QUERY` (con
+  ritorno alla BVH), BLAS unico con i triangoli in ordine di primitiva + TLAS con un'istanza
+  (`build_accel`), shader `path_tracer_rt.wgsl` che sostituisce `trace` (la BVH diventa
+  `trace_bvh`), binding 5 = TLAS, pipeline RGB e spettrale RT. Ritagli: ripartenza oltre i punti
+  trasparenti (naga non ha ancora le intersezioni candidate).
+- Test `gpu_rt_cores_match_shader_bvh`, esempio `rt_bench`. Misure: 10,6–14,9× (RGB),
+  7,7–12,6× (spettrale) su RTX 5070.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

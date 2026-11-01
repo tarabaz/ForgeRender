@@ -10,6 +10,14 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## Unreleased (development branch, not on main)
+
+**Hardware ray tracing (RT cores)**
+- On GPUs with ray tracing units (NVIDIA RTX, AMD RX 6000 and newer, with Vulkan), the GPU renderer finds the triangles hit by each ray with the hardware (wgpu ray queries) instead of the shader's BVH. Same image: 99.9% of pixels identical to the BVH on the same GPU, and all CPU/GPU tests unchanged.
+- Measured on an RTX 5070, 256 samples at 1280×720: test scene 2.62 s → 0.25 s (**10.6×**), 1.6 M triangles 7.69 s → 0.59 s (**13.0×**), 3.8 M triangles 8.86 s → 0.59 s (**14.9×**); spectral 7.7–12.6×.
+- Automatic: the Render tab shows "RT cores active". Without support (or with `FORGE_GPU_RT=0`) the shader BVH is used as before. Cutout (opacity) textures work: the ray restarts just past transparent points.
+- Benchmark: `cargo run --release -p forge_render_gpu --example rt_bench`.
+
 ## 0.24.0 — 1 Nov 2026
 
 **Spectral rendering (optional)**

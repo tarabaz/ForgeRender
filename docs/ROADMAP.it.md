@@ -25,7 +25,7 @@ La complessità è una stima di lavoro e rischio per questo codice:
 | 10 | Anteprima del displacement nella viewport di modellazione | Media | displacement ✅ | Oggi il displacement si vede solo nel render |
 | 11 | Mip-mapping / filtraggio delle texture | Media | — | Meno sfarfallio sulle texture lontane |
 | 12 | DLSS Ray Reconstruction come anteprima interattiva veloce | Molto alta | SDK NVIDIA | Solo RTX, interop Vulkan con wgpu |
-| 13 | Ray tracing hardware (RT core) | Molto alta | OptiX o ray query Vulkan | — |
+| 13 | Ray tracing hardware (RT core) | Molto alta | OptiX o ray query Vulkan | ✅ fatto (branch di sviluppo): ray query Vulkan, 10–15 volte più veloce su una RTX 5070 |
 | 14 | Generatore di edera: rampicanti fotorealistici che crescono sugli oggetti | Alta | — | **Da fare più avanti**, non pianificato ora |
 | 15 | Utilizzo GPU / VRAM tramite NVML | Bassa | ✅ 0.6.0 (solo NVIDIA) | — |
 | 16 | Import di volumi OpenVDB (fumo/fuoco simulati in Blender Mantaflow, EmberGen, Houdini) | Media | renderer della nebbia ✅ | Lettore VDB in Rust puro; il renderer gestisce già griglie di densità |
@@ -181,7 +181,7 @@ Gerarchia, mesh, materiali Principled e texture, camere, luci `KHR_lights_punctu
 | 1 | Denoiser OIDN su CUDA | driver NVIDIA, GPU Volta o successiva | fatto, collaudato sulla RTX 5070: 18 ms contro 51 ms della CPU (640×360) |
 | 2 | DLSS Ray Reconstruction come anteprima veloce della vista Render | NVIDIA Streamline/NGX su Vulkan, interop con le risorse wgpu, solo RTX | da fare |
 | 3 | Menu DLSS: versione del modello (una cartella di DLL per versione, menu costruito da un manifest), risoluzione interna, nitidezza, miscela con l'immagine accumulata | passo 2 | da fare |
-| 4 | Ray tracing hardware (RT core) | OptiX o ray query Vulkan | da valutare |
+| 4 | Ray tracing hardware (RT core) | OptiX o ray query Vulkan | fatto: ray query Vulkan (wgpu), 10–15× (RTX 5070) |
 
 Note:
 - I "CUDA core" sono le unità di calcolo della GPU: il path tracer WGSL li usa già.

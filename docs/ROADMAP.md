@@ -25,7 +25,7 @@ Complexity is a rough estimate of the effort and risk for this codebase:
 | 10 | Displacement preview in the modelling viewport | Medium | displacement ✅ | Today displacement shows in the render only |
 | 11 | Texture mip-mapping / filtering | Medium | — | Less aliasing on distant textures |
 | 12 | DLSS Ray Reconstruction as fast interactive preview | Very high | NVIDIA SDK | RTX only, Vulkan interop with wgpu |
-| 13 | Hardware ray tracing (RT cores) | Very high | OptiX or Vulkan ray query | — |
+| 13 | Hardware ray tracing (RT cores) | Very high | OptiX or Vulkan ray query | ✅ done (development branch): Vulkan ray query, 10–15× faster on an RTX 5070 |
 | 14 | Ivy generator: photorealistic climbing plants growing on objects | High | — | **To do later**, not scheduled now |
 | 15 | GPU usage / VRAM readout via NVML | Low | ✅ 0.6.0 (NVIDIA only) | — |
 | 16 | Import OpenVDB volumes (smoke/fire simulated in Blender Mantaflow, EmberGen, Houdini) | Medium | fog renderer ✅ | Pure-Rust VDB reader; the renderer already handles density grids |
@@ -167,7 +167,7 @@ Hierarchy, meshes, Principled materials and textures, cameras, `KHR_lights_punct
 | 1 | OIDN denoiser on CUDA | NVIDIA driver, Volta or newer GPU | done, tested on the RTX 5070: 18 ms vs 51 ms on the CPU (640×360) |
 | 2 | DLSS Ray Reconstruction as fast preview of the Render view | NVIDIA Streamline/NGX on Vulkan, interop with wgpu resources, RTX only | to do |
 | 3 | DLSS menu: model version (one DLL folder per version, menu built from a manifest), internal resolution, sharpness, blend with the accumulated image | step 2 | to do |
-| 4 | Hardware ray tracing (RT cores) | OptiX or Vulkan ray query | to evaluate |
+| 4 | Hardware ray tracing (RT cores) | OptiX or Vulkan ray query | done: Vulkan ray query (wgpu), 10–15× (RTX 5070) |
 
 Notes:
 - "CUDA cores" are the GPU's compute units: the WGSL path tracer already uses them.

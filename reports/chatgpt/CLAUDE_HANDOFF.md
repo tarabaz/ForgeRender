@@ -2206,3 +2206,28 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
   Versione in `Cargo.toml` e nell'installer, changelog inglese e italiano, README (IT/EN) con
   le novità della 0.24.0 e la 0.23.0 nello storico.
 - Prossimo lavoro, in corso: ray query con gli RT core sulla GPU (Vulkan), sul branch `sviluppo`.
+
+## Claude Code — 01/11/2026: RT core (ray query Vulkan) sul branch `sviluppo`
+
+- Richiesta di Valerio: usare la potenza della scheda (CUDA, tensor core). Spiegato che i tensor
+  core servono alle reti neurali (denoiser, DLSS) e che per velocizzare il render servono gli
+  **RT core**; Valerio ha scelto gli RT core.
+- Implementazione senza CUDA né OptiX: ray query sperimentali di wgpu 30 (Vulkan).
+  - Si sostituisce solo `trace`: tutto il resto dello shader (BSDF, luci, texture, nebbie,
+    spettrale) è identico.
+  - BLAS con i triangoli in ordine di primitiva, così `primitive_index` e le baricentriche
+    coincidono con la BVH.
+  - Ritagli: naga non ha ancora le intersezioni "candidate", quindi i triangoli sono opachi per
+    l'hardware e il raggio riparte oltre i punti trasparenti (al massimo 32 volte).
+  - Ritorno automatico alla BVH se manca il supporto, se la validazione fallisce o se la scena
+    supera i limiti.
+- Verifiche:
+  - tutti i 23 test GPU passano con gli RT core attivi;
+  - nuovo test RT contro BVH sulla stessa GPU: 99,9% dei pixel identici in RGB, 100% in
+    spettrale;
+  - benchmark: 10,6× sulla scena di prova, 13,0× con 1,6 milioni di triangoli, 14,9× con 3,8
+    milioni (RGB), 7,7–12,6× in spettrale.
+- Limite noto: la scena (con i dati della BVH) deve stare in un solo buffer della GPU (circa 2,1
+  GB sulla RTX 5070, circa 6 milioni di triangoli). Con gli RT core i nodi della BVH dello shader
+  non servono: toglierli permetterebbe scene più grandi (prossimo passo possibile).
+- Pushato solo su `sviluppo`; main resta la 0.24.0 finché Valerio non chiede di portarlo.
