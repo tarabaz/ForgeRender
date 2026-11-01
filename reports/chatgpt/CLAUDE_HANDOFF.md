@@ -2171,3 +2171,30 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
   cronologia git); `DATA_PRESET_DIRS` vuoto, pronto per i predefiniti in zip; avviso licenze
   aggiornato. L'importatore `.blend`/BlenderKit resta. I progetti che usavano un `bk-…` mostrano
   il materiale senza mappe.
+
+## Claude Code — 01/11/2026: rendering spettrale (branch `sviluppo`, non su main)
+
+- Implementato il piano "ForgeRender — Spectral Rendering Implementation Plan" (fasi 0–3 più la
+  GPU e l'interfaccia; la fase 4, film sottili e spettri misurati, resta da fare). Dettagli e
+  verifiche in `docs/SPECTRAL.md` / `docs/SPECTRAL.it.md`.
+- È un'**opzione**: Render → Colore, RGB predefinito. L'RGB non è stato riscritto: la BSDF CPU è
+  diventata generica sui canali (con `Vec3` il codice è lo stesso, tutti i test RGB invariati);
+  sulla GPU la variante spettrale è un file WGSL a parte, aggiunto in coda al modulo
+  (`main_spectral`), con i dati nel binding 4 caricati solo quando serve.
+- Scelte rispetto al piano:
+  - hero wavelength con il campionamento visibile di PBRT v4 (4 campioni stratificati in u)
+    invece degli intervalli uguali in λ: entrambe corrette, questa ha meno varianza;
+  - MIS spettrale: dove le pdf non dipendono da λ (tutti i materiali non dispersivi) la stima è
+    esatta per le quattro; nei dielettrici dispersivi si fermano le secondarie come in PBRT v4
+    (`TerminateSecondary` prima della NEE, così i pesi MIS restano coerenti);
+  - roulette russa sul massimo della throughput (probabilità indipendente da λ);
+  - XYZ accumulato in forma di RGB (trasformazione lineare: equivalente) per non toccare
+    accumulo, denoiser ed EXR;
+  - bianco a energia uguale con adattamento di Bradford invece del D65 di PBRT, perché i
+    colori delle luci della scena sono già RGB con bianco (1, 1, 1);
+  - funzioni colorimetriche: fit analitico di Wyman 2013 (nessuna tabella esterna), tabella dei
+    coefficienti calcolata da noi (nessun dato copiato da PBRT o SlyZ1).
+- Riferimenti letti: PBR Book 4ª ed. (capitoli su spettri e colore, dielettrici, path tracer) e
+  il README di SlyZ1/Path-Tracer (MIT, stesso schema: hero 4λ, sigmoide di PBRT, Cauchy, Airy).
+- Correzione collaterale: la tabella si costruisce su un pool di thread dedicato (sul pool
+  globale bloccava per circa 2 s la sessione di render e faceva fallire un test temporizzato).

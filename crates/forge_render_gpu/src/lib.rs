@@ -18,7 +18,8 @@ use layout::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
-const SHADER: &str = include_str!("path_tracer.wgsl");
+/// Path tracer RGB e, in coda, la variante spettrale (punto d'ingresso `main_spectral`).
+const SHADER: &str = concat!(include_str!("path_tracer.wgsl"), "\n", include_str!("path_tracer_spectral.wgsl"));
 /// Durata obiettivo di una passata GPU.
 pub const TARGET_PASS_MS: f64 = 60.0;
 const MAX_SAMPLES_PER_PASS: u32 = 64;
@@ -57,6 +58,13 @@ pub struct GpuBackend {
     samples_per_pass: u32,
     /// Maschera del campionamento adattivo (un bit per riquadro), almeno una parola.
     mask: wgpu::Buffer,
+    /// Per creare la pipeline spettrale alla prima richiesta.
+    module: wgpu::ShaderModule,
+    pipeline_layout: wgpu::PipelineLayout,
+    /// Render spettrale: pipeline e dati (tabella RGB → spettro), creati alla prima richiesta.
+    spectral: Option<(wgpu::ComputePipeline, wgpu::Buffer)>,
+    /// Buffer minimo al posto dei dati spettrali nel render RGB.
+    spectral_dummy: wgpu::Buffer,
 }
 
 fn mask_buffer(device: &wgpu::Device, words: usize) -> wgpu::Buffer {
@@ -180,6 +188,15 @@ impl GpuBackend {
                         min_binding_size: None,
                     },
                 ),
+                // Dati del render spettrale (nel render RGB un buffer minimo).
+                entry(
+                    4,
+                    wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                ),
             ],
         });
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -209,6 +226,12 @@ impl GpuBackend {
             info.driver
         );
         let mask = mask_buffer(&device, 1);
+        let spectral_dummy = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("forge-gpu-spectral-dummy"),
+            size: 16,
+            usage: wgpu::BufferUsages::STORAGE,
+            mapped_at_creation: false,
+        });
         Ok(Self {
             mask,
             device,
@@ -220,7 +243,40 @@ impl GpuBackend {
             target: None,
             info,
             samples_per_pass: 1,
+            module,
+            pipeline_layout: layout,
+            spectral: None,
+            spectral_dummy,
         })
+    }
+
+    /// Pipeline e dati del render spettrale, creati la prima volta che servono.
+    fn ensure_spectral(&mut self) {
+        if self.spectral.is_some() {
+            return;
+        }
+        let t0 = Instant::now();
+        let pipeline = self.device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("forge-gpu-pipeline-spectral"),
+            layout: Some(&self.pipeline_layout),
+            module: &self.module,
+            entry_point: Some("main_spectral"),
+            compilation_options: Default::default(),
+            cache: None,
+        });
+        use wgpu::util::DeviceExt;
+        let data = forge_render_core::spectral::gpu_data();
+        let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("forge-gpu-spectral"),
+            contents: bytemuck::cast_slice(&data),
+            usage: wgpu::BufferUsages::STORAGE,
+        });
+        tracing::info!(
+            "render spettrale sulla GPU pronto: {:.1} MB di dati in {:.0} ms",
+            data.len() as f64 * 4.0 / 1e6,
+            t0.elapsed().as_secs_f64() * 1e3
+        );
+        self.spectral = Some((pipeline, buffer));
     }
 
     pub fn info(&self) -> &GpuInfo {
@@ -351,6 +407,10 @@ impl GpuBackend {
         }
         self.upload_scene(scene)?;
         self.ensure_target(w, h);
+        let spectral = settings.color_mode == forge_render_core::ColorMode::Spectral;
+        if spectral {
+            self.ensure_spectral();
+        }
         // La prima passata di un render è di un solo campione: muovendo la vista l'immagine
         // nuova compare subito, poi le passate crescono fino a ~TARGET_PASS_MS.
         let n = if first_sample == 0 {
@@ -422,6 +482,13 @@ impl GpuBackend {
                     binding: 3,
                     resource: self.mask.as_entire_binding(),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: match (&self.spectral, spectral) {
+                        (Some((_, b)), true) => b.as_entire_binding(),
+                        _ => self.spectral_dummy.as_entire_binding(),
+                    },
+                },
             ],
         });
         let t0 = Instant::now();
@@ -433,7 +500,10 @@ impl GpuBackend {
                 label: Some("path-trace"),
                 timestamp_writes: None,
             });
-            pass.set_pipeline(&self.pipeline);
+            match (&self.spectral, spectral) {
+                (Some((p, _)), true) => pass.set_pipeline(p),
+                _ => pass.set_pipeline(&self.pipeline),
+            }
             pass.set_bind_group(0, &bind, &[]);
             pass.dispatch_workgroups(w.div_ceil(8), h.div_ceil(8), 1);
         }

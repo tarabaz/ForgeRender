@@ -72,7 +72,7 @@ struct JobInfo {
     geometry_rev: u64,
     shading_rev: u64,
     camera_rev: u64,
-    key: (u32, u32, u32, u32, u32, u64, bool),
+    key: (u32, u32, u32, u32, u32, u64, bool, forge_render_core::ColorMode),
     threads: usize,
     target: u32,
     /// Soglia di rumore e campioni minimi inviati alla sessione.

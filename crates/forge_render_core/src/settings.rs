@@ -153,6 +153,10 @@ pub struct RenderSettings {
     /// Campioni minimi per pixel prima di valutare il rumore.
     #[serde(default = "default_adaptive_min")]
     pub adaptive_min_samples: u32,
+    /// Trasporto della luce in RGB (predefinito) o spettrale (lunghezze d'onda: dispersione nei
+    /// vetri, colori più fedeli; più lento e con più rumore di colore).
+    #[serde(default)]
+    pub color_mode: ColorMode,
 }
 
 fn default_adaptive_min() -> u32 {
@@ -177,6 +181,7 @@ impl Default for RenderSettings {
             denoise: DenoiseSettings::default(),
             noise_threshold: 0.0,
             adaptive_min_samples: default_adaptive_min(),
+            color_mode: ColorMode::Rgb,
         }
     }
 }
@@ -226,7 +231,7 @@ impl RenderSettings {
     /// Le impostazioni che, se cambiano, invalidano l'accumulo.
     /// (Tone mapping ed esposizione si applicano in visualizzazione, e anche
     /// il numero di campioni obiettivo si può cambiare senza ripartire.)
-    pub fn accumulation_key(&self) -> (u32, u32, u32, u32, u32, u64, bool) {
+    pub fn accumulation_key(&self) -> (u32, u32, u32, u32, u32, u64, bool, ColorMode) {
         (
             self.width,
             self.height,
@@ -235,6 +240,26 @@ impl RenderSettings {
             self.clamp_indirect.to_bits(),
             self.seed,
             self.environment_visible,
+            self.color_mode,
         )
+    }
+}
+
+/// Come si trasporta la luce.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub enum ColorMode {
+    /// Tre canali (rosso, verde, blu): il render di sempre.
+    #[default]
+    Rgb,
+    /// Quattro lunghezze d'onda per percorso (hero wavelength): dispersione e colori spettrali.
+    Spectral,
+}
+
+impl ColorMode {
+    pub fn label(self) -> &'static str {
+        match self {
+            ColorMode::Rgb => "RGB",
+            ColorMode::Spectral => "Spettrale",
+        }
     }
 }

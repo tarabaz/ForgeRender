@@ -875,7 +875,12 @@ mod tests {
         let id = s.start(scene.clone(), settings(0), Box::new(ConstBackend(Duration::from_millis(2))));
         std::thread::sleep(Duration::from_millis(60));
         s.pause();
-        std::thread::sleep(Duration::from_millis(30));
+        // Sotto carico (altri test in parallelo) la pausa può arrivare dopo qualche millisecondo.
+        let t0 = std::time::Instant::now();
+        while s.progress().state != SessionState::Paused && t0.elapsed() < Duration::from_secs(2) {
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        std::thread::sleep(Duration::from_millis(10));
         let p1 = s.progress();
         assert_eq!(p1.state, SessionState::Paused);
         std::thread::sleep(Duration::from_millis(30));

@@ -15,6 +15,18 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 
 ## In sviluppo (branch di sviluppo, non su main)
 
+**Rendering spettrale (opzionale)**
+- Render → Colore: **RGB** (predefinito, invariato) o **Spettrale**: quattro lunghezze d'onda per
+  percorso (hero wavelength, campionamento visibile di PBRT v4), colori RGB convertiti in spettri
+  lisci (sigmoide di un polinomio, tabella dei coefficienti nostra), ricostruzione CIE 1931 con il
+  bianco della scena che resta bianco. CPU e GPU, stesso risultato. Circa 2 volte più lento
+  dell'RGB, con più rumore di colore.
+- Materiali trasparenti: **Dispersione** (numero di Abbe, equazione di Cauchy) con i predefiniti
+  crown, flint, cristallo al piombo, policarbonato e diamante. Si vede solo in modalità spettrale.
+- Controllo IA: `set_render_settings` accetta `color` (rgb / spettrale), `create_material`
+  accetta `abbe`.
+- Dettagli e verifiche: [docs/SPECTRAL.it.md](docs/SPECTRAL.it.md).
+
 **Scelta della modalità all'avvio**
 - All'avvio, dopo la schermata di benvenuto, la finestra "Come vuoi lavorare?" propone la
   modalità Semplice o Avanzata, con una breve descrizione di ognuna e l'indicazione che si

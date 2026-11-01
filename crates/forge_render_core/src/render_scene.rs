@@ -27,6 +27,12 @@ pub struct RenderMaterial {
     pub sigma_a: Vec3,
     /// Priorità tra volumi trasparenti sovrapposti.
     pub priority: f32,
+    /// Numero di Abbe (0 = nessuna dispersione): solo nel render spettrale.
+    pub abbe: f32,
+    /// Colore del volume allo spessore `volume_depth` (m): il render spettrale ne ricava
+    /// l'assorbimento per lunghezza d'onda.
+    pub volume_color: Vec3,
+    pub volume_depth: f32,
 }
 
 /// Texture di un materiale, già caricate.
@@ -107,6 +113,9 @@ impl RenderMaterial {
                 Vec3::ZERO
             },
             priority: m.priority as f32,
+            abbe: m.abbe,
+            volume_color: Vec3::from_array(m.volume_color),
+            volume_depth: m.volume_depth_cm * 0.01,
         }
     }
 }

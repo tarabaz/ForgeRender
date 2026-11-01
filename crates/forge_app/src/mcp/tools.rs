@@ -739,6 +739,9 @@ fn create_material(app: &mut ForgeApp, a: &Args) -> R {
     if let Some(v) = a.f32("ior")? {
         m.ior = v.clamp(1.0, 3.0);
     }
+    if let Some(v) = a.f32("abbe")? {
+        m.abbe = if v > 0.0 { v.clamp(5.0, 200.0) } else { 0.0 };
+    }
     if let Some(v) = a.f32("specular")? {
         m.specular = v.clamp(0.0, 1.0);
     }
@@ -947,6 +950,13 @@ fn set_render_settings(app: &mut ForgeApp, a: &Args) -> R {
         };
         // Scelta esplicita: la modalità Semplice non la cambia più da sola.
         app.simple_gpu_checked = true;
+    }
+    if let Some(c) = a.str("color")? {
+        app.settings.color_mode = match c.to_lowercase().as_str() {
+            "rgb" => forge_render_core::ColorMode::Rgb,
+            "spettrale" | "spectral" => forge_render_core::ColorMode::Spectral,
+            _ => return Err(format!("colore \"{c}\": rgb o spettrale")),
+        };
     }
     if let Some(d) = a.bool("denoise")? {
         app.settings.denoise.mode = if d { DenoiseMode::Final } else { DenoiseMode::Off };

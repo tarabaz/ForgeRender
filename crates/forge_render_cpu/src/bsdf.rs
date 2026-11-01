@@ -14,20 +14,56 @@
 use forge_math::{luminance, sampling, Onb, Vec3};
 use forge_render_core::RenderMaterial;
 use std::f32::consts::{FRAC_1_PI, PI};
+use std::ops::{Add, AddAssign, Mul, MulAssign, Sub};
 
-pub struct Bsdf<'a> {
+/// Valori "di colore" trasportati lungo il percorso: tre canali RGB (`Vec3`) o le quattro
+/// lunghezze d'onda del render spettrale (`Vec4`). La BSDF è la stessa: il colore entra solo come
+/// fattore per canale; con `Vec3` il codice compilato è quello di sempre.
+pub trait Channels:
+    Copy + PartialEq + Add<Output = Self> + Sub<Output = Self> + Mul<Output = Self> + Mul<f32, Output = Self> + AddAssign + MulAssign
+{
+    const ZERO: Self;
+    const ONE: Self;
+    fn splat(v: f32) -> Self;
+    fn lerp(self, rhs: Self, t: f32) -> Self;
+}
+
+macro_rules! channels {
+    ($t:ty) => {
+        impl Channels for $t {
+            const ZERO: Self = <$t>::ZERO;
+            const ONE: Self = <$t>::ONE;
+            #[inline]
+            fn splat(v: f32) -> Self {
+                <$t>::splat(v)
+            }
+            #[inline]
+            fn lerp(self, rhs: Self, t: f32) -> Self {
+                <$t>::lerp(self, rhs, t)
+            }
+        }
+    };
+}
+channels!(Vec3);
+channels!(forge_math::glam::Vec4);
+
+pub struct Bsdf<'a, C = Vec3> {
     pub frame: Onb,
     /// Normale geometrica orientata come la normale di shading.
     pub ng: Vec3,
     pub mat: &'a RenderMaterial,
     /// Vero se il raggio arriva dal lato esterno della superficie (rispetto al winding).
     pub entering: bool,
+    /// Colore base nei canali trasportati (`mat.base_color` in RGB, il suo spettro nel render
+    /// spettrale). Le probabilità di campionamento usano sempre `mat.base_color` (RGB), così non
+    /// dipendono dalla lunghezza d'onda.
+    pub color: C,
 }
 
-pub struct BsdfSample {
+pub struct BsdfSample<C = Vec3> {
     pub wi: Vec3,
     /// f · |cos θ| / pdf
-    pub weight: Vec3,
+    pub weight: C,
     pub pdf: f32,
     pub delta: bool,
 }
@@ -40,10 +76,10 @@ fn schlick(f0: f32, cos: f32) -> f32 {
 }
 
 #[inline]
-fn schlick3(f0: Vec3, cos: f32) -> Vec3 {
+fn schlick3<C: Channels>(f0: C, cos: f32) -> C {
     let m = (1.0 - cos).clamp(0.0, 1.0);
     let m2 = m * m;
-    f0 + (Vec3::ONE - f0) * (m2 * m2 * m)
+    f0 + (C::ONE - f0) * (m2 * m2 * m)
 }
 
 /// Riflettanza di Fresnel esatta per dielettrici (luce non polarizzata).
@@ -153,7 +189,7 @@ fn ggx_albedo(cos_o: f32, alpha: f32) -> f32 {
 /// Rugosità oltre la quale il vetro diventa satinato (trasmissione microfacet).
 const ROUGH_GLASS: f32 = 0.03;
 
-impl<'a> Bsdf<'a> {
+impl<'a, C: Channels> Bsdf<'a, C> {
     /// Componente non-delta presente (serve il campionamento delle luci).
     #[inline]
     pub fn has_non_delta(&self) -> bool {
@@ -181,7 +217,14 @@ impl<'a> Bsdf<'a> {
     }
 
     #[inline]
-    fn f0(&self) -> Vec3 {
+    fn f0(&self) -> C {
+        let m = self.mat;
+        C::splat((m.specular_scale * m.f0_dielectric).min(1.0)).lerp(self.color, m.metallic)
+    }
+
+    /// F0 in RGB (per le probabilità di campionamento, uguali in tutte le modalità).
+    #[inline]
+    fn f0_rgb(&self) -> Vec3 {
         let m = self.mat;
         Vec3::splat((m.specular_scale * m.f0_dielectric).min(1.0)).lerp(m.base_color, m.metallic)
     }
@@ -190,7 +233,7 @@ impl<'a> Bsdf<'a> {
     #[inline]
     fn spec_probability(&self, wo: Vec3) -> f32 {
         let m = self.mat;
-        let spec = luminance(schlick3(self.f0(), wo.z)).max(if m.metallic > 0.0 || m.specular_scale > 0.0 { 1e-3 } else { 0.0 });
+        let spec = luminance(schlick3(self.f0_rgb(), wo.z)).max(if m.metallic > 0.0 || m.specular_scale > 0.0 { 1e-3 } else { 0.0 });
         let diff = (1.0 - m.metallic) * luminance(m.base_color) * (1.0 - self.f_dielectric(wo.z));
         if diff <= 0.0 {
             1.0
@@ -202,15 +245,15 @@ impl<'a> Bsdf<'a> {
     }
 
     /// Lobo opaco (diffuso + GGX con compensazione multi-scattering), solo riflessione.
-    fn eval_opaque(&self, wo: Vec3, wi: Vec3) -> (Vec3, f32) {
+    fn eval_opaque(&self, wo: Vec3, wi: Vec3) -> (C, f32) {
         let m = self.mat;
         if wo.z <= 0.0 || wi.z <= 0.0 {
-            return (Vec3::ZERO, 0.0);
+            return (C::ZERO, 0.0);
         }
         let p_spec = self.spec_probability(wo);
         let a2 = m.alpha * m.alpha;
         let h = (wo + wi).normalize();
-        let mut f = Vec3::ZERO;
+        let mut f = C::ZERO;
         let mut pdf = 0.0;
         if p_spec > 0.0 {
             let d = ggx_d(h, a2);
@@ -219,16 +262,16 @@ impl<'a> Bsdf<'a> {
             let g2 = 1.0 / (1.0 + lo + li);
             let g1o = 1.0 / (1.0 + lo);
             let voh = wo.dot(h).max(0.0);
-            let fr = Vec3::splat(self.f_dielectric(voh)).lerp(schlick3(m.base_color, voh), m.metallic);
+            let fr = C::splat(self.f_dielectric(voh)).lerp(schlick3(self.color, voh), m.metallic);
             // Compensazione dell'energia dei riflessi multipli: 1 + F0·(1/E − 1).
             let e = ggx_albedo(wo.z, m.alpha);
-            let ms = Vec3::ONE + self.f0() * (1.0 / e - 1.0);
+            let ms = C::ONE + self.f0() * (1.0 / e - 1.0);
             f += fr * ms * (d * g2 / (4.0 * wo.z * wi.z));
             pdf += p_spec * g1o * d / (4.0 * wo.z);
         }
         if p_spec < 1.0 {
             let kd = (1.0 - m.metallic) * (1.0 - self.f_dielectric(wi.z)) * (1.0 - self.f_dielectric(wo.z));
-            f += m.base_color * (kd * FRAC_1_PI);
+            f += self.color * (kd * FRAC_1_PI);
             pdf += (1.0 - p_spec) * sampling::cosine_hemisphere_pdf(wi.z);
         }
         (f, pdf)
@@ -236,17 +279,17 @@ impl<'a> Bsdf<'a> {
 
     /// Dielettrico ruvido (Walter et al. 2007, formulazione di PBRT v4): riflessione e
     /// rifrazione attraverso le microfacce GGX. Radianza scalata per (n_o/n_i)².
-    fn eval_rough_glass(&self, wo: Vec3, wi: Vec3) -> (Vec3, f32) {
+    fn eval_rough_glass(&self, wo: Vec3, wi: Vec3) -> (C, f32) {
         let m = self.mat;
         if wo.z <= 0.0 || wi.z == 0.0 {
-            return (Vec3::ZERO, 0.0);
+            return (C::ZERO, 0.0);
         }
         let (n_o, n_t) = self.ior_pair();
         let eta = n_t / n_o;
         let reflect = wi.z > 0.0;
         let mut wm = if reflect { wi + wo } else { wi * eta + wo };
         if wm.length_squared() == 0.0 {
-            return (Vec3::ZERO, 0.0);
+            return (C::ZERO, 0.0);
         }
         wm = wm.normalize();
         if wm.z < 0.0 {
@@ -254,7 +297,7 @@ impl<'a> Bsdf<'a> {
         }
         let (wom, wim) = (wo.dot(wm), wi.dot(wm));
         if wom * wo.z <= 0.0 || wim * wi.z <= 0.0 {
-            return (Vec3::ZERO, 0.0);
+            return (C::ZERO, 0.0);
         }
         let a2 = m.alpha * m.alpha;
         let (fr, _) = fresnel_dielectric(wom, eta);
@@ -266,34 +309,34 @@ impl<'a> Bsdf<'a> {
         let dv = g1o * wom * d / wo.z;
         if reflect {
             let f = d * g2 * fr / (4.0 * wo.z * wi.z);
-            (Vec3::splat(f), dv / (4.0 * wom) * fr)
+            (C::splat(f), dv / (4.0 * wom) * fr)
         } else {
             let denom = (wim + wom / eta).powi(2);
             if denom <= 0.0 {
-                return (Vec3::ZERO, 0.0);
+                return (C::ZERO, 0.0);
             }
             let ft = (1.0 - fr) * d * g2 * (wim * wom / (wi.z * wo.z * denom)).abs() / (eta * eta);
             let pdf = dv * (wim.abs() / denom) * (1.0 - fr);
-            (m.base_color * ft, pdf)
+            (self.color * ft, pdf)
         }
     }
 
     /// Valuta la parte non-delta della BSDF (senza il coseno) e la sua PDF complessiva.
     /// `wo`, `wi` in spazio mondo.
-    pub fn eval(&self, wo_w: Vec3, wi_w: Vec3) -> (Vec3, f32) {
+    pub fn eval(&self, wo_w: Vec3, wi_w: Vec3) -> (C, f32) {
         let m = self.mat;
         if wo_w.dot(self.ng) <= 0.0 {
-            return (Vec3::ZERO, 0.0);
+            return (C::ZERO, 0.0);
         }
         let wo = self.frame.to_local(wo_w);
         let wi = self.frame.to_local(wi_w);
         // Coerenza tra normale geometrica e di shading: evita che la luce "trapeli".
         let geo_reflect = wi_w.dot(self.ng) > 0.0;
         if geo_reflect != (wi.z > 0.0) {
-            return (Vec3::ZERO, 0.0);
+            return (C::ZERO, 0.0);
         }
         let t = m.transmission;
-        let mut f = Vec3::ZERO;
+        let mut f = C::ZERO;
         let mut pdf = 0.0;
         if t < 1.0 && geo_reflect {
             let (fo, po) = self.eval_opaque(wo, wi);
@@ -308,7 +351,7 @@ impl<'a> Bsdf<'a> {
         (f, pdf)
     }
 
-    pub fn sample(&self, wo_w: Vec3, u_lobe: f32, u1: f32, u2: f32) -> Option<BsdfSample> {
+    pub fn sample(&self, wo_w: Vec3, u_lobe: f32, u1: f32, u2: f32) -> Option<BsdfSample<C>> {
         let m = self.mat;
         let wo = self.frame.to_local(wo_w);
         if wo.z <= 0.0 {
@@ -351,7 +394,7 @@ impl<'a> Bsdf<'a> {
         let wi_w = self.frame.to_world(wi.normalize());
         // Stimatore a un campione sulla miscela dei lobi: f e pdf complessivi.
         let (f, pdf) = self.eval(wo_w, wi_w);
-        if pdf <= 0.0 || f == Vec3::ZERO {
+        if pdf <= 0.0 || f == C::ZERO {
             return None;
         }
         Some(BsdfSample {
@@ -363,7 +406,7 @@ impl<'a> Bsdf<'a> {
     }
 
     /// Dielettrico liscio: riflessione o rifrazione scelte con probabilità F.
-    fn sample_glass(&self, wo_w: Vec3, u1: f32, _u2: f32) -> Option<BsdfSample> {
+    fn sample_glass(&self, wo_w: Vec3, u1: f32, _u2: f32) -> Option<BsdfSample<C>> {
         let m = self.mat;
         let n = self.frame.n;
         let cos_o = wo_w.dot(n);
@@ -377,7 +420,7 @@ impl<'a> Bsdf<'a> {
             let wi = 2.0 * cos_o * n - wo_w;
             return Some(BsdfSample {
                 wi,
-                weight: Vec3::ONE,
+                weight: C::ONE,
                 pdf: 0.0,
                 delta: true,
             });
@@ -388,7 +431,7 @@ impl<'a> Bsdf<'a> {
         let scale = (n_wo / n_wi) * (n_wo / n_wi);
         Some(BsdfSample {
             wi,
-            weight: m.base_color * scale,
+            weight: self.color * scale,
             pdf: 0.0,
             delta: true,
         })
@@ -417,6 +460,7 @@ mod tests {
             ng: Vec3::Z,
             mat: m,
             entering: true,
+            color: m.base_color,
         }
     }
 
@@ -538,6 +582,7 @@ mod tests {
                 ng: Vec3::Z,
                 mat: &m,
                 entering: ent,
+                color: m.base_color,
             };
             let wo = Vec3::new(0.3, 0.1, 0.95).normalize();
             let mut rng = Pcg32::new(21, 5);

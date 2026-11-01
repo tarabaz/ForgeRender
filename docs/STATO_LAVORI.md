@@ -564,5 +564,14 @@
   (motore, CLI, test) non cambia.
 - Su richiesta di Valerio solo sul branch, non su main.
 
+
+### In sviluppo (branch `sviluppo`): rendering spettrale (01/11/2026)
+- `forge_render_core::spectral` (lunghezze d'onda, CIE, tabella RGB → spettro, Cauchy, dati GPU),
+  `forge_render_cpu::spectral` (integratore; `Bsdf<C: Channels>` generica su `Vec3`/`Vec4`),
+  `forge_render_gpu/src/path_tracer_spectral.wgsl` (`main_spectral`, binding 4).
+- `RenderSettings::color_mode` (nella chiave di accumulo), `Material::abbe`; UI Render → Colore,
+  materiali → Dispersione; MCP `color` e `abbe`. Documentazione: `docs/SPECTRAL.md`.
+- Test di sessione `pause_resume_cancel_and_retarget` reso robusto al carico.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

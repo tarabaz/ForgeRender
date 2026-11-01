@@ -230,6 +230,7 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
             ng,
             mat,
             entering,
+            color: mat.base_color,
         };
 
         // Next Event Estimation.
@@ -292,7 +293,7 @@ pub(crate) struct Media {
 }
 
 impl Media {
-    fn current(&self, scene: &RenderScene) -> Option<u32> {
+    pub(crate) fn current(&self, scene: &RenderScene) -> Option<u32> {
         let mut best: Option<u32> = None;
         for &m in &self.ids[..self.n] {
             if best.is_none_or(|b| scene.materials[m as usize].priority >= scene.materials[b as usize].priority) {
@@ -303,7 +304,7 @@ impl Media {
     }
 
     /// Faccia di un volume con priorità minore di quello corrente: non è un'interfaccia.
-    fn is_false_hit(&self, scene: &RenderScene, mat: usize, front: bool) -> bool {
+    pub(crate) fn is_false_hit(&self, scene: &RenderScene, mat: usize, front: bool) -> bool {
         if scene.materials[mat].transmission <= 0.0 {
             return false;
         }
@@ -318,7 +319,7 @@ impl Media {
     }
 
     /// Entra nel volume (faccia frontale) o ne esce.
-    fn cross(&mut self, mat: usize, front: bool) {
+    pub(crate) fn cross(&mut self, mat: usize, front: bool) {
         if front {
             if self.n < self.ids.len() {
                 self.ids[self.n] = mat as u32;
@@ -331,16 +332,23 @@ impl Media {
     }
 
     /// IOR del volume dall'altra parte della superficie del materiale `mat`.
-    fn outside_ior(&self, scene: &RenderScene, mat: usize, front: bool) -> f32 {
+    pub(crate) fn outside_ior(&self, scene: &RenderScene, mat: usize, front: bool) -> f32 {
+        self.outside_medium(scene, mat, front)
+            .map(|m| scene.materials[m as usize].ior)
+            .unwrap_or(1.0)
+    }
+
+    /// Volume dall'altra parte della superficie del materiale `mat` (nessuno = aria).
+    pub(crate) fn outside_medium(&self, scene: &RenderScene, mat: usize, front: bool) -> Option<u32> {
         let mut other = Media { ids: self.ids, n: self.n };
         if !front {
             other.cross(mat, false);
         }
-        other.current(scene).map(|m| scene.materials[m as usize].ior).unwrap_or(1.0)
+        other.current(scene)
     }
 
     /// Trasmittanza del volume corrente lungo un tratto di lunghezza `t`.
-    fn transmittance(&self, scene: &RenderScene, t: f32) -> Vec3 {
+    pub(crate) fn transmittance(&self, scene: &RenderScene, t: f32) -> Vec3 {
         match self.current(scene) {
             Some(m) => {
                 let s = scene.materials[m as usize].sigma_a;
@@ -352,16 +360,16 @@ impl Media {
 }
 
 /// Luci tra cui scegliere per la NEE: luci della scena, HDRI, superfici emissive.
-struct LightSlots {
-    n_lights: usize,
-    env_slot: Option<usize>,
-    emissive_slot: Option<usize>,
-    n_select: usize,
+pub(crate) struct LightSlots {
+    pub(crate) n_lights: usize,
+    pub(crate) env_slot: Option<usize>,
+    pub(crate) emissive_slot: Option<usize>,
+    pub(crate) n_select: usize,
 }
 
 /// Sceglie uniformemente una "luce" e ne campiona una direzione dal punto `p`.
 /// Restituisce anche se la luce proietta ombre.
-fn sample_any_light(scene: &RenderScene, s: &LightSlots, p: Vec3, rng: &mut Pcg32) -> Option<(LightSample, bool)> {
+pub(crate) fn sample_any_light(scene: &RenderScene, s: &LightSlots, p: Vec3, rng: &mut Pcg32) -> Option<(LightSample, bool)> {
     let li_idx = ((rng.next_f32() * s.n_select as f32) as usize).min(s.n_select - 1);
     let (u1, u2) = rng.next_2d();
     if li_idx < s.n_lights {
@@ -407,7 +415,7 @@ fn sample_any_light(scene: &RenderScene, s: &LightSlots, p: Vec3, rng: &mut Pcg3
 /// Visibilità della luce dal punto `so` (già spostato dalla superficie): 0 se un
 /// oggetto la copre, altrimenti la trasmittanza delle nebbie lungo il raggio.
 /// Una luce senza ombre ignora oggetti e nebbie.
-fn shadow(scene: &RenderScene, so: Vec3, ls: &LightSample, cast_shadows: bool, rng: &mut Pcg32) -> f32 {
+pub(crate) fn shadow(scene: &RenderScene, so: Vec3, ls: &LightSample, cast_shadows: bool, rng: &mut Pcg32) -> f32 {
     if !cast_shadows {
         return 1.0;
     }

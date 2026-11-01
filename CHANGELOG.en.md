@@ -12,6 +12,12 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 
 ## Unreleased (development branch, not on main)
 
+**Spectral rendering (optional)**
+- Render → Colour: **RGB** (default, unchanged) or **Spectral**: four wavelengths per path (hero wavelength, PBRT v4 visible sampling), RGB colours converted to smooth spectra (sigmoid polynomial, own coefficient table), CIE 1931 reconstruction with the scene's white kept white. CPU and GPU, same result. About 2× slower than RGB, with more colour noise.
+- Transparent materials: **Dispersion** (Abbe number, Cauchy's equation) with presets for crown, flint, lead crystal, polycarbonate and diamond. Visible only in spectral mode.
+- AI control: `set_render_settings` accepts `color` (rgb / spettrale), `create_material` accepts `abbe`.
+- Details and validation: [docs/SPECTRAL.md](docs/SPECTRAL.md).
+
 **Startup mode choice**
 - At startup, after the welcome screen, a "How do you want to work?" window offers Simple or Advanced mode, with a short description of each and a note that you can switch later with the "Mode: Simple | Advanced" selector at the top left. It appears at every launch until "Don't show at startup again" is ticked; it can be turned back on in Settings, Information ("Ask for the mode at startup").
 

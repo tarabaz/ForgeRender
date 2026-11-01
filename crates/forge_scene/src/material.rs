@@ -44,6 +44,9 @@ pub struct Material {
     pub metallic: f32,
     pub roughness: f32,
     pub ior: f32,
+    /// Dispersione dei trasparenti: numero di Abbe (vetro crown ~64, flint ~36, diamante ~55,
+    /// più basso = più dispersione); 0 = nessuna. Si vede solo nel render spettrale.
+    pub abbe: f32,
     /// Scala del riflesso speculare dei dielettrici (0.5 = F0 derivato da `ior`).
     pub specular: f32,
     pub transmission: f32,
@@ -166,6 +169,7 @@ impl Default for Material {
             metallic: 0.0,
             roughness: 0.5,
             ior: 1.5,
+            abbe: 0.0,
             specular: 0.5,
             transmission: 0.0,
             emission: [0.0; 3],
@@ -230,6 +234,11 @@ impl Material {
             10.0
         };
         m.priority = m.priority.clamp(-100, 100);
+        m.abbe = if m.abbe.is_finite() && m.abbe > 0.0 {
+            m.abbe.clamp(5.0, 200.0)
+        } else {
+            0.0
+        };
         if !m.mapping.scale.is_finite() || m.mapping.scale <= 0.0 {
             m.mapping.scale = TextureMapping::default().scale;
         }

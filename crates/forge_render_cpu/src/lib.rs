@@ -12,6 +12,7 @@ mod integrator;
 pub mod lights;
 pub mod medium;
 pub mod passes;
+pub mod spectral;
 mod textures;
 
 pub use guides::{render_guides, GUIDE_SAMPLES};
@@ -89,6 +90,9 @@ pub fn camera_ray(cam: &Camera, width: u32, height: u32, x: u32, y: u32, rng: &m
 /// Calcola un campione per il pixel `(x, y)`.
 #[inline]
 pub fn render_pixel(scene: &RenderScene, settings: &RenderSettings, x: u32, y: u32, sample: u32) -> [f32; 3] {
+    if settings.color_mode == forge_render_core::ColorMode::Spectral {
+        return spectral::render_pixel_spectral(scene, settings, x, y, sample);
+    }
     let mut rng = Pcg32::for_pixel(settings.seed, x, y, sample);
     let (o, dir) = camera_ray(&scene.camera, settings.width, settings.height, x, y, &mut rng);
     radiance(scene, settings, o, dir, &mut rng).to_array()
@@ -114,6 +118,7 @@ impl RenderBackend for CpuBackend {
     ) -> anyhow::Result<u32> {
         let w = settings.width as usize;
         anyhow::ensure!(out.len() == w * settings.height as usize, "buffer di uscita di dimensione errata");
+        prepare(settings);
         self.pool.install(|| {
             out.par_chunks_mut(w).enumerate().for_each(|(y, row)| {
                 if cancel.load(Ordering::Relaxed) {
@@ -142,6 +147,7 @@ impl RenderBackend for CpuBackend {
     ) -> anyhow::Result<u32> {
         let w = settings.width as usize;
         anyhow::ensure!(out.len() == w * settings.height as usize, "buffer di uscita di dimensione errata");
+        prepare(settings);
         self.pool.install(|| {
             out.par_chunks_mut(w).enumerate().for_each(|(y, row)| {
                 if cancel.load(Ordering::Relaxed) {
@@ -157,5 +163,13 @@ impl RenderBackend for CpuBackend {
             });
         });
         Ok(if cancel.load(Ordering::Relaxed) { 0 } else { 1 })
+    }
+}
+
+/// Prima del calcolo: la tabella RGB → spettro (qualche secondo la prima volta, su un pool suo) si
+/// costruisce qui, non dentro la passata dove tutti i thread del backend la aspetterebbero.
+fn prepare(settings: &RenderSettings) {
+    if settings.color_mode == forge_render_core::ColorMode::Spectral {
+        let _ = forge_render_core::spectral::rgb_table();
     }
 }

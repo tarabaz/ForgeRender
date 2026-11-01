@@ -128,6 +128,7 @@ pub fn list() -> Value {
                 "roughness": {"type": "number"},
                 "transmission": {"type": "number"},
                 "ior": {"type": "number"},
+                "abbe": {"type": "number", "description": "Dispersione dei trasparenti: numero di Abbe (crown 64, flint 36, diamante 55 con ior 2.42; 0 = nessuna). Visibile solo con il render spettrale."},
                 "specular": {"type": "number"},
                 "emission_color": color,
                 "emission_strength": {"type": "number"},
@@ -162,6 +163,7 @@ pub fn list() -> Value {
                 "samples": {"type": "integer", "description": "Campioni per pixel (64 bozza, 256 buona, 1024 finale)."},
                 "quality": {"type": "string", "enum": ["bozza", "bilanciata", "alta"]},
                 "device": {"type": "string", "enum": ["cpu", "gpu"]},
+                "color": {"type": "string", "enum": ["rgb", "spettrale"], "description": "Trasporto della luce: rgb (predefinito, veloce) o spettrale (lunghezze d'onda: dispersione nei vetri con numero di Abbe, colori più fedeli; più lento, servono più campioni)."},
                 "denoise": {"type": "boolean", "description": "Riduzione del rumore sull'immagine finale (consigliata sempre)."},
                 "denoise_preview": {"type": "boolean", "description": "Ripulisce anche l'anteprima durante il render (a 8, 16, 32… campioni), non solo l'immagine finale."},
                 "exposure_ev": {"type": "number"}

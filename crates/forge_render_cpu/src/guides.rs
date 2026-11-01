@@ -127,6 +127,7 @@ fn guide_sample(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
             ng,
             mat: &mat,
             entering,
+            color: mat.base_color,
         };
         if bsdf.has_non_delta() || depth == MAX_SPECULAR {
             return (tint * mat.base_color, ns);

@@ -269,8 +269,9 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
         w.f(ao_s);
         w.v3(m.sigma_a);
         w.f(m.priority);
-        w.u(0);
-        w.u(0);
+        // Solo per il render spettrale (parole 34, 35).
+        w.f(m.abbe);
+        w.f(m.volume_depth);
         assert_eq!(
             (w.pos() - p[P_OFF_MATS]) as usize,
             (i + 1) * MAT_WORDS,

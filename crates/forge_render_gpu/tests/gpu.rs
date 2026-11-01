@@ -1259,3 +1259,59 @@ fn gpu_spot_beam_matches_cpu() {
     assert!((ma - mg).abs() / ma < 0.03, "media CPU {ma} vs GPU {mg}");
     assert!(diff < noise * 1.5, "RMSE GPU−CPU {diff} vs rumore CPU−CPU {noise}");
 }
+
+/// Render spettrale sulla GPU: stesso risultato della CPU sulla scena di prova (materiali
+/// colorati, vetro, metalli), e su un vetro molto dispersivo davanti a una luce piccola.
+#[test]
+fn gpu_spectral_matches_cpu() {
+    let Some(mut g) = gpu() else { return };
+    let mut s = Scene::test_scene();
+    // Un po' di dispersione su tutti i trasparenti della scena di prova.
+    for m in s.materials.materials.iter_mut().filter(|m| m.transmission > 0.0) {
+        m.abbe = 20.0;
+    }
+    let st = RenderSettings {
+        width: 32,
+        height: 18,
+        color_mode: forge_render_core::ColorMode::Spectral,
+        ..Default::default()
+    };
+    let spp = 512;
+    let mut cpu = CpuBackend::new(0).unwrap();
+    let a = render_with(&mut cpu, &s, &st, spp);
+    let b = render_with(&mut cpu, &s, &RenderSettings { seed: 999, ..st.clone() }, spp);
+    let gpu = render_with(&mut g, &s, &st, spp);
+    let rmse = |x: &[[f32; 3]], y: &[[f32; 3]]| {
+        let e: f64 = x
+            .iter()
+            .zip(y)
+            .map(|(p, q)| (0..3).map(|k| ((p[k] - q[k]) as f64).powi(2)).sum::<f64>())
+            .sum();
+        (e / (x.len() * 3) as f64).sqrt()
+    };
+    let mean = |x: &[[f32; 3]], k: usize| x.iter().map(|p| p[k] as f64).sum::<f64>() / x.len() as f64;
+    let noise = rmse(&a, &b);
+    let diff = rmse(&a, &gpu);
+    for k in 0..3 {
+        let (ma, mg) = (mean(&a, k), mean(&gpu, k));
+        assert!((ma - mg).abs() / ma < 0.03, "canale {k}: media CPU {ma} vs GPU {mg}");
+    }
+    assert!(diff < noise * 1.5, "RMSE GPU−CPU {diff} vs rumore CPU−CPU {noise}");
+    eprintln!("spettrale: RMSE GPU−CPU {diff:.4}, rumore CPU−CPU {noise:.4}");
+}
+
+/// White furnace spettrale sulla GPU con un vetro dispersivo: nessuna energia persa o creata.
+#[test]
+fn gpu_spectral_white_furnace_with_dispersion() {
+    let Some(mut g) = gpu() else { return };
+    let mut m = mat(1.0, 0.0, 0.0, 0.5, 1.0);
+    m.abbe = 25.0;
+    let s = sphere_scene(m);
+    let st = RenderSettings {
+        color_mode: forge_render_core::ColorMode::Spectral,
+        ..settings(32, 32)
+    };
+    let img = render_with(&mut g, &s, &st, 512);
+    let c = mean_region(&img, 32, 12, 12, 20, 20);
+    assert!((c - Vec3::ONE).abs().max_element() < 0.04, "{c}");
+}

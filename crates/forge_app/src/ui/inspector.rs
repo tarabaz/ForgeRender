@@ -1,5 +1,5 @@
 use crate::app::{ForgeApp, InspectorTab, NewLight, RenderView};
-use crate::i18n::{tf, tr};
+use crate::i18n::{tf, tk, tr};
 use crate::ui::manual::{help_button, HelpExt};
 use crate::ui::style;
 use eframe::egui;
@@ -458,6 +458,42 @@ pub(crate) fn material_form(ui: &mut egui::Ui, m: &mut Material, obj_size: Optio
             .changed();
         ui.end_row();
         if m.transmission > 0.0 {
+            ui.label(tr("Dispersione"));
+            ui.horizontal(|ui| {
+                // Materiali tipici: (nome, numero di Abbe, IOR suggerito).
+                const GLASSES: [(&str, f32, f32); 6] = [
+                    (tk("Nessuna"), 0.0, 0.0),
+                    (tk("Vetro crown (BK7)"), 64.2, 1.517),
+                    (tk("Vetro flint"), 36.4, 1.62),
+                    (tk("Cristallo al piombo"), 30.0, 1.7),
+                    (tk("Policarbonato"), 30.0, 1.586),
+                    (tk("Diamante"), 55.0, 2.417),
+                ];
+                let current = GLASSES
+                    .iter()
+                    .find(|g| (g.1 - m.abbe).abs() < 0.05 && (g.1 == 0.0 || (g.2 - m.ior).abs() < 0.005))
+                    .map(|g| tr(g.0))
+                    .unwrap_or_else(|| tr("Personalizzata"));
+                egui::ComboBox::from_id_salt("dispersione")
+                    .selected_text(current)
+                    .show_ui(ui, |ui| {
+                        for (name, abbe, ior) in GLASSES {
+                            if ui.selectable_label(false, tr(name)).clicked() {
+                                m.abbe = abbe;
+                                if ior > 0.0 {
+                                    m.ior = ior;
+                                }
+                                changed = true;
+                            }
+                        }
+                    });
+                changed |= ui
+                    .add(egui::DragValue::new(&mut m.abbe).range(0.0..=200.0).speed(0.2).prefix("V "))
+                    .on_hover_text(tr("Numero di Abbe: più basso = colori più separati (0 = nessuna dispersione). \
+                         Si vede solo con il render Spettrale (Render, Colore)."))
+                    .changed();
+            });
+            ui.end_row();
             ui.label(tr("Colore in volume"));
             changed |= ui
                 .color_edit_button_rgb(&mut m.volume_color)
@@ -1839,6 +1875,35 @@ fn render(app: &mut ForgeApp, ui: &mut egui::Ui) {
             Err(e) => {
                 ui.colored_label(style::WARN, tf("GPU non disponibile: {e}", std::slice::from_ref(&e)));
             }
+        }
+    }
+    // Trasporto della luce: RGB (predefinito) o spettrale.
+    {
+        use forge_render_core::ColorMode;
+        let mode = &mut app.settings.color_mode;
+        ui.horizontal(|ui| {
+            ui.label(tr("Colore"));
+            changed |= ui
+                .selectable_value(mode, ColorMode::Rgb, tr("RGB"))
+                .on_hover_text(tr("Tre canali, rosso, verde e blu: veloce, il render di sempre"))
+                .changed();
+            changed |= ui
+                .selectable_value(mode, ColorMode::Spectral, tr("Spettrale"))
+                .on_hover_text(tr(
+                    "La luce viaggia per lunghezze d'onda (4 per raggio): dispersione nei vetri e nei \
+                     gioielli (arcobaleni), colori più fedeli con luci sature. Più lento e con più \
+                     rumore di colore: servono più campioni",
+                ))
+                .changed();
+        });
+        if *mode == ColorMode::Spectral {
+            ui.label(
+                egui::RichText::new(tr(
+                    "Spettrale: la dispersione si regola nel materiale (Dispersione, numero di Abbe).",
+                ))
+                .weak()
+                .small(),
+            );
         }
     }
     let s = &mut app.settings;
