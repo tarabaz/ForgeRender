@@ -190,6 +190,13 @@ pub fn radiance_spectral_with(
             if skipped >= 8 || !media.is_false_hit(scene, mi, front) {
                 break;
             }
+            // Fascio laser nel tratto saltato (dentro un liquido, fino alla parete del bicchiere).
+            if camera_path && !scene.lasers.is_empty() {
+                let c = laser_beams(scene, o, d, h.t, w);
+                if c != Vec4::ZERO {
+                    add(&mut l, beta * c, depth);
+                }
+            }
             beta *= transmittance(&media, scene, h.t, w);
             media.cross(mi, front);
             o = offset_ray_origin(

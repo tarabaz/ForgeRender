@@ -27,15 +27,17 @@ pub enum NewLight {
     Spot,
     Directional,
     Portal,
+    Laser,
 }
 
 impl NewLight {
-    pub const ALL: [NewLight; 5] = [
+    pub const ALL: [NewLight; 6] = [
         NewLight::Area,
         NewLight::Point,
         NewLight::Spot,
         NewLight::Directional,
         NewLight::Portal,
+        NewLight::Laser,
     ];
 
     pub fn label(self) -> &'static str {
@@ -45,6 +47,7 @@ impl NewLight {
             NewLight::Spot => tk("Spot"),
             NewLight::Directional => tk("Direzionale"),
             NewLight::Portal => tk("Portale (finestra)"),
+            NewLight::Laser => tk("Laser"),
         }
     }
 }
@@ -812,6 +815,16 @@ impl ForgeApp {
                 ..Light::point(tr("Sole"), at, 3.0)
             },
             NewLight::Portal => portal_from_selection.unwrap_or_else(|| Light::portal(tr("Portale finestra"), at, center, radius, radius)),
+            // Laser rosso puntato sul centro, fascio visibile leggero; il tipo si cambia nella scheda.
+            NewLight::Laser => Light {
+                kind: LightKind::Laser {
+                    diameter_mm: 2.0,
+                    source: forge_scene::LaserSource::Red,
+                },
+                target: center,
+                beam_density: 0.05,
+                ..Light::point(tr("Laser"), at, 0.5)
+            },
         };
         self.scene.lights.push(light);
         self.selected_light = Some(self.scene.lights.len() - 1);

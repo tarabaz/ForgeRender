@@ -1534,6 +1534,8 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
             let hng = sv3(hpb + 12u);
             let hfront = dot(hng, d) < 0.0;
             if (!media_false_hit(hm, hfront)) { break; }
+            // Fascio laser nel tratto saltato (dentro un liquido, fino alla parete del bicchiere).
+            if (camera_path && pu(P_N_LASERS) > 0u) { l = l + beta * laser_beams_rgb(o, d, hit.t); }
             beta = beta * media_transmittance(hit.t);
             media_cross(hm, hfront);
             var hside = hng;

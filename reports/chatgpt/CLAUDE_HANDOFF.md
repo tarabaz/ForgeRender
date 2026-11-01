@@ -2337,3 +2337,14 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
 - Detto a Valerio: la luce Laser è un fascio di luce bianca; un laser vero monocromatico è una
   possibile aggiunta futura (non chiesta).
 - Portato su main come **0.29.0** su sua richiesta ("procedi push e main").
+
+## Claude Code — 02/11/2026: fascio visibile dentro il liquido (branch `sviluppo`)
+
+- Causa: nel ciclo che salta le facce "false" (vetro dentro il liquido) il fascio laser si
+  cercava solo dopo il salto. Ora `laser_beams*` anche sul tratto saltato, in `integrator.rs`,
+  `spectral.rs`, `path_tracer.wgsl`, `path_tracer_spectral.wgsl`. Test
+  `laser_beam_is_visible_inside_a_liquid` (senza correzione dava 0).
+- Poi, su richiesta di Valerio: laser come voce a sé (rosso, verde, blu, bianco da laboratorio) e
+  preset delle luci che aggiungono senza togliere ("non eliminare mai niente"). Le "Look" della
+  modalità Semplice continuano a sostituire le luci (con Annulla preset): non toccate.
+  Portato su main come **0.30.0** ("pusha e merge").

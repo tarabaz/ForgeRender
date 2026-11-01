@@ -443,6 +443,7 @@ fn radiance_spectral(o_in: vec3<f32>, d_in: vec3<f32>) -> vec4<f32> {
             let hng = sv3(hpb + 12u);
             let hfront = dot(hng, d) < 0.0;
             if (!media_false_hit(hm, hfront)) { break; }
+            if (camera_path && pu(P_N_LASERS) > 0u) { l = l + beta * laser_beams_s(o, d, hit.t); }
             beta = beta * media_transmittance4(hit.t);
             media_cross(hm, hfront);
             var hside = hng;

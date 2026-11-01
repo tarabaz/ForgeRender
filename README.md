@@ -18,14 +18,16 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
-### What's new in 0.29.0
+### What's new in 0.30.0
 
-- **Light through glasses with liquid:** the laser beam and the caustics bend correctly at the glass-liquid boundary and the beam fades gradually in a coloured drink.
-- **Liquids category:** water, wines, whisky, red cocktail and olive oil with real index and dispersion; a liquid automatically wins over its glass where they overlap.
+- **Laser as its own light:** add it from the Lights panel and choose Red (650 nm), Green (532 nm), Blue (450 nm) or White lab laser; coloured lasers have a single wavelength and never split, only the white one makes rainbows.
+- **Light presets add, they don't replace:** your lights stay.
+- **Fix:** the visible laser beam now shows inside a liquid in a glass.
 
 <details>
 <summary><strong>Previous versions — complete release history</strong></summary>
 
+- **0.29.0 — Light through glasses with liquid:** correct glass-liquid bending for the laser and caustics, beam fading in coloured drinks; new Liquids material category.
 - **0.28.0–0.28.1 — Caustics and demo scenes:** photon-mapped caustics with every light (CPU and GPU, RGB and Spectral); File → Demo scenes grouped by type with an explanation card; Prism, Diamond and Crystal pendant shapes; demo scenes saved as projects keep their objects.
 - **0.27.0 — Lights aimed at an object, laser in glass:** lights hooked to an object follow it and orbit around it; the laser beam is visible inside glass; scrollable, resizable Lights panel.
 - **0.26.0 — Laser light and "Prism and light" demo:** thin beam traced from the light through glass and mirrors, exact spot and optional visible beam, rainbow fan in the Spectral render; demo scene with a glass prism on black.

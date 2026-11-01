@@ -777,7 +777,10 @@ pub fn prism_demo_scene() -> (Scene, RenderSettings) {
     let up = ((ior * 0.5).asin().to_degrees() - 30.0).to_radians();
     let start = entry - Vec3::new(up.cos(), up.sin(), 0.0) * 1.4;
     let mut laser = Light::point(tr("Luce bianca"), start, 1.0);
-    laser.kind = LightKind::Laser { diameter_mm: 12.0 };
+    laser.kind = LightKind::Laser {
+        diameter_mm: 12.0,
+        source: forge_scene::LaserSource::White,
+    };
     laser.target = entry;
     laser.beam_density = 0.08;
     s.lights.push(laser);

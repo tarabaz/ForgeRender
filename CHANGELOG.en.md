@@ -10,6 +10,18 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.30.0 — 2 Nov 2026
+
+**Laser: its own light, in red, green, blue or white**
+- **Laser** is now in the list of lights you can add (Lights panel, Add), no longer only by changing the type of another light.
+- **Laser type**: **Red (650 nm)**, **Green (532 nm)**, **Blue (450 nm)** or **White lab laser**. Red, green and blue have a single wavelength like real lasers: their path uses the index of that wavelength and they never split, not even in a prism or a diamond. The white lab laser contains every colour and, in the Spectral render, dispersive glass opens it into a rainbow. Projects saved before keep a white laser; a new laser starts red.
+
+**Light presets add, they don't replace**
+- The light presets of the Lights panel add their lights to the ones already in the scene instead of deleting them.
+
+**Fixes**
+- The visible laser beam was not drawn inside a liquid modelled slightly larger than the cavity of its glass (the right way): the camera ray skipped the inner face of the glass that lies inside the liquid and only looked for the beam after that face, so the whole stretch through the drink was lost. Now the skipped stretch is checked too (CPU and GPU, RGB and Spectral).
+
 ## 0.29.0 — 1 Nov 2026
 
 **Light through glasses with liquid**

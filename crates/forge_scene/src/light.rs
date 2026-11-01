@@ -29,7 +29,45 @@ pub enum LightKind {
     /// macchia di luce dove arriva e, se `beam_density` > 0, il fascio visibile nell'aria.
     Laser {
         diameter_mm: f32,
+        /// Colore del laser (i progetti di prima della 0.30 avevano solo il bianco).
+        #[serde(default)]
+        source: LaserSource,
     },
+}
+
+/// Tipo di laser: rosso, verde e blu hanno una sola lunghezza d'onda e non si scompongono mai
+/// (nemmeno in un prisma); il bianco da laboratorio contiene tutti i colori e nel render
+/// spettrale i vetri con dispersione lo aprono in un arcobaleno.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LaserSource {
+    Red,
+    Green,
+    Blue,
+    #[default]
+    White,
+}
+
+impl LaserSource {
+    pub const ALL: [LaserSource; 4] = [LaserSource::Red, LaserSource::Green, LaserSource::Blue, LaserSource::White];
+
+    /// Lunghezza d'onda in nm (None = luce bianca).
+    pub fn wavelength_nm(self) -> Option<f32> {
+        match self {
+            LaserSource::Red => Some(650.0),
+            LaserSource::Green => Some(532.0),
+            LaserSource::Blue => Some(450.0),
+            LaserSource::White => None,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            LaserSource::Red => "Rosso (650 nm)",
+            LaserSource::Green => "Verde (532 nm)",
+            LaserSource::Blue => "Blu (450 nm)",
+            LaserSource::White => "Bianco da laboratorio",
+        }
+    }
 }
 
 impl LightKind {

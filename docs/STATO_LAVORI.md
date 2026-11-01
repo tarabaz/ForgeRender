@@ -628,5 +628,16 @@
   la priorità di un liquido vale mezzo punto in più (vince sul contenitore a parità).
 - Test `laser_crosses_glass_and_liquid_with_the_right_interfaces`.
 
+
+### 0.30.0 (02/11/2026): laser rosso/verde/blu/bianco, preset luci che aggiungono, fascio nel liquido
+- `forge_scene::LaserSource` (Red 650, Green 532, Blue 450, White; serde default White) in
+  `LightKind::Laser`; `NewLight::Laser` (parte rosso).
+- `forge_render_core::laser`: laser monocromatico = un solo percorso all'indice della sua lunghezza
+  d'onda, copiato in tutti i percorsi spettrali (GPU invariata); potenza `monochrome_rgb(λ)` con
+  luminanza 1 × intensità.
+- Fascio visibile anche sui tratti saltati per le facce "false" (integratori CPU e shader GPU).
+- Preset del pannello Luci: `extend` invece di sostituire.
+- Test `colored_lasers_do_not_split`, `laser_beam_is_visible_inside_a_liquid`.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

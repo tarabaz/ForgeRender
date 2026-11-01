@@ -1392,7 +1392,10 @@ fn gpu_laser_matches_cpu() {
     };
     let mut laser = Light::point("laser", Vec3::new(-1.0, -0.268, 0.0), 0.5);
     // Fascio largo: la macchia copre molti pixel e il confronto non dipende dal rumore.
-    laser.kind = forge_scene::LightKind::Laser { diameter_mm: 60.0 };
+    laser.kind = forge_scene::LightKind::Laser {
+        diameter_mm: 60.0,
+        source: forge_scene::LaserSource::White,
+    };
     laser.target = Vec3::new(-0.075, 0.0433, 0.0);
     laser.beam_density = 0.3;
     s.lights.push(laser);

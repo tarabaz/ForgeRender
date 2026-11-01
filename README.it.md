@@ -18,14 +18,16 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
-### Novità della versione 0.29.0
+### Novità della versione 0.30.0
 
-- **Luce nei bicchieri con il liquido:** il fascio laser e le caustiche piegano correttamente all'interfaccia vetro-liquido e il fascio si affievolisce gradualmente in un drink colorato.
-- **Categoria Liquidi:** acqua, vini, whisky, cocktail rosso e olio d'oliva con indice e dispersione veri; un liquido vince da solo sul suo bicchiere dove si sovrappongono.
+- **Laser come luce a sé:** si aggiunge dal pannello Luci e si sceglie Rosso (650 nm), Verde (532 nm), Blu (450 nm) o Bianco da laboratorio; i laser colorati hanno una sola lunghezza d'onda e non si scompongono mai, solo il bianco fa l'arcobaleno.
+- **I preset delle luci aggiungono, non sostituiscono:** le tue luci restano.
+- **Correzione:** il fascio laser visibile ora si vede dentro il liquido di un bicchiere.
 
 <details>
 <summary><strong>Versioni precedenti — storico completo delle release</strong></summary>
 
+- **0.29.0 — Luce nei bicchieri con il liquido:** piega giusta vetro-liquido per il laser e le caustiche, fascio che si affievolisce nei drink colorati; nuova categoria di materiali Liquidi.
 - **0.28.0–0.28.1 — Caustiche e scene demo:** caustiche con il photon mapping con tutte le luci (CPU e GPU, RGB e Spettrale); File → Scene demo divise per tipo con la scheda che le spiega; forme Prisma, Diamante e Pendente di cristallo; le scene demo salvate come progetto tengono i loro oggetti.
 - **0.27.0 — Luci puntate su un oggetto, laser nel vetro:** le luci agganciate a un oggetto lo seguono e gli girano attorno; il fascio laser si vede dentro il vetro; pannello Luci scorrevole e ridimensionabile.
 - **0.26.0 — Luce laser e demo "Prisma e luce":** fascio sottile seguito dalla luce attraverso vetri e specchi, macchia esatta e fascio visibile a scelta, ventaglio arcobaleno nel render Spettrale; scena demo con un prisma di vetro sul nero.

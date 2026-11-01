@@ -45,7 +45,10 @@ fn prism_scene(abbe: f32, beam: f32) -> Scene {
     // Deviazione minima (IOR 1,5): il fascio sale di 18,6° verso la faccia sinistra, dentro il
     // prisma viaggia parallelo alla base ed esce dalla faccia destra scendendo di 18,6°.
     let mut laser = Light::point("laser", Vec3::new(-1.0, -0.268, 0.0), 0.5);
-    laser.kind = LightKind::Laser { diameter_mm: 10.0 };
+    laser.kind = LightKind::Laser {
+        diameter_mm: 10.0,
+        source: forge_scene::LaserSource::White,
+    };
     laser.target = Vec3::new(-0.075, 0.0433, 0.0);
     laser.beam_density = beam;
     s.lights.push(laser);
@@ -164,8 +167,7 @@ fn laser_spot_and_beam_render() {
 /// (come un drink in un bicchiere). Il fascio deve usare l'interfaccia vetro-liquido vera:
 /// nel liquido l'angolo segue Snell con l'indice del liquido, ed esce parallelo a come è entrato
 /// (pareti parallele). Il liquido vince sul vetro perché è nella categoria Liquidi.
-#[test]
-fn laser_crosses_glass_and_liquid_with_the_right_interfaces() {
+fn tank_scene(beam: f32) -> (Scene, Vec3) {
     let mut s = Scene::default();
     s.materials.upsert(Material {
         id: MaterialId::new("vetro"),
@@ -197,9 +199,23 @@ fn laser_crosses_glass_and_liquid_with_the_right_interfaces() {
     let d0 = Vec3::new(30f32.to_radians().cos(), 30f32.to_radians().sin(), 0.0);
     let start = Vec3::new(-1.0, -0.45, 0.0);
     let mut laser = Light::point("laser", start, 0.5);
-    laser.kind = LightKind::Laser { diameter_mm: 2.0 };
+    laser.kind = LightKind::Laser {
+        diameter_mm: 2.0,
+        source: forge_scene::LaserSource::White,
+    };
     laser.target = start + d0;
+    laser.beam_density = beam;
     s.lights.push(laser);
+    s.environment = Environment::Uniform {
+        color: [1.0; 3],
+        strength: 0.0,
+    };
+    (s, d0)
+}
+
+#[test]
+fn laser_crosses_glass_and_liquid_with_the_right_interfaces() {
+    let (s, d0) = tank_scene(0.0);
     let rs = RenderScene::compile(&s);
     let segs = &rs.lasers[0].rgb.segments;
     let dir = |k: usize| (segs[k].end - segs[k].start).normalize();
@@ -217,4 +233,58 @@ fn laser_crosses_glass_and_liquid_with_the_right_interfaces() {
     let glass = dir(1);
     assert!((glass.y - sin_in / 1.5).abs() < 1e-3, "nel vetro sin = {}", glass.y);
     assert!(dir(4).dot(d0) > 0.99999, "esce parallelo: {:?}", dir(4));
+}
+
+/// Il fascio visibile si vede anche dentro il liquido: la camera guarda la vasca di fianco, a
+/// un'altezza dove il fascio passa solo nel liquido. Il raggio della camera attraversa la parete
+/// interna del vetro (faccia "falsa", dentro il liquido) e deve vedere il tratto prima di saltarla.
+#[test]
+fn laser_beam_is_visible_inside_a_liquid() {
+    let st = RenderSettings {
+        width: 24,
+        height: 24,
+        max_bounces: 8,
+        ..Default::default()
+    };
+    let energy = |beam: f32| {
+        let (mut s, _) = tank_scene(beam);
+        s.camera = Camera {
+            position: Vec3::new(-1.0, 0.1, 0.0),
+            target: Vec3::new(1.0, 0.1, 0.0),
+            up: Vec3::Y,
+            vfov_deg: 1.0,
+            ..Default::default()
+        };
+        render(&s, &st, 4).iter().map(|p| (p[0] + p[1] + p[2]) as f64).sum::<f64>()
+    };
+    let (off, on) = (energy(0.0), energy(1.0));
+    eprintln!("fascio nel liquido: spento {off:.4}, acceso {on:.4}");
+    assert!(on > off + 1e-3, "il fascio nel liquido non si vede: {off} → {on}");
+}
+
+/// Laser rosso, verde e blu: un solo colore, non si scompongono nemmeno nel prisma più
+/// dispersivo (tutti i percorsi spettrali arrivano nello stesso punto) e il colore è il loro; il
+/// verde piega più del rosso (indice più alto alla sua lunghezza d'onda).
+#[test]
+fn colored_lasers_do_not_split() {
+    let spot_x = |source: forge_scene::LaserSource| {
+        let mut s = prism_scene(20.0, 0.0);
+        if let LightKind::Laser { source: src, .. } = &mut s.lights[0].kind {
+            *src = source;
+        }
+        let rs = RenderScene::compile(&s);
+        let l = &rs.lasers[0];
+        let xs: Vec<f32> = l.spectral.iter().map(|p| p.spot.expect("macchia").point.x).collect();
+        let spread = xs.iter().cloned().fold(f32::MIN, f32::max) - xs.iter().cloned().fold(f32::MAX, f32::min);
+        (l.rgb.spot.expect("macchia").point.x, spread, l.power)
+    };
+    let (red, spread_r, p_r) = spot_x(forge_scene::LaserSource::Red);
+    let (green, spread_g, p_g) = spot_x(forge_scene::LaserSource::Green);
+    let (_, spread_w, _) = spot_x(forge_scene::LaserSource::White);
+    eprintln!("rosso x={red:.4} {p_r:?}, verde x={green:.4} {p_g:?}; apertura bianco {spread_w:.4}");
+    assert!(spread_r < 1e-6 && spread_g < 1e-6, "un laser colorato non si apre");
+    assert!(spread_w > 0.05, "il bianco da laboratorio sì");
+    assert!(p_r.x > 5.0 * p_r.y.max(p_r.z), "rosso: {p_r:?}");
+    assert!(p_g.y > p_g.x && p_g.y > p_g.z, "verde: {p_g:?}");
+    assert!(green < red, "il verde piega più del rosso");
 }

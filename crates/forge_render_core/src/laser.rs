@@ -307,17 +307,45 @@ pub fn trace_lasers(scene: &RenderScene, lights: &[Light]) -> Vec<RenderLaser> {
         .iter()
         .filter(|l| l.enabled && l.intensity > 0.0)
         .filter_map(|l| {
-            let LightKind::Laser { diameter_mm } = l.kind else { return None };
+            let LightKind::Laser { diameter_mm, source } = l.kind else {
+                return None;
+            };
             let dir = l.direction();
+            let (power, rgb, spectral) = match source.wavelength_nm() {
+                // Laser di un solo colore: un solo percorso, con l'indice di quella lunghezza
+                // d'onda; non si scompone (tutti i percorsi spettrali sono quello).
+                Some(lambda) => {
+                    let path = trace(scene, l.position, dir, Some(lambda));
+                    (monochrome_rgb(lambda) * l.intensity.max(0.0), path.clone(), vec![path; N_LAMBDA])
+                }
+                None => (
+                    l.radiance_color(),
+                    trace(scene, l.position, dir, None),
+                    (0..N_LAMBDA).map(|k| trace(scene, l.position, dir, Some(lambda_of(k)))).collect(),
+                ),
+            };
             Some(RenderLaser {
-                power: l.radiance_color(),
+                power,
                 radius: (diameter_mm * 0.5e-3).max(1e-5),
                 beam_density: l.beam_density.max(0.0),
-                rgb: trace(scene, l.position, dir, None),
-                spectral: (0..N_LAMBDA).map(|k| trace(scene, l.position, dir, Some(lambda_of(k)))).collect(),
+                rgb,
+                spectral,
             })
         })
         .collect()
+}
+
+/// Colore RGB della scena di una luce di lunghezza d'onda `lambda` (nm), con luminanza 1: un
+/// laser verde e uno rosso della stessa potenza sembrano luminosi uguale. Le componenti fuori
+/// dalla gamma (negative) si tolgono.
+pub fn monochrome_rgb(lambda: f32) -> Vec3 {
+    let c = crate::spectral::lambda_to_rgb(lambda, 1.0).max(Vec3::ZERO);
+    let y = forge_math::luminance(c);
+    if y > 0.0 {
+        c / y
+    } else {
+        Vec3::ZERO
+    }
 }
 
 /// Irradianza gaussiana (TEM₀₀) a distanza `rho` dall'asse di un fascio di potenza 1 e raggio

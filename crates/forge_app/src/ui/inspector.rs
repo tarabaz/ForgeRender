@@ -960,11 +960,15 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
         for (id, name) in light::PRESETS {
             if ui
                 .button(tr(name))
-                .on_hover_text(tr("Sostituisce tutte le luci, adattandole alle dimensioni della scena"))
+                .on_hover_text(tr(
+                    "Aggiunge le luci del preset, adattate alle dimensioni della scena, a quelle che ci \
+                     sono già (non ne toglie nessuna)",
+                ))
                 .clicked()
             {
-                app.scene.lights = light::preset(id, center, radius).unwrap_or_default();
-                app.selected_light = None;
+                let first = app.scene.lights.len();
+                app.scene.lights.extend(light::preset(id, center, radius).unwrap_or_default());
+                app.selected_light = (app.scene.lights.len() > first).then_some(first);
                 app.shading_changed();
             }
         }
@@ -1035,7 +1039,10 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
                     outer_angle_deg: 40.0,
                 },
                 4 => LightKind::Portal { width: r, height: r },
-                5 => LightKind::Laser { diameter_mm: 2.0 },
+                5 => LightKind::Laser {
+                    diameter_mm: 2.0,
+                    source: forge_scene::LaserSource::Red,
+                },
                 _ => LightKind::Directional,
             };
             if kind_idx == 5 {
@@ -1103,19 +1110,38 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 }
                 return;
             }
-            ui.label(tr("Colore"));
-            changed |= ui.color_edit_button_rgb(&mut l.color).changed();
-            ui.end_row();
-            ui.label(tr("Temperatura"));
-            ui.horizontal(|ui| {
-                for k in [2700.0, 4000.0, 5500.0, 6500.0, 9000.0] {
-                    if ui.small_button(format!("{}K", k as u32)).clicked() {
-                        l.color = light::kelvin_to_rgb(k);
-                        changed = true;
+            if let LightKind::Laser { source, .. } = &mut l.kind {
+                // Il colore di un laser è la sua lunghezza d'onda.
+                ui.label(tr("Tipo di laser"));
+                egui::ComboBox::from_id_salt("laser-source")
+                    .selected_text(tr(source.label()))
+                    .show_ui(ui, |ui| {
+                        for s in forge_scene::LaserSource::ALL {
+                            changed |= ui.selectable_value(source, s, tr(s.label())).changed();
+                        }
+                    })
+                    .response
+                    .on_hover_text(tr(
+                        "Rosso, verde e blu hanno un solo colore, come i laser veri: non si scompongono mai, \
+                         nemmeno in un prisma o in un diamante. Il bianco da laboratorio contiene tutti i \
+                         colori: nel render Spettrale i vetri con dispersione lo aprono in un arcobaleno",
+                    ));
+                ui.end_row();
+            } else {
+                ui.label(tr("Colore"));
+                changed |= ui.color_edit_button_rgb(&mut l.color).changed();
+                ui.end_row();
+                ui.label(tr("Temperatura"));
+                ui.horizontal(|ui| {
+                    for k in [2700.0, 4000.0, 5500.0, 6500.0, 9000.0] {
+                        if ui.small_button(format!("{}K", k as u32)).clicked() {
+                            l.color = light::kelvin_to_rgb(k);
+                            changed = true;
+                        }
                     }
-                }
-            });
-            ui.end_row();
+                });
+                ui.end_row();
+            }
             let unit = match l.kind {
                 LightKind::Area { .. } => tr("Radianza (W/sr/m²)"),
                 LightKind::Directional => tr("Irradianza (W/m²)"),
@@ -1170,14 +1196,15 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
                     }
                     ui.end_row();
                 }
-                LightKind::Laser { diameter_mm } => {
+                LightKind::Laser { diameter_mm, .. } => {
                     ui.label(tr("Diametro del fascio (mm)"));
                     changed |= ui
                         .add(egui::DragValue::new(diameter_mm).speed(0.05).range(0.1..=100.0))
                         .on_hover_text(tr(
                             "Larghezza del fascio: piccola = punto e linea sottili. Il fascio segue la \
-                             direzione verso il bersaglio e attraversa vetri e specchi; nel render \
-                             Spettrale i vetri con dispersione lo aprono in un arcobaleno",
+                             direzione verso il bersaglio e attraversa vetri e specchi; il laser bianco \
+                             da laboratorio, nel render Spettrale, si apre in un arcobaleno nei vetri \
+                             con dispersione",
                         ))
                         .changed();
                     ui.end_row();

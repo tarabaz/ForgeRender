@@ -19,7 +19,7 @@ pub use added::{AddedKind, AddedRecord};
 pub use camera::{Camera, OrbitController, RenderCamera};
 pub use environment::Environment;
 pub use fog::{FogPreset, FogVolume, FOG_PRESETS, FOG_QUALITY};
-pub use light::{Light, LightKind};
+pub use light::{LaserSource, Light, LightKind};
 pub use material::{Material, MaterialId, MaterialLibrary, Projection, TextureAnchor, TextureMapping, LIQUIDS_CATEGORY};
 pub use mesh::Mesh;
 pub use scene::{ComponentId, CopyRecord, Node, NodeIndex, Scene, UserTransform};

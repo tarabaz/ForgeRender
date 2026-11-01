@@ -227,7 +227,6 @@
     "Seleziona prima un oggetto nella scena": "Select an object in the scene first",
     "nessun oggetto": "no object",
     "Diametro del fascio (mm)": "Beam diameter (mm)",
-    "Larghezza del fascio: piccola = punto e linea sottili. Il fascio segue la direzione verso il bersaglio e attraversa vetri e specchi; nel render Spettrale i vetri con dispersione lo aprono in un arcobaleno": "Beam width: small = thin dot and line. The beam follows the direction towards the target and passes through glass and mirrors; in the Spectral render dispersive glass opens it into a rainbow",
     "Laser": "Laser",
     "Luce bianca": "White light",
     "Mostra il raggio nell'aria, come in una stanza con un po' di foschia": "Shows the ray in the air, as in a room with a little haze",
@@ -457,7 +456,6 @@
     "Scegli…": "Choose…",
     "Immagini": "Images",
     "Preset:": "Preset:",
-    "Sostituisce tutte le luci, adattandole alle dimensioni della scena": "Replaces all the lights, fitting them to the size of the scene",
     "Portale finestra": "Window portal",
     "Aggiungi:": "Add:",
     "Area": "Area",
@@ -1209,6 +1207,14 @@
     "Vetro colorato: tinta a ogni attraversamento": "Coloured glass: tinted at every pass through it",
     "Vetro con liquido dentro (priorità dei volumi)": "Glass with liquid inside (volume priority)",
     "Diamante (taglio brillante)": "Diamond (brilliant cut)",
-    "Pendente di cristallo": "Crystal pendant"
+    "Pendente di cristallo": "Crystal pendant",
+    "Aggiunge le luci del preset, adattate alle dimensioni della scena, a quelle che ci sono già (non ne toglie nessuna)": "Adds the preset's lights, fitted to the size of the scene, to the ones already there (it removes none)",
+    "Larghezza del fascio: piccola = punto e linea sottili. Il fascio segue la direzione verso il bersaglio e attraversa vetri e specchi; il laser bianco da laboratorio, nel render Spettrale, si apre in un arcobaleno nei vetri con dispersione": "Beam width: small = thin dot and line. The beam follows the direction towards the target and passes through glass and mirrors; the white lab laser, in the Spectral render, opens into a rainbow in dispersive glass",
+    "Rosso, verde e blu hanno un solo colore, come i laser veri: non si scompongono mai, nemmeno in un prisma o in un diamante. Il bianco da laboratorio contiene tutti i colori: nel render Spettrale i vetri con dispersione lo aprono in un arcobaleno": "Red, green and blue have a single colour, like real lasers: they never split, not even in a prism or a diamond. The white lab laser contains every colour: in the Spectral render dispersive glass opens it into a rainbow",
+    "Tipo di laser": "Laser type",
+    "Rosso (650 nm)": "Red (650 nm)",
+    "Verde (532 nm)": "Green (532 nm)",
+    "Blu (450 nm)": "Blue (450 nm)",
+    "Bianco da laboratorio": "White lab laser"
   }
 }

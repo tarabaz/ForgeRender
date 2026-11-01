@@ -13,6 +13,28 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.30.0 — 02/11/2026
+
+**Laser: luce a sé, rosso, verde, blu o bianco**
+- Il **Laser** è nell'elenco delle luci da aggiungere (pannello Luci, Aggiungi), non più solo
+  cambiando il tipo di un'altra luce.
+- **Tipo di laser**: **Rosso (650 nm)**, **Verde (532 nm)**, **Blu (450 nm)** o **Bianco da
+  laboratorio**. Rosso, verde e blu hanno una sola lunghezza d'onda come i laser veri: il loro
+  percorso usa l'indice di quella lunghezza d'onda e non si scompongono mai, nemmeno in un prisma
+  o in un diamante. Il bianco da laboratorio contiene tutti i colori e, nel render Spettrale, i
+  vetri con dispersione lo aprono in un arcobaleno. I progetti salvati prima tengono il laser
+  bianco; un laser nuovo parte rosso.
+
+**I preset delle luci aggiungono, non sostituiscono**
+- I preset del pannello Luci aggiungono le loro luci a quelle che ci sono già invece di
+  cancellarle.
+
+**Correzioni**
+- Il fascio laser visibile non si vedeva dentro un liquido modellato un filo più grande della
+  cavità del bicchiere (il modo giusto): il raggio della camera saltava la faccia interna del vetro
+  che sta dentro il liquido e cercava il fascio solo dopo quella faccia, perdendo tutto il tratto
+  nel drink. Ora si controlla anche il tratto saltato (CPU e GPU, RGB e Spettrale).
+
 ## 0.29.0 — 01/11/2026
 
 **Luce nei bicchieri con il liquido**

@@ -45,7 +45,10 @@ fn scene() -> Scene {
         strength: 0.01,
     };
     let mut laser = Light::point("laser", Vec3::new(-1.2, -0.336, 0.0), 0.5);
-    laser.kind = LightKind::Laser { diameter_mm: 3.0 };
+    laser.kind = LightKind::Laser {
+        diameter_mm: 3.0,
+        source: forge_scene::LaserSource::White,
+    };
     laser.target = Vec3::new(-0.075, 0.0433, 0.0);
     laser.beam_density = 0.02;
     s.lights.push(laser);

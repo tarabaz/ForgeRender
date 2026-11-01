@@ -337,7 +337,10 @@ pub fn diamond_laser_scene() -> (Scene, RenderSettings) {
         strength: 0.03,
     };
     let mut laser = Light::point(tr("Laser bianco"), Vec3::new(-0.9, 0.75, 0.25), 0.6);
-    laser.kind = LightKind::Laser { diameter_mm: 3.0 };
+    laser.kind = LightKind::Laser {
+        diameter_mm: 3.0,
+        source: forge_scene::LaserSource::White,
+    };
     laser.target = centre + Vec3::new(0.0, 0.03, 0.0);
     laser.beam_density = 0.15;
     s.lights.push(laser);

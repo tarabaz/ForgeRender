@@ -44,6 +44,11 @@ pub const EXTERNAL: &[&str] = &[
     tk("In pausa"),
     tk("Completato"),
     tk("Interrotto"),
+    // forge_scene::LaserSource
+    tk("Rosso (650 nm)"),
+    tk("Verde (532 nm)"),
+    tk("Blu (450 nm)"),
+    tk("Bianco da laboratorio"),
     // forge_scene::light::PRESETS, FOG_PRESETS, FOG_QUALITY
     tk("Studio neutro"),
     tk("Studio fotografico (4 luci)"),
