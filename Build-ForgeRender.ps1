@@ -5,7 +5,7 @@
 .DESCRIPTION
     1. Controlla di essere nel repository ForgeRender, sul branch giusto, senza modifiche
        locali non committate (se ce ne sono si ferma e non tocca nulla).
-    2. git pull --ff-only dal branch di sviluppo (se fallisce si ferma: niente build obsolete).
+    2. git pull --ff-only dal branch main (le release) (se fallisce si ferma: niente build obsolete).
     3. cargo build --release -p forge_app -p forge_cli -p forge_mcp_bridge (cache Cargo riutilizzata).
     4. Convertitore STEP: cargo build --release -p forge_step (Open CASCADE; serve CMake). La prima
        volta richiede decine di minuti, poi resta nella cache. Se CMake manca o la compilazione
@@ -42,7 +42,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$Branch = 'claude/festive-heisenberg-d2ow6z'
+# Branch delle release (dal 01/11/2026; prima claude/festive-heisenberg-d2ow6z, cancellato).
+$Branch = 'main'
 $Root = $PSScriptRoot
 
 function Step([string]$text) { Write-Host "`n==> $text" -ForegroundColor Cyan }
