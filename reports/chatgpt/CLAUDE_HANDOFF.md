@@ -2322,3 +2322,8 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
   (`add_mesh`/`add_node`), ma il progetto salva solo file importati e oggetti aggiunti. Ora
   `demos::node` crea `AddedRecord` (anche per il prisma della 0.26); test
   `generated_demos_survive_save_and_load`.
+
+## Claude Code — 01/11/2026: 0.28.1 su main
+
+- Su richiesta di Valerio la correzione delle scene demo salvabili passa su main come **0.28.1**.
+  Main e `sviluppo` sullo stesso commit.

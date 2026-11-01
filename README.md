@@ -18,11 +18,12 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
-### What's new in 0.28.0
+### What's new in 0.28.1
 
 - **Caustics (photon mapping):** Render tab → Caustics. Light through glass, crystals and gems gathers into bright spots and rainbows on the surfaces around them, with every light (point, spot, sun, area), on CPU and GPU, RGB and Spectral.
 - **Demo scenes menu:** File → Demo scenes, grouped by what they show, with a card that explains the features used and how to recreate each scene. New scenes: laser in a diamond, crystal pendants in the sun, glass and caustics on the table.
 - **New shapes:** Prism, Diamond (brilliant cut) and Crystal pendant in the Add menu; floors and backdrops now always go under all the objects.
+- **Fix (0.28.1):** demo scenes saved as a project now keep all their objects when reopened.
 
 <details>
 <summary><strong>Previous versions — complete release history</strong></summary>

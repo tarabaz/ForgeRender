@@ -18,11 +18,12 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
-### Novità della versione 0.28.0
+### Novità della versione 0.28.1
 
 - **Caustiche (photon mapping):** scheda Render → Caustiche. La luce che passa da vetri, cristalli e gemme si concentra in macchie luminose e arcobaleni sulle superfici attorno, con tutte le luci (puntiforme, spot, sole, area), su CPU e GPU, RGB e Spettrale.
 - **Menu Scene demo:** File → Scene demo, divise per che cosa mostrano, con una scheda che spiega le funzioni usate e come rifare ogni scena. Scene nuove: laser nel diamante, ciondoli di cristallo al sole, vetri e caustiche sul tavolo.
 - **Forme nuove:** Prisma, Diamante (taglio brillante) e Pendente di cristallo nel menu Aggiungi; pavimenti e fondali ora vanno sempre sotto tutti gli oggetti.
+- **Correzione (0.28.1):** le scene demo salvate come progetto ora tengono tutti i loro oggetti quando si riaprono.
 
 <details>
 <summary><strong>Versioni precedenti — storico completo delle release</strong></summary>
