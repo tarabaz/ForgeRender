@@ -10,7 +10,7 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
-## Unreleased (development branch, not on main)
+## 0.27.0 — 1 Nov 2026
 
 **Lights aimed at an object**
 - Lights panel → **Aim at → Hook to selection** (spot, area, laser, directional): the light stays aimed at the object. The target follows the object when it moves; moving the light keeps it aimed, and rotating it with the Rotate gizmo **orbits around the object**. "Unhook" frees the target again.

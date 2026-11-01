@@ -18,14 +18,16 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
-### What's new in 0.26.0
+### What's new in 0.27.0
 
-- **Laser light:** a thin beam traced from the light through glass and mirrors, with an exact spot where it lands and an optional visible beam in the air. In the Spectral render, dispersive glass opens it into a rainbow fan.
-- **Demo scene "Prism and light":** File → New demo scene: a white beam enters a glass prism on a black background and leaves as a rainbow.
+- **Lights aimed at an object:** Lights panel → Aim at → Hook to selection. The light follows the object; moving the light keeps it aimed, rotating it orbits around the object.
+- **Laser beam visible inside glass:** it enters white, crosses the prism or gem and leaves as a rainbow.
+- **Lights panel:** its own scrollable area with a draggable border to set the height (all lights can be selected again).
 
 <details>
 <summary><strong>Previous versions — complete release history</strong></summary>
 
+- **0.26.0 — Laser light and "Prism and light" demo:** thin beam traced from the light through glass and mirrors, exact spot and optional visible beam, rainbow fan in the Spectral render; demo scene with a glass prism on black.
 - **0.25.0 — Hardware ray tracing (RT cores):** rays traced by the GPU's ray tracing units (Vulkan), same image, renders 10–15× faster on an RTX 5070; automatic fallback to the shader BVH.
 - **0.24.0 — Spectral rendering, startup mode choice:** optional spectral mode on CPU and GPU with glass dispersion (Abbe number) and presets for crown, flint, lead crystal, polycarbonate and diamond ([docs/SPECTRAL.md](docs/SPECTRAL.md)); Simple or Advanced mode chosen at startup; BlenderKit materials removed from the bundled presets.
 - **0.23.0 — Cleaner default renders:** the denoiser runs at 100% and the noise threshold starts at 0.03.

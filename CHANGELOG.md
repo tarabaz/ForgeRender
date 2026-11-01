@@ -13,7 +13,7 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
-## In sviluppo (branch di sviluppo, non su main)
+## 0.27.0 — 01/11/2026
 
 **Luci puntate su un oggetto**
 - Pannello Luci → **Punta su → Aggancia alla selezione** (spot, area, laser, direzionale): la luce

@@ -2286,3 +2286,9 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
   - Causa dei due difetti segnalati: l'altezza dell'albero contava solo le luci, la sezione degli
     eliminati spingeva le luci fuori dal pannello e il pannello si allungava fin dentro la barra
     di stato.
+
+## Claude Code — 01/11/2026: 0.27.0 su main
+
+- Su richiesta di Valerio: luci puntate su un oggetto, fascio laser visibile nel vetro e pannello
+  Luci scorrevole e ridimensionabile passano su main come **0.27.0**. Versione, changelog IT/EN e
+  README IT/EN aggiornati. Main e `sviluppo` sullo stesso commit.
