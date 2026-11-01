@@ -888,10 +888,17 @@ mod tests {
         // L'immagine pubblicata in pausa corrisponde esattamente allo stato.
         assert_eq!(s.latest_frame().unwrap().samples, p1.samples);
         s.resume();
-        std::thread::sleep(Duration::from_millis(40));
+        // Sotto carico il thread della sessione può partire in ritardo: si aspetta il risultato.
+        let wait_for = |ok: &dyn Fn(&Progress) -> bool| {
+            let t0 = std::time::Instant::now();
+            while !ok(&s.progress()) && t0.elapsed() < Duration::from_secs(2) {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+        };
+        wait_for(&|p| p.samples > p1.samples);
         assert!(s.progress().samples > p1.samples);
         s.cancel();
-        std::thread::sleep(Duration::from_millis(20));
+        wait_for(&|p| p.state == SessionState::Cancelled);
         let p2 = s.progress();
         assert_eq!(p2.state, SessionState::Cancelled);
         // Nuovo obiettivo superiore: si riprende con "resume".

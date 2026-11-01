@@ -17,6 +17,7 @@ use crate::integrator::{sample_any_light, shadow, LightSlots, Media};
 use crate::lights::intersect_area;
 use forge_math::glam::Vec4;
 use forge_math::{offset_ray_origin, sampling::power_heuristic, Onb, Pcg32, Vec3};
+use forge_render_core::laser::{beam_radiance, compatible, lerp_segment, lerp_spot, path_pair, spot_at};
 use forge_render_core::spectral::{cauchy_ior, RgbSpectrum, Wavelengths};
 use forge_render_core::{RenderMaterial, RenderScene, RenderSettings};
 
@@ -60,6 +61,62 @@ fn transmittance(media: &Media, scene: &RenderScene, t: f32, w: &Wavelengths) ->
         }
         None => Vec4::ONE,
     }
+}
+
+/// Fascio visibile dei laser lungo il raggio della camera fino a `t_end`: per ogni lunghezza
+/// d'onda il percorso calcolato con il suo indice di rifrazione (dopo un vetro dispersivo i
+/// colori si separano).
+fn laser_beams(scene: &RenderScene, o: Vec3, d: Vec3, t_end: f32, w: &Wavelengths) -> Vec4 {
+    let mut c = [0.0f32; 4];
+    for laser in scene.lasers.iter().filter(|l| l.beam_density > 0.0) {
+        let power = illuminant(laser.power, w);
+        for (i, ci) in c.iter_mut().enumerate() {
+            if w.pdf[i] <= 0.0 {
+                continue;
+            }
+            // Percorso interpolato tra le due lunghezze d'onda della tabella più vicine.
+            let (k0, k1, t) = path_pair(w.lambda[i]);
+            let (a, b2) = (&laser.spectral[k0], &laser.spectral[k1]);
+            let lerp = compatible(a, b2);
+            let path = if lerp || t < 0.5 { a } else { b2 };
+            for (si, s0) in path.segments.iter().enumerate() {
+                let seg = if lerp { lerp_segment(s0, &b2.segments[si], t) } else { *s0 };
+                let seg = &seg;
+                let b = beam_radiance(seg, laser.radius, laser.beam_density, o, d, t_end);
+                if b > 0.0 {
+                    *ci += power[i] * seg.throughput.x * b;
+                }
+            }
+        }
+    }
+    Vec4::from_array(c)
+}
+
+/// Luce delle macchie laser sul punto `p`, per lunghezza d'onda.
+fn laser_spots(scene: &RenderScene, bsdf: &Bsdf<'_, Vec4>, wo: Vec3, p: Vec3, ng: Vec3, w: &Wavelengths) -> Vec4 {
+    let mut c = [0.0f32; 4];
+    for laser in scene.lasers.iter() {
+        let power = illuminant(laser.power, w);
+        for (i, ci) in c.iter_mut().enumerate() {
+            if w.pdf[i] <= 0.0 {
+                continue;
+            }
+            let (k0, k1, t) = path_pair(w.lambda[i]);
+            let (a, b) = (&laser.spectral[k0], &laser.spectral[k1]);
+            let spot = match (&a.spot, &b.spot) {
+                (Some(sa), Some(sb)) if compatible(a, b) => lerp_spot(sa, sb, t),
+                (Some(sa), _) if t < 0.5 || b.spot.is_none() => *sa,
+                (_, Some(sb)) => *sb,
+                _ => continue,
+            };
+            let spot = &spot;
+            if let Some((wi, e)) = spot_at(spot, laser.radius, p, ng) {
+                let (f, _) = bsdf.eval(wo, wi);
+                *ci += f[i] * power[i] * spot.throughput.x * e;
+            }
+        }
+    }
+    Vec4::from_array(c)
 }
 
 /// Solo la hero: le altre lunghezze d'onda si fermano (throughput e radianza azzerate).
@@ -146,6 +203,13 @@ pub fn radiance_spectral(
             let t_max = light_hit.map(|x| x.0).unwrap_or(t_surf);
             if let Some(h) = intersect_area(light, o, d, t_max) {
                 light_hit = Some(h);
+            }
+        }
+        if camera_path && !scene.lasers.is_empty() {
+            let t_end = light_hit.map(|x| x.0).unwrap_or(t_surf);
+            let c = laser_beams(scene, o, d, t_end, w);
+            if c != Vec4::ZERO {
+                add(&mut l, beta * c, depth);
             }
         }
         if media.n > 0 {
@@ -284,6 +348,13 @@ pub fn radiance_spectral(
             entering,
             color: albedo(mat.base_color, w),
         };
+
+        if !scene.lasers.is_empty() && bsdf.has_non_delta() {
+            let c = laser_spots(scene, &bsdf, wo, p, geo.geometric_normals[prim], w);
+            if c != Vec4::ZERO {
+                add(&mut l, beta * c, depth);
+            }
+        }
 
         if n_select > 0 && bsdf.has_non_delta() {
             if let Some((ls, cast_shadows)) = sample_any_light(scene, &slots, p, rng) {

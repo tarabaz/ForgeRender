@@ -5,7 +5,7 @@
 // luci analitiche, HDRI ed emissivi, Russian roulette, texture.
 // Tutta la scena è in un unico buffer di parole a 32 bit (vedi layout.rs).
 
-@group(0) @binding(0) var<uniform> P: array<vec4<u32>, 20>;
+@group(0) @binding(0) var<uniform> P: array<vec4<u32>, 21>;
 @group(0) @binding(1) var<storage, read> S: array<u32>;
 @group(0) @binding(2) var<storage, read_write> OUT: array<vec4<f32>>;
 // Campionamento adattivo: un bit per riquadro di 16×16 pixel (1 = riceve ancora campioni).
@@ -104,6 +104,8 @@ const P_OFF_PORTALS: u32 = 76u;
 const P_N_PORTALS: u32 = 77u;
 const P_PORTAL_AREA: u32 = 78u;
 const P_TILES_X: u32 = 79u;
+const P_OFF_LASERS: u32 = 80u;
+const P_N_LASERS: u32 = 81u;
 const ADAPTIVE_TILE: u32 = 16u;
 const PORTAL_WORDS: u32 = 16u;
 
@@ -1353,6 +1355,97 @@ fn media_transmittance(t: f32) -> vec3<f32> {
     return exp(-sv3(b) * t);
 }
 
+// ---------------------------------------------------------------- Laser
+// Percorsi del fascio già calcolati sulla CPU (`forge_render_core::laser`): macchia gaussiana
+// dove arriva e fascio visibile (diffusione singola), entrambi analitici.
+const LASER_HDR: u32 = 8u;
+const LASER_MAX_SEG: u32 = 16u;
+const LASER_PATH_WORDS: u32 = 208u;
+const LASER_N_LAMBDA: u32 = 64u;
+const LASER_WORDS: u32 = 13528u;
+
+fn laser_base(i: u32) -> u32 { return pu(P_OFF_LASERS) + i * LASER_WORDS; }
+// Percorso k del laser i: 0 = RGB, 1 + n = lunghezza d'onda n.
+fn laser_path(i: u32, k: u32) -> u32 { return laser_base(i) + LASER_HDR + k * LASER_PATH_WORDS; }
+
+fn gauss_irr(rho: f32, r: f32) -> f32 { return 2.0 / (PI * r * r) * exp(-2.0 * rho * rho / (r * r)); }
+
+// Radianza del fascio visibile di un tratto lungo il raggio o + t d, t in [0, t_end], per potenza 1.
+fn laser_beam_seg(sb: u32, r: f32, dens: f32, o: vec3<f32>, d: vec3<f32>, t_end: f32) -> f32 {
+    if (S[sb + 3u] != 0u) { return 0.0; }
+    return laser_beam_ab(sv3(sb), sv3(sb + 4u), r, dens, o, d, t_end);
+}
+
+// Come laser_beam_seg, con gli estremi del tratto (a → e) già noti (tratti interpolati).
+fn laser_beam_ab(a: vec3<f32>, e_pt: vec3<f32>, r: f32, dens: f32, o: vec3<f32>, d: vec3<f32>, t_end: f32) -> f32 {
+    var sdir = e_pt - a;
+    let len = length(sdir);
+    if (len <= 0.0) { return 0.0; }
+    sdir = sdir / len;
+    let w0 = o - a;
+    let b = dot(d, sdir);
+    let denom = 1.0 - b * b;
+    if (denom < 1e-6) { return 0.0; }
+    let dd = dot(d, w0);
+    let e = dot(sdir, w0);
+    let t_ray = (b * e - dd) / denom;
+    let t_seg = (e - b * dd) / denom;
+    let margin = 3.0 * r;
+    if (t_ray < 0.0 || t_ray > t_end || t_seg < -margin || t_seg > len + margin) { return 0.0; }
+    let rho = length((o + d * t_ray) - (a + sdir * t_seg));
+    if (rho > 3.0 * r) { return 0.0; }
+    let sn = max(sqrt(denom), 0.02);
+    let line = gauss_irr(rho, r) * r * sqrt(PI * 0.5) / sn;
+    return dens * line / (4.0 * PI);
+}
+
+// Macchia del percorso pb sul punto p: (direzione verso la luce, irradianza per potenza 1).
+fn laser_spot(pb: u32, r: f32, p: vec3<f32>, ng: vec3<f32>) -> vec4<f32> {
+    if (S[pb + 1u] == 0u) { return vec4<f32>(0.0); }
+    return laser_spot_at(sv3(pb + 4u), sv3(pb + 8u), r, p, ng);
+}
+
+// Macchia con punto d'arrivo e direzione del fascio già noti (macchie interpolate).
+fn laser_spot_at(spot: vec3<f32>, dir: vec3<f32>, r: f32, p: vec3<f32>, ng: vec3<f32>) -> vec4<f32> {
+    let to = p - spot;
+    if (dot(to, to) > 16.0 * r * r + 1e-10) { return vec4<f32>(0.0); }
+    let along = dot(to, dir);
+    let rho2 = max(dot(to, to) - along * along, 0.0);
+    let e = gauss_irr(sqrt(rho2), r) * abs(dot(ng, dir));
+    return vec4<f32>(-dir, e);
+}
+
+fn laser_beams_rgb(o: vec3<f32>, d: vec3<f32>, t_end: f32) -> vec3<f32> {
+    var c = vec3<f32>(0.0);
+    for (var i: u32 = 0u; i < pu(P_N_LASERS); i = i + 1u) {
+        let lb = laser_base(i);
+        let dens = sf(lb + 4u);
+        if (dens <= 0.0) { continue; }
+        let r = sf(lb + 3u);
+        let pb = laser_path(i, 0u);
+        for (var s: u32 = 0u; s < S[pb]; s = s + 1u) {
+            let sb = pb + 16u + s * 12u;
+            let b = laser_beam_seg(sb, r, dens, o, d, t_end);
+            if (b > 0.0) { c = c + sv3(lb) * sv3(sb + 8u) * b; }
+        }
+    }
+    return c;
+}
+
+fn laser_spots_rgb(bs: Bsdf, wo: vec3<f32>, p: vec3<f32>, ng: vec3<f32>) -> vec3<f32> {
+    var c = vec3<f32>(0.0);
+    for (var i: u32 = 0u; i < pu(P_N_LASERS); i = i + 1u) {
+        let lb = laser_base(i);
+        let pb = laser_path(i, 0u);
+        let sp = laser_spot(pb, sf(lb + 3u), p, ng);
+        if (sp.w > 0.0) {
+            let e = bsdf_eval(bs, wo, sp.xyz);
+            c = c + e.xyz * sv3(lb) * sv3(pb + 12u) * sp.w;
+        }
+    }
+    return c;
+}
+
 // ---------------------------------------------------------------- Integratore
 fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
     media_n = 0u;
@@ -1407,6 +1500,12 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
             if (lt > 0.0) { tm = lt; }
             let r = intersect_area(i, o, d, tm);
             if (r.x > 0.0) { lt = r.x; lpdf = r.y; lfront = r.z; lem = sv3(light_base(i) + 4u); }
+        }
+        // Fascio visibile dei laser (raggi visti dalla camera, anche attraverso i vetri).
+        if (camera_path && pu(P_N_LASERS) > 0u) {
+            var t_end = t_surf;
+            if (lt > 0.0) { t_end = lt; }
+            l = l + beta * laser_beams_rgb(o, d, t_end);
         }
         // Assorbimento del volume trasparente attraversato.
         if (media_n > 0u) {
@@ -1534,6 +1633,11 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
         bs.ng = ng;
         bs.m = m;
         bs.entering = entering;
+
+        // Macchie dei laser (luce dal percorso del fascio già calcolato).
+        if (pu(P_N_LASERS) > 0u && has_non_delta(bs)) {
+            l = l + beta * laser_spots_rgb(bs, wo, p, sv3(pb + 12u));
+        }
 
         // Next Event Estimation.
         if (n_select > 0u && has_non_delta(bs)) {

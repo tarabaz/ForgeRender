@@ -156,6 +156,8 @@ pub struct StartupOptions {
     pub sequence_passes: bool,
     pub sequence_step: Option<f32>,
     pub sequence_samples: Option<u32>,
+    /// Apre la scena demo "Prisma e luce" all'avvio (`--demo-prisma`).
+    pub prism_demo: bool,
     /// Mostra la scelta della modalità anche nelle prove (`--scelta-modalita`).
     pub mode_choice: bool,
 }
@@ -538,6 +540,9 @@ impl ForgeApp {
             app.ai_setup.open();
         }
         app.sequence.open = startup.sequences_window;
+        if startup.prism_demo {
+            app.new_prism_demo();
+        }
         if startup.iso {
             app.orbit.lens.ortho = true;
             app.orbit.yaw = std::f32::consts::FRAC_PI_4;
@@ -1464,6 +1469,24 @@ impl ForgeApp {
         self.geometry_changed();
         self.unsaved = false;
         self.view = View::Viewport;
+    }
+
+    /// Scena demo "Prisma e luce" (laser bianco, prisma dispersivo, render spettrale).
+    pub fn new_prism_demo(&mut self) {
+        let (scene, demo) = crate::presets::prism_demo_scene();
+        let mut settings = self.prefs.new_project_settings();
+        settings.color_mode = demo.color_mode;
+        settings.target_samples = demo.target_samples;
+        settings.max_bounces = demo.max_bounces;
+        settings.environment_visible = demo.environment_visible;
+        self.replace_scene(
+            scene,
+            ProjectMeta {
+                test_scene: true,
+                ..Default::default()
+            },
+            Some(settings),
+        );
     }
 
     pub fn new_test_scene(&mut self) {

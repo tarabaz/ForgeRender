@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Numero di parole dei parametri (uniform `array<vec4<u32>, 20>`).
-pub const PARAM_WORDS: usize = 80;
+pub const PARAM_WORDS: usize = 84;
 
 // Indici dei parametri (devono coincidere con le costanti dello shader).
 pub const P_WIDTH: usize = 0;
@@ -83,6 +83,16 @@ pub const P_N_PORTALS: usize = 77;
 pub const P_PORTAL_AREA: usize = 78;
 /// Campionamento adattivo: riquadri per riga della maschera (attiva col bit 2 di P_FLAGS).
 pub const P_TILES_X: usize = 79;
+/// Laser: offset e numero (vedi [`LASER_WORDS`]).
+pub const P_OFF_LASERS: usize = 80;
+pub const P_N_LASERS: usize = 81;
+/// Laser: potenza(3), raggio, densità del fascio, 0, 0, 0; poi 1 + [`forge_render_core::laser::N_LAMBDA`]
+/// percorsi (RGB, poi le lunghezze d'onda) di [`LASER_PATH_WORDS`] parole.
+pub const LASER_HEADER_WORDS: usize = 8;
+/// Percorso: tratti, macchia (0/1), 0, 0, punto(3), 0, direzione(3), 0, throughput(3), 0; poi
+/// [`forge_render_core::laser::MAX_SEGMENTS`] tratti: inizio(3), dentro (0/1), fine(3), 0, throughput(3), 0.
+pub const LASER_PATH_WORDS: usize = 16 + forge_render_core::laser::MAX_SEGMENTS * 12;
+pub const LASER_WORDS: usize = LASER_HEADER_WORDS + (1 + forge_render_core::laser::N_LAMBDA) * LASER_PATH_WORDS;
 /// Portale: centro(3), mezza larghezza, normale(3), mezza altezza, u(3), 0, v(3), 0.
 pub const PORTAL_WORDS: usize = 16;
 
@@ -485,10 +495,73 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
         h.copy_from_slice(&words);
     }
 
+    // --- Laser: percorsi del fascio già calcolati (RGB e per lunghezza d'onda) ---
+    p[P_N_LASERS] = scene.lasers.len() as u32;
+    p[P_OFF_LASERS] = w.pos();
+    for laser in scene.lasers.iter() {
+        let start = w.pos() as usize;
+        w.v3(laser.power);
+        w.f(laser.radius);
+        w.f(laser.beam_density);
+        w.u(0);
+        w.u(0);
+        w.u(0);
+        for path in std::iter::once(&laser.rgb).chain(laser.spectral.iter()) {
+            let path_start = w.pos() as usize;
+            let n = path.segments.len().min(forge_render_core::laser::MAX_SEGMENTS);
+            w.u(n as u32);
+            w.u(path.spot.is_some() as u32);
+            w.u(0);
+            w.u(0);
+            let spot = path.spot.unwrap_or(forge_render_core::laser::LaserSpot {
+                point: forge_math::Vec3::ZERO,
+                dir: forge_math::Vec3::ZERO,
+                throughput: forge_math::Vec3::ZERO,
+            });
+            for v in [spot.point, spot.dir, spot.throughput] {
+                w.v3(v);
+                w.u(0);
+            }
+            for k in 0..forge_render_core::laser::MAX_SEGMENTS {
+                match path.segments.get(k).filter(|_| k < n) {
+                    Some(s) => {
+                        w.v3(s.start);
+                        w.u(s.inside as u32);
+                        w.v3(s.end);
+                        w.u(0);
+                        w.v3(s.throughput);
+                        w.u(0);
+                    }
+                    None => {
+                        for _ in 0..12 {
+                            w.u(0);
+                        }
+                    }
+                }
+            }
+            debug_assert_eq!(w.pos() as usize - path_start, LASER_PATH_WORDS);
+        }
+        assert_eq!(w.pos() as usize - start, LASER_WORDS, "record laser di lunghezza errata");
+    }
+
     p[P_N_SELECT] = scene.lights.len() as u32 + scene.samples_environment() as u32 + scene.emissive.is_some() as u32;
     p[P_HAS_CUTOUT] = scene.has_cutout as u32;
     if w.w.is_empty() {
         w.u(0);
     }
     SceneBuffer { words: w.w, params: p }
+}
+
+#[cfg(test)]
+mod laser_layout_tests {
+    /// Le costanti del laser nello shader coincidono con quelle del layout.
+    #[test]
+    fn shader_laser_constants_match() {
+        let src = include_str!("path_tracer.wgsl");
+        assert!(src.contains(&format!("const LASER_PATH_WORDS: u32 = {}u;", super::LASER_PATH_WORDS)));
+        assert!(src.contains(&format!("const LASER_WORDS: u32 = {}u;", super::LASER_WORDS)));
+        assert!(src.contains(&format!("const LASER_N_LAMBDA: u32 = {}u;", forge_render_core::laser::N_LAMBDA)));
+        assert!(src.contains(&format!("const LASER_MAX_SEG: u32 = {}u;", forge_render_core::laser::MAX_SEGMENTS)));
+        assert!(src.contains(&format!("var<uniform> P: array<vec4<u32>, {}>;", super::PARAM_WORDS / 4)));
+    }
 }

@@ -726,6 +726,61 @@ pub fn studio_demo_scene() -> Scene {
     scene
 }
 
+/// Scena demo "Prisma e luce": prisma di vetro molto dispersivo su fondo nero, visto di fronte,
+/// con un fascio di luce bianca (laser visibile nell'aria) che entra da sinistra all'angolo di
+/// deviazione minima ed esce a destra aperto in un arcobaleno. Va renderizzata in Spettrale.
+pub fn prism_demo_scene() -> (Scene, RenderSettings) {
+    use forge_scene::{primitives, Camera, LightKind};
+    let mut s = Scene::default();
+    let (ior, side) = (1.6f32, 0.5f32);
+    s.materials.upsert(Material {
+        id: MaterialId::new("demo-prisma"),
+        name: tr("Vetro molto dispersivo").into(),
+        base_color: [1.0; 3],
+        transmission: 1.0,
+        roughness: 0.0,
+        ior,
+        abbe: 8.0,
+        ..Default::default()
+    });
+    let prism = s.add_mesh(primitives::prism(side, 0.5));
+    let pid = ComponentId("demo/prisma".into());
+    s.add_node(None, pid.clone(), tr("Prisma"), Mat4::IDENTITY, Some(prism));
+    s.assignments.insert(pid, MaterialId::new("demo-prisma"));
+    s.environment = Environment::Uniform {
+        color: [1.0; 3],
+        // Ambiente tenue e invisibile alla camera: lo sfondo resta nero, ma il vetro lo riflette e
+        // lo rifrange, e il prisma si vede come una sagoma di vetro.
+        strength: 0.15,
+    };
+    // Fascio all'angolo di deviazione minima (sin i = n · sin 30°): dentro il prisma viaggia
+    // parallelo alla base, esce dalla faccia destra e si apre per la dispersione.
+    let r = side / 3f32.sqrt();
+    let entry = Vec3::new(-side * 0.25, r * 0.25, 0.0);
+    let up = ((ior * 0.5).asin().to_degrees() - 30.0).to_radians();
+    let start = entry - Vec3::new(up.cos(), up.sin(), 0.0) * 1.4;
+    let mut laser = Light::point(tr("Luce bianca"), start, 1.0);
+    laser.kind = LightKind::Laser { diameter_mm: 12.0 };
+    laser.target = entry;
+    laser.beam_density = 0.08;
+    s.lights.push(laser);
+    s.camera = Camera {
+        position: Vec3::new(0.2, 0.0, 3.2),
+        target: Vec3::new(0.2, 0.0, 0.0),
+        up: Vec3::Y,
+        vfov_deg: 30.0,
+        ..Default::default()
+    };
+    let settings = RenderSettings {
+        color_mode: forge_render_core::ColorMode::Spectral,
+        target_samples: 1024,
+        max_bounces: 16,
+        environment_visible: false,
+        ..Default::default()
+    };
+    (s, settings)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -951,6 +1006,25 @@ mod tests {
             scene.assignments.get(&backdrop_record_of(&scene).id),
             Some(&MaterialId::new(BACKDROP_MATERIAL))
         );
+    }
+
+    /// Scena "Prisma e luce": il fascio entra, attraversa il prisma ed esce a destra aperto in
+    /// un arcobaleno (il violetto deviato più del rosso); render spettrale già impostato.
+    #[test]
+    fn prism_demo_scene_disperses_light() {
+        let (scene, s) = prism_demo_scene();
+        assert_eq!(s.color_mode, forge_render_core::ColorMode::Spectral);
+        let rs = forge_render_core::RenderScene::compile(&scene);
+        let l = &rs.lasers[0];
+        assert!(l.rgb.segments.len() >= 3, "il fascio attraversa il prisma");
+        let exit = |lambda: f32| {
+            let p = &l.spectral[forge_render_core::laser::path_index(lambda)];
+            let last = p.segments.last().unwrap();
+            (last.end - last.start).normalize()
+        };
+        let (violet, red) = (exit(420.0), exit(680.0));
+        assert!(violet.x > 0.0 && red.x > 0.0, "esce verso destra");
+        assert!(violet.y < red.y - 0.02, "violetto {violet} più deviato del rosso {red}");
     }
 
     #[test]

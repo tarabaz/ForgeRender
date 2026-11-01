@@ -581,6 +581,8 @@ pub struct RenderScene {
     pub node_frames: Vec<crate::displace::BoxFrame>,
     /// Nebbie volumetriche già calcolate.
     pub fogs: Vec<Arc<forge_volume::BakedFog>>,
+    /// Laser con il percorso del fascio già calcolato (vedi [`crate::laser`]).
+    pub lasers: Arc<Vec<crate::laser::RenderLaser>>,
 }
 
 impl RenderScene {
@@ -643,7 +645,7 @@ impl RenderScene {
         let lights = scene
             .lights
             .iter()
-            .filter(|l| l.enabled && l.intensity > 0.0 && !matches!(l.kind, LightKind::Portal { .. }))
+            .filter(|l| l.enabled && l.intensity > 0.0 && !matches!(l.kind, LightKind::Portal { .. } | LightKind::Laser { .. }))
             .map(|l| {
                 let kind = match l.kind {
                     LightKind::Point => RenderLightKind::Point { position: l.position },
@@ -661,7 +663,7 @@ impl RenderScene {
                         }
                     }
                     LightKind::Directional => RenderLightKind::Directional { direction: l.direction() },
-                    LightKind::Portal { .. } => unreachable!("portali filtrati sopra"),
+                    LightKind::Portal { .. } | LightKind::Laser { .. } => unreachable!("portali e laser filtrati sopra"),
                     LightKind::Area { width, height } => {
                         let n = l.direction();
                         let hint = if n.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
@@ -713,7 +715,7 @@ impl RenderScene {
         let mut fogs = crate::fog::bake_fogs(scene, &geometry);
         fogs.extend(crate::fog::beam_fogs(scene));
         let id = next_scene_id();
-        RenderScene {
+        let mut rs = RenderScene {
             has_cutout,
             node_frames: box_frames(scene),
             fogs,
@@ -729,7 +731,13 @@ impl RenderScene {
             env_map,
             camera: scene.render_camera().clone(),
             portals,
+            lasers: Arc::new(Vec::new()),
+        };
+        // Percorsi dei fasci laser (servono geometria e materiali già compilati).
+        if scene.lights.iter().any(|l| l.enabled && matches!(l.kind, LightKind::Laser { .. })) {
+            rs.lasers = Arc::new(crate::laser::trace_lasers(&rs, &scene.lights));
         }
+        rs
     }
 
     /// Stessa scena vista da un'altra camera: nessuna ricompilazione, e il backend GPU
@@ -751,6 +759,7 @@ impl RenderScene {
             has_cutout: self.has_cutout,
             node_frames: self.node_frames.clone(),
             fogs: self.fogs.clone(),
+            lasers: self.lasers.clone(),
         }
     }
 

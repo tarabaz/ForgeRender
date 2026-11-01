@@ -583,5 +583,19 @@
 - Test `gpu_rt_cores_match_shader_bvh`, esempio `rt_bench`. Misure: 10,6–14,9× (RGB),
   7,7–12,6× (spettrale) su RTX 5070.
 
+
+### In sviluppo (branch `sviluppo`): luce laser e scena demo "Prisma e luce" (01/11/2026)
+- `forge_scene::LightKind::Laser { diameter_mm }`, `primitives::prism`.
+- `forge_render_core::laser`: percorso del fascio dalla luce (vetri lisci, specchi, prima superficie
+  opaca), RGB + 64 lunghezze d'onda; `RenderScene::lasers`; macchia gaussiana (`spot_at`) e fascio
+  visibile analitico (`beam_radiance`); interpolazione tra lunghezze d'onda (`path_pair`,
+  `compatible`, `lerp_*`).
+- CPU: `integrator` (RGB) e `spectral`; GPU: dati in coda al buffer della scena
+  (`P_OFF_LASERS`, `LASER_WORDS`), funzioni in `path_tracer.wgsl` e `path_tracer_spectral.wgsl`.
+- UI: tipo Laser, diametro, potenza, "Fascio visibile: Nell'aria"; File → Nuova scena demo: prisma e
+  luce (`presets::prism_demo_scene`, opzione di prova `--demo-prisma`).
+- Test: `forge_render_cpu/tests/laser.rs`, `gpu_laser_matches_cpu`, `prism_demo_scene_disperses_light`,
+  costanti shader/layout. Test di sessione reso robusto al carico.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

@@ -2238,3 +2238,26 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
   versione in `Cargo.toml` e nell'installer, changelog inglese e italiano, README (IT/EN) con le
   novità della 0.25.0 e la 0.24.0 nello storico, roadmap aggiornata. Main e `sviluppo` puntano
   allo stesso commit.
+
+## Claude Code — 01/11/2026: luce laser e scena demo "Prisma e luce" (branch `sviluppo`)
+
+- Richiesta di Valerio: uno spot "tipo laser" e la possibilità di vedere o no il fascio; poi una
+  scena demo in stile copertina di un album famoso. La scena non porta il nome dell'album e non
+  copia la grafica (opera protetta): si chiama "Prisma e luce" ed è fisica pura (prisma, fascio
+  bianco, arcobaleno).
+- Perché non bastava uno spot stretto: una luce puntiforme o un fascio sottile dietro un vetro
+  liscio non si trova partendo dalla camera (probabilità quasi nulla), quindi niente caustiche.
+  Soluzione: tracciamento deterministico dalla luce, cioè percorso del fascio precalcolato
+  (per lunghezza d'onda nello spettrale), macchia gaussiana e fascio visibile analitici, senza
+  rumore.
+- Limiti:
+  - un solo ramo per interfaccia (rifrazione, o riflessione totale): il riflesso parziale di
+    Fresnel non genera un secondo fascio;
+  - la macchia illumina solo la prima superficie opaca e non rimbalza oltre (niente luce
+    indiretta del laser);
+  - vetri ruvidi e metalli ruvidi fermano il fascio come superfici opache.
+- Verifiche:
+  - prisma a deviazione minima: violetto a terra a 1,42 m, rosso a 1,77 m; senza dispersione
+    stesso punto;
+  - CPU e GPU coincidono entro l'1–4% (RGB e spettrale);
+  - render nell'app della scena demo: 1024 campioni in 10,5 s su RTX 5070.

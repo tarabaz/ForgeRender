@@ -1350,3 +1350,76 @@ fn gpu_rt_cores_match_shader_bvh() {
         assert!(same > 0.9, "{mode:?}: solo {:.1}% dei pixel uguali", same * 100.0);
     }
 }
+
+/// Laser attraverso un prisma dispersivo, con fascio visibile: la GPU (RT core o BVH) dà la
+/// stessa immagine della CPU, in RGB e in spettrale.
+#[test]
+fn gpu_laser_matches_cpu() {
+    let Some(mut g) = gpu() else { return };
+    let mut s = Scene::default();
+    s.materials.upsert(Material {
+        id: MaterialId::new("vetro"),
+        base_color: [1.0; 3],
+        transmission: 1.0,
+        roughness: 0.0,
+        ior: 1.5,
+        abbe: 15.0,
+        ..Default::default()
+    });
+    s.materials.upsert(Material {
+        id: MaterialId::new("bianco"),
+        base_color: [0.8; 3],
+        roughness: 0.8,
+        ..Default::default()
+    });
+    let prism = s.add_mesh(primitives::prism(0.3, 0.3));
+    let pid = ComponentId("prisma".into());
+    s.add_node(None, pid.clone(), "Prisma", Mat4::IDENTITY, Some(prism));
+    s.assignments.insert(pid, MaterialId::new("vetro"));
+    let floor = s.add_mesh(primitives::plane(10.0, 10.0));
+    let fid = ComponentId("piano".into());
+    s.add_node(
+        None,
+        fid.clone(),
+        "Piano",
+        Mat4::from_translation(Vec3::new(0.0, -0.5, 0.0)),
+        Some(floor),
+    );
+    s.assignments.insert(fid, MaterialId::new("bianco"));
+    s.environment = Environment::Uniform {
+        color: [1.0; 3],
+        strength: 0.0,
+    };
+    let mut laser = Light::point("laser", Vec3::new(-1.0, -0.268, 0.0), 0.5);
+    // Fascio largo: la macchia copre molti pixel e il confronto non dipende dal rumore.
+    laser.kind = forge_scene::LightKind::Laser { diameter_mm: 60.0 };
+    laser.target = Vec3::new(-0.075, 0.0433, 0.0);
+    laser.beam_density = 0.3;
+    s.lights.push(laser);
+    s.camera = Camera {
+        position: Vec3::new(0.6, 0.5, 2.0),
+        target: Vec3::new(0.6, -0.2, 0.0),
+        up: Vec3::Y,
+        vfov_deg: 60.0,
+        ..Default::default()
+    };
+    let mut cpu = CpuBackend::new(0).unwrap();
+    for mode in [forge_render_core::ColorMode::Rgb, forge_render_core::ColorMode::Spectral] {
+        let st = RenderSettings {
+            width: 96,
+            height: 54,
+            max_bounces: 8,
+            color_mode: mode,
+            ..Default::default()
+        };
+        let spp = 512;
+        let a = render_with(&mut cpu, &s, &st, spp);
+        let b = render_with(&mut g, &s, &st, spp);
+        let sum = |x: &[[f32; 3]], k: usize| x.iter().map(|p| p[k] as f64).sum::<f64>();
+        for k in 0..3 {
+            let (ca, gb) = (sum(&a, k), sum(&b, k));
+            eprintln!("{mode:?} canale {k}: CPU {ca:.3}, GPU {gb:.3}");
+            assert!(ca > 0.0 && (ca - gb).abs() / ca < 0.05, "{mode:?} canale {k}: CPU {ca} vs GPU {gb}");
+        }
+    }
+}

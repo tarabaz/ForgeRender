@@ -95,6 +95,14 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
                 light_hit = Some(h);
             }
         }
+        // Fascio visibile dei laser (solo per i raggi visti dalla camera, anche attraverso i vetri).
+        if camera_path && !scene.lasers.is_empty() {
+            let t_end = light_hit.map(|x| x.0).unwrap_or(t_surf);
+            let c = laser_beams_rgb(scene, o, d, t_end);
+            if c != Vec3::ZERO {
+                add(&mut l, beta * c, depth);
+            }
+        }
         // Assorbimento del volume trasparente attraversato fino alla superficie (o alla luce).
         if media.n > 0 {
             let t_end = light_hit.map(|x| x.0).unwrap_or(t_surf);
@@ -233,6 +241,14 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
             color: mat.base_color,
         };
 
+        // Macchie dei laser: luce calcolata dal percorso del fascio (deterministica).
+        if !scene.lasers.is_empty() && bsdf.has_non_delta() {
+            let c = laser_spots_rgb(scene, &bsdf, wo, p, geo.geometric_normals[prim]);
+            if c != Vec3::ZERO {
+                add(&mut l, beta * c, depth);
+            }
+        }
+
         // Next Event Estimation.
         if n_select > 0 && bsdf.has_non_delta() {
             if let Some((ls, cast_shadows)) = sample_any_light(scene, &slots, p, rng) {
@@ -281,6 +297,33 @@ pub fn radiance(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
         }
     }
     l
+}
+
+/// Fascio visibile dei laser lungo il raggio della camera fino a `t_end` (RGB).
+pub(crate) fn laser_beams_rgb(scene: &RenderScene, o: Vec3, d: Vec3, t_end: f32) -> Vec3 {
+    let mut c = Vec3::ZERO;
+    for laser in scene.lasers.iter().filter(|l| l.beam_density > 0.0) {
+        for seg in &laser.rgb.segments {
+            let b = forge_render_core::laser::beam_radiance(seg, laser.radius, laser.beam_density, o, d, t_end);
+            if b > 0.0 {
+                c += laser.power * seg.throughput * b;
+            }
+        }
+    }
+    c
+}
+
+/// Luce delle macchie laser sul punto `p` (radianza riflessa verso `wo`, RGB).
+pub(crate) fn laser_spots_rgb(scene: &RenderScene, bsdf: &Bsdf, wo: Vec3, p: Vec3, ng: Vec3) -> Vec3 {
+    let mut c = Vec3::ZERO;
+    for laser in scene.lasers.iter() {
+        let Some(spot) = &laser.rgb.spot else { continue };
+        if let Some((wi, e)) = forge_render_core::laser::spot_at(spot, laser.radius, p, ng) {
+            let (f, _) = bsdf.eval(wo, wi);
+            c += f * laser.power * spot.throughput * e;
+        }
+    }
+    c
 }
 
 /// Volumi trasparenti attraversati dal percorso (al più 4 annidati), per gestire liquidi

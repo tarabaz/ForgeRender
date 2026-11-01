@@ -301,6 +301,7 @@ pub fn light_json(i: usize, l: &Light) -> Value {
             LightKind::Directional => "direzionale",
             LightKind::Area { .. } => "area",
             LightKind::Portal { .. } => "portale",
+            LightKind::Laser { .. } => "laser",
         },
         "posizione_m": r3(l.position),
         "bersaglio_m": r3(l.target),

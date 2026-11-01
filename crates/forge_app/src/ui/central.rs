@@ -611,6 +611,18 @@ fn draw_lights(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
             LightKind::Point => {
                 painter.circle_stroke(p, 6.0, stroke);
             }
+            LightKind::Laser { .. } => {
+                // Emettitore e direzione del fascio (fino al bersaglio, il percorso vero si vede nel render).
+                painter.rect_stroke(
+                    egui::Rect::from_center_size(p, egui::vec2(9.0, 9.0)),
+                    1.0,
+                    stroke,
+                    egui::StrokeKind::Middle,
+                );
+                if let Some(q) = project(cam, rect, l.target) {
+                    painter.line_segment([p, q], egui::Stroke::new(1.5, egui::Color32::from_rgb(255, 80, 80)));
+                }
+            }
             LightKind::Spot {
                 inner_angle_deg,
                 outer_angle_deg,

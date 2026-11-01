@@ -14,6 +14,8 @@ pub enum Cmd {
     // File
     NewEmpty,
     NewTest,
+    /// Scena demo "Prisma e luce" (laser, dispersione, render spettrale).
+    NewPrismDemo,
     Open,
     OpenRecent(usize),
     Save,
@@ -132,6 +134,13 @@ pub fn spec(cmd: Cmd) -> Spec {
             icons::NEW,
             None,
             tk("Sfere, cubo e toro su fondale, con luci da studio: per provare materiali e impostazioni"),
+        ),
+        Cmd::NewPrismDemo => s(
+            "file.new_prism_demo",
+            tk("Nuova scena demo: prisma e luce"),
+            icons::NEW,
+            None,
+            tk("Un fascio di luce bianca entra in un prisma di vetro su fondo nero ed esce aperto in un arcobaleno: render spettrale con laser e dispersione"),
         ),
         Cmd::Open => s(
             "file.open",
@@ -501,7 +510,10 @@ pub fn render_label(app: &ForgeApp) -> &'static str {
 
 /// Comandi che buttano via la scena attuale: con modifiche non salvate si chiede prima.
 fn discards_scene(cmd: Cmd) -> bool {
-    matches!(cmd, Cmd::NewEmpty | Cmd::NewTest | Cmd::Open | Cmd::OpenRecent(_) | Cmd::Exit)
+    matches!(
+        cmd,
+        Cmd::NewEmpty | Cmd::NewTest | Cmd::NewPrismDemo | Cmd::Open | Cmd::OpenRecent(_) | Cmd::Exit
+    )
 }
 
 /// Esegue un comando (da menu, toolbar o tastiera).
@@ -522,6 +534,7 @@ pub fn run_confirmed(app: &mut ForgeApp, ctx: &egui::Context, cmd: Cmd) {
     match cmd {
         Cmd::NewEmpty => app.new_empty_scene(),
         Cmd::NewTest => app.new_test_scene(),
+        Cmd::NewPrismDemo => app.new_prism_demo(),
         Cmd::Open => app.open_project_dialog(),
         Cmd::OpenRecent(i) => {
             if let Some(p) = app.prefs.recent_projects.get(i).cloned() {
@@ -681,6 +694,7 @@ mod tests {
         let all = [
             Cmd::NewEmpty,
             Cmd::NewTest,
+            Cmd::NewPrismDemo,
             Cmd::Open,
             Cmd::Save,
             Cmd::SaveAs,

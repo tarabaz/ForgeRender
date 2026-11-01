@@ -1004,6 +1004,7 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
             LightKind::Spot { .. } => 2,
             LightKind::Directional => 3,
             LightKind::Portal { .. } => 4,
+            LightKind::Laser { .. } => 5,
         };
         let before = kind_idx;
         egui::ComboBox::from_label(tr("Tipo"))
@@ -1014,6 +1015,7 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 ui.selectable_value(&mut kind_idx, 2, tr("Spot"));
                 ui.selectable_value(&mut kind_idx, 3, tr("Direzionale"));
                 ui.selectable_value(&mut kind_idx, 4, tr("Portale (finestra)"));
+                ui.selectable_value(&mut kind_idx, 5, tr("Laser"));
             });
         if kind_idx != before {
             let r = radius;
@@ -1025,8 +1027,15 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
                     outer_angle_deg: 40.0,
                 },
                 4 => LightKind::Portal { width: r, height: r },
+                5 => LightKind::Laser { diameter_mm: 2.0 },
                 _ => LightKind::Directional,
             };
+            if kind_idx == 5 {
+                // Potenza in watt: 0,5 W è già un fascio molto luminoso.
+                l.intensity = 0.5;
+                l.color = [1.0; 3];
+                l.beam_density = 0.05;
+            }
             changed = true;
         }
         changed |= ui.checkbox(&mut l.enabled, tr("Accesa")).changed();
@@ -1068,6 +1077,7 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
             let unit = match l.kind {
                 LightKind::Area { .. } => tr("Radianza (W/sr/m²)"),
                 LightKind::Directional => tr("Irradianza (W/m²)"),
+                LightKind::Laser { .. } => tr("Potenza (W)"),
                 _ => tr("Intensità (W/sr)"),
             };
             ui.label(unit);
@@ -1117,6 +1127,37 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
                         changed = true;
                     }
                     ui.end_row();
+                }
+                LightKind::Laser { diameter_mm } => {
+                    ui.label(tr("Diametro del fascio (mm)"));
+                    changed |= ui
+                        .add(egui::DragValue::new(diameter_mm).speed(0.05).range(0.1..=100.0))
+                        .on_hover_text(tr(
+                            "Larghezza del fascio: piccola = punto e linea sottili. Il fascio segue la \
+                             direzione verso il bersaglio e attraversa vetri e specchi; nel render \
+                             Spettrale i vetri con dispersione lo aprono in un arcobaleno",
+                        ))
+                        .changed();
+                    ui.end_row();
+                    let mut beam = l.beam_density > 0.0;
+                    ui.label(tr("Fascio visibile"));
+                    if ui
+                        .checkbox(&mut beam, tr("Nell'aria"))
+                        .on_hover_text(tr("Mostra il raggio nell'aria, come in una stanza con un po' di foschia"))
+                        .changed()
+                    {
+                        l.beam_density = if beam { 0.05 } else { 0.0 };
+                        changed = true;
+                    }
+                    ui.end_row();
+                    if l.beam_density > 0.0 {
+                        ui.label(tr("Intensità del fascio"));
+                        changed |= ui
+                            .add(egui::Slider::new(&mut l.beam_density, 0.001..=2.0).logarithmic(true))
+                            .on_hover_text(tr("Quanta foschia illumina il raggio: più alta = linea più luminosa"))
+                            .changed();
+                        ui.end_row();
+                    }
                 }
                 _ => {}
             }

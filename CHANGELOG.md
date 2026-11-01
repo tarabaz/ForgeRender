@@ -13,6 +13,23 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## In sviluppo (branch di sviluppo, non su main)
+
+**Luce laser**
+- Nuovo tipo di luce **Laser** (pannello Luci): fascio sottile (diametro in mm, potenza in W)
+  dalla luce verso il bersaglio. Il percorso si calcola partendo dalla luce attraverso i vetri
+  lisci (rifrazione, riflessione totale, perdite di Fresnel, assorbimento nel volume) e gli
+  specchi fino alla prima superficie opaca, dove illumina una macchia gaussiana: esatta e senza
+  rumore, anche dietro un vetro, dove un path tracer che parte dalla camera non la troverebbe mai.
+- **Fascio visibile** sì/no ("Nell'aria"): diffusione singola in una foschia uniforme dentro il
+  fascio, integrata analiticamente.
+- Nel render **Spettrale** il percorso si calcola per 64 lunghezze d'onda (interpolate fra loro):
+  dopo un prisma o una gemma dispersivi il fascio si apre a ventaglio arcobaleno e disegna uno
+  spettro continuo sul pavimento. CPU e GPU (RT core e BVH dello shader) danno lo stesso risultato.
+- **File → Nuova scena demo: prisma e luce**: un fascio di luce bianca entra in un prisma di vetro
+  su fondo nero ed esce come arcobaleno (render spettrale già impostato). Nuova primitiva: prisma
+  triangolare.
+
 ## 0.25.0 — 01/11/2026
 
 **Ray tracing hardware (RT core)**

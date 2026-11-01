@@ -93,6 +93,7 @@ fn tab_item(app: &mut ForgeApp, ui: &mut egui::Ui, tab: InspectorTab, text: &'st
 fn file_menu(app: &mut ForgeApp, ui: &mut egui::Ui) {
     item(app, ui, Cmd::NewEmpty);
     item(app, ui, Cmd::NewTest);
+    item(app, ui, Cmd::NewPrismDemo);
     ui.separator();
     item(app, ui, Cmd::Open);
     let recent = app.prefs.recent_projects.clone();

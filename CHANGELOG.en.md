@@ -10,6 +10,14 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## Unreleased (development branch, not on main)
+
+**Laser light**
+- New light type **Laser** (Lights panel): a thin beam (diameter in mm, power in W) from the light towards its target. Its path is traced from the light through smooth glass (refraction, total internal reflection, Fresnel losses, volume absorption) and mirrors up to the first opaque surface, where it lights a Gaussian spot: exact and noise-free, also behind glass, which a camera path tracer could never find.
+- **Visible beam** on/off ("In the air"): single scattering in a uniform haze inside the beam, integrated analytically.
+- In the **Spectral** render the path is traced for 64 wavelengths (interpolated in between): after a dispersive prism or gem the beam opens into a rainbow fan and draws a continuous spectrum on the floor. CPU and GPU (RT cores and shader BVH) give the same result.
+- **File → New demo scene: prism and light**: a white beam enters a glass prism on a black background and leaves as a rainbow (spectral render, already set up). New primitive: triangular prism.
+
 ## 0.25.0 — 1 Nov 2026
 
 **Hardware ray tracing (RT cores)**

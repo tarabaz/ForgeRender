@@ -34,6 +34,52 @@ pub fn cuboid(size: Vec3) -> Mesh {
     m
 }
 
+/// Prisma a base triangolare equilatera (lato `side`), lungo `length` sull'asse Z, centrato
+/// nell'origine, con uno spigolo in alto: facce piane (normali per faccia).
+pub fn prism(side: f32, length: f32) -> Mesh {
+    let mut m = Mesh {
+        name: "Prisma".into(),
+        ..Default::default()
+    };
+    let r = side / 3f32.sqrt();
+    // Vertici del triangolo (nel piano XY, baricentro nell'origine).
+    let tri: Vec<Vec3> = (0..3)
+        .map(|k| {
+            let a = std::f32::consts::FRAC_PI_2 + k as f32 * TAU / 3.0;
+            Vec3::new(r * a.cos(), r * a.sin(), 0.0)
+        })
+        .collect();
+    let z = length * 0.5;
+    let mut quad = |a: Vec3, b: Vec3, c: Vec3, d: Vec3| {
+        let n = (b - a).cross(c - a).normalize();
+        let base = m.positions.len() as u32;
+        for (p, uv) in [(a, Vec2::ZERO), (b, Vec2::X), (c, Vec2::ONE), (d, Vec2::Y)] {
+            m.positions.push(p);
+            m.normals.push(n);
+            m.uvs.push(uv);
+        }
+        m.indices.push([base, base + 1, base + 2]);
+        m.indices.push([base, base + 2, base + 3]);
+    };
+    for k in 0..3 {
+        let (a, b) = (tri[k], tri[(k + 1) % 3]);
+        // Facce laterali con la normale verso l'esterno.
+        quad(a + Vec3::Z * z, a - Vec3::Z * z, b - Vec3::Z * z, b + Vec3::Z * z);
+    }
+    // Basi.
+    for (s, order) in [(1.0f32, [0usize, 1, 2]), (-1.0, [0, 2, 1])] {
+        let n = Vec3::Z * s;
+        let base = m.positions.len() as u32;
+        for k in order {
+            m.positions.push(tri[k] + Vec3::Z * z * s);
+            m.normals.push(n);
+            m.uvs.push(Vec2::ZERO);
+        }
+        m.indices.push([base, base + 1, base + 2]);
+    }
+    m
+}
+
 /// Sfera UV con normali analitiche.
 pub fn uv_sphere(radius: f32, segments: u32, rings: u32) -> Mesh {
     let mut m = Mesh {

@@ -297,6 +297,102 @@ fn bsdf_sample_s(bs: Bsdf, col: vec4<f32>, wo_w: vec3<f32>, u_lobe: f32, u1: f32
     return s;
 }
 
+// I due percorsi della tabella attorno alla lunghezza d'onda l: (indice del primo, peso del secondo).
+fn laser_lambda_pair(l: f32) -> vec2<f32> {
+    let k = clamp((l - 380.0) / 400.0 * f32(LASER_N_LAMBDA - 1u), 0.0, f32(LASER_N_LAMBDA - 1u));
+    let k0 = min(floor(k), f32(LASER_N_LAMBDA - 2u));
+    return vec2<f32>(k0, k - k0);
+}
+
+// Stessa struttura (stesse superfici attraversate): si può interpolare tra i due percorsi.
+fn laser_compatible(pa: u32, pb: u32) -> bool {
+    if (S[pa] != S[pb] || S[pa + 1u] != S[pb + 1u]) { return false; }
+    for (var s: u32 = 0u; s < S[pa]; s = s + 1u) {
+        if (S[pa + 16u + s * 12u + 3u] != S[pb + 16u + s * 12u + 3u]) { return false; }
+    }
+    return true;
+}
+
+// Fascio visibile dei laser: per ogni lunghezza d'onda il suo percorso (dispersione nei vetri),
+// interpolato tra le due lunghezze d'onda della tabella più vicine.
+fn laser_beams_s(o: vec3<f32>, d: vec3<f32>, t_end: f32) -> vec4<f32> {
+    var c = vec4<f32>(0.0);
+    for (var li: u32 = 0u; li < pu(P_N_LASERS); li = li + 1u) {
+        let lb = laser_base(li);
+        let dens = sf(lb + 4u);
+        if (dens <= 0.0) { continue; }
+        let r = sf(lb + 3u);
+        let power = illum4(sv3(lb));
+        for (var i: u32 = 0u; i < 4u; i = i + 1u) {
+            if (lam_pdf[i] <= 0.0) { continue; }
+            let kp = laser_lambda_pair(lam[i]);
+            let p0 = laser_path(li, 1u + u32(kp.x));
+            let p1 = laser_path(li, 2u + u32(kp.x));
+            let lerp = laser_compatible(p0, p1);
+            var pb = p0;
+            if (!lerp && kp.y >= 0.5) { pb = p1; }
+            for (var s: u32 = 0u; s < S[pb]; s = s + 1u) {
+                let sb = pb + 16u + s * 12u;
+                if (S[sb + 3u] != 0u) { continue; }
+                var a = sv3(sb);
+                var e = sv3(sb + 4u);
+                var tp = sf(sb + 8u);
+                if (lerp) {
+                    let sb1 = p1 + 16u + s * 12u;
+                    a = mix(a, sv3(sb1), kp.y);
+                    e = mix(e, sv3(sb1 + 4u), kp.y);
+                    tp = mix(tp, sf(sb1 + 8u), kp.y);
+                }
+                let b = laser_beam_ab(a, e, r, dens, o, d, t_end);
+                if (b > 0.0) { c[i] = c[i] + power[i] * tp * b; }
+            }
+        }
+    }
+    return c;
+}
+
+// Macchie dei laser sul punto p, per lunghezza d'onda (interpolate come i fasci).
+fn laser_spots_s(bs: Bsdf, col: vec4<f32>, wo: vec3<f32>, p: vec3<f32>, ng: vec3<f32>) -> vec4<f32> {
+    var c = vec4<f32>(0.0);
+    for (var li: u32 = 0u; li < pu(P_N_LASERS); li = li + 1u) {
+        let lb = laser_base(li);
+        let r = sf(lb + 3u);
+        let power = illum4(sv3(lb));
+        for (var i: u32 = 0u; i < 4u; i = i + 1u) {
+            if (lam_pdf[i] <= 0.0) { continue; }
+            let kp = laser_lambda_pair(lam[i]);
+            let p0 = laser_path(li, 1u + u32(kp.x));
+            let p1 = laser_path(li, 2u + u32(kp.x));
+            let has0 = S[p0 + 1u] != 0u;
+            let has1 = S[p1 + 1u] != 0u;
+            var spot: vec3<f32>;
+            var dir: vec3<f32>;
+            var tp: f32;
+            if (has0 && has1 && laser_compatible(p0, p1)) {
+                spot = mix(sv3(p0 + 4u), sv3(p1 + 4u), kp.y);
+                dir = normalize(mix(sv3(p0 + 8u), sv3(p1 + 8u), kp.y));
+                tp = mix(sf(p0 + 12u), sf(p1 + 12u), kp.y);
+            } else if (has0 && (kp.y < 0.5 || !has1)) {
+                spot = sv3(p0 + 4u);
+                dir = sv3(p0 + 8u);
+                tp = sf(p0 + 12u);
+            } else if (has1) {
+                spot = sv3(p1 + 4u);
+                dir = sv3(p1 + 8u);
+                tp = sf(p1 + 12u);
+            } else {
+                continue;
+            }
+            let sp = laser_spot_at(spot, dir, r, p, ng);
+            if (sp.w > 0.0) {
+                let e = bsdf_eval_s(bs, col, wo, sp.xyz);
+                c[i] = c[i] + e.f[i] * power[i] * tp * sp.w;
+            }
+        }
+    }
+    return c;
+}
+
 fn clamp_s(c: vec4<f32>, depth: u32, clamp_v: f32) -> vec4<f32> {
     let y = (c.x + c.y + c.z + c.w) * 0.25;
     if (clamp_v > 0.0 && depth > 0u && y > clamp_v) { return c * (clamp_v / y); }
@@ -361,6 +457,11 @@ fn radiance_spectral(o_in: vec3<f32>, d_in: vec3<f32>) -> vec4<f32> {
             if (lt > 0.0) { tm = lt; }
             let r = intersect_area(i, o, d, tm);
             if (r.x > 0.0) { lt = r.x; lpdf = r.y; lfront = r.z; lem = sv3(light_base(i) + 4u); }
+        }
+        if (camera_path && pu(P_N_LASERS) > 0u) {
+            var t_end = t_surf;
+            if (lt > 0.0) { t_end = lt; }
+            l = l + beta * laser_beams_s(o, d, t_end);
         }
         if (media_n > 0u) {
             var t_end = t_surf;
@@ -481,6 +582,10 @@ fn radiance_spectral(o_in: vec3<f32>, d_in: vec3<f32>) -> vec4<f32> {
         bs.m = m;
         bs.entering = entering;
         let col = albedo4(m.base);
+
+        if (pu(P_N_LASERS) > 0u && has_non_delta(bs)) {
+            l = l + beta * laser_spots_s(bs, col, wo, p, sv3(pb + 12u));
+        }
 
         if (n_select > 0u && has_non_delta(bs)) {
             let ls = spectral_light_sample(n_lights, n_select, env_slot, p);

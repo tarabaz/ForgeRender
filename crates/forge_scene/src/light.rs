@@ -11,10 +11,25 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum LightKind {
     Point,
-    Spot { inner_angle_deg: f32, outer_angle_deg: f32 },
+    Spot {
+        inner_angle_deg: f32,
+        outer_angle_deg: f32,
+    },
     Directional,
-    Area { width: f32, height: f32 },
-    Portal { width: f32, height: f32 },
+    Area {
+        width: f32,
+        height: f32,
+    },
+    Portal {
+        width: f32,
+        height: f32,
+    },
+    /// Laser: fascio sottile (diametro in mm) dalla posizione verso il bersaglio. Si calcola il suo
+    /// percorso attraverso vetri e specchi (anche per lunghezza d'onda, nel render spettrale): una
+    /// macchia di luce dove arriva e, se `beam_density` > 0, il fascio visibile nell'aria.
+    Laser {
+        diameter_mm: f32,
+    },
 }
 
 impl LightKind {
@@ -25,6 +40,7 @@ impl LightKind {
             LightKind::Directional => "Direzionale",
             LightKind::Area { .. } => "Area (rettangolare)",
             LightKind::Portal { .. } => "Portale (finestra)",
+            LightKind::Laser { .. } => "Laser",
         }
     }
 }
