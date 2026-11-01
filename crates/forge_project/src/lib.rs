@@ -368,9 +368,8 @@ pub fn load(path: &Path) -> anyhow::Result<LoadedProject> {
     if let forge_scene::Environment::Hdri { path: hdri, .. } = &mut scene.environment {
         relocate_asset(hdri, project_dir, &["hdri"], &source_dirs, &mut report);
     }
-    // Mappe dei materiali predefiniti (`materiali/<id>/…` e le cartelle a dati accanto, come
-    // `materiali-blenderkit`): si ritrovano anche se il programma è in un'altra cartella
-    // (portable spostata, nuova versione).
+    // Mappe dei materiali predefiniti (`materiali/<id>/…` e le eventuali cartelle a dati accanto):
+    // si ritrovano anche se il programma è in un'altra cartella (portable spostata, nuova versione).
     let builtin = forge_scene::material::builtin_textures_dir();
     let texture_dirs: Vec<PathBuf> = source_dirs
         .iter()

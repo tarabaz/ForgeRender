@@ -699,10 +699,10 @@ pub fn presets() -> Vec<Material> {
     v
 }
 
-/// Cartelle di predefiniti "a dati": una sottocartella per materiale con `materiale.json` e le
-/// mappe. `materiali-blenderkit`: metalli BlenderKit (licenza Royalty Free, solo uso personale;
-/// da togliere prima di distribuire il programma).
-pub const DATA_PRESET_DIRS: [&str; 1] = ["materiali-blenderkit"];
+/// Cartelle di predefiniti "a dati" accanto a `materiali`: una sottocartella per materiale con
+/// `materiale.json` e le mappe (lo stesso formato degli zip di "Esporta zip…"). Per ora nessuna:
+/// i metalli BlenderKit (solo uso personale) sono stati tolti dal programma il 01/11/2026.
+pub const DATA_PRESET_DIRS: [&str; 0] = [];
 
 /// Materiali di una cartella di predefiniti a dati (ordinati per cartella). Le mappe indicate
 /// con il solo nome del file si cercano nella cartella del materiale; un file non valido si salta.
@@ -817,35 +817,38 @@ mod tests {
         }
     }
 
-    /// Predefiniti a dati (assets/materiali-blenderkit): letti con le mappe nella loro cartella,
-    /// senza id doppi. Se la cartella è stata tolta (versione da distribuire) non c'è niente.
+    /// Predefiniti a dati: letti con le mappe nella loro cartella (nome del file relativo).
     #[test]
     fn data_presets_load_with_their_maps() {
-        let Some(root) = builtin_textures_dir().and_then(std::path::Path::parent) else {
-            return;
+        let dir = std::env::temp_dir().join(format!("forge_dati_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let m_dir = dir.join("mio-metallo");
+        std::fs::create_dir_all(&m_dir).unwrap();
+        std::fs::write(m_dir.join("colore.png"), b"x").unwrap();
+        let m = Material {
+            id: MaterialId::new("mio-metallo"),
+            name: "Mio metallo".into(),
+            base_color_texture: Some(PathBuf::from("colore.png")),
+            ..Default::default()
         };
-        let dir = root.join(DATA_PRESET_DIRS[0]);
-        if !dir.is_dir() {
-            return;
-        }
+        std::fs::write(m_dir.join("materiale.json"), serde_json::to_string(&m).unwrap()).unwrap();
         let data = data_presets(&dir);
-        assert!(!data.is_empty(), "nessun predefinito letto da {}", dir.display());
-        for m in &data {
-            assert!(m.has_textures(), "{} senza mappe", m.id.0);
-            for t in m.texture_slots().into_iter().flatten() {
-                assert!(t.is_file() && t.starts_with(&dir), "{}: {}", m.id.0, t.display());
-            }
-        }
+        assert_eq!(data.len(), 1);
+        let t = data[0].base_color_texture.as_ref().unwrap();
+        assert!(t.is_file() && t.starts_with(&m_dir), "{}", t.display());
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    /// I metalli BlenderKit (solo uso personale) non sono più tra i predefiniti; nessun id doppio.
+    #[test]
+    fn no_blenderkit_presets_and_unique_ids() {
         let all = presets();
+        assert!(all.iter().all(|m| !m.id.0.starts_with("bk-")), "materiali BlenderKit nell'elenco");
         let mut ids: Vec<_> = all.iter().map(|m| &m.id).collect();
         let n = ids.len();
         ids.sort();
         ids.dedup();
         assert_eq!(ids.len(), n, "id doppi");
-        assert!(
-            data.iter().all(|d| all.iter().any(|m| m.id == d.id)),
-            "predefiniti a dati nell'elenco"
-        );
     }
 
     /// Le mappe dei predefiniti (assets/materiali) si trovano anche dai test e sono complete.

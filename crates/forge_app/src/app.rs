@@ -156,6 +156,8 @@ pub struct StartupOptions {
     pub sequence_passes: bool,
     pub sequence_step: Option<f32>,
     pub sequence_samples: Option<u32>,
+    /// Mostra la scelta della modalità anche nelle prove (`--scelta-modalita`).
+    pub mode_choice: bool,
 }
 
 /// Stato di un componente salvato per annulla/ripeti (trasformazione e visibilità).
@@ -280,6 +282,9 @@ pub struct ForgeApp {
     pub language_errors: Vec<String>,
     /// Schermata di benvenuto aperta e sua immagine.
     pub splash_open: bool,
+    /// Finestra "Come vuoi lavorare?" (scelta della modalità all'avvio) e la sua casella.
+    pub mode_choice_open: bool,
+    pub mode_choice_dont_ask: bool,
     pub splash_texture: Option<egui::TextureHandle>,
     pub logo_texture: Option<egui::TextureHandle>,
     /// Modalità Semplice: aspetto e qualità scelti, valori prima dell'ultimo preset.
@@ -408,6 +413,8 @@ impl ForgeApp {
             languages: Vec::new(),
             language_errors: Vec::new(),
             splash_open: false,
+            mode_choice_open: false,
+            mode_choice_dont_ask: false,
             splash_texture: None,
             logo_texture: None,
             simple_look: crate::presets::Look::Light,
@@ -462,6 +469,14 @@ impl ForgeApp {
         app.apply_prefs(prefs, true);
         // Avviato già comandato dall'assistente (prove automatiche): niente schermata davanti.
         app.splash_open = app.prefs.show_splash && !startup.mcp;
+        // Scelta della modalità: non nelle prove automatiche (modalità già indicata, assistente,
+        // sequenze, screenshot) salvo `--scelta-modalita`.
+        app.mode_choice_open = startup.mode_choice
+            || (app.prefs.ask_ui_mode
+                && !startup.mcp
+                && startup.ui_mode.is_none()
+                && startup.sequence.is_none()
+                && startup.screenshot.is_none());
         if startup.mcp {
             crate::mcp::set_enabled(&mut app, &cc.egui_ctx, true);
         }

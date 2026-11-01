@@ -332,6 +332,10 @@ fn about(ui: &mut egui::Ui, p: &mut Preferences) {
     ui.checkbox(&mut p.show_splash, tr("Mostra all'avvio")).on_hover_text(tr(
         "Schermata di benvenuto all'avvio (si riapre da Guida, Benvenuto e informazioni…)",
     ));
+    ui.checkbox(&mut p.ask_ui_mode, tr("Chiedi la modalità all'avvio"))
+        .on_hover_text(tr(
+            "Finestra per scegliere tra modalità Semplice e Avanzata (si cambia anche dal selettore in alto a sinistra)",
+        ));
     egui::Grid::new("prefs-about").num_columns(2).spacing([12.0, 6.0]).show(ui, |ui| {
         ui.label(tr("Libreria"));
         ui.label(egui::RichText::new(forge_library::paths::root().display().to_string()).monospace());

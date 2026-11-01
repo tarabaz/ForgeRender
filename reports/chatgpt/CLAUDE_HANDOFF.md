@@ -2157,3 +2157,17 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
 - La pagina latest mostra i pacchetti disponibili e le note della release corrente; il README non contiene più un URL ZIP legato alla versione 0.23.0.
 - Nessun link a un asset ZIP è stato inventato o modificato. Nessun codice applicativo cambiato.
 - Verifica: file aggiornati tramite GitHub API su `main`; nessun test/build necessario per questa modifica documentale.
+
+## Claude Code — 01/11/2026: scelta della modalità all'avvio, materiali BlenderKit tolti (branch `sviluppo`)
+
+- Su richiesta di Valerio questo lavoro è pushato solo sul branch `sviluppo`, non su main, e
+  senza cambiare versione: main resta la 0.23.0 pubblicata.
+- `ui/mode_choice.rs`: finestra "Come vuoi lavorare?" dopo la schermata di benvenuto; preferenza
+  `ask_ui_mode` (vale true per chi non ce l'ha) con la casella in Impostazioni, Informazioni.
+  Non compare nelle prove automatiche (`--modalita`, `--controllo-ia`, `--sequenza`,
+  `--screenshot`) salvo `--scelta-modalita`.
+- Materiali BlenderKit: cartella `assets/materiali-blenderkit` tolta dal repository (copia
+  identica in `C:\Users\valer\Dev\RenderingEngine\backup-materiali-blenderkit-2026-11-01`, e nella
+  cronologia git); `DATA_PRESET_DIRS` vuoto, pronto per i predefiniti in zip; avviso licenze
+  aggiornato. L'importatore `.blend`/BlenderKit resta. I progetti che usavano un `bk-…` mostrano
+  il materiale senza mappe.

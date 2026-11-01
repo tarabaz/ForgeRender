@@ -104,6 +104,7 @@ fn parse_args() -> StartupOptions {
                 o.camera_test = args.get(i).cloned();
             }
             "--sequenze" => o.sequences_window = true,
+            "--scelta-modalita" => o.mode_choice = true,
             "--sequenza" => {
                 i += 1;
                 o.sequence = args.get(i).map(PathBuf::from);

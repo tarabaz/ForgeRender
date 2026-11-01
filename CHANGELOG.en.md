@@ -10,6 +10,14 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## Unreleased (development branch, not on main)
+
+**Startup mode choice**
+- At startup, after the welcome screen, a "How do you want to work?" window offers Simple or Advanced mode, with a short description of each and a note that you can switch later with the "Mode: Simple | Advanced" selector at the top left. It appears at every launch until "Don't show at startup again" is ticked; it can be turned back on in Settings, Information ("Ask for the mode at startup").
+
+**BlenderKit materials removed**
+- The 38 BlenderKit metals (Royalty Free, personal use only) are no longer bundled or listed among the presets. The `.blend` / BlenderKit material importer is still available.
+
 ## 0.23.0 — 31 Oct 2026
 
 **Default render settings**

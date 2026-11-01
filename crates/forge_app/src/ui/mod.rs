@@ -14,6 +14,7 @@ pub mod library;
 pub mod manual;
 pub(crate) mod material_editor;
 pub mod menubar;
+pub(crate) mod mode_choice;
 pub mod navigator;
 mod quickbar;
 pub(crate) mod sequence;
@@ -268,6 +269,7 @@ impl ForgeApp {
         crate::ui::manual::window(self, ctx);
         crate::ui::settings::window(self, ctx);
         crate::ui::splash::show(self, ctx);
+        crate::ui::mode_choice::show(self, ctx);
         if self.show_import_options {
             self.import_options_window(ctx);
         }

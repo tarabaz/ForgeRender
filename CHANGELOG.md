@@ -13,6 +13,19 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## In sviluppo (branch di sviluppo, non su main)
+
+**Scelta della modalità all'avvio**
+- All'avvio, dopo la schermata di benvenuto, la finestra "Come vuoi lavorare?" propone la
+  modalità Semplice o Avanzata, con una breve descrizione di ognuna e l'indicazione che si
+  cambia poi dal selettore "Modalità: Semplice | Avanzata" in alto a sinistra. Compare a ogni
+  avvio finché non si spunta "Non mostrare più all'avvio"; si riattiva in Impostazioni,
+  Informazioni ("Chiedi la modalità all'avvio").
+
+**Materiali BlenderKit tolti**
+- I 38 metalli BlenderKit (Royalty Free, solo uso personale) non sono più inclusi né elencati
+  tra i predefiniti. L'importatore di materiali da file `.blend` / BlenderKit resta disponibile.
+
 ## 0.23.0 — 31/10/2026
 
 **Valori di partenza del render**

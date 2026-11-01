@@ -36,8 +36,3 @@ sostituito da ForgeRender per mostrare il materiale scelto.
 Mappe dei materiali predefiniti (cartella materiali): Rovere da "Oak Veneer 01" e Pelle
 nera da "Leather White" di Poly Haven (https://polyhaven.com), licenza CC0 (pubblico
 dominio); Marmo bianco lucido generato da ForgeRender.
-
-Metalli BlenderKit (cartella materiali-blenderkit, se presente): licenza Royalty Free di
-BlenderKit (https://www.blenderkit.com), usabili nei propri render ma non ridistribuibili.
-Valgono solo per l'uso personale di questa copia; prima di distribuire il programma la
-cartella va tolta (vedi materiali-blenderkit\LEGGIMI.md).

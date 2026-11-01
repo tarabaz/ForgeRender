@@ -1149,7 +1149,7 @@ mod tests {
         assert!((0.03..0.5).contains(&stage.size_m), "{}", stage.size_m);
         set_preview_samples(8);
         let presets = forge_scene::material::presets();
-        let ids = ["legno-rovere", "acciaio-satinato", "vetro", "bk-acciaio-spazzolato"];
+        let ids = ["legno-rovere", "acciaio-satinato", "vetro"];
         for id in ids {
             let Some(m) = presets.iter().find(|m| m.id.0 == id) else { continue };
             let px = render_preview(m, 96);

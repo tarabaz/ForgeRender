@@ -31,6 +31,8 @@ pub struct Preferences {
     pub language: String,
     /// Schermata di benvenuto all'avvio.
     pub show_splash: bool,
+    /// Finestra di scelta della modalità (Semplice o Avanzata) all'avvio.
+    pub ask_ui_mode: bool,
     // --- Libreria e import dei materiali ---
     /// Risoluzione proposta per i download (indice in `online::RESOLUTIONS`: 0 = 1K).
     pub download_resolution: usize,
@@ -82,6 +84,7 @@ impl Default for Preferences {
             ui_mode: UiMode::Simple,
             language: crate::i18n::SOURCE_CODE.into(),
             show_splash: true,
+            ask_ui_mode: true,
             download_resolution: 0,
             download_provider: "ambientcg".into(),
             import_displacement: ImportDisplacement::Off,
@@ -224,6 +227,7 @@ mod tests {
             ui_mode: UiMode::Advanced,
             language: "en".into(),
             show_splash: false,
+            ask_ui_mode: false,
             download_resolution: 2,
             download_provider: "polyhaven".into(),
             import_displacement: ImportDisplacement::FromMaterialX,
