@@ -25,7 +25,7 @@ La complessità è una stima di lavoro e rischio per questo codice:
 | 10 | Anteprima del displacement nella viewport di modellazione | Media | displacement ✅ | Oggi il displacement si vede solo nel render |
 | 11 | Mip-mapping / filtraggio delle texture | Media | — | Meno sfarfallio sulle texture lontane |
 | 12 | DLSS Ray Reconstruction come anteprima interattiva veloce | Molto alta | SDK NVIDIA | Solo RTX, interop Vulkan con wgpu |
-| 13 | Ray tracing hardware (RT core) | Molto alta | OptiX o ray query Vulkan | ✅ fatto (branch di sviluppo): ray query Vulkan, 10–15 volte più veloce su una RTX 5070 |
+| 13 | Ray tracing hardware (RT core) | Molto alta | OptiX o ray query Vulkan | ✅ fatto nella 0.25.0: ray query Vulkan, 10–15 volte più veloce su una RTX 5070 |
 | 14 | Generatore di edera: rampicanti fotorealistici che crescono sugli oggetti | Alta | — | **Da fare più avanti**, non pianificato ora |
 | 15 | Utilizzo GPU / VRAM tramite NVML | Bassa | ✅ 0.6.0 (solo NVIDIA) | — |
 | 16 | Import di volumi OpenVDB (fumo/fuoco simulati in Blender Mantaflow, EmberGen, Houdini) | Media | renderer della nebbia ✅ | Lettore VDB in Rust puro; il renderer gestisce già griglie di densità |

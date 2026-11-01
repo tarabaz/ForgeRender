@@ -10,7 +10,7 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
-## Unreleased (development branch, not on main)
+## 0.25.0 — 1 Nov 2026
 
 **Hardware ray tracing (RT cores)**
 - On GPUs with ray tracing units (NVIDIA RTX, AMD RX 6000 and newer, with Vulkan), the GPU renderer finds the triangles hit by each ray with the hardware (wgpu ray queries) instead of the shader's BVH. Same image: 99.9% of pixels identical to the BVH on the same GPU, and all CPU/GPU tests unchanged.

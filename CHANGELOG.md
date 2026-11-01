@@ -13,7 +13,7 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
-## In sviluppo (branch di sviluppo, non su main)
+## 0.25.0 — 01/11/2026
 
 **Ray tracing hardware (RT core)**
 - Sulle schede con unità di ray tracing (NVIDIA RTX, AMD RX 6000 e successive, con Vulkan) il

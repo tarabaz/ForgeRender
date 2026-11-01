@@ -18,15 +18,14 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
-### Novità della versione 0.24.0
+### Novità della versione 0.25.0
 
-- **Rendering spettrale (opzionale):** Render → Colore: RGB (predefinito) o Spettrale, su CPU e GPU. Vetri e gemme possono scomporre la luce in arcobaleni (Dispersione del materiale, numero di Abbe), con i predefiniti crown, flint, cristallo al piombo, policarbonato e diamante. Vedi [docs/SPECTRAL.it.md](docs/SPECTRAL.it.md).
-- **Scelta della modalità all'avvio:** Semplice o Avanzata a ogni avvio, finché non si spunta "Non mostrare più all'avvio".
-- **Materiali BlenderKit tolti** dai predefiniti inclusi (licenza solo per uso personale); l'importatore `.blend` resta disponibile.
+- **Ray tracing hardware (RT core):** sulle schede con unità di ray tracing (NVIDIA RTX, AMD RX 6000 e successive, Vulkan) i raggi si tracciano in hardware. Stessa immagine, render **10–15 volte più veloci** su una RTX 5070 (spettrale 8–13 volte). Automatico, con ritorno alla BVH dello shader sulle altre schede.
 
 <details>
 <summary><strong>Versioni precedenti — storico completo delle release</strong></summary>
 
+- **0.24.0 — Rendering spettrale, scelta della modalità all'avvio:** modalità spettrale opzionale su CPU e GPU con dispersione nei vetri (numero di Abbe) e i predefiniti crown, flint, cristallo al piombo, policarbonato e diamante ([docs/SPECTRAL.it.md](docs/SPECTRAL.it.md)); modalità Semplice o Avanzata scelta all'avvio; materiali BlenderKit tolti dai predefiniti inclusi.
 - **0.23.0 — Render più puliti di base:** il denoiser lavora al 100% e la soglia di rumore parte da 0,03.
 - **0.22.0 — Viste multiple, turntable e passaggi di render:** viste frontale, posteriore, laterali, dall'alto e a tre quarti automatiche; video del prodotto in rotazione in MP4 (H.264) con rotazione e durata regolabili; passaggi albedo, normali, profondità, maschera del prodotto e ID dei componenti.
 - **0.21.0 — Editor materiali ed esportazione ZIP:** modifica materiali e mappe, ruota l'anteprima in tempo reale, applica e salva le modifiche ed esporta materiali portabili in ZIP. Corretti anche i campioni di Bozza e il ridimensionamento ripetuto dei fondali.

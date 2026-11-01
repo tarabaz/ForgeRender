@@ -25,7 +25,7 @@ Complexity is a rough estimate of the effort and risk for this codebase:
 | 10 | Displacement preview in the modelling viewport | Medium | displacement ✅ | Today displacement shows in the render only |
 | 11 | Texture mip-mapping / filtering | Medium | — | Less aliasing on distant textures |
 | 12 | DLSS Ray Reconstruction as fast interactive preview | Very high | NVIDIA SDK | RTX only, Vulkan interop with wgpu |
-| 13 | Hardware ray tracing (RT cores) | Very high | OptiX or Vulkan ray query | ✅ done (development branch): Vulkan ray query, 10–15× faster on an RTX 5070 |
+| 13 | Hardware ray tracing (RT cores) | Very high | OptiX or Vulkan ray query | ✅ done in 0.25.0: Vulkan ray query, 10–15× faster on an RTX 5070 |
 | 14 | Ivy generator: photorealistic climbing plants growing on objects | High | — | **To do later**, not scheduled now |
 | 15 | GPU usage / VRAM readout via NVML | Low | ✅ 0.6.0 (NVIDIA only) | — |
 | 16 | Import OpenVDB volumes (smoke/fire simulated in Blender Mantaflow, EmberGen, Houdini) | Medium | fog renderer ✅ | Pure-Rust VDB reader; the renderer already handles density grids |

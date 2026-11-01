@@ -2231,3 +2231,10 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
   GB sulla RTX 5070, circa 6 milioni di triangoli). Con gli RT core i nodi della BVH dello shader
   non servono: toglierli permetterebbe scene più grandi (prossimo passo possibile).
 - Pushato solo su `sviluppo`; main resta la 0.24.0 finché Valerio non chiede di portarlo.
+
+## Claude Code — 01/11/2026: 0.25.0 su main (RT core)
+
+- Su richiesta di Valerio gli RT core (ray query Vulkan) passano su main come **0.25.0**:
+  versione in `Cargo.toml` e nell'installer, changelog inglese e italiano, README (IT/EN) con le
+  novità della 0.25.0 e la 0.24.0 nello storico, roadmap aggiornata. Main e `sviluppo` puntano
+  allo stesso commit.
