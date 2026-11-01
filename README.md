@@ -18,13 +18,15 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
-### What's new in 0.25.0
+### What's new in 0.26.0
 
-- **Hardware ray tracing (RT cores):** on GPUs with ray tracing units (NVIDIA RTX, AMD RX 6000 and newer, Vulkan) rays are traced in hardware. Same image, renders **10–15× faster** on an RTX 5070 (spectral 8–13×). Automatic, with fallback to the shader BVH on other GPUs.
+- **Laser light:** a thin beam traced from the light through glass and mirrors, with an exact spot where it lands and an optional visible beam in the air. In the Spectral render, dispersive glass opens it into a rainbow fan.
+- **Demo scene "Prism and light":** File → New demo scene: a white beam enters a glass prism on a black background and leaves as a rainbow.
 
 <details>
 <summary><strong>Previous versions — complete release history</strong></summary>
 
+- **0.25.0 — Hardware ray tracing (RT cores):** rays traced by the GPU's ray tracing units (Vulkan), same image, renders 10–15× faster on an RTX 5070; automatic fallback to the shader BVH.
 - **0.24.0 — Spectral rendering, startup mode choice:** optional spectral mode on CPU and GPU with glass dispersion (Abbe number) and presets for crown, flint, lead crystal, polycarbonate and diamond ([docs/SPECTRAL.md](docs/SPECTRAL.md)); Simple or Advanced mode chosen at startup; BlenderKit materials removed from the bundled presets.
 - **0.23.0 — Cleaner default renders:** the denoiser runs at 100% and the noise threshold starts at 0.03.
 - **0.22.0 — Multiple views, turntable and render passes:** automatic front, rear, side, top and three-quarter views; rotating product video exported as MP4 (H.264) with adjustable rotation and duration; albedo, normals, depth, product mask and component ID passes.

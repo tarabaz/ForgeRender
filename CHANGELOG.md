@@ -13,7 +13,7 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
-## In sviluppo (branch di sviluppo, non su main)
+## 0.26.0 — 01/11/2026
 
 **Luce laser**
 - Nuovo tipo di luce **Laser** (pannello Luci): fascio sottile (diametro in mm, potenza in W)

@@ -2261,3 +2261,10 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
     stesso punto;
   - CPU e GPU coincidono entro l'1–4% (RGB e spettrale);
   - render nell'app della scena demo: 1024 campioni in 10,5 s su RTX 5070.
+
+## Claude Code — 01/11/2026: 0.26.0 su main (laser e scena demo)
+
+- Su richiesta di Valerio la luce laser e la scena demo "Prisma e luce" passano su main come
+  **0.26.0**: versione in `Cargo.toml` e nell'installer, changelog inglese e italiano, README
+  (IT/EN) con le novità della 0.26.0 e la 0.25.0 nello storico. Main e `sviluppo` puntano allo
+  stesso commit.

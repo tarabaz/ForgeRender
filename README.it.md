@@ -18,13 +18,15 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
-### Novità della versione 0.25.0
+### Novità della versione 0.26.0
 
-- **Ray tracing hardware (RT core):** sulle schede con unità di ray tracing (NVIDIA RTX, AMD RX 6000 e successive, Vulkan) i raggi si tracciano in hardware. Stessa immagine, render **10–15 volte più veloci** su una RTX 5070 (spettrale 8–13 volte). Automatico, con ritorno alla BVH dello shader sulle altre schede.
+- **Luce laser:** fascio sottile seguito dalla luce attraverso vetri e specchi, con una macchia esatta dove arriva e il fascio visibile nell'aria (a scelta). Nel render Spettrale i vetri dispersivi lo aprono a ventaglio arcobaleno.
+- **Scena demo "Prisma e luce":** File → Nuova scena demo: un fascio di luce bianca entra in un prisma di vetro su fondo nero ed esce come arcobaleno.
 
 <details>
 <summary><strong>Versioni precedenti — storico completo delle release</strong></summary>
 
+- **0.25.0 — Ray tracing hardware (RT core):** raggi tracciati dalle unità di ray tracing della scheda (Vulkan), stessa immagine, render 10–15 volte più veloci su una RTX 5070; ritorno automatico alla BVH dello shader.
 - **0.24.0 — Rendering spettrale, scelta della modalità all'avvio:** modalità spettrale opzionale su CPU e GPU con dispersione nei vetri (numero di Abbe) e i predefiniti crown, flint, cristallo al piombo, policarbonato e diamante ([docs/SPECTRAL.it.md](docs/SPECTRAL.it.md)); modalità Semplice o Avanzata scelta all'avvio; materiali BlenderKit tolti dai predefiniti inclusi.
 - **0.23.0 — Render più puliti di base:** il denoiser lavora al 100% e la soglia di rumore parte da 0,03.
 - **0.22.0 — Viste multiple, turntable e passaggi di render:** viste frontale, posteriore, laterali, dall'alto e a tre quarti automatiche; video del prodotto in rotazione in MP4 (H.264) con rotazione e durata regolabili; passaggi albedo, normali, profondità, maschera del prodotto e ID dei componenti.
