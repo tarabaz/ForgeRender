@@ -2314,3 +2314,11 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
   descrittiva, scene nuove, prisma/diamante/pendente nel menu Aggiungi e fondale sotto gli oggetti
   passano su main come **0.28.0**. Versione, changelog IT/EN e README IT/EN aggiornati. Main e
   `sviluppo` sullo stesso commit.
+
+## Claude Code — 01/11/2026: scene demo salvabili (branch `sviluppo`)
+
+- Segnalazione di Valerio: la demo del diamante salvata e riaperta dava "3 componenti con materiale
+  assegnato non sono più presenti". Causa: le demo aggiungevano mesh e nodi direttamente
+  (`add_mesh`/`add_node`), ma il progetto salva solo file importati e oggetti aggiunti. Ora
+  `demos::node` crea `AddedRecord` (anche per il prisma della 0.26); test
+  `generated_demos_survive_save_and_load`.

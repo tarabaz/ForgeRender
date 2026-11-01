@@ -9,7 +9,7 @@
 use crate::i18n::{tk, tr};
 use forge_math::{Mat4, Quat, Vec3};
 use forge_render_core::{CausticSettings, ColorMode, RenderSettings};
-use forge_scene::{primitives, Camera, ComponentId, Environment, Light, LightKind, Material, MaterialId, Mesh, Scene};
+use forge_scene::{primitives, AddedKind, AddedRecord, Camera, ComponentId, Environment, Light, LightKind, Material, MaterialId, Scene};
 use std::path::{Path, PathBuf};
 
 /// Gruppi del sottomenu, nell'ordine.
@@ -249,11 +249,26 @@ fn glass(m: &mut Material, ior: f32, abbe: f32) {
     m.abbe = abbe;
 }
 
-fn node(s: &mut Scene, id: &str, name: &str, mesh: Mesh, xf: Mat4, material: &str) {
-    let mi = s.add_mesh(mesh);
-    let cid = ComponentId(format!("demo/{id}"));
-    s.add_node(None, cid.clone(), name, xf, Some(mi));
-    s.assignments.insert(cid, MaterialId::new(material));
+/// Oggetto della scena come oggetto aggiunto (menu Aggiungi): il progetto salvato lo ricrea.
+/// `xf` posiziona la forma come la crea la sua primitiva (gemme e prisma centrati, le altre con la
+/// base a y = 0); lo spostamento che mette gemme e prisma in piedi sul piano si toglie qui.
+pub(crate) fn node(s: &mut Scene, id: &str, name: &str, kind: AddedKind, xf: Mat4, material: &str) {
+    let raw = match kind {
+        AddedKind::Prism { side, length } => Some(primitives::prism(side, length)),
+        AddedKind::Gem { diameter } => Some(primitives::brilliant(diameter)),
+        AddedKind::Pendant { width, length } => Some(primitives::crystal_drop(width, length)),
+        _ => None,
+    };
+    let lift = raw.map_or(0.0, |m| -m.positions.iter().map(|p| p.y).fold(f32::INFINITY, f32::min));
+    let r = AddedRecord {
+        id: ComponentId(format!("demo/{id}")),
+        name: name.into(),
+        kind,
+        placement: xf * Mat4::from_translation(Vec3::new(0.0, -lift, 0.0)),
+    };
+    s.instantiate_added(&r);
+    s.assignments.insert(r.id.clone(), MaterialId::new(material));
+    s.added.push(r);
 }
 
 fn spot(name: &str, position: Vec3, target: Vec3, angle_deg: f32, intensity: f32) -> Light {
@@ -297,7 +312,7 @@ pub fn diamond_laser_scene() -> (Scene, RenderSettings) {
         &mut s,
         "diamante",
         tr("Diamante"),
-        primitives::brilliant(0.12),
+        AddedKind::Gem { diameter: 0.12 },
         Mat4::from_rotation_translation(tilt, centre),
         "demo-diamante",
     );
@@ -305,7 +320,7 @@ pub fn diamond_laser_scene() -> (Scene, RenderSettings) {
         &mut s,
         "pavimento",
         tr("Pavimento"),
-        primitives::plane(4.0, 4.0),
+        AddedKind::Floor { size: 4.0 },
         Mat4::IDENTITY,
         "demo-bianco",
     );
@@ -313,8 +328,8 @@ pub fn diamond_laser_scene() -> (Scene, RenderSettings) {
         &mut s,
         "fondale",
         tr("Fondale"),
-        primitives::plane(4.0, 2.0),
-        Mat4::from_rotation_translation(Quat::from_rotation_x(std::f32::consts::FRAC_PI_2), Vec3::new(0.0, 1.0, -0.7)),
+        AddedKind::Wall { width: 4.0, height: 2.0 },
+        Mat4::from_translation(Vec3::new(0.0, 0.0, -0.7)),
         "demo-bianco",
     );
     s.environment = Environment::Uniform {
@@ -357,7 +372,7 @@ pub fn pendants_sun_scene() -> (Scene, RenderSettings) {
         &mut s,
         "pavimento",
         tr("Pavimento"),
-        primitives::plane(4.0, 4.0),
+        AddedKind::Floor { size: 4.0 },
         Mat4::IDENTITY,
         "demo-bianco",
     );
@@ -365,16 +380,16 @@ pub fn pendants_sun_scene() -> (Scene, RenderSettings) {
         &mut s,
         "parete-fondo",
         tr("Parete di fondo"),
-        primitives::plane(4.0, 3.0),
-        Mat4::from_rotation_translation(Quat::from_rotation_x(FRAC_PI_2), Vec3::new(0.0, 1.5, -0.8)),
+        AddedKind::Wall { width: 4.0, height: 3.0 },
+        Mat4::from_translation(Vec3::new(0.0, 0.0, -0.8)),
         "demo-bianco",
     );
     node(
         &mut s,
         "parete-sinistra",
         tr("Parete sinistra"),
-        primitives::plane(3.0, 4.0),
-        Mat4::from_rotation_translation(Quat::from_rotation_z(-FRAC_PI_2), Vec3::new(-1.2, 1.5, 0.0)),
+        AddedKind::Wall { width: 4.0, height: 3.0 },
+        Mat4::from_rotation_translation(Quat::from_rotation_y(FRAC_PI_2), Vec3::new(-1.2, 0.0, 0.0)),
         "demo-bianco",
     );
     // Pendenti a quote e rotazioni diverse, ognuno col suo filo.
@@ -387,11 +402,11 @@ pub fn pendants_sun_scene() -> (Scene, RenderSettings) {
         (Vec3::new(0.0, 1.18, 0.1), 2.6, false),
     ];
     for (i, (p, rot, round)) in gems.into_iter().enumerate() {
-        let (mesh, top) = if round {
+        let (kind, top) = if round {
             // Brillante appeso di taglio (tavola verso la luce).
-            (primitives::brilliant(0.09), 0.045)
+            (AddedKind::Gem { diameter: 0.09 }, 0.045)
         } else {
-            (primitives::crystal_drop(0.07, 0.15), 0.15 * 0.22)
+            (AddedKind::Pendant { width: 0.07, length: 0.15 }, 0.15 * 0.22)
         };
         let q = if round {
             Quat::from_rotation_y(rot) * Quat::from_rotation_x(FRAC_PI_2)
@@ -402,7 +417,7 @@ pub fn pendants_sun_scene() -> (Scene, RenderSettings) {
             &mut s,
             &format!("pendente-{i}"),
             &format!("{} {}", tr("Pendente"), i + 1),
-            mesh,
+            kind,
             Mat4::from_rotation_translation(q, p),
             "demo-cristallo",
         );
@@ -411,7 +426,10 @@ pub fn pendants_sun_scene() -> (Scene, RenderSettings) {
             &mut s,
             &format!("filo-{i}"),
             &format!("{} {}", tr("Filo"), i + 1),
-            primitives::cylinder(0.0008, len, 8),
+            AddedKind::Cylinder {
+                radius: 0.0008,
+                height: len,
+            },
             Mat4::from_translation(Vec3::new(p.x, p.y + top, p.z)),
             "demo-cromo",
         );
@@ -455,7 +473,7 @@ pub fn glass_caustics_scene() -> (Scene, RenderSettings) {
         &mut s,
         "tavolo",
         tr("Tavolo"),
-        primitives::plane(3.0, 3.0),
+        AddedKind::Floor { size: 3.0 },
         Mat4::IDENTITY,
         "demo-tavolo",
     );
@@ -464,24 +482,24 @@ pub fn glass_caustics_scene() -> (Scene, RenderSettings) {
         &mut s,
         "sfera",
         tr("Sfera di vetro"),
-        primitives::uv_sphere(r, 96, 48),
-        Mat4::from_translation(Vec3::new(0.0, r, 0.0)),
+        AddedKind::Sphere { radius: r },
+        Mat4::IDENTITY,
         "demo-vetro",
     );
     node(
         &mut s,
         "sfera-ambra",
         tr("Sfera ambra"),
-        primitives::uv_sphere(r * 0.75, 96, 48),
-        Mat4::from_translation(Vec3::new(0.24, r * 0.75, -0.1)),
+        AddedKind::Sphere { radius: r * 0.75 },
+        Mat4::from_translation(Vec3::new(0.24, 0.0, -0.1)),
         "demo-ambra",
     );
     node(
         &mut s,
         "cubo",
         tr("Cubo di vetro"),
-        primitives::cuboid(Vec3::splat(0.1)),
-        Mat4::from_rotation_translation(Quat::from_rotation_y(0.5), Vec3::new(-0.24, 0.05, -0.08)),
+        AddedKind::Box { size: Vec3::splat(0.1) },
+        Mat4::from_rotation_translation(Quat::from_rotation_y(0.5), Vec3::new(-0.24, 0.0, -0.08)),
         "demo-vetro",
     );
     s.environment = Environment::Uniform {
@@ -517,6 +535,45 @@ mod tests {
         for (c, name) in CATEGORIES.iter().enumerate() {
             assert!(DEMOS.iter().any(|d| d.category == c), "gruppo vuoto {name}");
         }
+    }
+
+    /// Salvate e riaperte, le scene generate tornano uguali: ogni oggetto ricreato con la sua
+    /// posizione e il suo materiale (prima i pezzi delle demo non finivano nel progetto).
+    #[test]
+    fn generated_demos_survive_save_and_load() {
+        let dir = std::env::temp_dir().join(format!("forge_demo_rt_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        for d in &DEMOS {
+            let DemoSource::Generated(build) = d.source else { continue };
+            let (scene, st) = build();
+            let path = dir.join("demo.frproject");
+            forge_project::save(&path, &scene, &forge_project::ProjectMeta::default(), &st).unwrap();
+            let l = forge_project::load(&path).unwrap();
+            let bounds = |s: &Scene| {
+                let mut v: Vec<(String, [i32; 6])> = s
+                    .nodes
+                    .iter()
+                    .filter(|n| n.mesh.is_some())
+                    .map(|n| {
+                        let i = s.find(&n.id).unwrap();
+                        let b = s.exact_bounds_of(i);
+                        let q = |x: f32| (x * 1e4).round() as i32;
+                        (
+                            n.id.0.clone(),
+                            [q(b.min.x), q(b.min.y), q(b.min.z), q(b.max.x), q(b.max.y), q(b.max.z)],
+                        )
+                    })
+                    .collect();
+                v.sort();
+                v
+            };
+            assert!(!bounds(&scene).is_empty(), "{}", d.title);
+            assert_eq!(bounds(&scene), bounds(&l.scene), "{}", d.title);
+            for id in scene.assignments.keys() {
+                assert!(l.scene.find(id).is_some(), "{}: manca {}", d.title, id.0);
+            }
+        }
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// Il progetto del cocktail è nel repository.

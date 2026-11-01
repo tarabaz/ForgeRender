@@ -742,7 +742,7 @@ pub fn studio_demo_scene() -> Scene {
 /// con un fascio di luce bianca (laser visibile nell'aria) che entra da sinistra all'angolo di
 /// deviazione minima ed esce a destra aperto in un arcobaleno. Va renderizzata in Spettrale.
 pub fn prism_demo_scene() -> (Scene, RenderSettings) {
-    use forge_scene::{primitives, Camera, LightKind};
+    use forge_scene::{Camera, LightKind};
     let mut s = Scene::default();
     let (ior, side) = (1.6f32, 0.5f32);
     s.materials.upsert(Material {
@@ -755,10 +755,15 @@ pub fn prism_demo_scene() -> (Scene, RenderSettings) {
         abbe: 8.0,
         ..Default::default()
     });
-    let prism = s.add_mesh(primitives::prism(side, 0.5));
-    let pid = ComponentId("demo/prisma".into());
-    s.add_node(None, pid.clone(), tr("Prisma"), Mat4::IDENTITY, Some(prism));
-    s.assignments.insert(pid, MaterialId::new("demo-prisma"));
+    // Oggetto aggiunto (come dal menu Aggiungi): il progetto salvato lo ricrea.
+    crate::demos::node(
+        &mut s,
+        "prisma",
+        tr("Prisma"),
+        forge_scene::AddedKind::Prism { side, length: 0.5 },
+        Mat4::IDENTITY,
+        "demo-prisma",
+    );
     s.environment = Environment::Uniform {
         color: [1.0; 3],
         // Ambiente tenue e invisibile alla camera: lo sfondo resta nero, ma il vetro lo riflette e

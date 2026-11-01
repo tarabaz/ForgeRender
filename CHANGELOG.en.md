@@ -10,6 +10,11 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## Unreleased (`sviluppo` branch)
+
+**Fixes**
+- Demo scenes saved as a project and reopened lost their objects (diamond, backdrop, floor, prism…) and showed "components with an assigned material are no longer present": the shapes built by the demos were not written to the project. They are now created like the objects of the Add menu, so the project saves them and recreates them on opening. Projects saved from a demo with 0.26–0.28.0 have to be saved again from the demo.
+
 ## 0.28.0 — 1 Nov 2026
 
 **Caustics (progressive photon mapping)**

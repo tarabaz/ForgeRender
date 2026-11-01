@@ -13,6 +13,15 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## In sviluppo (branch `sviluppo`)
+
+**Correzioni**
+- Le scene demo salvate come progetto e riaperte perdevano gli oggetti (diamante, fondale,
+  pavimento, prisma…) e compariva "componenti con materiale assegnato non sono più presenti": le
+  forme costruite dalle demo non finivano nel progetto. Ora si creano come gli oggetti del menu
+  Aggiungi, quindi il progetto le salva e le ricrea all'apertura. I progetti salvati da una demo
+  con la 0.26–0.28.0 vanno salvati di nuovo partendo dalla demo.
+
 ## 0.28.0 — 01/11/2026
 
 **Caustiche (photon mapping progressivo)**
