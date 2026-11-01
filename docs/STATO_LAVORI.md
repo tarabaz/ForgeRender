@@ -619,5 +619,14 @@
   nella cartella dell'utente (`writable_project`); `samples` anche nell'installer.
 - Fondale: `presets::scenery_bounds` (sotto tutti gli oggetti, non solo la selezione).
 
+
+### 0.29.0 (01/11/2026): luce nei bicchieri con il liquido, categoria Liquidi
+- `forge_render_core::laser`: pila dei volumi con priorità (`Media`), facce "false" attraversate,
+  indici dei due lati (`outside`), potenza del fascio visibile a metà tratto.
+- `forge_render_cpu::photons`: stessa gestione con `integrator::Media`.
+- `forge_scene`: `LIQUIDS_CATEGORY`, `Material::is_liquid`, preset Liquidi; in `RenderMaterial`
+  la priorità di un liquido vale mezzo punto in più (vince sul contenitore a parità).
+- Test `laser_crosses_glass_and_liquid_with_the_right_interfaces`.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

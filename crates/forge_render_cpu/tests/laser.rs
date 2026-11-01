@@ -159,3 +159,62 @@ fn laser_spot_and_beam_render() {
     eprintln!("pixel illuminati {}, saturazione media {sat:.3}", bright.len());
     assert!(!bright.is_empty() && sat > 0.2, "{sat}");
 }
+
+/// Vasca: due pareti di vetro e un liquido modellato un filo più grande, che entra nelle pareti
+/// (come un drink in un bicchiere). Il fascio deve usare l'interfaccia vetro-liquido vera:
+/// nel liquido l'angolo segue Snell con l'indice del liquido, ed esce parallelo a come è entrato
+/// (pareti parallele). Il liquido vince sul vetro perché è nella categoria Liquidi.
+#[test]
+fn laser_crosses_glass_and_liquid_with_the_right_interfaces() {
+    let mut s = Scene::default();
+    s.materials.upsert(Material {
+        id: MaterialId::new("vetro"),
+        base_color: [1.0; 3],
+        transmission: 1.0,
+        roughness: 0.0,
+        ior: 1.5,
+        ..Default::default()
+    });
+    s.materials.upsert(Material {
+        id: MaterialId::new("liquido"),
+        base_color: [1.0; 3],
+        transmission: 1.0,
+        roughness: 0.0,
+        ior: 1.33,
+        category: forge_scene::LIQUIDS_CATEGORY.into(),
+        ..Default::default()
+    });
+    for (i, x) in [-0.16f32, 0.16].into_iter().enumerate() {
+        let m = s.add_mesh(primitives::cuboid(Vec3::new(0.02, 0.4, 0.4)));
+        let id = ComponentId(format!("parete{i}"));
+        s.add_node(None, id.clone(), "Parete", Mat4::from_translation(Vec3::new(x, 0.0, 0.0)), Some(m));
+        s.assignments.insert(id, MaterialId::new("vetro"));
+    }
+    let m = s.add_mesh(primitives::cuboid(Vec3::new(0.32, 0.38, 0.38)));
+    let id = ComponentId("liquido".into());
+    s.add_node(None, id.clone(), "Liquido", Mat4::IDENTITY, Some(m));
+    s.assignments.insert(id, MaterialId::new("liquido"));
+    let d0 = Vec3::new(30f32.to_radians().cos(), 30f32.to_radians().sin(), 0.0);
+    let start = Vec3::new(-1.0, -0.45, 0.0);
+    let mut laser = Light::point("laser", start, 0.5);
+    laser.kind = LightKind::Laser { diameter_mm: 2.0 };
+    laser.target = start + d0;
+    s.lights.push(laser);
+    let rs = RenderScene::compile(&s);
+    let segs = &rs.lasers[0].rgb.segments;
+    let dir = |k: usize| (segs[k].end - segs[k].start).normalize();
+    eprintln!("{} tratti: {:?}", segs.len(), (0..segs.len()).map(dir).collect::<Vec<_>>());
+    // Aria, vetro, liquido, vetro, aria: le facce del liquido dentro il vetro non contano.
+    assert_eq!(segs.len(), 5, "{segs:?}");
+    let sin_in = d0.y;
+    let liquid = dir(2);
+    assert!(
+        (liquid.y - sin_in / 1.33).abs() < 1e-3,
+        "nel liquido sin = {} invece di {}",
+        liquid.y,
+        sin_in / 1.33
+    );
+    let glass = dir(1);
+    assert!((glass.y - sin_in / 1.5).abs() < 1e-3, "nel vetro sin = {}", glass.y);
+    assert!(dir(4).dot(d0) > 0.99999, "esce parallelo: {:?}", dir(4));
+}

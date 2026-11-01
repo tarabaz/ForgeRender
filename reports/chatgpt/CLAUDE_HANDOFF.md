@@ -2327,3 +2327,13 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
 
 - Su richiesta di Valerio la correzione delle scene demo salvabili passa su main come **0.28.1**.
   Main e `sviluppo` sullo stesso commit.
+
+## Claude Code — 01/11/2026: 0.29.0, liquidi nei bicchieri (main)
+
+- Valerio ha notato nel render del cocktail un arcobaleno troppo forte e il fascio invisibile nel
+  liquido. Cause: vetro con Abbe 10,5 (suo materiale) e percorso del laser/fotoni che ignorava le
+  priorità dei volumi (interfaccia vetro-liquido trattata come vetro-aria). Corretto; niente spunta
+  "liquido" (Valerio non la vuole): sono liquidi i materiali della categoria Liquidi.
+- Detto a Valerio: la luce Laser è un fascio di luce bianca; un laser vero monocromatico è una
+  possibile aggiunta futura (non chiesta).
+- Portato su main come **0.29.0** su sua richiesta ("procedi push e main").

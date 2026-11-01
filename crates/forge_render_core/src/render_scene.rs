@@ -112,7 +112,8 @@ impl RenderMaterial {
             } else {
                 Vec3::ZERO
             },
-            priority: m.priority as f32,
+            // Un liquido vince sul contenitore a parità di priorità (mezzo punto in più).
+            priority: m.priority as f32 + if m.is_liquid() { 0.5 } else { 0.0 },
             abbe: m.abbe,
             volume_color: Vec3::from_array(m.volume_color),
             volume_depth: m.volume_depth_cm * 0.01,

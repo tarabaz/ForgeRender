@@ -10,6 +10,18 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.29.0 — 1 Nov 2026
+
+**Light through glasses with liquid**
+- The laser beam and the caustic photons now handle a liquid inside a glass like the path tracer does: at the glass-liquid boundary they bend with the real pair of indices (e.g. 1.52 → 1.35) instead of acting as if there were air on the other side, and the faces of the liquid that sit inside the thickness of the glass no longer count as surfaces. Before, the beam bent far too much in a drink and the colours opened up much more than in reality.
+- The visible beam fades gradually inside a coloured liquid (power halfway along each stretch) instead of being drawn with the colour it has when it leaves.
+
+**Liquids category**
+- New **Liquids** category in the material library: Water (moved from Glass), Red wine, White wine, Whisky, Red cocktail, Olive oil, with real refractive index and dispersion (Abbe 55) and the colour of the volume.
+- A material of the Liquids category wins over its container where they overlap, with no other settings: just model the liquid slightly larger than the cavity. An explicit higher Priority still wins.
+
+**Note on the Laser light**: it is a thin beam of **white** light (like the sunbeam of the prism demo). A real laser has a single colour and never splits into a rainbow; the strong rainbow in a cocktail render came from a glass with Abbe 10.5 (extremely dispersive; ordinary glass is about 58) together with the wrong glass-liquid bending fixed here.
+
 ## 0.28.1 — 1 Nov 2026
 
 **Fixes**

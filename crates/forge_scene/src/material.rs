@@ -84,8 +84,19 @@ pub struct Material {
     /// nella parte comune vale quello con priorità più alta. Il liquido si modella un filo
     /// più grande della cavità del vetro, con priorità maggiore del vetro.
     pub priority: i32,
-    /// Categoria per la libreria (solo UI).
+    /// Categoria per la libreria. [`LIQUIDS_CATEGORY`] rende il materiale un liquido.
     pub category: String,
+}
+
+/// Categoria dei liquidi della libreria: un materiale di questa categoria è un liquido.
+pub const LIQUIDS_CATEGORY: &str = "Liquidi";
+
+impl Material {
+    /// Liquido (categoria [`LIQUIDS_CATEGORY`]): dove si sovrappone al contenitore vince lui a
+    /// parità di priorità, così basta modellarlo un filo più grande della cavità.
+    pub fn is_liquid(&self) -> bool {
+        self.category.eq_ignore_ascii_case(LIQUIDS_CATEGORY)
+    }
 }
 
 /// Come si proiettano le texture sulla superficie.
@@ -610,8 +621,27 @@ pub fn presets() -> Vec<Material> {
     add("vetro-ambra", "Vetro ambra", c, &glass(srgb(230, 150, 50), 1.52, 0.0));
     add("cristallo", "Cristallo al piombo", c, &glass([1.0; 3], 1.7, 0.0));
     add("diamante", "Diamante", c, &glass([1.0; 3], 2.42, 0.0));
-    add("acqua", "Acqua", c, &glass([1.0; 3], 1.333, 0.0));
     add("lente-ottica", "Lente ottica", c, &glass([1.0; 3], 1.517, 0.0));
+
+    // --- Liquidi (vincono sul contenitore dove si sovrappongono: vedi `Material::is_liquid`) ---
+    let c = LIQUIDS_CATEGORY;
+    let liquid = |ior: f32, vol: [f32; 3], depth_cm: f32| {
+        move |m: &mut Material| {
+            m.base_color = [1.0; 3];
+            m.transmission = 1.0;
+            m.roughness = 0.0;
+            m.ior = ior;
+            m.abbe = 55.0;
+            m.volume_color = vol;
+            m.volume_depth_cm = depth_cm;
+        }
+    };
+    add("acqua", "Acqua", c, &liquid(1.333, [1.0; 3], 10.0));
+    add("vino-rosso", "Vino rosso", c, &liquid(1.34, [0.45, 0.04, 0.06], 2.0));
+    add("vino-bianco", "Vino bianco", c, &liquid(1.34, [0.97, 0.9, 0.6], 5.0));
+    add("whisky", "Whisky", c, &liquid(1.36, [0.9, 0.55, 0.2], 4.0));
+    add("cocktail-rosso", "Cocktail rosso", c, &liquid(1.35, [0.88, 0.32, 0.1], 3.0));
+    add("olio-oliva", "Olio d'oliva", c, &liquid(1.47, [0.85, 0.8, 0.25], 4.0));
 
     // --- Ceramiche e pietre ---
     let c = "Ceramiche e pietre";

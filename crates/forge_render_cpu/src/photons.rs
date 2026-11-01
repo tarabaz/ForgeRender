@@ -185,10 +185,42 @@ fn trace_photon(
 ) -> Option<Photon> {
     let geo = &*scene.geometry;
     let mut glass_events = 0u32;
-    let mut inside: Option<usize> = None;
+    // Volumi attraversati, come nel path tracer: liquido nel bicchiere con l'interfaccia giusta.
+    let mut media = crate::integrator::Media::default();
+    let absorb = |media: &crate::integrator::Media, t: f32, power: &mut Vec3| {
+        if let Some(mi) = media.current(scene) {
+            let m = &scene.materials[mi as usize];
+            if m.volume_depth > 0.0 && m.volume_color != Vec3::ONE {
+                let k = t / m.volume_depth;
+                let c = if lambda > 0.0 {
+                    Vec3::splat(RgbSpectrum::albedo(m.volume_color).eval(lambda))
+                } else {
+                    m.volume_color
+                }
+                .max(Vec3::splat(1e-6));
+                *power *= Vec3::new(c.x.powf(k), c.y.powf(k), c.z.powf(k));
+            }
+        }
+    };
+    let ior_of = |m: &RenderMaterial| if lambda > 0.0 { cauchy_ior(m.ior, m.abbe, lambda) } else { m.ior };
     let mut first = true;
     for _ in 0..settings.max_bounces.max(2) {
-        let hit = crate::textures::intersect(scene, o, d, 0.0, f32::INFINITY)?;
+        let mut hit = crate::textures::intersect(scene, o, d, 0.0, f32::INFINITY)?;
+        // Facce di un volume "perdente" (il liquido dentro lo spessore del vetro): si attraversano.
+        let mut skipped = 0;
+        loop {
+            let mi = scene.material_index(hit.prim as usize);
+            let ng = geo.geometric_normals[hit.prim as usize];
+            let front = ng.dot(d) < 0.0;
+            if skipped >= 8 || !media.is_false_hit(scene, mi, front) {
+                break;
+            }
+            absorb(&media, hit.t, &mut power);
+            media.cross(mi, front);
+            o = offset_ray_origin(geo.surface_point(hit.prim as usize, hit.u, hit.v), if front { -ng } else { ng });
+            hit = crate::textures::intersect(scene, o, d, 0.0, f32::INFINITY)?;
+            skipped += 1;
+        }
         if first {
             // Raggio d'azione di punto e spot: conta la distanza fino al primo contatto.
             power *= light.range_window(hit.t);
@@ -196,20 +228,7 @@ fn trace_photon(
         }
         let prim = hit.prim as usize;
         let p = geo.surface_point(prim, hit.u, hit.v);
-        if let Some(mi) = inside {
-            // Assorbimento nel volume attraversato.
-            let m = &scene.materials[mi];
-            if m.volume_depth > 0.0 && m.volume_color != Vec3::ONE {
-                let k = hit.t / m.volume_depth;
-                let c = if lambda > 0.0 {
-                    Vec3::splat(RgbSpectrum::albedo(m.volume_color).eval(lambda))
-                } else {
-                    m.volume_color
-                }
-                .max(Vec3::splat(1e-6));
-                power *= Vec3::new(c.x.powf(k), c.y.powf(k), c.z.powf(k));
-            }
-        }
+        absorb(&media, hit.t, &mut power);
         let mi = scene.material_index(prim);
         let m = &scene.materials[mi];
         let mut ng = geo.geometric_normals[prim];
@@ -227,8 +246,13 @@ fn trace_photon(
             if n.dot(-d) <= 0.0 {
                 n = ng;
             }
-            let ior = if lambda > 0.0 { cauchy_ior(m.ior, m.abbe, lambda) } else { m.ior };
-            let (n_from, n_to) = if entering { (1.0, ior) } else { (ior, 1.0) };
+            // Indici dei due lati: il materiale e il volume dall'altra parte (aria, il vetro
+            // attorno a un liquido o il liquido dentro un vetro).
+            let n_mat = ior_of(m);
+            let n_other = media
+                .outside_medium(scene, mi, entering)
+                .map_or(1.0, |k| ior_of(&scene.materials[k as usize]));
+            let (n_from, n_to) = if entering { (n_other, n_mat) } else { (n_mat, n_other) };
             let cos_i = (-d).dot(n);
             let (fr, cos_t) = fresnel_dielectric(cos_i, n_to / n_from);
             if rng.next_f32() < fr {
@@ -244,7 +268,7 @@ fn trace_photon(
                 } else {
                     m.base_color
                 };
-                inside = if entering { Some(mi) } else { None };
+                media.cross(mi, entering);
             }
             glass_events += 1;
             if power.max_element() <= 0.0 {

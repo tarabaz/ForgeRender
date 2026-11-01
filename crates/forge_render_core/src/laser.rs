@@ -113,6 +113,61 @@ pub fn lerp_spot(a: &LaserSpot, b: &LaserSpot, t: f32) -> LaserSpot {
 /// Rugosità sotto cui un vetro o un metallo deviano il fascio senza disperderlo.
 const SMOOTH: f32 = 0.1;
 
+/// Volumi trasparenti in cui si trova il fascio (come nel path tracer): vale quello con priorità
+/// più alta, a pari priorità l'ultimo in cui si è entrati. Le facce di un volume "perdente"
+/// (il liquido dentro lo spessore del vetro) non sono interfacce vere.
+#[derive(Clone, Copy, Default)]
+struct Media {
+    ids: [usize; 4],
+    n: usize,
+}
+
+impl Media {
+    fn current(&self, scene: &RenderScene) -> Option<usize> {
+        let mut best: Option<usize> = None;
+        for &m in &self.ids[..self.n] {
+            if best.is_none_or(|b| scene.materials[m].priority >= scene.materials[b].priority) {
+                best = Some(m);
+            }
+        }
+        best
+    }
+
+    fn is_false_hit(&self, scene: &RenderScene, mat: usize, front: bool) -> bool {
+        if scene.materials[mat].transmission <= 0.0 {
+            return false;
+        }
+        let Some(cur) = self.current(scene) else { return false };
+        let (p, pc) = (scene.materials[mat].priority, scene.materials[cur].priority);
+        if front {
+            p < pc
+        } else {
+            cur != mat && self.ids[..self.n].contains(&mat) && p < pc
+        }
+    }
+
+    fn cross(&mut self, mat: usize, front: bool) {
+        if front {
+            if self.n < self.ids.len() {
+                self.ids[self.n] = mat;
+                self.n += 1;
+            }
+        } else if let Some(i) = self.ids[..self.n].iter().rposition(|&m| m == mat) {
+            self.ids.copy_within(i + 1..self.n, i);
+            self.n -= 1;
+        }
+    }
+
+    /// Volume dall'altra parte della superficie del materiale `mat` (None = aria).
+    fn outside(&self, scene: &RenderScene, mat: usize, front: bool) -> Option<usize> {
+        let mut other = *self;
+        if !front {
+            other.cross(mat, false);
+        }
+        other.current(scene)
+    }
+}
+
 /// Segue il fascio da `origin` in direzione `dir`; `lambda` = None per il render RGB.
 fn trace(scene: &RenderScene, origin: Vec3, dir: Vec3, lambda: Option<f32>) -> LaserPath {
     let geo = &*scene.geometry;
@@ -121,21 +176,58 @@ fn trace(scene: &RenderScene, origin: Vec3, dir: Vec3, lambda: Option<f32>) -> L
     let mut o = origin;
     let mut d = dir.normalize_or(-Vec3::Y);
     let mut tp = Vec3::ONE;
-    let mut inside = false;
-    let mut inside_mat: Option<usize> = None;
+    let mut media = Media::default();
     let tint = |rgb: Vec3| match lambda {
         None => rgb,
         Some(l) => Vec3::splat(RgbSpectrum::albedo(rgb).eval(l)),
     };
-    for _ in 0..MAX_SEGMENTS {
-        let hit = if geo.accel.tris.is_empty() {
+    let ior_of = |m: &crate::RenderMaterial| match lambda {
+        Some(l) => cauchy_ior(m.ior, m.abbe, l),
+        None => m.ior,
+    };
+    let cast = |o: Vec3, d: Vec3| {
+        if geo.accel.tris.is_empty() {
             None
         } else {
             geo.accel.intersect(o, d, 0.0, f32::INFINITY)
-        };
+        }
+    };
+    // Assorbimento del volume in cui si è (Beer-Lambert) lungo un tratto lungo `t`.
+    let absorb = |media: &Media, t: f32, tp: &mut Vec3| {
+        if let Some(mi) = media.current(scene) {
+            let m = &scene.materials[mi];
+            if m.volume_depth > 0.0 && m.volume_color != Vec3::ONE {
+                let k = t / m.volume_depth;
+                let c = tint(m.volume_color).max(Vec3::splat(1e-6));
+                *tp *= Vec3::new(c.x.powf(k), c.y.powf(k), c.z.powf(k));
+            }
+        }
+    };
+    // Il fascio visibile di un tratto usa la potenza a metà tratto: in un liquido colorato si
+    // affievolisce lungo il percorso invece di avere già all'ingresso il colore dell'uscita.
+    let mid = |a: Vec3, b: Vec3| Vec3::new((a.x * b.x).sqrt(), (a.y * b.y).sqrt(), (a.z * b.z).sqrt());
+    for _ in 0..MAX_SEGMENTS {
+        let (start, tp_start, inside) = (o, tp, media.n > 0);
+        // Le facce di un volume "perdente" (il liquido dentro lo spessore del vetro) si
+        // attraversano senza deviare: il tratto continua.
+        let mut hit = cast(o, d);
+        let mut skipped = 0;
+        while let Some(h) = hit {
+            let mi = scene.material_index(h.prim as usize);
+            let ng = geo.geometric_normals[h.prim as usize];
+            let front = ng.dot(d) < 0.0;
+            if skipped >= 8 || !media.is_false_hit(scene, mi, front) {
+                break;
+            }
+            absorb(&media, h.t, &mut tp);
+            media.cross(mi, front);
+            o = offset_ray_origin(geo.surface_point(h.prim as usize, h.u, h.v), if front { -ng } else { ng });
+            hit = cast(o, d);
+            skipped += 1;
+        }
         let Some(h) = hit else {
             path.segments.push(LaserSegment {
-                start: o,
+                start,
                 end: o + d * far,
                 throughput: tp,
                 inside,
@@ -144,19 +236,11 @@ fn trace(scene: &RenderScene, origin: Vec3, dir: Vec3, lambda: Option<f32>) -> L
         };
         let prim = h.prim as usize;
         let p = geo.surface_point(prim, h.u, h.v);
-        // Assorbimento del volume attraversato (Beer-Lambert).
-        if let Some(mi) = inside_mat {
-            let m = &scene.materials[mi];
-            if m.volume_depth > 0.0 && m.volume_color != Vec3::ONE {
-                let k = h.t / m.volume_depth;
-                let c = tint(m.volume_color).max(Vec3::splat(1e-6));
-                tp *= Vec3::new(c.x.powf(k), c.y.powf(k), c.z.powf(k));
-            }
-        }
+        absorb(&media, h.t, &mut tp);
         path.segments.push(LaserSegment {
-            start: o,
+            start,
             end: p,
-            throughput: tp,
+            throughput: mid(tp_start, tp),
             inside,
         });
         let mi = scene.material_index(prim);
@@ -175,11 +259,11 @@ fn trace(scene: &RenderScene, origin: Vec3, dir: Vec3, lambda: Option<f32>) -> L
         let cos_i = (-d).dot(n).clamp(0.0, 1.0);
         let reflect = |d: Vec3| d - 2.0 * d.dot(n) * n;
         if m.transmission >= 0.5 && m.roughness < SMOOTH {
-            let ior = match lambda {
-                Some(l) => cauchy_ior(m.ior, m.abbe, l),
-                None => m.ior,
-            };
-            let eta = if entering { 1.0 / ior } else { ior };
+            // Indici dei due lati: il materiale e il volume dall'altra parte (aria, oppure il
+            // vetro attorno a un liquido o il liquido dentro un vetro).
+            let n_mat = ior_of(m);
+            let n_other = media.outside(scene, mi, entering).map_or(1.0, |k| ior_of(&scene.materials[k]));
+            let eta = if entering { n_other / n_mat } else { n_mat / n_other };
             let sin2_t = eta * eta * (1.0 - cos_i * cos_i);
             if sin2_t >= 1.0 {
                 // Riflessione totale interna: resta nel vetro.
@@ -196,8 +280,7 @@ fn trace(scene: &RenderScene, origin: Vec3, dir: Vec3, lambda: Option<f32>) -> L
                 }
                 d = (d * eta + n * (eta * cos_i - cos_t)).normalize();
                 o = offset_ray_origin(p, -ng);
-                inside = entering;
-                inside_mat = entering.then_some(mi);
+                media.cross(mi, entering);
             }
         } else if m.metallic >= 0.5 && m.roughness < SMOOTH {
             tp *= tint(m.base_color);

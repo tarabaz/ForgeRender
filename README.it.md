@@ -18,16 +18,15 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
-### Novità della versione 0.28.1
+### Novità della versione 0.29.0
 
-- **Caustiche (photon mapping):** scheda Render → Caustiche. La luce che passa da vetri, cristalli e gemme si concentra in macchie luminose e arcobaleni sulle superfici attorno, con tutte le luci (puntiforme, spot, sole, area), su CPU e GPU, RGB e Spettrale.
-- **Menu Scene demo:** File → Scene demo, divise per che cosa mostrano, con una scheda che spiega le funzioni usate e come rifare ogni scena. Scene nuove: laser nel diamante, ciondoli di cristallo al sole, vetri e caustiche sul tavolo.
-- **Forme nuove:** Prisma, Diamante (taglio brillante) e Pendente di cristallo nel menu Aggiungi; pavimenti e fondali ora vanno sempre sotto tutti gli oggetti.
-- **Correzione (0.28.1):** le scene demo salvate come progetto ora tengono tutti i loro oggetti quando si riaprono.
+- **Luce nei bicchieri con il liquido:** il fascio laser e le caustiche piegano correttamente all'interfaccia vetro-liquido e il fascio si affievolisce gradualmente in un drink colorato.
+- **Categoria Liquidi:** acqua, vini, whisky, cocktail rosso e olio d'oliva con indice e dispersione veri; un liquido vince da solo sul suo bicchiere dove si sovrappongono.
 
 <details>
 <summary><strong>Versioni precedenti — storico completo delle release</strong></summary>
 
+- **0.28.0–0.28.1 — Caustiche e scene demo:** caustiche con il photon mapping con tutte le luci (CPU e GPU, RGB e Spettrale); File → Scene demo divise per tipo con la scheda che le spiega; forme Prisma, Diamante e Pendente di cristallo; le scene demo salvate come progetto tengono i loro oggetti.
 - **0.27.0 — Luci puntate su un oggetto, laser nel vetro:** le luci agganciate a un oggetto lo seguono e gli girano attorno; il fascio laser si vede dentro il vetro; pannello Luci scorrevole e ridimensionabile.
 - **0.26.0 — Luce laser e demo "Prisma e luce":** fascio sottile seguito dalla luce attraverso vetri e specchi, macchia esatta e fascio visibile a scelta, ventaglio arcobaleno nel render Spettrale; scena demo con un prisma di vetro sul nero.
 - **0.25.0 — Ray tracing hardware (RT core):** raggi tracciati dalle unità di ray tracing della scheda (Vulkan), stessa immagine, render 10–15 volte più veloci su una RTX 5070; ritorno automatico alla BVH dello shader.

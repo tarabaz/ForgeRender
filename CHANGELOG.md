@@ -13,6 +13,30 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.29.0 — 01/11/2026
+
+**Luce nei bicchieri con il liquido**
+- Il fascio laser e i fotoni delle caustiche ora trattano il liquido dentro un bicchiere come fa
+  il path tracer: all'interfaccia vetro-liquido piegano con la coppia di indici vera (per esempio
+  1,52 → 1,35) invece di comportarsi come se dall'altra parte ci fosse aria, e le facce del
+  liquido che stanno dentro lo spessore del vetro non contano più come superfici. Prima, in un
+  drink, il fascio piegava troppo e i colori si aprivano molto più che nella realtà.
+- Il fascio visibile si affievolisce gradualmente dentro un liquido colorato (potenza a metà di
+  ogni tratto) invece di essere disegnato con il colore che ha all'uscita.
+
+**Categoria Liquidi**
+- Nuova categoria **Liquidi** nella libreria dei materiali: Acqua (spostata dai Vetri), Vino
+  rosso, Vino bianco, Whisky, Cocktail rosso, Olio d'oliva, con indice e dispersione veri (Abbe 55)
+  e il colore del volume.
+- Un materiale della categoria Liquidi vince sul contenitore dove si sovrappongono, senza altre
+  impostazioni: basta modellare il liquido un filo più grande della cavità. Una Priorità più
+  alta impostata a mano vince comunque.
+
+**Nota sulla luce Laser**: è un fascio sottile di luce **bianca** (come il raggio di sole della
+demo del prisma). Un laser vero ha un solo colore e non si scompone mai in un arcobaleno;
+l'arcobaleno forte nel render del cocktail veniva da un vetro con Abbe 10,5 (dispersione
+estrema: un vetro comune è circa 58) insieme alla piega sbagliata vetro-liquido corretta qui.
+
 ## 0.28.1 — 01/11/2026
 
 **Correzioni**
