@@ -2268,3 +2268,21 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
   **0.26.0**: versione in `Cargo.toml` e nell'installer, changelog inglese e italiano, README
   (IT/EN) con le novità della 0.26.0 e la 0.25.0 nello storico. Main e `sviluppo` puntano allo
   stesso commit.
+
+## Claude Code — 01/11/2026: luci agganciate, laser nel vetro, pannello Luci (branch `sviluppo`)
+
+- `Light::aim: Option<ComponentId>` (serde default):
+  - `ForgeApp::follow_light_aims` a ogni fotogramma porta il bersaglio al centro dell'oggetto;
+  - `aim_light_at_selection` aggancia la luce;
+  - nel gizmo, per una luce agganciata, Sposta cambia solo la posizione e Ruota orbita attorno
+    al bersaglio;
+  - UI: "Punta su" nel pannello Luci.
+- Laser: il fascio visibile conta anche dentro il vetro (richiesta di Valerio: "sembra finto
+  altrimenti"); `LaserSegment::inside` serve ora solo all'interpolazione.
+- Pannello di sinistra:
+  - `tree::show` diviso in `Panel::bottom("tree-lights")` ridimensionabile (luci con il loro
+    scorrimento) e `CentralPanel` con l'albero;
+  - "Eliminati dal progetto" sopra l'albero.
+  - Causa dei due difetti segnalati: l'altezza dell'albero contava solo le luci, la sezione degli
+    eliminati spingeva le luci fuori dal pannello e il pannello si allungava fin dentro la barra
+    di stato.

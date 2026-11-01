@@ -653,8 +653,21 @@ fn apply_drag(app: &mut ForgeApp, rect: egui::Rect, drag: &Drag, pos: egui::Pos2
             app.geometry_changed();
         }
         DragStart::Light(i, st) => {
+            let rotating = app.gizmo.mode == GizmoMode::Rotate;
             let l = &mut app.scene.lights[*i];
             match &op {
+                // Luce agganciata a un oggetto: resta puntata su di lui. Spostandola cambia solo la
+                // posizione; ruotandola gira attorno all'oggetto (orbita), come si cerca l'angolo
+                // giusto in studio.
+                Op::World(m) if st.aim.is_some() => {
+                    l.position = if rotating {
+                        let r = Mat4::from_mat3(forge_math::Mat3::from_mat4(*m));
+                        st.target + r.transform_vector3(st.position - st.target)
+                    } else {
+                        m.transform_point3(st.position)
+                    };
+                    l.target = st.target;
+                }
                 // Spostamento: posizione e bersaglio insieme (la direzione resta);
                 // rotazione attorno alla luce: ruota il bersaglio.
                 Op::World(m) => {

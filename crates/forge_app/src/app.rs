@@ -1053,6 +1053,48 @@ impl ForgeApp {
     }
 
     /// Se l'oggetto agganciato si è spostato, la camera lo segue (una volta per frame).
+    /// Luci agganciate a un oggetto (`Light::aim`): il bersaglio segue il centro dell'oggetto,
+    /// anche quando si spostano la luce o l'oggetto. Un oggetto che non c'è più sgancia la luce.
+    pub fn follow_light_aims(&mut self) {
+        let mut changed = false;
+        for k in 0..self.scene.lights.len() {
+            let Some(id) = self.scene.lights[k].aim.clone() else { continue };
+            let Some(i) = self.scene.find(&id) else {
+                self.scene.lights[k].aim = None;
+                continue;
+            };
+            let b = self.scene.bounds_of(i);
+            if b.is_empty() {
+                continue;
+            }
+            let c = b.center();
+            let l = &mut self.scene.lights[k];
+            if (l.target - c).length() > 1e-6 * (1.0 + c.length()) {
+                l.target = c;
+                changed = true;
+            }
+        }
+        if changed {
+            self.shading_changed();
+        }
+    }
+
+    /// Aggancia la luce `k` all'oggetto selezionato (il pezzo, non la sua mesh interna).
+    pub fn aim_light_at_selection(&mut self, k: usize) {
+        let Some(&first) = self.selection.iter().next() else { return };
+        let mut idx = first;
+        if let Some(p) = self.scene.nodes[idx].parent {
+            if self.scene.nodes[idx].name.ends_with("(mesh)") {
+                idx = p;
+            }
+        }
+        if let Some(l) = self.scene.lights.get_mut(k) {
+            l.aim = Some(self.scene.nodes[idx].id.clone());
+        }
+        self.follow_light_aims();
+        self.shading_changed();
+    }
+
     pub fn follow_aim(&mut self) {
         let Some(id) = &self.aim_lock else { return };
         let Some(i) = self.scene.find(id) else {

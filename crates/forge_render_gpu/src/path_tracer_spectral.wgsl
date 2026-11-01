@@ -333,7 +333,6 @@ fn laser_beams_s(o: vec3<f32>, d: vec3<f32>, t_end: f32) -> vec4<f32> {
             if (!lerp && kp.y >= 0.5) { pb = p1; }
             for (var s: u32 = 0u; s < S[pb]; s = s + 1u) {
                 let sb = pb + 16u + s * 12u;
-                if (S[sb + 3u] != 0u) { continue; }
                 var a = sv3(sb);
                 var e = sv3(sb + 4u);
                 var tp = sf(sb + 8u);

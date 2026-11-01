@@ -76,6 +76,10 @@ pub struct Light {
     /// Spot: lunghezza del fascio visibile in metri (0 = il raggio d'azione, o 3 m se illimitato).
     #[serde(default)]
     pub beam_length: f32,
+    /// Oggetto su cui la luce resta puntata: il bersaglio segue il suo centro anche quando si
+    /// sposta la luce o l'oggetto (None = bersaglio libero).
+    #[serde(default)]
+    pub aim: Option<crate::ComponentId>,
 }
 
 fn default_range_softness() -> f32 {
@@ -116,6 +120,7 @@ impl Light {
             range_softness: default_range_softness(),
             beam_density: 0.0,
             beam_length: 0.0,
+            aim: None,
         }
     }
 
@@ -143,6 +148,7 @@ impl Light {
             range_softness: default_range_softness(),
             beam_density: 0.0,
             beam_length: 0.0,
+            aim: None,
         }
     }
 }

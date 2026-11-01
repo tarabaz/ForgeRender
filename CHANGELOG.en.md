@@ -10,6 +10,17 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## Unreleased (development branch, not on main)
+
+**Lights aimed at an object**
+- Lights panel → **Aim at → Hook to selection** (spot, area, laser, directional): the light stays aimed at the object. The target follows the object when it moves; moving the light keeps it aimed, and rotating it with the Rotate gizmo **orbits around the object**. "Unhook" frees the target again.
+
+**Laser**
+- The beam is now visible **inside glass** too (real glass is never perfectly pure): it enters white, crosses the prism or gem and leaves as a rainbow.
+
+**Interface fixes**
+- Left panel: the **Lights** list has its own area with a scroll bar and a **draggable border** to set its height; "Removed from project" moved above the scene tree. Before, with several lights they ended up below the panel and could not be selected, and the panel border ran down into the status bar.
+
 ## 0.26.0 — 1 Nov 2026
 
 **Laser light**

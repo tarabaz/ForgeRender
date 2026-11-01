@@ -992,6 +992,14 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
     let mut changed = false;
     let mut delete = false;
     let mut duplicate = false;
+    // Aggancio a un oggetto: nome dell'oggetto puntato e se c'è una selezione a cui agganciarsi.
+    let aim_name = app.scene.lights[i]
+        .aim
+        .as_ref()
+        .and_then(|id| app.scene.find(id))
+        .map(|n| app.scene.nodes[n].name.clone());
+    let can_aim = !app.selection.is_empty();
+    let mut aim_now = false;
     {
         let l = &mut app.scene.lights[i];
         ui.horizontal(|ui| {
@@ -1039,6 +1047,40 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
             changed = true;
         }
         changed |= ui.checkbox(&mut l.enabled, tr("Accesa")).changed();
+        if !matches!(l.kind, LightKind::Point | LightKind::Portal { .. }) {
+            // Punta su un oggetto: il bersaglio segue l'oggetto; spostando la luce resta puntata,
+            // ruotandola (gizmo Ruota) gira attorno all'oggetto.
+            ui.horizontal(|ui| {
+                ui.label(tr("Punta su"));
+                match &aim_name {
+                    Some(n) => {
+                        ui.label(egui::RichText::new(n).strong());
+                        if ui
+                            .small_button(tr("Sgancia"))
+                            .on_hover_text(tr("Bersaglio di nuovo libero"))
+                            .clicked()
+                        {
+                            l.aim = None;
+                            changed = true;
+                        }
+                    }
+                    None => {
+                        ui.label(egui::RichText::new(tr("nessun oggetto")).weak());
+                    }
+                }
+                if ui
+                    .add_enabled(can_aim, egui::Button::new(tr("Aggancia alla selezione")).small())
+                    .on_hover_text(tr(
+                        "La luce resta puntata sull'oggetto selezionato: segue l'oggetto quando lo sposti; \
+                         spostando la luce continua a puntarlo, ruotandola (gizmo Ruota) gira attorno all'oggetto",
+                    ))
+                    .on_disabled_hover_text(tr("Seleziona prima un oggetto nella scena"))
+                    .clicked()
+                {
+                    aim_now = true;
+                }
+            });
+        }
         let portal = matches!(l.kind, LightKind::Portal { .. });
         if portal {
             ui.label(
@@ -1262,6 +1304,9 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
             duplicate = ui.button(tr("Duplica")).clicked();
             delete = ui.button(tr("Elimina")).clicked();
         });
+    }
+    if aim_now {
+        app.aim_light_at_selection(i);
     }
     if duplicate {
         let mut l = app.scene.lights[i].clone();

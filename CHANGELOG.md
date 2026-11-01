@@ -13,6 +13,24 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## In sviluppo (branch di sviluppo, non su main)
+
+**Luci puntate su un oggetto**
+- Pannello Luci → **Punta su → Aggancia alla selezione** (spot, area, laser, direzionale): la luce
+  resta puntata sull'oggetto. Il bersaglio segue l'oggetto quando si sposta; spostando la luce
+  continua a puntarlo, ruotandola con il gizmo Ruota **gira attorno all'oggetto**. "Sgancia"
+  rende di nuovo libero il bersaglio.
+
+**Laser**
+- Il fascio ora si vede anche **dentro il vetro** (un vetro vero non è mai perfettamente puro):
+  entra bianco, attraversa il prisma o la gemma ed esce come arcobaleno.
+
+**Correzioni dell'interfaccia**
+- Pannello di sinistra: l'elenco **Luci** ha un'area sua con la barra di scorrimento e un **bordo
+  trascinabile** per regolarne l'altezza; "Eliminati dal progetto" si sposta sopra l'albero della
+  scena. Prima, con più luci, queste finivano sotto il pannello e non si potevano selezionare, e il
+  bordo del pannello scendeva nella barra di stato.
+
 ## 0.26.0 — 01/11/2026
 
 **Luce laser**

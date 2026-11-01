@@ -1372,7 +1372,6 @@ fn gauss_irr(rho: f32, r: f32) -> f32 { return 2.0 / (PI * r * r) * exp(-2.0 * r
 
 // Radianza del fascio visibile di un tratto lungo il raggio o + t d, t in [0, t_end], per potenza 1.
 fn laser_beam_seg(sb: u32, r: f32, dens: f32, o: vec3<f32>, d: vec3<f32>, t_end: f32) -> f32 {
-    if (S[sb + 3u] != 0u) { return 0.0; }
     return laser_beam_ab(sv3(sb), sv3(sb + 4u), r, dens, o, d, t_end);
 }
 

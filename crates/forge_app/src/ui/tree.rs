@@ -3,7 +3,20 @@ use crate::i18n::{tf, tr};
 use eframe::egui;
 use std::collections::BTreeSet;
 
+/// Pannello di sinistra: albero della scena sopra, luci sotto, con un bordo trascinabile tra i due
+/// (altezza delle luci regolabile) e ognuno con il suo scorrimento.
 pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
+    let avail = ui.available_height();
+    egui::Panel::bottom("tree-lights")
+        .resizable(true)
+        .default_size(170.0)
+        .min_size(80.0)
+        .max_size((avail * 0.8).max(90.0))
+        .show(ui, |ui| lights(app, ui));
+    egui::CentralPanel::default().show(ui, |ui| scene_tree(app, ui));
+}
+
+fn scene_tree(app: &mut ForgeApp, ui: &mut egui::Ui) {
     ui.heading(tr("Scena"));
     ui.label(
         egui::RichText::new(tf(
@@ -39,10 +52,43 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
         }
     }
 
+    // Eliminati dal progetto: sopra l'albero, così l'albero prende tutto lo spazio che resta.
+    let removed = app.removed_nodes();
+    if !removed.is_empty() {
+        ui.separator();
+        let mut restore: Vec<usize> = Vec::new();
+        egui::CollapsingHeader::new(tf("Eliminati dal progetto ({})", &[format!("{}", removed.len())]))
+            .id_salt("tree-removed")
+            .show(ui, |ui| {
+                ui.label(
+                    egui::RichText::new(tr(
+                        "Componenti dei file importati tolti dal progetto: il file sorgente non è cambiato.",
+                    ))
+                    .weak()
+                    .small(),
+                );
+                if ui.small_button(tr("Ripristina tutti")).clicked() {
+                    restore = removed.clone();
+                }
+                egui::ScrollArea::vertical()
+                    .id_salt("tree-removed-list")
+                    .max_height(120.0)
+                    .show(ui, |ui| {
+                        for &i in &removed {
+                            ui.horizontal(|ui| {
+                                if ui.small_button(tr("Ripristina")).clicked() {
+                                    restore = vec![i];
+                                }
+                                ui.label(&app.scene.nodes[i].name).on_hover_text(app.scene.nodes[i].id.to_string());
+                            });
+                        }
+                    });
+            });
+        app.restore_removed(&restore);
+    }
+
     let row_h = ui.spacing().interact_size.y;
-    let avail = ui.available_height();
-    let lights_h = (app.scene.lights.len() as f32 + 2.5) * row_h;
-    let tree_h = (avail - lights_h - 10.0).max(row_h * 4.0);
+    let tree_h = ui.available_height().max(row_h * 3.0);
 
     let mut toggle_vis: Option<usize> = None;
     let mut click: Option<(usize, bool)> = None;
@@ -160,42 +206,11 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
         app.selection = BTreeSet::from([i]);
         app.frame_selection();
     }
+}
 
-    let removed = app.removed_nodes();
-    if !removed.is_empty() {
-        ui.separator();
-        let mut restore: Vec<usize> = Vec::new();
-        egui::CollapsingHeader::new(tf("Eliminati dal progetto ({})", &[format!("{}", removed.len())]))
-            .id_salt("tree-removed")
-            .show(ui, |ui| {
-                ui.label(
-                    egui::RichText::new(tr(
-                        "Componenti dei file importati tolti dal progetto: il file sorgente non è cambiato.",
-                    ))
-                    .weak()
-                    .small(),
-                );
-                if ui.small_button(tr("Ripristina tutti")).clicked() {
-                    restore = removed.clone();
-                }
-                egui::ScrollArea::vertical()
-                    .id_salt("tree-removed-list")
-                    .max_height(120.0)
-                    .show(ui, |ui| {
-                        for &i in &removed {
-                            ui.horizontal(|ui| {
-                                if ui.small_button(tr("Ripristina")).clicked() {
-                                    restore = vec![i];
-                                }
-                                ui.label(&app.scene.nodes[i].name).on_hover_text(app.scene.nodes[i].id.to_string());
-                            });
-                        }
-                    });
-            });
-        app.restore_removed(&restore);
-    }
-
-    ui.separator();
+/// Elenco delle luci (scorre se non ci sta).
+fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
+    ui.add_space(4.0);
     ui.horizontal(|ui| {
         ui.strong(tr("Luci"));
         if ui.small_button("+").on_hover_text(tr("Aggiungi una luce ad area")).clicked() {
@@ -215,20 +230,25 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
     });
     let mut light_click = None;
     let mut light_toggle = None;
-    for (i, l) in app.scene.lights.iter().enumerate() {
-        ui.horizontal(|ui| {
-            let mut on = l.enabled;
-            if ui.checkbox(&mut on, "").on_hover_text(tr("Accendi/spegni")).changed() {
-                light_toggle = Some(i);
-            }
-            if ui
-                .selectable_label(app.selected_light == Some(i), format!("{} ({})", l.name, tr(l.kind.label())))
-                .clicked()
-            {
-                light_click = Some(i);
+    egui::ScrollArea::vertical()
+        .id_salt("tree-lights-list")
+        .auto_shrink([false, false])
+        .show(ui, |ui| {
+            for (i, l) in app.scene.lights.iter().enumerate() {
+                ui.horizontal(|ui| {
+                    let mut on = l.enabled;
+                    if ui.checkbox(&mut on, "").on_hover_text(tr("Accendi/spegni")).changed() {
+                        light_toggle = Some(i);
+                    }
+                    if ui
+                        .selectable_label(app.selected_light == Some(i), format!("{} ({})", l.name, tr(l.kind.label())))
+                        .clicked()
+                    {
+                        light_click = Some(i);
+                    }
+                });
             }
         });
-    }
     if let Some(i) = light_toggle {
         app.scene.lights[i].enabled = !app.scene.lights[i].enabled;
         app.shading_changed();

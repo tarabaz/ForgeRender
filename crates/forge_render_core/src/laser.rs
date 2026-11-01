@@ -8,7 +8,8 @@
 //! il percorso si calcola per [`N_LAMBDA`] lunghezze d'onda con l'indice di rifrazione di ognuna
 //! (dispersione): dopo un prisma o una gemma il fascio si apre a ventaglio.
 //!
-//! Il fascio visibile nell'aria è diffusione singola in una foschia uniforme dentro il cilindro
+//! Il fascio visibile (nell'aria e dentro i vetri, che non sono mai perfettamente puri) è diffusione
+//! singola in una foschia uniforme dentro il cilindro
 //! del fascio: integrale analitico lungo il raggio della camera, senza rumore.
 
 use crate::spectral::{cauchy_ior, RgbSpectrum};
@@ -31,7 +32,7 @@ pub struct LaserSegment {
     /// Potenza rimasta (RGB, o lo stesso valore nei tre canali per un percorso spettrale), come
     /// frazione di quella del laser.
     pub throughput: Vec3,
-    /// Dentro un vetro (il fascio visibile conta solo nell'aria).
+    /// Dentro un vetro (serve a decidere se due percorsi vicini sono interpolabili).
     pub inside: bool,
 }
 
@@ -263,7 +264,7 @@ pub fn spot_at(spot: &LaserSpot, radius: f32, p: Vec3, ng: Vec3) -> Option<(Vec3
 /// un tratto (diffusione singola isotropa in una foschia di densità `density`), per potenza 1.
 #[inline]
 pub fn beam_radiance(seg: &LaserSegment, radius: f32, density: f32, o: Vec3, d: Vec3, t_end: f32) -> f32 {
-    if seg.inside || density <= 0.0 {
+    if density <= 0.0 {
         return 0.0;
     }
     let s = seg.end - seg.start;

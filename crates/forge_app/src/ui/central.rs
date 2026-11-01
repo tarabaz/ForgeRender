@@ -191,6 +191,7 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
     crate::ui::gizmo::toolbar(app, ui, rect);
 
     app.follow_aim();
+    app.follow_light_aims();
     // Punta su oggetto: il clic sceglie l'oggetto a cui agganciare la camera.
     if app.aim_pick {
         if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
