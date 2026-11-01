@@ -10,7 +10,7 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
-## Unreleased (`sviluppo` branch)
+## 0.28.0 — 1 Nov 2026
 
 **Caustics (progressive photon mapping)**
 - Render tab → **Caustics**: light passing through smooth glass, crystals and gems gathers on the surfaces around them (bright focus spots, the rainbows of hanging crystals). Works with **every light**: point, spot, directional (sun) and area. With point, spot and sun lights plain path tracing cannot find these paths at all.

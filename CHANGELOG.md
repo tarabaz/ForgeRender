@@ -13,7 +13,7 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
-## In sviluppo (branch `sviluppo`)
+## 0.28.0 — 01/11/2026
 
 **Caustiche (photon mapping progressivo)**
 - Scheda Render → **Caustiche**: la luce che passa da vetri, cristalli e gemme lisce si concentra

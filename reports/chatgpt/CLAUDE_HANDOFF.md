@@ -2307,3 +2307,10 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
   laser, ciondoli al sole, vetri sul tavolo) da migliorare in seguito, come detto da Valerio.
 - Valerio ha chiesto anche: prisma (e gemme) tra le forme da aggiungere; fondale sempre sotto gli
   oggetti.
+
+## Claude Code — 01/11/2026: 0.28.0 su main
+
+- Su richiesta di Valerio: caustiche con il photon mapping, sottomenu Scene demo con la scheda
+  descrittiva, scene nuove, prisma/diamante/pendente nel menu Aggiungi e fondale sotto gli oggetti
+  passano su main come **0.28.0**. Versione, changelog IT/EN e README IT/EN aggiornati. Main e
+  `sviluppo` sullo stesso commit.

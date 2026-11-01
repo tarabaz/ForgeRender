@@ -18,15 +18,16 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
-### What's new in 0.27.0
+### What's new in 0.28.0
 
-- **Lights aimed at an object:** Lights panel → Aim at → Hook to selection. The light follows the object; moving the light keeps it aimed, rotating it orbits around the object.
-- **Laser beam visible inside glass:** it enters white, crosses the prism or gem and leaves as a rainbow.
-- **Lights panel:** its own scrollable area with a draggable border to set the height (all lights can be selected again).
+- **Caustics (photon mapping):** Render tab → Caustics. Light through glass, crystals and gems gathers into bright spots and rainbows on the surfaces around them, with every light (point, spot, sun, area), on CPU and GPU, RGB and Spectral.
+- **Demo scenes menu:** File → Demo scenes, grouped by what they show, with a card that explains the features used and how to recreate each scene. New scenes: laser in a diamond, crystal pendants in the sun, glass and caustics on the table.
+- **New shapes:** Prism, Diamond (brilliant cut) and Crystal pendant in the Add menu; floors and backdrops now always go under all the objects.
 
 <details>
 <summary><strong>Previous versions — complete release history</strong></summary>
 
+- **0.27.0 — Lights aimed at an object, laser in glass:** lights hooked to an object follow it and orbit around it; the laser beam is visible inside glass; scrollable, resizable Lights panel.
 - **0.26.0 — Laser light and "Prism and light" demo:** thin beam traced from the light through glass and mirrors, exact spot and optional visible beam, rainbow fan in the Spectral render; demo scene with a glass prism on black.
 - **0.25.0 — Hardware ray tracing (RT cores):** rays traced by the GPU's ray tracing units (Vulkan), same image, renders 10–15× faster on an RTX 5070; automatic fallback to the shader BVH.
 - **0.24.0 — Spectral rendering, startup mode choice:** optional spectral mode on CPU and GPU with glass dispersion (Abbe number) and presets for crown, flint, lead crystal, polycarbonate and diamond ([docs/SPECTRAL.md](docs/SPECTRAL.md)); Simple or Advanced mode chosen at startup; BlenderKit materials removed from the bundled presets.

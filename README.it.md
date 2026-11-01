@@ -18,15 +18,16 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
-### Novità della versione 0.27.0
+### Novità della versione 0.28.0
 
-- **Luci puntate su un oggetto:** pannello Luci → Punta su → Aggancia alla selezione. La luce segue l'oggetto; spostandola continua a puntarlo, ruotandola gira attorno all'oggetto.
-- **Fascio laser visibile anche dentro il vetro:** entra bianco, attraversa il prisma o la gemma ed esce come arcobaleno.
-- **Pannello Luci:** area propria con scorrimento e bordo trascinabile per regolarne l'altezza (tutte le luci di nuovo selezionabili).
+- **Caustiche (photon mapping):** scheda Render → Caustiche. La luce che passa da vetri, cristalli e gemme si concentra in macchie luminose e arcobaleni sulle superfici attorno, con tutte le luci (puntiforme, spot, sole, area), su CPU e GPU, RGB e Spettrale.
+- **Menu Scene demo:** File → Scene demo, divise per che cosa mostrano, con una scheda che spiega le funzioni usate e come rifare ogni scena. Scene nuove: laser nel diamante, ciondoli di cristallo al sole, vetri e caustiche sul tavolo.
+- **Forme nuove:** Prisma, Diamante (taglio brillante) e Pendente di cristallo nel menu Aggiungi; pavimenti e fondali ora vanno sempre sotto tutti gli oggetti.
 
 <details>
 <summary><strong>Versioni precedenti — storico completo delle release</strong></summary>
 
+- **0.27.0 — Luci puntate su un oggetto, laser nel vetro:** le luci agganciate a un oggetto lo seguono e gli girano attorno; il fascio laser si vede dentro il vetro; pannello Luci scorrevole e ridimensionabile.
 - **0.26.0 — Luce laser e demo "Prisma e luce":** fascio sottile seguito dalla luce attraverso vetri e specchi, macchia esatta e fascio visibile a scelta, ventaglio arcobaleno nel render Spettrale; scena demo con un prisma di vetro sul nero.
 - **0.25.0 — Ray tracing hardware (RT core):** raggi tracciati dalle unità di ray tracing della scheda (Vulkan), stessa immagine, render 10–15 volte più veloci su una RTX 5070; ritorno automatico alla BVH dello shader.
 - **0.24.0 — Rendering spettrale, scelta della modalità all'avvio:** modalità spettrale opzionale su CPU e GPU con dispersione nei vetri (numero di Abbe) e i predefiniti crown, flint, cristallo al piombo, policarbonato e diamante ([docs/SPECTRAL.it.md](docs/SPECTRAL.it.md)); modalità Semplice o Avanzata scelta all'avvio; materiali BlenderKit tolti dai predefiniti inclusi.
