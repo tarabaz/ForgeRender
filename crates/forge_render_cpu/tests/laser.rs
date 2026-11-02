@@ -48,6 +48,7 @@ fn prism_scene(abbe: f32, beam: f32) -> Scene {
     laser.kind = LightKind::Laser {
         diameter_mm: 10.0,
         source: forge_scene::LaserSource::White,
+        split: false,
     };
     laser.target = Vec3::new(-0.075, 0.0433, 0.0);
     laser.beam_density = beam;
@@ -75,14 +76,14 @@ fn laser_path_refracts_and_disperses() {
     assert_eq!(rs.lasers.len(), 1);
     let l = &rs.lasers[0];
     assert!(l.rgb.segments.len() >= 3, "{:?}", l.rgb.segments);
-    let spot = l.rgb.spot.expect("macchia sul pavimento");
+    let spot = l.rgb.spot().expect("macchia sul pavimento");
     assert!((spot.point.y + 0.5).abs() < 1e-3, "{spot:?}");
     assert!(spot.dir.y < -0.1, "deviato verso la base del prisma: {spot:?}");
     // Due superfici di vetro: perdita di Fresnel di qualche percento.
     assert!(spot.throughput.x > 0.8 && spot.throughput.x < 0.99, "{spot:?}");
     let x_at = |rs: &RenderScene, lambda: f32| {
         rs.lasers[0].spectral[forge_render_core::laser::path_index(lambda)]
-            .spot
+            .spot()
             .expect("macchia")
             .point
             .x
@@ -202,6 +203,7 @@ fn tank_scene(beam: f32) -> (Scene, Vec3) {
     laser.kind = LightKind::Laser {
         diameter_mm: 2.0,
         source: forge_scene::LaserSource::White,
+        split: false,
     };
     laser.target = start + d0;
     laser.beam_density = beam;
@@ -274,9 +276,9 @@ fn colored_lasers_do_not_split() {
         }
         let rs = RenderScene::compile(&s);
         let l = &rs.lasers[0];
-        let xs: Vec<f32> = l.spectral.iter().map(|p| p.spot.expect("macchia").point.x).collect();
+        let xs: Vec<f32> = l.spectral.iter().map(|p| p.spot().expect("macchia").point.x).collect();
         let spread = xs.iter().cloned().fold(f32::MIN, f32::max) - xs.iter().cloned().fold(f32::MAX, f32::min);
-        (l.rgb.spot.expect("macchia").point.x, spread, l.power)
+        (l.rgb.spot().expect("macchia").point.x, spread, l.power)
     };
     let (red, spread_r, p_r) = spot_x(forge_scene::LaserSource::Red);
     let (green, spread_g, p_g) = spot_x(forge_scene::LaserSource::Green);
@@ -313,4 +315,39 @@ fn wide_beam_is_cut_along_the_glass_faces() {
     let gdir = (glass.end - glass.start).normalize();
     assert_eq!(look(glass.start - gdir * 0.01, glass), 0.0, "il fascio nel vetro sporge fuori");
     assert!(look(glass.start + gdir * 0.01, glass) > 0.0);
+}
+
+/// Riflessi parziali: con la spunta il fascio si divide sulle facce del prisma in più rami, ognuno
+/// con la sua macchia; il ramo principale resta quello di prima e la luce non aumenta (i rami si
+/// dividono la potenza). Senza la spunta tutto come prima: un solo percorso.
+#[test]
+fn partial_reflections_split_the_beam() {
+    let compile = |split_on: bool| {
+        let mut s = prism_scene(0.0, 0.0);
+        if let LightKind::Laser { split, .. } = &mut s.lights[0].kind {
+            *split = split_on;
+        }
+        RenderScene::compile(&s)
+    };
+    let (one, many) = (compile(false), compile(true));
+    let (a, b) = (&one.lasers[0].rgb, &many.lasers[0].rgb);
+    eprintln!(
+        "senza: {} tratti, {} macchie; con: {} tratti, {} macchie",
+        a.segments.len(),
+        a.spots.len(),
+        b.segments.len(),
+        b.spots.len()
+    );
+    assert_eq!(a.spots.len(), 1);
+    assert!(b.segments.len() > a.segments.len(), "nessun riflesso seguito");
+    assert!(b.spots.len() >= 2, "i riflessi non arrivano da nessuna parte");
+    let (ma, mb) = (a.spot().unwrap(), b.spot().unwrap());
+    assert!((ma.point - mb.point).length() < 1e-5, "il ramo principale non deve cambiare");
+    let total: f32 = b.spots.iter().map(|s| s.throughput.x).sum();
+    assert!(total <= 1.0 + 1e-4, "i rami non possono avere più luce del laser: {total}");
+    assert!(b
+        .spots
+        .iter()
+        .skip(1)
+        .all(|s| s.throughput.x >= forge_render_core::laser::SPLIT_MIN_POWER * 0.5));
 }

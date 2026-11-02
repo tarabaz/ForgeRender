@@ -358,10 +358,11 @@ pub(crate) fn laser_beams_rgb(scene: &RenderScene, o: Vec3, d: Vec3, t_end: f32)
 pub(crate) fn laser_spots_rgb(scene: &RenderScene, bsdf: &Bsdf, wo: Vec3, p: Vec3, ng: Vec3) -> Vec3 {
     let mut c = Vec3::ZERO;
     for laser in scene.lasers.iter() {
-        let Some(spot) = &laser.rgb.spot else { continue };
-        if let Some((wi, e)) = forge_render_core::laser::spot_at(spot, laser.radius, p, ng) {
-            let (f, _) = bsdf.eval(wo, wi);
-            c += f * laser.power * spot.throughput * e;
+        for spot in &laser.rgb.spots {
+            if let Some((wi, e)) = forge_render_core::laser::spot_at(spot, laser.radius, p, ng) {
+                let (f, _) = bsdf.eval(wo, wi);
+                c += f * laser.power * spot.throughput * e;
+            }
         }
     }
     c

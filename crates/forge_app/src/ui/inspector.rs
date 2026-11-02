@@ -1042,6 +1042,7 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 5 => LightKind::Laser {
                     diameter_mm: 2.0,
                     source: forge_scene::LaserSource::Red,
+                    split: false,
                 },
                 _ => LightKind::Directional,
             };
@@ -1196,7 +1197,18 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
                     }
                     ui.end_row();
                 }
-                LightKind::Laser { diameter_mm, .. } => {
+                LightKind::Laser { diameter_mm, split, .. } => {
+                    ui.label(tr("Riflessi parziali"));
+                    changed |= ui
+                        .checkbox(split, tr("Dividi il fascio sulle facce del vetro"))
+                        .on_hover_text(tr(
+                            "Come un laser vero: a ogni faccia di vetro una parte della luce si riflette e \
+                             diventa un fascio a sé, così attorno a un cristallo o a un diamante compaiono \
+                             tanti puntini. Si seguono i fasci sopra l'1% della potenza. Render un po' più \
+                             lento con i laser accesi; spento = un solo percorso",
+                        ))
+                        .changed();
+                    ui.end_row();
                     ui.label(tr("Diametro del fascio (mm)"));
                     changed |= ui
                         .add(egui::DragValue::new(diameter_mm).speed(0.05).range(0.1..=100.0))

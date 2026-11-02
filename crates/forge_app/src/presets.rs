@@ -819,6 +819,7 @@ pub fn prism_demo_scene() -> (Scene, RenderSettings) {
     laser.kind = LightKind::Laser {
         diameter_mm: 12.0,
         source: forge_scene::LaserSource::White,
+        split: false,
     };
     laser.target = entry;
     laser.beam_density = 0.08;

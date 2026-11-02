@@ -1247,6 +1247,20 @@
     "Render: Colore Spettrale, Caustiche attive (550 k fotoni, raggio 0,1 mm), Rimbalzi massimi 24": "Render: Colour Spectral, Caustics on (550 k photons, 0.1 mm radius), Max bounces 24",
     "Salva con File, Salva pacchetto completo (.frpack) per avere tutto in un file": "Save with File, Save complete package (.frpack) to have everything in one file",
     "Spegni le luci ad area: la scena è illuminata solo dai laser": "Turn off the area lights: the scene is lit by the lasers only",
-    "Un banco ottico da laboratorio su fondo scuro: un laser bianco attraversa le lenti e un prisma e si apre in uno spettro che disegna una riga di colori sullo schermo; un laser blu, di un solo colore, passa dallo stesso prisma e arriva sull'altro schermo senza scomporsi.": "A laboratory optical bench on a dark background: a white laser goes through the lenses and a prism and opens into a spectrum that draws a line of colours on the screen; a blue laser, of a single colour, goes through the same prism and reaches the other screen without splitting."
+    "Un banco ottico da laboratorio su fondo scuro: un laser bianco attraversa le lenti e un prisma e si apre in uno spettro che disegna una riga di colori sullo schermo; un laser blu, di un solo colore, passa dallo stesso prisma e arriva sull'altro schermo senza scomporsi.": "A laboratory optical bench on a dark background: a white laser goes through the lenses and a prism and opens into a spectrum that draws a line of colours on the screen; a blue laser, of a single colour, goes through the same prism and reaches the other screen without splitting.",
+    "Abbassa la Dispersione (Abbe) delle lenti per colori più aperti: un vetro ottico vero è attorno a 60": "Lower the lenses' Dispersion (Abbe) for wider colours: real optical glass is around 60",
+    "Aggiungi tre luci Laser lungo l'asse delle lenti: due Bianco da laboratorio da 0,1 mm e una Viola UV": "Add three Laser lights along the lens axis: two 0.1 mm White lab lasers and one UV violet",
+    "Come un laser vero: a ogni faccia di vetro una parte della luce si riflette e diventa un fascio a sé, così attorno a un cristallo o a un diamante compaiono tanti puntini. Si seguono i fasci sopra l'1% della potenza. Render un po' più lento con i laser accesi; spento = un solo percorso": "Like a real laser: at every glass face part of the light is reflected and becomes a beam of its own, so many dots appear around a crystal or a diamond. Beams above 1% of the power are followed. Slightly slower render with lasers on; off = a single path",
+    "Dispersione: i laser bianchi si aprono in colori, il viola UV no": "Dispersion: the white lasers open into colours, the UV violet one does not",
+    "Dividi il fascio sulle facce del vetro": "Split the beam at the glass faces",
+    "Fascio visibile leggero (0,002–0,004) per vedere il percorso nell'aria": "Faint visible beam (0.002–0.004) to see the path in the air",
+    "Importa il banco con le lenti (STEP) e dai alle lenti il materiale Lente ottica (Trasmissione 1, Ruvidità 0)": "Import the bench with the lenses (STEP) and give the lenses the Optical lens material (Transmission 1, Roughness 0)",
+    "Lenti convergenti e divergenti": "Converging and diverging lenses",
+    "Modello STEP del banco in un pacchetto .frpack": "STEP model of the bench in a .frpack package",
+    "Render Spettrale con le caustiche": "Spectral render with caustics",
+    "Render: Colore Spettrale, Caustiche attive, Rimbalzi massimi 25": "Render: Colour Spectral, Caustics on, Max bounces 25",
+    "Riflessi parziali": "Partial reflections",
+    "Rifrazione nelle lenti: fasci che convergono, si incrociano e divergono": "Refraction in the lenses: beams that converge, cross and diverge",
+    "Tre laser su un banco ottico, due bianchi da laboratorio e uno viola UV, attraversano una fila di lenti: i fasci si piegano, si incrociano nel fuoco e si riaprono verso lo schermo. I bianchi a ogni lente si aprono un po' di più in un ventaglio di colori; il viola, di un solo colore, resta una linea.": "Three lasers on an optical bench, two white lab lasers and one UV violet, go through a row of lenses: the beams bend, cross at the focus and open again towards the screen. At every lens the white ones open a little more into a fan of colours; the violet one, a single colour, stays a line."
   }
 }

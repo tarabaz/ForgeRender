@@ -32,6 +32,10 @@ pub enum LightKind {
         /// Colore del laser (i progetti di prima della 0.30 avevano solo il bianco).
         #[serde(default)]
         source: LaserSource,
+        /// Riflessi parziali: a ogni faccia di vetro una parte della luce si riflette e diventa un
+        /// fascio a sé (tanti puntini attorno a un cristallo). Spento: un solo percorso.
+        #[serde(default)]
+        split: bool,
     },
 }
 

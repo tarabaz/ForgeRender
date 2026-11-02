@@ -2363,3 +2363,13 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
 - Il pacchetto `dist/MCP/Optical Experiment.frpack` di Valerio copiato in
   `samples/scene/banco-ottico/banco-ottico.frpack` (5,7 MB; modelli STEP dentro). `DemoSource::Pack`:
   `open_pack` e niente `pack_path` (Salva chiede dove). Da portare su main alla prossima build.
+
+## Claude Code — 03/11/2026: riflessi parziali del laser, demo delle lenti (branch `sviluppo`)
+
+- `LightKind::Laser { split }` (serde default false). `laser::trace` segue un albero di rami
+  (pila `Branch`: o, d, potenza, volumi, faccia): a ogni faccia di vetro senza riflessione totale il
+  riflesso (Fresnel) diventa un ramo se sopra `SPLIT_MIN_POWER` (1%). `LaserPath::spots: Vec`
+  (prima `spot`), `MAX_SEGMENTS` 64, `MAX_SPOTS` 16; layout GPU con 16 macchie per percorso
+  (`LASER_PATH_WORDS` 964, `laser_spot_base`, `laser_seg`). Test `partial_reflections_split_the_beam`
+  e variante in `gpu_laser_matches_cpu`.
+- Demo "Lenti convergenti e divergenti": pacchetto di Valerio in `samples/scene/lenti/lenti.frpack`.

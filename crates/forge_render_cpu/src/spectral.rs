@@ -103,16 +103,16 @@ fn laser_spots(scene: &RenderScene, bsdf: &Bsdf<'_, Vec4>, wo: Vec3, p: Vec3, ng
             }
             let (k0, k1, t) = path_pair(w.lambda[i]);
             let (a, b) = (&laser.spectral[k0], &laser.spectral[k1]);
-            let spot = match (&a.spot, &b.spot) {
-                (Some(sa), Some(sb)) if compatible(a, b) => lerp_spot(sa, sb, t),
-                (Some(sa), _) if t < 0.5 || b.spot.is_none() => *sa,
-                (_, Some(sb)) => *sb,
-                _ => continue,
-            };
-            let spot = &spot;
-            if let Some((wi, e)) = spot_at(spot, laser.radius, p, ng) {
-                let (f, _) = bsdf.eval(wo, wi);
-                *ci += f[i] * power[i] * spot.throughput.x * e;
+            // Macchie interpolate tra le due lunghezze d'onda se i percorsi hanno la stessa
+            // struttura, altrimenti quelle del percorso più vicino.
+            let lerp = compatible(a, b);
+            let nearest = if t < 0.5 { a } else { b };
+            for (j, s0) in nearest.spots.iter().enumerate() {
+                let spot = if lerp { lerp_spot(&a.spots[j], &b.spots[j], t) } else { *s0 };
+                if let Some((wi, e)) = spot_at(&spot, laser.radius, p, ng) {
+                    let (f, _) = bsdf.eval(wo, wi);
+                    *ci += f[i] * power[i] * spot.throughput.x * e;
+                }
             }
         }
     }

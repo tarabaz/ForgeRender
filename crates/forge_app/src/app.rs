@@ -833,6 +833,7 @@ impl ForgeApp {
                 kind: LightKind::Laser {
                     diameter_mm: 2.0,
                     source: forge_scene::LaserSource::Red,
+                    split: false,
                 },
                 target: center,
                 beam_density: 0.05,

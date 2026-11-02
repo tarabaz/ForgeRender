@@ -21,8 +21,13 @@ use forge_scene::{Light, LightKind};
 pub const N_LAMBDA: usize = 64;
 pub const LAMBDA_FIRST: f32 = 380.0;
 pub const LAMBDA_LAST: f32 = 780.0;
-/// Tratti al massimo per percorso.
-pub const MAX_SEGMENTS: usize = 16;
+/// Tratti al massimo per percorso (con i riflessi parziali, tra tutti i rami).
+pub const MAX_SEGMENTS: usize = 64;
+/// Macchie al massimo per percorso (una per ramo che arriva su una superficie opaca).
+pub const MAX_SPOTS: usize = 16;
+/// Riflessi parziali: un ramo più debole di questa frazione della potenza del laser si lascia
+/// perdere (non si vedrebbe e costerebbe tempo).
+pub const SPLIT_MIN_POWER: f32 = 0.01;
 
 /// Un tratto rettilineo del fascio.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -49,10 +54,19 @@ pub struct LaserSpot {
     pub throughput: Vec3,
 }
 
+/// Percorso del fascio: i tratti di tutti i rami (il ramo principale per primo) e le macchie dove
+/// i rami arrivano su una superficie opaca.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct LaserPath {
     pub segments: Vec<LaserSegment>,
-    pub spot: Option<LaserSpot>,
+    pub spots: Vec<LaserSpot>,
+}
+
+impl LaserPath {
+    /// Macchia del ramo principale (il primo che arriva su una superficie opaca).
+    pub fn spot(&self) -> Option<LaserSpot> {
+        self.spots.first().copied()
+    }
 }
 
 /// Laser pronto per il render.
@@ -91,7 +105,7 @@ pub fn path_pair(lambda: f32) -> (usize, usize, f32) {
 /// Stessa struttura (stesse superfici attraversate): si può interpolare tra i due percorsi.
 pub fn compatible(a: &LaserPath, b: &LaserPath) -> bool {
     a.segments.len() == b.segments.len()
-        && a.spot.is_some() == b.spot.is_some()
+        && a.spots.len() == b.spots.len()
         && a.segments.iter().zip(&b.segments).all(|(x, y)| x.inside == y.inside)
 }
 
@@ -174,15 +188,31 @@ impl Media {
     }
 }
 
-/// Segue il fascio da `origin` in direzione `dir`; `lambda` = None per il render RGB.
-fn trace(scene: &RenderScene, origin: Vec3, dir: Vec3, lambda: Option<f32>) -> LaserPath {
+/// Ramo del fascio ancora da seguire: dove riparte, in che direzione, con quanta potenza, in quali
+/// volumi e da quale faccia.
+#[derive(Clone, Copy)]
+struct Branch {
+    o: Vec3,
+    d: Vec3,
+    tp: Vec3,
+    media: Media,
+    start_face: Option<Vec3>,
+}
+
+/// Segue il fascio da `origin` in direzione `dir`; `lambda` = None per il render RGB. Con `split`
+/// a ogni faccia di vetro una parte della luce si riflette (Fresnel): il riflesso diventa un ramo
+/// a sé, seguito dopo il ramo principale finché è abbastanza forte.
+fn trace(scene: &RenderScene, origin: Vec3, dir: Vec3, lambda: Option<f32>, split: bool) -> LaserPath {
     let geo = &*scene.geometry;
     let far = (geo.bounds.max - geo.bounds.min).length().max(1.0) * 4.0 + (origin - geo.bounds.center()).length();
     let mut path = LaserPath::default();
-    let mut o = origin;
-    let mut d = dir.normalize_or(-Vec3::Y);
-    let mut tp = Vec3::ONE;
-    let mut media = Media::default();
+    let mut todo = vec![Branch {
+        o: origin,
+        d: dir.normalize_or(-Vec3::Y),
+        tp: Vec3::ONE,
+        media: Media::default(),
+        start_face: None,
+    }];
     let tint = |rgb: Vec3| match lambda {
         None => rgb,
         Some(l) => Vec3::splat(RgbSpectrum::albedo(rgb).eval(l)),
@@ -212,105 +242,131 @@ fn trace(scene: &RenderScene, origin: Vec3, dir: Vec3, lambda: Option<f32>) -> L
     // Il fascio visibile di un tratto usa la potenza a metà tratto: in un liquido colorato si
     // affievolisce lungo il percorso invece di avere già all'ingresso il colore dell'uscita.
     let mid = |a: Vec3, b: Vec3| Vec3::new((a.x * b.x).sqrt(), (a.y * b.y).sqrt(), (a.z * b.z).sqrt());
-    // Faccia da cui parte il tratto (None = l'emettitore).
-    let mut start_face: Option<Vec3> = None;
     let orient = |n: Vec3, d: Vec3| if n.dot(d) < 0.0 { -n } else { n };
-    for _ in 0..MAX_SEGMENTS {
-        let (start, tp_start, inside) = (o, tp, media.n > 0);
-        let n_start = start_face.map_or(d, |n| orient(n, d));
-        // Le facce di un volume "perdente" (il liquido dentro lo spessore del vetro) si
-        // attraversano senza deviare: il tratto continua.
-        let mut hit = cast(o, d);
-        let mut skipped = 0;
-        while let Some(h) = hit {
-            let mi = scene.material_index(h.prim as usize);
-            let ng = geo.geometric_normals[h.prim as usize];
-            let front = ng.dot(d) < 0.0;
-            if skipped >= 8 || !media.is_false_hit(scene, mi, front) {
+    // Il ramo principale per primo, poi i riflessi (dal più recente), fino ai limiti di tratti e
+    // macchie.
+    while let Some(Branch {
+        mut o,
+        mut d,
+        mut tp,
+        mut media,
+        mut start_face,
+    }) = todo.pop()
+    {
+        loop {
+            if path.segments.len() >= MAX_SEGMENTS {
                 break;
             }
+            let (start, tp_start, inside) = (o, tp, media.n > 0);
+            let n_start = start_face.map_or(d, |n| orient(n, d));
+            // Le facce di un volume "perdente" (il liquido dentro lo spessore del vetro) si
+            // attraversano senza deviare: il tratto continua.
+            let mut hit = cast(o, d);
+            let mut skipped = 0;
+            while let Some(h) = hit {
+                let mi = scene.material_index(h.prim as usize);
+                let ng = geo.geometric_normals[h.prim as usize];
+                let front = ng.dot(d) < 0.0;
+                if skipped >= 8 || !media.is_false_hit(scene, mi, front) {
+                    break;
+                }
+                absorb(&media, h.t, &mut tp);
+                media.cross(mi, front);
+                o = offset_ray_origin(geo.surface_point(h.prim as usize, h.u, h.v), if front { -ng } else { ng });
+                hit = cast(o, d);
+                skipped += 1;
+            }
+            let Some(h) = hit else {
+                path.segments.push(LaserSegment {
+                    start,
+                    end: o + d * far,
+                    throughput: tp,
+                    inside,
+                    n_start,
+                    n_end: d,
+                });
+                break;
+            };
+            let prim = h.prim as usize;
+            let p = geo.surface_point(prim, h.u, h.v);
             absorb(&media, h.t, &mut tp);
-            media.cross(mi, front);
-            o = offset_ray_origin(geo.surface_point(h.prim as usize, h.u, h.v), if front { -ng } else { ng });
-            hit = cast(o, d);
-            skipped += 1;
-        }
-        let Some(h) = hit else {
             path.segments.push(LaserSegment {
                 start,
-                end: o + d * far,
-                throughput: tp,
+                end: p,
+                throughput: mid(tp_start, tp),
                 inside,
                 n_start,
-                n_end: d,
+                n_end: orient(geo.geometric_normals[prim], d),
             });
-            return path;
-        };
-        let prim = h.prim as usize;
-        let p = geo.surface_point(prim, h.u, h.v);
-        absorb(&media, h.t, &mut tp);
-        path.segments.push(LaserSegment {
-            start,
-            end: p,
-            throughput: mid(tp_start, tp),
-            inside,
-            n_start,
-            n_end: orient(geo.geometric_normals[prim], d),
-        });
-        start_face = Some(geo.geometric_normals[prim]);
-        let mi = scene.material_index(prim);
-        let m = &scene.materials[mi];
-        let mut ng = geo.geometric_normals[prim];
-        let [n0, n1, n2] = geo.shading_normals[prim];
-        let mut n = (n0 * (1.0 - h.u - h.v) + n1 * h.u + n2 * h.v).normalize_or(ng);
-        let entering = ng.dot(d) < 0.0;
-        if !entering {
-            ng = -ng;
-            n = -n;
-        }
-        if n.dot(ng) <= 0.0 {
-            n = ng;
-        }
-        let cos_i = (-d).dot(n).clamp(0.0, 1.0);
-        let reflect = |d: Vec3| d - 2.0 * d.dot(n) * n;
-        if m.transmission >= 0.5 && m.roughness < SMOOTH {
-            // Indici dei due lati: il materiale e il volume dall'altra parte (aria, oppure il
-            // vetro attorno a un liquido o il liquido dentro un vetro).
-            let n_mat = ior_of(m);
-            let n_other = media.outside(scene, mi, entering).map_or(1.0, |k| ior_of(&scene.materials[k]));
-            let eta = if entering { n_other / n_mat } else { n_mat / n_other };
-            let sin2_t = eta * eta * (1.0 - cos_i * cos_i);
-            if sin2_t >= 1.0 {
-                // Riflessione totale interna: resta nel vetro.
+            start_face = Some(geo.geometric_normals[prim]);
+            let mi = scene.material_index(prim);
+            let m = &scene.materials[mi];
+            let mut ng = geo.geometric_normals[prim];
+            let [n0, n1, n2] = geo.shading_normals[prim];
+            let mut n = (n0 * (1.0 - h.u - h.v) + n1 * h.u + n2 * h.v).normalize_or(ng);
+            let entering = ng.dot(d) < 0.0;
+            if !entering {
+                ng = -ng;
+                n = -n;
+            }
+            if n.dot(ng) <= 0.0 {
+                n = ng;
+            }
+            let cos_i = (-d).dot(n).clamp(0.0, 1.0);
+            let reflect = |d: Vec3| d - 2.0 * d.dot(n) * n;
+            if m.transmission >= 0.5 && m.roughness < SMOOTH {
+                // Indici dei due lati: il materiale e il volume dall'altra parte (aria, oppure il
+                // vetro attorno a un liquido o il liquido dentro un vetro).
+                let n_mat = ior_of(m);
+                let n_other = media.outside(scene, mi, entering).map_or(1.0, |k| ior_of(&scene.materials[k]));
+                let eta = if entering { n_other / n_mat } else { n_mat / n_other };
+                let sin2_t = eta * eta * (1.0 - cos_i * cos_i);
+                if sin2_t >= 1.0 {
+                    // Riflessione totale interna: resta nel vetro.
+                    d = reflect(d).normalize();
+                    o = offset_ray_origin(p, ng);
+                } else {
+                    let cos_t = (1.0 - sin2_t).sqrt();
+                    let rs = (cos_i - cos_t / eta) / (cos_i + cos_t / eta);
+                    let rp = (cos_i / eta - cos_t) / (cos_i / eta + cos_t);
+                    let fr = 0.5 * (rs * rs + rp * rp);
+                    // Riflesso parziale: un ramo a sé, se abbastanza forte (dalla stessa parte della
+                    // faccia, quindi negli stessi volumi).
+                    let reflected = tp * fr;
+                    if split && reflected.max_element() >= SPLIT_MIN_POWER {
+                        todo.push(Branch {
+                            o: offset_ray_origin(p, ng),
+                            d: reflect(d).normalize(),
+                            tp: reflected,
+                            media,
+                            start_face,
+                        });
+                    }
+                    tp *= (1.0 - fr) * m.transmission;
+                    if entering {
+                        tp *= tint(m.base_color);
+                    }
+                    d = (d * eta + n * (eta * cos_i - cos_t)).normalize();
+                    o = offset_ray_origin(p, -ng);
+                    media.cross(mi, entering);
+                }
+            } else if m.metallic >= 0.5 && m.roughness < SMOOTH {
+                tp *= tint(m.base_color);
                 d = reflect(d).normalize();
                 o = offset_ray_origin(p, ng);
             } else {
-                let cos_t = (1.0 - sin2_t).sqrt();
-                let rs = (cos_i - cos_t / eta) / (cos_i + cos_t / eta);
-                let rp = (cos_i / eta - cos_t) / (cos_i / eta + cos_t);
-                let fr = 0.5 * (rs * rs + rp * rp);
-                tp *= (1.0 - fr) * m.transmission;
-                if entering {
-                    tp *= tint(m.base_color);
+                if path.spots.len() < MAX_SPOTS {
+                    path.spots.push(LaserSpot {
+                        point: p,
+                        dir: d,
+                        throughput: tp,
+                    });
                 }
-                d = (d * eta + n * (eta * cos_i - cos_t)).normalize();
-                o = offset_ray_origin(p, -ng);
-                media.cross(mi, entering);
+                break;
             }
-        } else if m.metallic >= 0.5 && m.roughness < SMOOTH {
-            tp *= tint(m.base_color);
-            d = reflect(d).normalize();
-            o = offset_ray_origin(p, ng);
-        } else {
-            path.spot = Some(LaserSpot {
-                point: p,
-                dir: d,
-                throughput: tp,
-            });
-            return path;
-        }
-        if tp.max_element() < 1e-4 {
-            return path;
+            if tp.max_element() < 1e-4 {
+                break;
+            }
         }
     }
     path
@@ -322,7 +378,12 @@ pub fn trace_lasers(scene: &RenderScene, lights: &[Light]) -> Vec<RenderLaser> {
         .iter()
         .filter(|l| l.enabled && l.intensity > 0.0)
         .filter_map(|l| {
-            let LightKind::Laser { diameter_mm, source } = l.kind else {
+            let LightKind::Laser {
+                diameter_mm,
+                source,
+                split,
+            } = l.kind
+            else {
                 return None;
             };
             let dir = l.direction();
@@ -330,13 +391,15 @@ pub fn trace_lasers(scene: &RenderScene, lights: &[Light]) -> Vec<RenderLaser> {
                 // Laser di un solo colore: un solo percorso, con l'indice di quella lunghezza
                 // d'onda; non si scompone (tutti i percorsi spettrali sono quello).
                 Some(lambda) => {
-                    let path = trace(scene, l.position, dir, Some(lambda));
+                    let path = trace(scene, l.position, dir, Some(lambda), split);
                     (monochrome_rgb(source) * l.intensity.max(0.0), path.clone(), vec![path; N_LAMBDA])
                 }
                 None => (
                     l.radiance_color(),
-                    trace(scene, l.position, dir, None),
-                    (0..N_LAMBDA).map(|k| trace(scene, l.position, dir, Some(lambda_of(k)))).collect(),
+                    trace(scene, l.position, dir, None, split),
+                    (0..N_LAMBDA)
+                        .map(|k| trace(scene, l.position, dir, Some(lambda_of(k)), split))
+                        .collect(),
                 ),
             };
             Some(RenderLaser {

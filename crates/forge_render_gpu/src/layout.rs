@@ -89,10 +89,11 @@ pub const P_N_LASERS: usize = 81;
 /// Laser: potenza(3), raggio, densità del fascio, 0, 0, 0; poi 1 + [`forge_render_core::laser::N_LAMBDA`]
 /// percorsi (RGB, poi le lunghezze d'onda) di [`LASER_PATH_WORDS`] parole.
 pub const LASER_HEADER_WORDS: usize = 8;
-/// Percorso: tratti, macchia (0/1), 0, 0, punto(3), 0, direzione(3), 0, throughput(3), 0; poi
-/// [`forge_render_core::laser::MAX_SEGMENTS`] tratti: inizio(3), dentro (0/1), fine(3), piano
-/// d'inizio (direzione compressa), throughput(3), piano di fine (direzione compressa).
-pub const LASER_PATH_WORDS: usize = 16 + forge_render_core::laser::MAX_SEGMENTS * 12;
+/// Percorso: tratti, macchie, 0, 0; poi [`forge_render_core::laser::MAX_SPOTS`] macchie: punto(3),
+/// 0, direzione(3), 0, throughput(3), 0; poi [`forge_render_core::laser::MAX_SEGMENTS`] tratti:
+/// inizio(3), dentro (0/1), fine(3), piano d'inizio (direzione compressa), throughput(3), piano di
+/// fine (direzione compressa).
+pub const LASER_PATH_WORDS: usize = 4 + forge_render_core::laser::MAX_SPOTS * 12 + forge_render_core::laser::MAX_SEGMENTS * 12;
 pub const LASER_WORDS: usize = LASER_HEADER_WORDS + (1 + forge_render_core::laser::N_LAMBDA) * LASER_PATH_WORDS;
 /// Portale: centro(3), mezza larghezza, normale(3), mezza altezza, u(3), 0, v(3), 0.
 pub const PORTAL_WORDS: usize = 16;
@@ -510,18 +511,26 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
         for path in std::iter::once(&laser.rgb).chain(laser.spectral.iter()) {
             let path_start = w.pos() as usize;
             let n = path.segments.len().min(forge_render_core::laser::MAX_SEGMENTS);
+            let n_spots = path.spots.len().min(forge_render_core::laser::MAX_SPOTS);
             w.u(n as u32);
-            w.u(path.spot.is_some() as u32);
+            w.u(n_spots as u32);
             w.u(0);
             w.u(0);
-            let spot = path.spot.unwrap_or(forge_render_core::laser::LaserSpot {
-                point: forge_math::Vec3::ZERO,
-                dir: forge_math::Vec3::ZERO,
-                throughput: forge_math::Vec3::ZERO,
-            });
-            for v in [spot.point, spot.dir, spot.throughput] {
-                w.v3(v);
-                w.u(0);
+            for k in 0..forge_render_core::laser::MAX_SPOTS {
+                let spot = path
+                    .spots
+                    .get(k)
+                    .filter(|_| k < n_spots)
+                    .copied()
+                    .unwrap_or(forge_render_core::laser::LaserSpot {
+                        point: forge_math::Vec3::ZERO,
+                        dir: forge_math::Vec3::ZERO,
+                        throughput: forge_math::Vec3::ZERO,
+                    });
+                for v in [spot.point, spot.dir, spot.throughput] {
+                    w.v3(v);
+                    w.u(0);
+                }
             }
             for k in 0..forge_render_core::laser::MAX_SEGMENTS {
                 match path.segments.get(k).filter(|_| k < n) {
@@ -563,6 +572,7 @@ mod laser_layout_tests {
         assert!(src.contains(&format!("const LASER_WORDS: u32 = {}u;", super::LASER_WORDS)));
         assert!(src.contains(&format!("const LASER_N_LAMBDA: u32 = {}u;", forge_render_core::laser::N_LAMBDA)));
         assert!(src.contains(&format!("const LASER_MAX_SEG: u32 = {}u;", forge_render_core::laser::MAX_SEGMENTS)));
+        assert!(src.contains(&format!("const LASER_MAX_SPOTS: u32 = {}u;", forge_render_core::laser::MAX_SPOTS)));
         assert!(src.contains(&format!("var<uniform> P: array<vec4<u32>, {}>;", super::PARAM_WORDS / 4)));
     }
 }

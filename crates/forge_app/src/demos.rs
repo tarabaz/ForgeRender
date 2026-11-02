@@ -44,7 +44,7 @@ pub struct Demo {
     pub source: DemoSource,
 }
 
-pub static DEMOS: [Demo; 7] = [
+pub static DEMOS: [Demo; 8] = [
     Demo {
         category: 0,
         title: tk("Prisma e luce (Dark Side of the Moon)"),
@@ -93,6 +93,30 @@ pub static DEMOS: [Demo; 7] = [
             tk("Salva con File, Salva pacchetto completo (.frpack) per avere tutto in un file"),
         ],
         source: DemoSource::Pack("scene/banco-ottico/banco-ottico.frpack"),
+    },
+    Demo {
+        category: 0,
+        title: tk("Lenti convergenti e divergenti"),
+        summary: tk(
+            "Tre laser su un banco ottico, due bianchi da laboratorio e uno viola UV, attraversano una fila \
+             di lenti: i fasci si piegano, si incrociano nel fuoco e si riaprono verso lo schermo. I bianchi \
+             a ogni lente si aprono un po' di più in un ventaglio di colori; il viola, di un solo colore, \
+             resta una linea.",
+        ),
+        features: &[
+            tk("Rifrazione nelle lenti: fasci che convergono, si incrociano e divergono"),
+            tk("Dispersione: i laser bianchi si aprono in colori, il viola UV no"),
+            tk("Render Spettrale con le caustiche"),
+            tk("Modello STEP del banco in un pacchetto .frpack"),
+        ],
+        steps: &[
+            tk("Importa il banco con le lenti (STEP) e dai alle lenti il materiale Lente ottica (Trasmissione 1, Ruvidità 0)"),
+            tk("Abbassa la Dispersione (Abbe) delle lenti per colori più aperti: un vetro ottico vero è attorno a 60"),
+            tk("Aggiungi tre luci Laser lungo l'asse delle lenti: due Bianco da laboratorio da 0,1 mm e una Viola UV"),
+            tk("Fascio visibile leggero (0,002–0,004) per vedere il percorso nell'aria"),
+            tk("Render: Colore Spettrale, Caustiche attive, Rimbalzi massimi 25"),
+        ],
+        source: DemoSource::Pack("scene/lenti/lenti.frpack"),
     },
     Demo {
         category: 0,
@@ -368,6 +392,7 @@ pub fn diamond_laser_scene() -> (Scene, RenderSettings) {
     laser.kind = LightKind::Laser {
         diameter_mm: 3.0,
         source: forge_scene::LaserSource::White,
+        split: false,
     };
     laser.target = centre + Vec3::new(0.0, 0.03, 0.0);
     laser.beam_density = 0.15;
