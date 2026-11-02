@@ -58,6 +58,8 @@ enum Thumb {
 
 pub struct LibraryUi {
     pub open: bool,
+    /// Dentro la finestra del programma invece che in una finestra a parte.
+    pub docked: bool,
     tab: Tab,
     provider: Provider,
     kind: AssetKind,
@@ -98,6 +100,7 @@ impl Default for LibraryUi {
         let (tx, rx) = channel();
         Self {
             open: false,
+            docked: false,
             tab: Tab::Mine,
             provider: Provider::AmbientCg,
             kind: AssetKind::Material,
@@ -548,12 +551,29 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
         return;
     }
     let mut open = true;
-    egui::Window::new(tr("Libreria materiali e HDRI"))
-        .id(egui::Id::NULL.with("win-libreria-materiali-e-hdri"))
-        .open(&mut open)
-        .default_size([860.0, 600.0])
-        .resizable(true)
-        .show(ctx, |ui| {
+    let docked = app.library.docked;
+    crate::ui::detachable(
+        ctx,
+        "win-libreria-materiali-e-hdri",
+        tr("Libreria materiali e HDRI"),
+        [860.0, 600.0],
+        docked,
+        &mut open,
+        |ui| {
+            crate::ui::dock_button(ui, &mut app.library.docked);
+            // Materiale scelto (aperto nella scheda): il pulsante per metterlo sui pezzi è qui
+            // in alto, grande, senza doverlo cercare.
+            let chosen = app.material_editor.edited_name().map(str::to_string);
+            if let Some(name) = chosen {
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new(tr("Materiale scelto:")).weak());
+                    ui.label(egui::RichText::new(name).strong().size(16.0));
+                });
+                if crate::ui::material_editor::apply_button(ui, app.selection.len()) {
+                    crate::ui::material_editor::apply_to_selection(app);
+                }
+                ui.add_space(4.0);
+            }
             ui.horizontal(|ui| {
                 ui.selectable_value(&mut app.library.tab, Tab::Mine, tr("Materiali"));
                 ui.selectable_value(&mut app.library.tab, Tab::Online, tr("Online (ambientCG, Poly Haven)"));
@@ -591,7 +611,8 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
                 Tab::Mine => mine(app, ui),
                 Tab::Online => online_tab(app, ui),
             }
-        });
+        },
+    );
     app.library.open = open;
 }
 

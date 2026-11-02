@@ -52,6 +52,14 @@ impl NewLight {
     }
 }
 
+/// Come salvare il progetto con tutti i suoi file.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PackageKind {
+    Folder,
+    Zip,
+    Pack,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum View {
     Viewport,
@@ -294,6 +302,9 @@ pub struct ForgeApp {
     /// finisce di caricarsi il progetto demo.
     pub demo_info: Option<usize>,
     pub demo_after_load: Option<usize>,
+    /// Pacchetto `.frpack` aperto (Salva lo riscrive) e quello in caricamento.
+    pub pack_path: Option<PathBuf>,
+    pub pack_after_load: Option<PathBuf>,
     pub splash_texture: Option<egui::TextureHandle>,
     pub logo_texture: Option<egui::TextureHandle>,
     /// Modalità Semplice: aspetto e qualità scelti, valori prima dell'ultimo preset.
@@ -425,6 +436,8 @@ impl ForgeApp {
             mode_choice_open: false,
             demo_info: None,
             demo_after_load: None,
+            pack_path: None,
+            pack_after_load: None,
             mode_choice_dont_ask: false,
             splash_texture: None,
             logo_texture: None,
@@ -1554,6 +1567,7 @@ impl ForgeApp {
         self.unsaved = false;
         self.view = View::Viewport;
         self.demo_info = None;
+        self.pack_path = None;
     }
 
     /// Apre la scena demo `i` di `demos::DEMOS` e la sua scheda descrittiva.
@@ -2026,10 +2040,95 @@ impl ForgeApp {
 
     pub fn open_project_dialog(&mut self) {
         if let Some(p) = rfd::FileDialog::new()
-            .add_filter(tr("Progetto ForgeRender"), &[forge_project::EXTENSION])
+            .add_filter(
+                tr("Progetto ForgeRender"),
+                &[forge_project::EXTENSION, forge_project::pack::PACK_EXTENSION],
+            )
             .pick_file()
         {
-            self.open_project(&p);
+            self.open_any(&p);
+        }
+    }
+
+    /// Apre un pacchetto `.frpack`: lo estrae in una cartella del programma e apre il progetto
+    /// che contiene. "Salva" riscrive poi il pacchetto.
+    pub fn open_pack(&mut self, pack: &Path) {
+        let stem = pack.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let dir = crate::prefs::file_path()
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("pacchetti-aperti")
+            .join(format!("{stem}-{stamp}"));
+        match forge_project::pack::unpack(pack, &dir) {
+            Ok(project) => {
+                self.open_project(&project);
+                self.pack_after_load = Some(pack.to_path_buf());
+            }
+            Err(e) => self.error = Some(tf("Pacchetto non apribile: {}", &[format!("{e:#}")])),
+        }
+    }
+
+    /// Salva il progetto con tutti i suoi file: in una cartella, in uno ZIP o nel pacchetto
+    /// `.frpack` (che diventa il file del progetto: "Salva" lo aggiorna).
+    pub fn save_package(&mut self, kind: PackageKind) {
+        let name = self
+            .pack_path
+            .as_ref()
+            .or(self.meta.path.as_ref())
+            .and_then(|p| p.file_stem())
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "progetto".into());
+        let result = match kind {
+            PackageKind::Folder => {
+                let Some(parent) = rfd::FileDialog::new().set_title(tr("Cartella in cui salvare")).pick_folder() else {
+                    return;
+                };
+                let mut dir = parent.join(&name);
+                let mut k = 2;
+                while dir.exists() {
+                    dir = parent.join(format!("{name}-{k}"));
+                    k += 1;
+                }
+                forge_project::pack::save_bundle(&dir, &name, &self.scene, &self.meta, &self.settings).map(|(_, r)| (dir, r))
+            }
+            PackageKind::Zip | PackageKind::Pack => {
+                let (ext, label) = match kind {
+                    PackageKind::Zip => ("zip", tr("Archivio ZIP")),
+                    _ => (forge_project::pack::PACK_EXTENSION, tr("Pacchetto ForgeRender")),
+                };
+                let Some(p) = rfd::FileDialog::new()
+                    .add_filter(label, &[ext])
+                    .set_file_name(format!("{name}.{ext}"))
+                    .save_file()
+                else {
+                    return;
+                };
+                let out = with_extension(p, ext);
+                forge_project::pack::save_pack(&out, &self.scene, &self.meta, &self.settings).map(|r| (out, r))
+            }
+        };
+        match result {
+            Ok((out, report)) => {
+                if kind == PackageKind::Pack {
+                    self.pack_path = Some(out.clone());
+                    self.unsaved = false;
+                    self.remember_recent(&out);
+                }
+                self.toast(tf(
+                    "Salvato con {} file: {}",
+                    &[report.copied.to_string(), out.display().to_string()],
+                ));
+                if !report.missing.is_empty() {
+                    let list: Vec<String> = report.missing.iter().map(|p| p.display().to_string()).collect();
+                    self.error = Some(tf("File non trovati, non sono nel pacchetto:\n- {}", &[list.join("\n- ")]));
+                }
+            }
+            Err(e) => self.error = Some(tf("salvataggio fallito: {e:#}", &[format!("{e:#}")])),
         }
     }
 
@@ -2038,6 +2137,8 @@ impl ForgeApp {
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
         if ext == forge_project::EXTENSION {
             self.open_project(path);
+        } else if ext == forge_project::pack::PACK_EXTENSION {
+            self.open_pack(path);
         } else {
             self.import_path(path);
         }
@@ -2076,7 +2177,8 @@ impl ForgeApp {
             let report = l.report;
             self.replace_scene(l.scene, l.meta, Some(l.settings));
             self.demo_info = self.demo_after_load.take();
-            if let Some(p) = self.meta.path.clone() {
+            self.pack_path = self.pack_after_load.take();
+            if let Some(p) = self.pack_path.clone().or_else(|| self.meta.path.clone()) {
                 self.remember_recent(&p);
             }
             let mut notes = Vec::new();
@@ -2104,6 +2206,17 @@ impl ForgeApp {
     }
 
     pub fn save_project(&mut self, save_as: bool) {
+        // Progetto aperto da un pacchetto: "Salva" riscrive il pacchetto.
+        if let (Some(pack), false) = (self.pack_path.clone(), save_as) {
+            match forge_project::pack::save_pack(&pack, &self.scene, &self.meta, &self.settings) {
+                Ok(_) => {
+                    self.unsaved = false;
+                    self.toast(tf("Pacchetto salvato: {}", &[pack.display().to_string()]));
+                }
+                Err(e) => self.error = Some(tf("salvataggio fallito: {e:#}", &[format!("{e:#}")])),
+            }
+            return;
+        }
         let path = match (&self.meta.path, save_as) {
             (Some(p), false) => p.clone(),
             _ => {

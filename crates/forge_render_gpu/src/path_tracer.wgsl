@@ -1374,11 +1374,12 @@ fn gauss_irr(rho: f32, r: f32) -> f32 { return 2.0 / (PI * r * r) * exp(-2.0 * r
 
 // Radianza del fascio visibile di un tratto lungo il raggio o + t d, t in [0, t_end], per potenza 1.
 fn laser_beam_seg(sb: u32, r: f32, dens: f32, o: vec3<f32>, d: vec3<f32>, t_end: f32) -> f32 {
-    return laser_beam_ab(sv3(sb), sv3(sb + 4u), r, dens, o, d, t_end);
+    return laser_beam_ab(sv3(sb), sv3(sb + 4u), unpack_dir(sf(sb + 7u)), unpack_dir(sf(sb + 11u)), r, dens, o, d, t_end);
 }
 
-// Come laser_beam_seg, con gli estremi del tratto (a → e) già noti (tratti interpolati).
-fn laser_beam_ab(a: vec3<f32>, e_pt: vec3<f32>, r: f32, dens: f32, o: vec3<f32>, d: vec3<f32>, t_end: f32) -> f32 {
+// Come laser_beam_seg, con gli estremi del tratto (a → e) e i piani delle facce (ns, ne) già noti
+// (tratti interpolati).
+fn laser_beam_ab(a: vec3<f32>, e_pt: vec3<f32>, ns: vec3<f32>, ne: vec3<f32>, r: f32, dens: f32, o: vec3<f32>, d: vec3<f32>, t_end: f32) -> f32 {
     var sdir = e_pt - a;
     let len = length(sdir);
     if (len <= 0.0) { return 0.0; }
@@ -1393,8 +1394,11 @@ fn laser_beam_ab(a: vec3<f32>, e_pt: vec3<f32>, r: f32, dens: f32, o: vec3<f32>,
     let t_seg = (e - b * dd) / denom;
     let margin = 3.0 * r;
     if (t_ray < 0.0 || t_ray > t_end || t_seg < -margin || t_seg > len + margin) { return 0.0; }
-    let rho = length((o + d * t_ray) - (a + sdir * t_seg));
+    let p = o + d * t_ray;
+    let rho = length(p - (a + sdir * t_seg));
     if (rho > 3.0 * r) { return 0.0; }
+    // Il fascio finisce sulle facce vere (come `beam_radiance` sulla CPU).
+    if (dot(p - a, ns) < 0.0 || dot(p - e_pt, ne) > 0.0) { return 0.0; }
     let sn = max(sqrt(denom), 0.02);
     let line = gauss_irr(rho, r) * r * sqrt(PI * 0.5) / sn;
     return dens * line / (4.0 * PI);

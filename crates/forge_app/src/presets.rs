@@ -522,6 +522,40 @@ pub fn apply_simple_base(s: &mut RenderSettings) {
     d.use_guides = true;
 }
 
+/// Luci dell'aspetto attuale: quelle messe da un aspetto. Nei progetti salvati prima che le luci
+/// fossero segnate nessuna lo è: allora contano tutte (come prima).
+fn look_lights(scene: &Scene) -> Vec<&Light> {
+    if scene.lights.iter().any(|l| l.from_look) {
+        scene.lights.iter().filter(|l| l.from_look).collect()
+    } else {
+        scene.lights.iter().collect()
+    }
+}
+
+/// Progetto di prima: se tutte le luci sono quelle di un aspetto, si segnano come tali (così il
+/// prossimo aspetto le sostituisce, come faceva prima).
+fn mark_legacy_look_lights(scene: &mut Scene, s: &RenderSettings) {
+    if !scene.lights.iter().any(|l| l.from_look) && look_ignoring_light_placement(scene, s).is_some() {
+        for l in &mut scene.lights {
+            l.from_look = true;
+        }
+    }
+}
+
+/// Mette le luci di un aspetto al posto di quelle dell'aspetto precedente. Le luci aggiunte
+/// dall'utente restano: un aspetto non cancella mai quello che ha messo lui.
+fn set_look_lights(scene: &mut Scene, lights: Vec<Light>) {
+    let mut all: Vec<Light> = lights
+        .into_iter()
+        .map(|mut l| {
+            l.from_look = true;
+            l
+        })
+        .collect();
+    all.extend(scene.lights.drain(..).filter(|l| !l.from_look));
+    scene.lights = all;
+}
+
 pub fn apply_look(scene: &mut Scene, s: &mut RenderSettings, look: Look) {
     let spec = look.spec();
     let b = product_bounds(scene);
@@ -530,8 +564,9 @@ pub fn apply_look(scene: &mut Scene, s: &mut RenderSettings, look: Look) {
     } else {
         (b.center(), b.radius().max(1e-3))
     };
+    mark_legacy_look_lights(scene, s);
     if let Some(lights) = forge_scene::light::preset(spec.lights, center, radius) {
-        scene.lights = lights;
+        set_look_lights(scene, lights);
     }
     scene.environment = spec.environment.clone();
     s.environment_visible = spec.environment_visible;
@@ -643,6 +678,7 @@ fn fit_backdrop(scene: &mut Scene, want: BackdropStyle, backup: &mut PresetBacku
 /// tenendo i colori delle luci. Senza aspetto riconosciuto le luci restano come sono.
 pub fn fit_scene(scene: &mut Scene, s: &RenderSettings) -> PresetBackup {
     let mut backup = PresetBackup::capture(scene, s);
+    mark_legacy_look_lights(scene, s);
     // Le luci sono ancora dimensionate sulle vecchie misure: l'aspetto si riconosce dal resto.
     let look = matching_look(scene, s).or_else(|| look_ignoring_light_placement(scene, s));
     let style = scene
@@ -655,12 +691,12 @@ pub fn fit_scene(scene: &mut Scene, s: &RenderSettings) -> PresetBackup {
     if let Some(l) = look {
         let b = product_bounds(scene);
         if !b.is_empty() {
-            let colors: Vec<[f32; 3]> = scene.lights.iter().map(|l| l.color).collect();
+            let colors: Vec<[f32; 3]> = look_lights(scene).iter().map(|l| l.color).collect();
             if let Some(mut lights) = forge_scene::light::preset(l.spec().lights, b.center(), b.radius().max(1e-3)) {
                 for (l, c) in lights.iter_mut().zip(colors) {
                     l.color = c;
                 }
-                scene.lights = lights;
+                set_look_lights(scene, lights);
             }
         }
     }
@@ -677,7 +713,7 @@ fn look_ignoring_light_placement(scene: &Scene, s: &RenderSettings) -> Option<Lo
             .into_iter()
             .map(|l| l.name)
             .collect();
-        scene.lights.iter().map(|l| &l.name).eq(names.iter())
+        look_lights(scene).iter().map(|l| &l.name).eq(names.iter())
             && scene.environment == spec.environment
             && s.environment_visible == spec.environment_visible
             && s.tone_mapping == spec.tone_mapping
@@ -697,11 +733,14 @@ pub fn matching_look(scene: &Scene, s: &RenderSettings) -> Option<Look> {
     Look::ALL.into_iter().find(|l| {
         let spec = l.spec();
         let lights = forge_scene::light::preset(spec.lights, center, radius).unwrap_or_default();
-        // Il colore delle luci si può cambiare senza uscire dall'aspetto.
-        scene.lights.len() == lights.len()
-            && scene.lights.iter().zip(&lights).all(|(a, b)| {
-                let mut a = a.clone();
+        // Il colore delle luci si può cambiare senza uscire dall'aspetto; le luci aggiunte
+        // dall'utente non contano.
+        let mine = look_lights(scene);
+        mine.len() == lights.len()
+            && mine.iter().zip(&lights).all(|(a, b)| {
+                let mut a = (*a).clone();
                 a.color = b.color;
+                a.from_look = b.from_look;
                 a == *b
             })
             && scene.environment == spec.environment
@@ -942,6 +981,28 @@ mod tests {
         s.exposure_ev += 0.5;
         assert_eq!(matching_look(&scene, &s), None);
         let _ = backup;
+    }
+
+    /// Un aspetto non cancella le luci dell'utente: cambiando aspetto si sostituiscono solo le luci
+    /// dell'aspetto di prima, e quella dell'utente resta (una volta sola).
+    #[test]
+    fn looks_keep_the_users_lights() {
+        let mut scene = product_scene();
+        let mine = Light::area("Mia luce", Vec3::new(1.0, 2.0, 1.0), Vec3::ZERO, 0.5, 0.5, 7.0);
+        scene.lights = vec![mine.clone()];
+        let mut s = RenderSettings::default();
+        let n_look = |look: Look| forge_scene::light::preset(look.spec().lights, Vec3::ZERO, 1.0).unwrap().len();
+        for look in [Look::Light, Look::Dark, Look::Dramatic] {
+            apply_look(&mut scene, &mut s, look);
+            let users: Vec<_> = scene.lights.iter().filter(|l| !l.from_look).collect();
+            assert_eq!(users.len(), 1, "{look:?}");
+            assert_eq!(users[0], &mine);
+            assert_eq!(scene.lights.len(), 1 + n_look(look), "{look:?}");
+            assert_eq!(matching_look(&scene, &s), Some(look), "l'aspetto si riconosce con la luce in più");
+        }
+        // Anche "Adatta la scena al prodotto" lascia la luce dell'utente.
+        let _ = fit_scene(&mut scene, &s);
+        assert!(scene.lights.contains(&mine));
     }
 
     #[test]

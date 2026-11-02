@@ -19,6 +19,10 @@ pub enum Cmd {
     OpenRecent(usize),
     Save,
     SaveAs,
+    /// Progetto con tutti i file: in una cartella, in uno ZIP, nel file unico .frpack.
+    SaveBundle,
+    SaveZip,
+    SavePack,
     Import,
     Export,
     /// Finestra "Passaggi di render" (albedo, normali, profondità, maschera, ID).
@@ -149,6 +153,27 @@ pub fn spec(cmd: Cmd) -> Spec {
             icons::SAVE,
             key(CMD_SHIFT, Key::S),
             tk("Salva una copia del progetto con un altro nome"),
+        ),
+        Cmd::SavePack => s(
+            "file.save_pack",
+            tk("Salva pacchetto completo (.frpack)…"),
+            icons::SAVE,
+            None,
+            tk("Un solo file con dentro tutto: progetto, modelli importati, texture dei materiali e HDRI. Si apre con File, Apri su qualunque computer"),
+        ),
+        Cmd::SaveBundle => s(
+            "file.save_bundle",
+            tk("Salva in una cartella con tutti i file…"),
+            icons::SAVE,
+            None,
+            tk("Una cartella con il progetto e, accanto, i modelli, le texture e l'HDRI che usa: basta copiare la cartella"),
+        ),
+        Cmd::SaveZip => s(
+            "file.save_zip",
+            tk("Salva come ZIP con tutti i file…"),
+            icons::SAVE,
+            None,
+            tk("Come la cartella con tutti i file, compressa in uno ZIP da mandare o archiviare"),
         ),
         Cmd::Import => s("file.import", tk("Importa modello…"), icons::IMPORT, key(CMD, Key::I), IMPORT_HINT),
         Cmd::Export => s(
@@ -522,7 +547,7 @@ pub fn run_confirmed(app: &mut ForgeApp, ctx: &egui::Context, cmd: Cmd) {
         Cmd::OpenRecent(i) => {
             if let Some(p) = app.prefs.recent_projects.get(i).cloned() {
                 if p.is_file() {
-                    app.open_project(&p);
+                    app.open_any(&p);
                 } else {
                     let mut prefs = app.prefs.clone();
                     prefs.recent_projects.retain(|x| x != &p);
@@ -536,6 +561,9 @@ pub fn run_confirmed(app: &mut ForgeApp, ctx: &egui::Context, cmd: Cmd) {
         }
         Cmd::Save => app.save_project(false),
         Cmd::SaveAs => app.save_project(true),
+        Cmd::SaveBundle => app.save_package(crate::app::PackageKind::Folder),
+        Cmd::SaveZip => app.save_package(crate::app::PackageKind::Zip),
+        Cmd::SavePack => app.save_package(crate::app::PackageKind::Pack),
         Cmd::Import => app.import_dialog(),
         Cmd::Export => app.export_dialog(),
         Cmd::ExportPasses => app.sequence.passes_open = true,
@@ -679,6 +707,9 @@ mod tests {
             Cmd::Open,
             Cmd::Save,
             Cmd::SaveAs,
+            Cmd::SaveBundle,
+            Cmd::SaveZip,
+            Cmd::SavePack,
             Cmd::Import,
             Cmd::Export,
             Cmd::ExportPasses,

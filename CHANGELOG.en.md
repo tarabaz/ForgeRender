@@ -10,6 +10,27 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.31.0 — 2 Nov 2026
+
+**Projects with all their files (package)**
+- **File → Save complete package (.frpack)…**: a single file with everything inside: the project, the imported models (with the files they refer to: `.mtl` and textures of OBJ files, `.bin` and images of glTF files), the textures of the materials in use and the HDRI. It opens with File → Open on any computer (also from the recent projects, by dragging it onto the window or with a double click once installed); **Save** then updates the package itself.
+- **File → Save to a folder with all files…**: the project with, next to it, `modelli/`, `textures/` and `hdri/`; just copy the folder.
+- **File → Save as ZIP with all files…**: the same folder compressed into a ZIP.
+
+**Materials library**
+- The library and the material card open in a **separate window** that can be moved outside the program or onto another screen; "⧉ Back into the program" puts them back over the scene.
+- **Apply to selection** is a large coloured button right under the preview, with the number of selected parts; it also appears at the top of the library as soon as a material is chosen.
+
+**Lasers**
+- New **UV violet (405 nm)** laser.
+- The **blue** laser looks blue (it used to look violet: the part of a pure wavelength that a screen cannot show was simply cut off, which shifted the hue). Lasers now use the colours they have in photos.
+
+**Wide laser beam**: each stretch of the visible beam now ends exactly on the glass faces it crosses. Before, it ended square on the axis and could stick up to three radii out of a prism: with a wide beam you could see a piece of beam that could not exist.
+
+**Simple mode**: choosing an aspect (Light, Dark, Dramatic…) no longer deletes the lights you added: only the lights of the previous aspect are replaced.
+
+**Welcome screen**: new image (optical bench rendered with ForgeRender) with the large logo, the version under the logo and the "A new dimension of light" title.
+
 ## 0.30.0 — 2 Nov 2026
 
 **Laser: its own light, in red, green, blue or white**

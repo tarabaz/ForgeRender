@@ -90,7 +90,8 @@ pub const P_N_LASERS: usize = 81;
 /// percorsi (RGB, poi le lunghezze d'onda) di [`LASER_PATH_WORDS`] parole.
 pub const LASER_HEADER_WORDS: usize = 8;
 /// Percorso: tratti, macchia (0/1), 0, 0, punto(3), 0, direzione(3), 0, throughput(3), 0; poi
-/// [`forge_render_core::laser::MAX_SEGMENTS`] tratti: inizio(3), dentro (0/1), fine(3), 0, throughput(3), 0.
+/// [`forge_render_core::laser::MAX_SEGMENTS`] tratti: inizio(3), dentro (0/1), fine(3), piano
+/// d'inizio (direzione compressa), throughput(3), piano di fine (direzione compressa).
 pub const LASER_PATH_WORDS: usize = 16 + forge_render_core::laser::MAX_SEGMENTS * 12;
 pub const LASER_WORDS: usize = LASER_HEADER_WORDS + (1 + forge_render_core::laser::N_LAMBDA) * LASER_PATH_WORDS;
 /// Portale: centro(3), mezza larghezza, normale(3), mezza altezza, u(3), 0, v(3), 0.
@@ -528,9 +529,9 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
                         w.v3(s.start);
                         w.u(s.inside as u32);
                         w.v3(s.end);
-                        w.u(0);
+                        w.f(forge_render_core::displace::pack_dir(s.n_start));
                         w.v3(s.throughput);
-                        w.u(0);
+                        w.f(forge_render_core::displace::pack_dir(s.n_end));
                     }
                     None => {
                         for _ in 0..12 {

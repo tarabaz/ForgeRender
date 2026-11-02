@@ -18,15 +18,17 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
-### What's new in 0.30.0
+### What's new in 0.31.0
 
-- **Laser as its own light:** add it from the Lights panel and choose Red (650 nm), Green (532 nm), Blue (450 nm) or White lab laser; coloured lasers have a single wavelength and never split, only the white one makes rainbows.
-- **Light presets add, they don't replace:** your lights stay.
-- **Fix:** the visible laser beam now shows inside a liquid in a glass.
+- **Complete package (.frpack):** one file with the project, imported models, textures and HDRI, to open anywhere; also as a folder or ZIP with all files.
+- **Materials library:** detachable windows (even outside the program) and a big **Apply to selection** button.
+- **Lasers:** new UV violet (405 nm), blue that really looks blue; wide beams end exactly on the glass faces.
+- **Simple mode:** aspects no longer delete the lights you added. New welcome screen.
 
 <details>
 <summary><strong>Previous versions — complete release history</strong></summary>
 
+- **0.30.0 — Laser as its own light, presets that add:** red, green, blue and white lab lasers (coloured ones never split); light presets add instead of replacing; visible beam inside liquids.
 - **0.29.0 — Light through glasses with liquid:** correct glass-liquid bending for the laser and caustics, beam fading in coloured drinks; new Liquids material category.
 - **0.28.0–0.28.1 — Caustics and demo scenes:** photon-mapped caustics with every light (CPU and GPU, RGB and Spectral); File → Demo scenes grouped by type with an explanation card; Prism, Diamond and Crystal pendant shapes; demo scenes saved as projects keep their objects.
 - **0.27.0 — Lights aimed at an object, laser in glass:** lights hooked to an object follow it and orbit around it; the laser beam is visible inside glass; scrollable, resizable Lights panel.

@@ -288,3 +288,29 @@ fn colored_lasers_do_not_split() {
     assert!(p_g.y > p_g.x && p_g.y > p_g.z, "verde: {p_g:?}");
     assert!(green < red, "il verde piega più del rosso");
 }
+
+/// Fascio largo (6 cm) sul prisma: il tratto in aria finisce sulla faccia del vetro e quello
+/// dentro comincia lì. Prima ogni tratto finiva dritto sull'asse e poteva sporgere fino a tre
+/// raggi oltre: un pezzo di fascio "impossibile" fuori o dentro il prisma.
+#[test]
+fn wide_beam_is_cut_along_the_glass_faces() {
+    let mut s = prism_scene(0.0, 1.0);
+    if let LightKind::Laser { diameter_mm, .. } = &mut s.lights[0].kind {
+        *diameter_mm = 60.0;
+    }
+    let rs = RenderScene::compile(&s);
+    let l = &rs.lasers[0];
+    let (air, glass) = (&l.rgb.segments[0], &l.rgb.segments[1]);
+    let dir = (air.end - air.start).normalize();
+    // Raggio della camera perpendicolare al fascio, dall'alto (asse z = fuori dal piano).
+    let look = |p: Vec3, seg: &forge_render_core::laser::LaserSegment| {
+        forge_render_core::laser::beam_radiance(seg, l.radius, l.beam_density, p + Vec3::Z, -Vec3::Z, 10.0)
+    };
+    // Il tratto in aria si vede prima della faccia, non oltre (dentro il vetro).
+    assert!(look(air.end - dir * 0.01, air) > 0.0);
+    assert_eq!(look(air.end + dir * 0.01, air), 0.0, "il fascio in aria sporge dentro il prisma");
+    // Il tratto nel vetro non comincia prima della faccia d'ingresso.
+    let gdir = (glass.end - glass.start).normalize();
+    assert_eq!(look(glass.start - gdir * 0.01, glass), 0.0, "il fascio nel vetro sporge fuori");
+    assert!(look(glass.start + gdir * 0.01, glass) > 0.0);
+}

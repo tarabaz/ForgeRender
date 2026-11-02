@@ -1,5 +1,5 @@
-//! Schermata di benvenuto all'avvio: immagine `assets/splash.png` con il logo `assets/logo.png`
-//! e la versione in alto a sinistra; sotto, versione, commit, rendering e, in piccolo, le
+//! Schermata di benvenuto all'avvio: immagine `assets/splash.png` (banco ottico renderizzato con ForgeRender)
+//! con sopra il logo `assets/logo.png`, la versione sotto il logo e il titolo con le funzioni della luce; sotto,
 //! licenze dei componenti open source. Resta davanti finché non si preme "Chiudi"; si riapre dal
 //! menu File. "Mostra all'avvio" è in Impostazioni → Informazioni.
 
@@ -69,12 +69,15 @@ pub fn show(app: &mut ForgeApp, ctx: &egui::Context) {
     }
 }
 
-/// Logo e versione in alto a sinistra, disegnati sopra l'immagine.
+/// Sopra l'immagine, come nel mockup: logo grande in alto a sinistra con la versione sotto, e in
+/// basso a sinistra il titolo con le funzioni della luce. Misure in frazioni della larghezza, così
+/// restano uguali a qualunque dimensione.
 fn overlay(ui: &egui::Ui, rect: egui::Rect, logo: Option<&egui::TextureHandle>) {
     let painter = ui.painter_at(rect);
-    let margin = rect.width() * 0.035;
-    let mut below = rect.min + egui::vec2(margin, margin);
-    let logo_w = rect.width() * 0.17;
+    let w = rect.width();
+    let margin = w * 0.035;
+    let mut below = rect.min + egui::vec2(margin, rect.height() * 0.06);
+    let logo_w = w * 0.24;
     if let Some(tex) = logo {
         let [w, h] = tex.size();
         let size = egui::vec2(logo_w, logo_w * h as f32 / w.max(1) as f32);
@@ -85,15 +88,44 @@ fn overlay(ui: &egui::Ui, rect: egui::Rect, logo: Option<&egui::TextureHandle>) 
             egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
             egui::Color32::WHITE,
         );
-        below = r.left_bottom() + egui::vec2(0.0, 4.0);
+        below = r.left_bottom() + egui::vec2(0.0, rect.width() * 0.01);
     }
     painter.text(
         below,
         egui::Align2::LEFT_TOP,
         format!("v. {}", env!("CARGO_PKG_VERSION")),
-        egui::FontId::proportional(13.0),
+        egui::FontId::proportional(w * 0.024),
         style::ACCENT,
     );
+    // Titolo e funzioni (testo del marchio, in inglese come nel mockup).
+    let left = rect.left() + margin;
+    let lines = [
+        ("A NEW DIMENSION OF LIGHT", 0.765, 0.036, egui::Color32::WHITE),
+        (
+            "SPECTRAL RENDERING · PHOTON MAPPING · REALISTIC CAUSTICS",
+            0.845,
+            0.0235,
+            egui::Color32::from_gray(225),
+        ),
+        (
+            "ADVANCED LIGHT TRANSPORT · DISPERSION · OPTICAL SIMULATION",
+            0.905,
+            0.0235,
+            egui::Color32::from_gray(225),
+        ),
+    ];
+    for (text, y, size, color) in lines {
+        let pos = egui::pos2(left, rect.top() + rect.height() * y);
+        // Ombra leggera: il testo resta leggibile anche sopra il cavo rosso.
+        painter.text(
+            pos + egui::vec2(1.0, 1.0),
+            egui::Align2::LEFT_TOP,
+            text,
+            egui::FontId::proportional(w * size),
+            egui::Color32::from_black_alpha(160),
+        );
+        painter.text(pos, egui::Align2::LEFT_TOP, text, egui::FontId::proportional(w * size), color);
+    }
 }
 
 fn decode(bytes: &[u8]) -> Option<egui::ColorImage> {

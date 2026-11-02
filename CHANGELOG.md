@@ -13,6 +13,41 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.31.0 — 02/11/2026
+
+**Progetti con tutti i loro file (pacchetto)**
+- **File → Salva pacchetto completo (.frpack)…**: un solo file con dentro tutto: il progetto, i
+  modelli importati (con i file a cui rimandano: `.mtl` e texture degli OBJ, `.bin` e immagini dei
+  glTF), le texture dei materiali usati e l'HDRI. Si apre con File → Apri su qualunque computer
+  (anche dai progetti recenti, trascinandolo sulla finestra o con il doppio clic, una volta
+  installato); **Salva** poi aggiorna il pacchetto stesso.
+- **File → Salva in una cartella con tutti i file…**: il progetto con accanto `modelli/`,
+  `textures/` e `hdri/`; basta copiare la cartella.
+- **File → Salva come ZIP con tutti i file…**: la stessa cartella compressa in uno ZIP.
+
+**Libreria dei materiali**
+- La libreria e la scheda del materiale si aprono in una **finestra a parte**, che si sposta fuori
+  dal programma o su un altro schermo; "⧉ Riporta nel programma" le rimette sopra la scena.
+- **Applica alla selezione** è un pulsante grande e colorato subito sotto l'anteprima, con il
+  numero dei pezzi selezionati; compare anche in alto nella libreria appena si sceglie un
+  materiale.
+
+**Laser**
+- Nuovo laser **Viola UV (405 nm)**.
+- Il laser **blu** si vede blu (prima sembrava viola: della lunghezza d'onda pura si tagliava la
+  parte che lo schermo non può mostrare, e la tinta cambiava). I laser hanno ora i colori che hanno
+  nelle foto.
+
+**Fascio laser largo**: ogni tratto del fascio visibile finisce esattamente sulle facce del vetro
+che attraversa. Prima finiva dritto sull'asse e poteva sporgere dal prisma fino a tre raggi: con un
+fascio largo si vedeva un pezzo di fascio impossibile.
+
+**Modalità Semplice**: scegliere un aspetto (Chiaro, Scuro, Drammatico…) non cancella più le luci
+che hai aggiunto: si sostituiscono solo le luci dell'aspetto di prima.
+
+**Schermata di benvenuto**: immagine nuova (banco ottico renderizzato con ForgeRender) con il logo
+grande, la versione sotto il logo e il titolo "A new dimension of light".
+
 ## 0.30.0 — 02/11/2026
 
 **Laser: luce a sé, rosso, verde, blu o bianco**

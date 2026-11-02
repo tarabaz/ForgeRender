@@ -129,6 +129,9 @@ fn file_menu(app: &mut ForgeApp, ui: &mut egui::Ui) {
     ui.separator();
     item(app, ui, Cmd::Save);
     item(app, ui, Cmd::SaveAs);
+    item(app, ui, Cmd::SavePack);
+    item(app, ui, Cmd::SaveBundle);
+    item(app, ui, Cmd::SaveZip);
     ui.separator();
     item(app, ui, Cmd::Import);
     item(app, ui, Cmd::Export);

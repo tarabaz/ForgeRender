@@ -639,5 +639,15 @@
 - Preset del pannello Luci: `extend` invece di sostituire.
 - Test `colored_lasers_do_not_split`, `laser_beam_is_visible_inside_a_liquid`.
 
+
+### 0.31.0 (02/11/2026): pacchetto .frpack, libreria staccabile, laser viola/blu, fascio largo, aspetti che non cancellano luci, splash
+- `forge_project::pack`: `save_bundle` (cartella con modelli/, textures/, hdri/; file collegati di OBJ e glTF), `zip_dir`, `save_pack`, `unpack`; `PACK_EXTENSION = "frpack"`; solo le texture dei materiali usati.
+- App: `Cmd::{SavePack, SaveBundle, SaveZip}`, `open_pack` (estrae in `pacchetti-aperti/`), `pack_path` (Salva riscrive il pacchetto); associazione `.frpack` nell'installer.
+- `ui::detachable` / `dock_button` (viewport immediate di egui) per libreria e scheda materiale; `material_editor::apply_button` / `apply_to_selection`.
+- `LaserSource::Violet` (405 nm) e `display_rgb` (colori da foto invece della lunghezza d'onda tagliata).
+- `LaserSegment::{n_start, n_end}`: il fascio visibile si taglia sui piani delle facce (CPU e GPU, normali compresse con `pack_dir` nelle parole libere del layout).
+- `Light::from_look` e `presets::{look_lights, set_look_lights, mark_legacy_look_lights}`.
+- Splash: `assets/splash.png` nuova (banco ottico), logo al 24%, versione, titolo e funzioni.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

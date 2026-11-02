@@ -34,6 +34,10 @@ pub struct LaserSegment {
     pub throughput: Vec3,
     /// Dentro un vetro (serve a decidere se due percorsi vicini sono interpolabili).
     pub inside: bool,
+    /// Piani delle superfici da cui il tratto parte e su cui finisce (normali orientate nel verso
+    /// del fascio): il fascio visibile si taglia lungo le facce vere, non dritto sull'asse.
+    pub n_start: Vec3,
+    pub n_end: Vec3,
 }
 
 /// Dove il fascio arriva su una superficie opaca.
@@ -98,6 +102,8 @@ pub fn lerp_segment(a: &LaserSegment, b: &LaserSegment, t: f32) -> LaserSegment 
         end: a.end.lerp(b.end, t),
         throughput: a.throughput.lerp(b.throughput, t),
         inside: a.inside,
+        n_start: a.n_start.lerp(b.n_start, t).normalize_or(a.n_start),
+        n_end: a.n_end.lerp(b.n_end, t).normalize_or(a.n_end),
     }
 }
 
@@ -206,8 +212,12 @@ fn trace(scene: &RenderScene, origin: Vec3, dir: Vec3, lambda: Option<f32>) -> L
     // Il fascio visibile di un tratto usa la potenza a metà tratto: in un liquido colorato si
     // affievolisce lungo il percorso invece di avere già all'ingresso il colore dell'uscita.
     let mid = |a: Vec3, b: Vec3| Vec3::new((a.x * b.x).sqrt(), (a.y * b.y).sqrt(), (a.z * b.z).sqrt());
+    // Faccia da cui parte il tratto (None = l'emettitore).
+    let mut start_face: Option<Vec3> = None;
+    let orient = |n: Vec3, d: Vec3| if n.dot(d) < 0.0 { -n } else { n };
     for _ in 0..MAX_SEGMENTS {
         let (start, tp_start, inside) = (o, tp, media.n > 0);
+        let n_start = start_face.map_or(d, |n| orient(n, d));
         // Le facce di un volume "perdente" (il liquido dentro lo spessore del vetro) si
         // attraversano senza deviare: il tratto continua.
         let mut hit = cast(o, d);
@@ -231,6 +241,8 @@ fn trace(scene: &RenderScene, origin: Vec3, dir: Vec3, lambda: Option<f32>) -> L
                 end: o + d * far,
                 throughput: tp,
                 inside,
+                n_start,
+                n_end: d,
             });
             return path;
         };
@@ -242,7 +254,10 @@ fn trace(scene: &RenderScene, origin: Vec3, dir: Vec3, lambda: Option<f32>) -> L
             end: p,
             throughput: mid(tp_start, tp),
             inside,
+            n_start,
+            n_end: orient(geo.geometric_normals[prim], d),
         });
+        start_face = Some(geo.geometric_normals[prim]);
         let mi = scene.material_index(prim);
         let m = &scene.materials[mi];
         let mut ng = geo.geometric_normals[prim];
@@ -316,7 +331,7 @@ pub fn trace_lasers(scene: &RenderScene, lights: &[Light]) -> Vec<RenderLaser> {
                 // d'onda; non si scompone (tutti i percorsi spettrali sono quello).
                 Some(lambda) => {
                     let path = trace(scene, l.position, dir, Some(lambda));
-                    (monochrome_rgb(lambda) * l.intensity.max(0.0), path.clone(), vec![path; N_LAMBDA])
+                    (monochrome_rgb(source) * l.intensity.max(0.0), path.clone(), vec![path; N_LAMBDA])
                 }
                 None => (
                     l.radiance_color(),
@@ -335,11 +350,10 @@ pub fn trace_lasers(scene: &RenderScene, lights: &[Light]) -> Vec<RenderLaser> {
         .collect()
 }
 
-/// Colore RGB della scena di una luce di lunghezza d'onda `lambda` (nm), con luminanza 1: un
-/// laser verde e uno rosso della stessa potenza sembrano luminosi uguale. Le componenti fuori
-/// dalla gamma (negative) si tolgono.
-pub fn monochrome_rgb(lambda: f32) -> Vec3 {
-    let c = crate::spectral::lambda_to_rgb(lambda, 1.0).max(Vec3::ZERO);
+/// Colore di un laser di un solo colore ([`LaserSource::display_rgb`]), con luminanza 1: due laser
+/// della stessa potenza sembrano luminosi uguale, qualunque sia il colore.
+pub fn monochrome_rgb(source: forge_scene::LaserSource) -> Vec3 {
+    let c = Vec3::from_array(source.display_rgb());
     let y = forge_math::luminance(c);
     if y > 0.0 {
         c / y
@@ -398,8 +412,14 @@ pub fn beam_radiance(seg: &LaserSegment, radius: f32, density: f32, o: Vec3, d: 
     if t_ray < 0.0 || t_ray > t_end || t_seg < -margin || t_seg > len + margin {
         return 0.0;
     }
-    let rho = ((o + d * t_ray) - (seg.start + s * t_seg)).length();
+    let p = o + d * t_ray;
+    let rho = (p - (seg.start + s * t_seg)).length();
     if rho > 3.0 * radius {
+        return 0.0;
+    }
+    // Il fascio finisce sulle facce vere: niente pezzi che sporgono dal vetro (con un fascio
+    // largo il taglio dritto sull'asse si vedeva).
+    if (p - seg.start).dot(seg.n_start) < 0.0 || (p - seg.end).dot(seg.n_end) > 0.0 {
         return 0.0;
     }
     let sin = denom.sqrt().max(0.02);

@@ -172,12 +172,12 @@ impl ForgeApp {
             files.retain(|f| !is_blend(f));
         }
         let (projects, models): (Vec<_>, Vec<_>) = files.into_iter().partition(|f| {
-            f.extension()
-                .and_then(|e| e.to_str())
-                .is_some_and(|e| e.eq_ignore_ascii_case(forge_project::EXTENSION))
+            f.extension().and_then(|e| e.to_str()).is_some_and(|e| {
+                e.eq_ignore_ascii_case(forge_project::EXTENSION) || e.eq_ignore_ascii_case(forge_project::pack::PACK_EXTENSION)
+            })
         });
         if let Some(p) = projects.first() {
-            self.open_project(p);
+            self.open_any(p);
         }
         self.ask_import(models);
     }
@@ -329,4 +329,62 @@ impl ForgeApp {
             }
         }
     }
+}
+
+/// Finestra che si può staccare dal programma. `docked`: sopra la scena, come prima; altrimenti
+/// in una finestra del sistema a parte, che si sposta anche fuori dal programma o su un altro
+/// schermo (se il sistema non permette più finestre resta dentro). `open` diventa falso quando la
+/// si chiude.
+pub fn detachable(
+    ctx: &egui::Context,
+    id: &str,
+    title: &str,
+    size: [f32; 2],
+    docked: bool,
+    open: &mut bool,
+    mut body: impl FnMut(&mut egui::Ui),
+) {
+    let window = |ctx: &egui::Context, open: &mut bool, body: &mut dyn FnMut(&mut egui::Ui)| {
+        egui::Window::new(title)
+            .id(egui::Id::NULL.with(id))
+            .open(open)
+            .default_size(size)
+            .resizable(true)
+            .show(ctx, |ui| body(ui));
+    };
+    if docked {
+        window(ctx, open, &mut body);
+        return;
+    }
+    let builder = egui::ViewportBuilder::default().with_title(title).with_inner_size(size);
+    ctx.show_viewport_immediate(egui::ViewportId::from_hash_of(id), builder, |ui, class| {
+        if class == egui::ViewportClass::EmbeddedWindow {
+            body(ui);
+            return;
+        }
+        egui::CentralPanel::default().show(ui, |ui| body(ui));
+        if ui.ctx().input(|i| i.viewport().close_requested()) {
+            *open = false;
+        }
+    });
+}
+
+/// Pulsante per staccare la finestra dal programma o riportarla dentro; vero se è cambiato.
+pub fn dock_button(ui: &mut egui::Ui, docked: &mut bool) -> bool {
+    let (text, hint) = if *docked {
+        (
+            tr("⧉ Stacca dal programma"),
+            tr("Apre questa finestra a parte: la sposti dove vuoi, anche fuori dal programma o su un altro schermo"),
+        )
+    } else {
+        (
+            tr("⧉ Riporta nel programma"),
+            tr("Rimette questa finestra dentro il programma, sopra la scena"),
+        )
+    };
+    let changed = ui.small_button(text).on_hover_text(hint).clicked();
+    if changed {
+        *docked = !*docked;
+    }
+    changed
 }

@@ -336,13 +336,17 @@ fn laser_beams_s(o: vec3<f32>, d: vec3<f32>, t_end: f32) -> vec4<f32> {
                 var a = sv3(sb);
                 var e = sv3(sb + 4u);
                 var tp = sf(sb + 8u);
+                var ns = unpack_dir(sf(sb + 7u));
+                var ne = unpack_dir(sf(sb + 11u));
                 if (lerp) {
                     let sb1 = p1 + 16u + s * 12u;
                     a = mix(a, sv3(sb1), kp.y);
                     e = mix(e, sv3(sb1 + 4u), kp.y);
                     tp = mix(tp, sf(sb1 + 8u), kp.y);
+                    ns = normalize(mix(ns, unpack_dir(sf(sb1 + 7u)), kp.y));
+                    ne = normalize(mix(ne, unpack_dir(sf(sb1 + 11u)), kp.y));
                 }
-                let b = laser_beam_ab(a, e, r, dens, o, d, t_end);
+                let b = laser_beam_ab(a, e, ns, ne, r, dens, o, d, t_end);
                 if (b > 0.0) { c[i] = c[i] + power[i] * tp * b; }
             }
         }

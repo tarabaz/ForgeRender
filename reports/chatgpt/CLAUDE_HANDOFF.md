@@ -2348,3 +2348,12 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
   preset delle luci che aggiungono senza togliere ("non eliminare mai niente"). Le "Look" della
   modalità Semplice continuano a sostituire le luci (con Annulla preset): non toccate.
   Portato su main come **0.30.0** ("pusha e merge").
+
+## Claude Code — 02/11/2026: 0.31.0 (main)
+
+- Richieste di Valerio in sequenza: splash dal suo mockup; laser blu che sembrava viola e laser viola UV;
+  aspetti della modalità Semplice che cancellavano le sue luci; pacchetto con tutti i file (cartella,
+  ZIP, .frpack in un file); libreria e scheda materiale staccabili e "Applica alla selezione" grande;
+  fascio largo che sporgeva dal prisma ("porcata": era la margine di 3 raggi oltre i tratti).
+- Limite rimasto: un fascio più largo della faccia che colpisce è trattato tutto come rifratto (servirebbe
+  un fascio di più raggi).

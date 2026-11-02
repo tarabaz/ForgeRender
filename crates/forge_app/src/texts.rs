@@ -48,6 +48,7 @@ pub const EXTERNAL: &[&str] = &[
     tk("Rosso (650 nm)"),
     tk("Verde (532 nm)"),
     tk("Blu (450 nm)"),
+    tk("Viola UV (405 nm)"),
     tk("Bianco da laboratorio"),
     // forge_scene::light::PRESETS, FOG_PRESETS, FOG_QUALITY
     tk("Studio neutro"),

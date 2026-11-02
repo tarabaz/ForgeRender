@@ -42,6 +42,8 @@ pub struct MaterialEditorUi {
     edited: Option<Material>,
     preview: Preview,
     status: Option<(String, bool)>,
+    /// Dentro la finestra del programma invece che in una finestra a parte.
+    pub docked: bool,
 }
 
 impl MaterialEditorUi {
@@ -63,6 +65,11 @@ impl MaterialEditorUi {
         self.preview = Preview::default();
         self.status = None;
         self.open = true;
+    }
+
+    /// Nome del materiale aperto nella scheda (la libreria lo mostra con "Applica alla selezione").
+    pub fn edited_name(&self) -> Option<&str> {
+        self.open.then_some(()).and(self.edited.as_ref().map(|m| m.name.as_str()))
     }
 
     /// Id del materiale aperto (per evidenziare la tessera nella libreria).
@@ -172,25 +179,65 @@ enum Action {
     Revert,
 }
 
+/// Finestra "Modifica materiale": di solito in una finestra del sistema a parte, che si sposta
+/// anche fuori dal programma (o su un altro schermo); "Riporta dentro" la rimette sopra la scena.
 pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
     if !app.material_editor.open {
         return;
     }
     let mut open = true;
     let mut action = None;
-    let selection = app.selection.len();
     let title = app
         .material_editor
         .edited
         .as_ref()
         .map(|m| tf("Modifica materiale: {}", std::slice::from_ref(&m.name)))
         .unwrap_or_else(|| tr("Modifica materiale").to_string());
-    egui::Window::new(title)
-        .id(egui::Id::NULL.with("win-modifica-materiale"))
-        .open(&mut open)
-        .default_size([980.0, 680.0])
-        .resizable(true)
-        .show(ctx, |ui| {
+    let docked = app.material_editor.docked;
+    crate::ui::detachable(ctx, "win-modifica-materiale", &title, [980.0, 680.0], docked, &mut open, |ui| {
+        body(app, ui, &mut action)
+    });
+    app.material_editor.open = open;
+    if let Some(action) = action {
+        run_action(app, action);
+    }
+}
+
+/// Mette il materiale aperto, con le impostazioni attuali, sui pezzi selezionati.
+pub fn apply_to_selection(app: &mut ForgeApp) {
+    let Some(m) = app.material_editor.edited.clone() else { return };
+    app.scene.materials.upsert(m.clone());
+    for &i in &app.selection {
+        app.scene.assignments.insert(app.scene.nodes[i].id.clone(), m.id.clone());
+    }
+    app.selected_material = m.id.clone();
+    app.appearance_changed();
+    app.material_editor.status = Some((tf("«{}» applicato alla selezione.", std::slice::from_ref(&m.name)), false));
+}
+
+/// Pulsante grande "Applica alla selezione" (nella scheda e nella libreria).
+pub fn apply_button(ui: &mut egui::Ui, selection: usize) -> bool {
+    let b = egui::Button::new(
+        egui::RichText::new(tf("Applica alla selezione ({})", &[selection.to_string()]))
+            .size(17.0)
+            .strong()
+            .color(egui::Color32::WHITE),
+    )
+    .fill(style::ACCENT)
+    .min_size(egui::vec2(ui.available_width().min(420.0), 38.0));
+    ui.add_enabled(selection > 0, b)
+        .on_hover_text(tr("Mette il materiale, con queste impostazioni, sui pezzi selezionati"))
+        .on_disabled_hover_text(tr("Seleziona prima uno o più pezzi nella viewport o nell'albero"))
+        .clicked()
+}
+
+fn body(app: &mut ForgeApp, ui: &mut egui::Ui, action: &mut Option<Action>) {
+    let selection = app.selection.len();
+    if crate::ui::dock_button(ui, &mut app.material_editor.docked) {
+        ui.ctx().request_repaint();
+    }
+    {
+        {
             let e = &mut app.material_editor;
             let (Some(m), Some(original)) = (e.edited.as_mut(), e.original.as_ref()) else {
                 return;
@@ -210,25 +257,18 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
                 ui.strong(tr("Anteprima"));
                 preview_image(ui, &mut e.preview, m);
                 ui.add_space(8.0);
+                // Il pulsante che serve di più: grande, subito sotto l'anteprima.
+                if apply_button(ui, selection) {
+                    *action = Some(Action::Apply);
+                }
+                ui.add_space(4.0);
                 ui.horizontal_wrapped(|ui| {
-                    if ui
-                        .add_enabled(selection > 0, egui::Button::new(tr("Applica alla selezione")))
-                        .on_hover_text(if selection > 0 {
-                            tr("Mette il materiale, con queste impostazioni, sui pezzi selezionati")
-                        } else {
-                            tr("Seleziona prima uno o più pezzi nella viewport o nell'albero")
-                        })
-                        .on_disabled_hover_text(tr("Seleziona prima uno o più pezzi nella viewport o nell'albero"))
-                        .clicked()
-                    {
-                        action = Some(Action::Apply);
-                    }
                     let save_hint = match &e.source {
                         Some(Source::Library(_)) => tr("Salva le nuove impostazioni nel materiale della libreria"),
                         _ => tr("Salva una copia nella tua libreria (i predefiniti del programma non cambiano)"),
                     };
                     if ui.button(tr("Salva nella libreria")).on_hover_text(save_hint).clicked() {
-                        action = Some(Action::Save);
+                        *action = Some(Action::Save);
                     }
                     if ui
                         .button(tr("Esporta zip…"))
@@ -237,10 +277,10 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
                         ))
                         .clicked()
                     {
-                        action = Some(Action::Export);
+                        *action = Some(Action::Export);
                     }
                     if ui.add_enabled(modified, egui::Button::new(tr("Annulla modifiche"))).clicked() {
-                        action = Some(Action::Revert);
+                        *action = Some(Action::Revert);
                     }
                 });
                 if modified {
@@ -255,25 +295,19 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
                     ui.colored_label(color, msg);
                 }
             });
-        });
-    app.material_editor.open = open;
-    let Some(action) = action else { return };
+        }
+    }
+}
+
+fn run_action(app: &mut ForgeApp, action: Action) {
     let Some(m) = app.material_editor.edited.clone() else { return };
     match action {
         Action::Revert => {
             app.material_editor.edited = app.material_editor.original.clone();
             app.material_editor.status = None;
         }
-        Action::Apply => {
-            // Il materiale del progetto prende queste impostazioni.
-            app.scene.materials.upsert(m.clone());
-            for &i in &app.selection {
-                app.scene.assignments.insert(app.scene.nodes[i].id.clone(), m.id.clone());
-            }
-            app.selected_material = m.id.clone();
-            app.appearance_changed();
-            app.material_editor.status = Some((tf("«{}» applicato alla selezione.", std::slice::from_ref(&m.name)), false));
-        }
+        // Il materiale del progetto prende queste impostazioni.
+        Action::Apply => apply_to_selection(app),
         Action::Save => {
             let result = match app.material_editor.source.clone() {
                 Some(Source::Library(l)) => store::update(&l.dir, &m),

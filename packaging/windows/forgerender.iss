@@ -1,8 +1,8 @@
 ; Installer di ForgeRender (Inno Setup 6).
-; Compilazione:  ISCC.exe /DAppVersion=0.30.0 /DBinDir=..\..\target\release packaging\windows\forgerender.iss
+; Compilazione:  ISCC.exe /DAppVersion=0.31.0 /DBinDir=..\..\target\release packaging\windows\forgerender.iss
 
 #ifndef AppVersion
-  #define AppVersion "0.30.0"
+  #define AppVersion "0.31.0"
 #endif
 #ifndef BinDir
   #define BinDir "..\..\target\release"
@@ -36,7 +36,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "assoc"; Description: "Apri i file .frproject con ForgeRender"; GroupDescription: "Associazioni file:"
+Name: "assoc"; Description: "Apri i file .frproject e .frpack con ForgeRender"; GroupDescription: "Associazioni file:"
 
 [Files]
 Source: "{#BinDir}\forgerender.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -68,6 +68,7 @@ Name: "{autodesktop}\ForgeRender"; Filename: "{app}\forgerender.exe"; Tasks: des
 
 [Registry]
 Root: HKA; Subkey: "Software\Classes\.frproject"; ValueType: string; ValueName: ""; ValueData: "ForgeRender.Project"; Flags: uninsdeletevalue; Tasks: assoc
+Root: HKA; Subkey: "Software\Classes\.frpack"; ValueType: string; ValueName: ""; ValueData: "ForgeRender.Project"; Flags: uninsdeletevalue; Tasks: assoc
 Root: HKA; Subkey: "Software\Classes\ForgeRender.Project"; ValueType: string; ValueName: ""; ValueData: "Progetto ForgeRender"; Flags: uninsdeletekey; Tasks: assoc
 Root: HKA; Subkey: "Software\Classes\ForgeRender.Project\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\forgerender.exe,0"; Tasks: assoc
 Root: HKA; Subkey: "Software\Classes\ForgeRender.Project\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\forgerender.exe"" ""%1"""; Tasks: assoc

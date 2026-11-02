@@ -8,6 +8,8 @@
 //! modificati. Le texture (Fase 3) saranno referenziate esternamente con la
 //! stessa strategia relativo/assoluto.
 
+pub mod pack;
+
 use anyhow::{bail, Context};
 use forge_import::{import_file, ImportOptions};
 use forge_render_core::RenderSettings;

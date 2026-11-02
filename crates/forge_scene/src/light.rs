@@ -43,20 +43,42 @@ pub enum LaserSource {
     Red,
     Green,
     Blue,
+    /// Viola al limite dell'ultravioletto (diodo da 405 nm).
+    Violet,
     #[default]
     White,
 }
 
 impl LaserSource {
-    pub const ALL: [LaserSource; 4] = [LaserSource::Red, LaserSource::Green, LaserSource::Blue, LaserSource::White];
+    pub const ALL: [LaserSource; 5] = [
+        LaserSource::Red,
+        LaserSource::Green,
+        LaserSource::Blue,
+        LaserSource::Violet,
+        LaserSource::White,
+    ];
 
-    /// Lunghezza d'onda in nm (None = luce bianca).
+    /// Lunghezza d'onda in nm (None = luce bianca): decide l'indice di rifrazione nei vetri.
     pub fn wavelength_nm(self) -> Option<f32> {
         match self {
             LaserSource::Red => Some(650.0),
             LaserSource::Green => Some(532.0),
             LaserSource::Blue => Some(450.0),
+            LaserSource::Violet => Some(405.0),
             LaserSource::White => None,
+        }
+    }
+
+    /// Colore RGB lineare con cui il laser si vede. Le lunghezze d'onda pure stanno fuori dai
+    /// colori che uno schermo può mostrare: togliendo semplicemente la parte che manca il blu da
+    /// 450 nm diventava viola. Questi sono i colori con cui i laser appaiono nelle foto.
+    pub fn display_rgb(self) -> [f32; 3] {
+        match self {
+            LaserSource::Red => [1.0, 0.015, 0.0],
+            LaserSource::Green => [0.06, 1.0, 0.02],
+            LaserSource::Blue => [0.0, 0.14, 1.0],
+            LaserSource::Violet => [0.42, 0.0, 1.0],
+            LaserSource::White => [1.0; 3],
         }
     }
 
@@ -65,6 +87,7 @@ impl LaserSource {
             LaserSource::Red => "Rosso (650 nm)",
             LaserSource::Green => "Verde (532 nm)",
             LaserSource::Blue => "Blu (450 nm)",
+            LaserSource::Violet => "Viola UV (405 nm)",
             LaserSource::White => "Bianco da laboratorio",
         }
     }
@@ -118,6 +141,10 @@ pub struct Light {
     /// sposta la luce o l'oggetto (None = bersaglio libero).
     #[serde(default)]
     pub aim: Option<crate::ComponentId>,
+    /// Luce messa da un aspetto della modalità Semplice: cambiando aspetto si sostituiscono solo
+    /// queste, le luci aggiunte dall'utente restano.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub from_look: bool,
 }
 
 fn default_range_softness() -> f32 {
@@ -159,6 +186,7 @@ impl Light {
             beam_density: 0.0,
             beam_length: 0.0,
             aim: None,
+            from_look: false,
         }
     }
 
@@ -187,6 +215,7 @@ impl Light {
             beam_density: 0.0,
             beam_length: 0.0,
             aim: None,
+            from_look: false,
         }
     }
 }

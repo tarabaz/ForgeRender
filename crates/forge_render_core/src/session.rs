@@ -840,7 +840,12 @@ mod tests {
 
         // Attivato a render finito (cambio d'impostazione dal pannello): si ripulisce subito.
         s.set_denoise(DenoiseSettings::default());
-        std::thread::sleep(Duration::from_millis(50));
+        // Si aspetta l'immagine ripulita (con la macchina carica dagli altri test può metterci più
+        // di qualche millisecondo).
+        let t0 = std::time::Instant::now();
+        while s.latest_frame().unwrap().denoised_samples == 0 && t0.elapsed() < Duration::from_secs(10) {
+            std::thread::sleep(Duration::from_millis(5));
+        }
         let f = s.latest_frame().unwrap();
         assert_eq!(f.denoised_samples, 5);
         assert_eq!(calls.lock().unwrap().len(), 1);

@@ -18,15 +18,17 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
-### Novità della versione 0.30.0
+### Novità della versione 0.31.0
 
-- **Laser come luce a sé:** si aggiunge dal pannello Luci e si sceglie Rosso (650 nm), Verde (532 nm), Blu (450 nm) o Bianco da laboratorio; i laser colorati hanno una sola lunghezza d'onda e non si scompongono mai, solo il bianco fa l'arcobaleno.
-- **I preset delle luci aggiungono, non sostituiscono:** le tue luci restano.
-- **Correzione:** il fascio laser visibile ora si vede dentro il liquido di un bicchiere.
+- **Pacchetto completo (.frpack):** un file con progetto, modelli importati, texture e HDRI, da aprire ovunque; anche come cartella o ZIP con tutti i file.
+- **Libreria materiali:** finestre staccabili (anche fuori dal programma) e pulsante **Applica alla selezione** grande.
+- **Laser:** nuovo viola UV (405 nm), il blu ora è davvero blu; i fasci larghi finiscono esattamente sulle facce del vetro.
+- **Modalità Semplice:** gli aspetti non cancellano più le luci che hai aggiunto. Nuova schermata di benvenuto.
 
 <details>
 <summary><strong>Versioni precedenti — storico completo delle release</strong></summary>
 
+- **0.30.0 — Laser come luce a sé, preset che aggiungono:** laser rosso, verde, blu e bianco da laboratorio (i colorati non si scompongono); i preset delle luci aggiungono invece di sostituire; fascio visibile dentro i liquidi.
 - **0.29.0 — Luce nei bicchieri con il liquido:** piega giusta vetro-liquido per il laser e le caustiche, fascio che si affievolisce nei drink colorati; nuova categoria di materiali Liquidi.
 - **0.28.0–0.28.1 — Caustiche e scene demo:** caustiche con il photon mapping con tutte le luci (CPU e GPU, RGB e Spettrale); File → Scene demo divise per tipo con la scheda che le spiega; forme Prisma, Diamante e Pendente di cristallo; le scene demo salvate come progetto tengono i loro oggetti.
 - **0.27.0 — Luci puntate su un oggetto, laser nel vetro:** le luci agganciate a un oggetto lo seguono e gli girano attorno; il fascio laser si vede dentro il vetro; pannello Luci scorrevole e ridimensionabile.
