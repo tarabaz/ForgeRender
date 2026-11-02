@@ -1233,6 +1233,20 @@
     "Un solo file con dentro tutto: progetto, modelli importati, texture dei materiali e HDRI. Si apre con File, Apri su qualunque computer": "A single file with everything inside: project, imported models, material textures and HDRI. Open it with File, Open on any computer",
     "Una cartella con il progetto e, accanto, i modelli, le texture e l'HDRI che usa: basta copiare la cartella": "A folder with the project and, next to it, the models, textures and HDRI it uses: just copy the folder",
     "⧉ Riporta nel programma": "⧉ Back into the program",
-    "⧉ Stacca dal programma": "⧉ Detach from the program"
+    "⧉ Stacca dal programma": "⧉ Detach from the program",
+    "Aggiungi un secondo Laser di tipo Blu: passa dallo stesso prisma senza scomporsi": "Add a second Laser of the Blue type: it goes through the same prism without splitting",
+    "Aggiungi una luce Laser, tipo Bianco da laboratorio, diametro 0,1 mm, fascio visibile leggero, puntata sul prisma": "Add a Laser light, White lab laser type, 0.1 mm diameter, faint visible beam, aimed at the prism",
+    "Banco ottico: laser e prisma": "Optical bench: lasers and prism",
+    "Caustiche con il photon mapping (raggio di raccolta molto piccolo, fasci nitidi)": "Photon-mapped caustics (very small gather radius, sharp beams)",
+    "Importa il banco e le lenti (STEP) e aggiungi un Prisma dal menu Aggiungi": "Import the bench and the lenses (STEP) and add a Prism from the Add menu",
+    "Laser bianco da laboratorio (si scompone) e laser blu (non si scompone)": "White lab laser (it splits) and blue laser (it does not split)",
+    "Modelli STEP importati: banco, supporti, lenti": "Imported STEP models: bench, mounts, lenses",
+    "Prisma e lenti in cristallo con dispersione forte, render Spettrale": "Prism and lenses in highly dispersive crystal, Spectral render",
+    "Prisma e lenti: Cristallo al piombo, Trasmissione 1, Ruvidità 0; abbassa la Dispersione (Abbe) per colori più aperti": "Prism and lenses: Lead crystal, Transmission 1, Roughness 0; lower the Dispersion (Abbe) for wider colours",
+    "Progetto in un pacchetto .frpack: modelli e materiali tutti dentro": "Project in a .frpack package: models and materials all inside",
+    "Render: Colore Spettrale, Caustiche attive (550 k fotoni, raggio 0,1 mm), Rimbalzi massimi 24": "Render: Colour Spectral, Caustics on (550 k photons, 0.1 mm radius), Max bounces 24",
+    "Salva con File, Salva pacchetto completo (.frpack) per avere tutto in un file": "Save with File, Save complete package (.frpack) to have everything in one file",
+    "Spegni le luci ad area: la scena è illuminata solo dai laser": "Turn off the area lights: the scene is lit by the lasers only",
+    "Un banco ottico da laboratorio su fondo scuro: un laser bianco attraversa le lenti e un prisma e si apre in uno spettro che disegna una riga di colori sullo schermo; un laser blu, di un solo colore, passa dallo stesso prisma e arriva sull'altro schermo senza scomporsi.": "A laboratory optical bench on a dark background: a white laser goes through the lenses and a prism and opens into a spectrum that draws a line of colours on the screen; a blue laser, of a single colour, goes through the same prism and reaches the other screen without splitting."
   }
 }

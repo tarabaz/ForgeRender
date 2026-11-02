@@ -10,6 +10,11 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## Unreleased (`sviluppo` branch)
+
+**Demo scenes**
+- New **Optical bench: lasers and prism** (Light and dispersion): Valerio's laboratory optical bench, with a white lab laser that opens into a spectrum and a blue laser that does not split, lenses and a prism in dispersive crystal, Spectral render with caustics. It is a `.frpack` package in `samples/`: it is extracted into the user's folder, and Save asks where to save it (never inside the program's files).
+
 ## 0.31.0 — 2 Nov 2026
 
 **Projects with all their files (package)**

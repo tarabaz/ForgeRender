@@ -13,6 +13,15 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## In sviluppo (branch `sviluppo`)
+
+**Scene demo**
+- Nuova **Banco ottico: laser e prisma** (Luce e dispersione): il banco ottico da laboratorio di
+  Valerio, con un laser bianco da laboratorio che si apre in uno spettro e un laser blu che non si
+  scompone, lenti e prisma in cristallo dispersivo, render Spettrale con le caustiche. È un
+  pacchetto `.frpack` in `samples/`: si estrae nella cartella dell'utente e Salva chiede dove
+  salvarlo (mai dentro i file del programma).
+
 ## 0.31.0 — 02/11/2026
 
 **Progetti con tutti i loro file (pacchetto)**

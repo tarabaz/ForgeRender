@@ -2357,3 +2357,9 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
   fascio largo che sporgeva dal prisma ("porcata": era la margine di 3 raggi oltre i tratti).
 - Limite rimasto: un fascio più largo della faccia che colpisce è trattato tutto come rifratto (servirebbe
   un fascio di più raggi).
+
+## Claude Code — 02/11/2026: scena demo "Banco ottico" (branch `sviluppo`)
+
+- Il pacchetto `dist/MCP/Optical Experiment.frpack` di Valerio copiato in
+  `samples/scene/banco-ottico/banco-ottico.frpack` (5,7 MB; modelli STEP dentro). `DemoSource::Pack`:
+  `open_pack` e niente `pack_path` (Salva chiede dove). Da portare su main alla prossima build.

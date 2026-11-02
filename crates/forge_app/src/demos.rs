@@ -25,6 +25,8 @@ pub enum DemoSource {
     Generated(fn() -> (Scene, RenderSettings)),
     /// Progetto in `samples/` (percorso relativo).
     Project(&'static str),
+    /// Pacchetto `.frpack` in `samples/` (percorso relativo): si estrae nella cartella dell'utente.
+    Pack(&'static str),
     /// La scena di test (File → Nuova scena di test).
     TestScene,
 }
@@ -42,7 +44,7 @@ pub struct Demo {
     pub source: DemoSource,
 }
 
-pub static DEMOS: [Demo; 6] = [
+pub static DEMOS: [Demo; 7] = [
     Demo {
         category: 0,
         title: tk("Prisma e luce (Dark Side of the Moon)"),
@@ -65,6 +67,32 @@ pub static DEMOS: [Demo; 6] = [
             tk("Render, Colore: Spettrale; almeno 1024 campioni"),
         ],
         source: DemoSource::Generated(crate::presets::prism_demo_scene),
+    },
+    Demo {
+        category: 0,
+        title: tk("Banco ottico: laser e prisma"),
+        summary: tk(
+            "Un banco ottico da laboratorio su fondo scuro: un laser bianco attraversa le lenti e un prisma e \
+             si apre in uno spettro che disegna una riga di colori sullo schermo; un laser blu, di un solo \
+             colore, passa dallo stesso prisma e arriva sull'altro schermo senza scomporsi.",
+        ),
+        features: &[
+            tk("Laser bianco da laboratorio (si scompone) e laser blu (non si scompone)"),
+            tk("Prisma e lenti in cristallo con dispersione forte, render Spettrale"),
+            tk("Caustiche con il photon mapping (raggio di raccolta molto piccolo, fasci nitidi)"),
+            tk("Modelli STEP importati: banco, supporti, lenti"),
+            tk("Progetto in un pacchetto .frpack: modelli e materiali tutti dentro"),
+        ],
+        steps: &[
+            tk("Importa il banco e le lenti (STEP) e aggiungi un Prisma dal menu Aggiungi"),
+            tk("Prisma e lenti: Cristallo al piombo, Trasmissione 1, Ruvidità 0; abbassa la Dispersione (Abbe) per colori più aperti"),
+            tk("Aggiungi una luce Laser, tipo Bianco da laboratorio, diametro 0,1 mm, fascio visibile leggero, puntata sul prisma"),
+            tk("Aggiungi un secondo Laser di tipo Blu: passa dallo stesso prisma senza scomporsi"),
+            tk("Spegni le luci ad area: la scena è illuminata solo dai laser"),
+            tk("Render: Colore Spettrale, Caustiche attive (550 k fotoni, raggio 0,1 mm), Rimbalzi massimi 24"),
+            tk("Salva con File, Salva pacchetto completo (.frpack) per avere tutto in un file"),
+        ],
+        source: DemoSource::Pack("scene/banco-ottico/banco-ottico.frpack"),
     },
     Demo {
         category: 0,
@@ -186,7 +214,7 @@ pub fn samples_root() -> Option<PathBuf> {
 /// La demo è disponibile? (I progetti richiedono la cartella `samples`.)
 pub fn available(d: &Demo) -> bool {
     match d.source {
-        DemoSource::Project(rel) => samples_root().is_some_and(|r| r.join(rel).is_file()),
+        DemoSource::Project(rel) | DemoSource::Pack(rel) => samples_root().is_some_and(|r| r.join(rel).is_file()),
         _ => true,
     }
 }
@@ -583,7 +611,7 @@ mod tests {
     #[test]
     fn project_demos_exist() {
         for d in &DEMOS {
-            if let DemoSource::Project(rel) = d.source {
+            if let DemoSource::Project(rel) | DemoSource::Pack(rel) = d.source {
                 assert!(available(d), "manca {rel}");
             }
         }

@@ -1600,6 +1600,16 @@ impl ForgeApp {
                 }
                 Err(e) => self.error = Some(tf("Scena demo non disponibile: {}", &[format!("{e:#}")])),
             },
+            // Pacchetto demo: si estrae nella cartella dell'utente; "Salva" non deve riscriverlo
+            // tra i file del programma, quindi chiede dove salvare.
+            DemoSource::Pack(rel) => match crate::demos::samples_root().map(|r| r.join(rel)) {
+                Some(p) if p.is_file() => {
+                    self.open_pack(&p);
+                    self.pack_after_load = None;
+                    self.demo_after_load = Some(i);
+                }
+                _ => self.error = Some(tf("Scena demo non disponibile: {}", &[rel.to_string()])),
+            },
             DemoSource::TestScene => {
                 self.new_test_scene();
                 self.demo_info = Some(i);
