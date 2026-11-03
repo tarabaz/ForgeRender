@@ -308,7 +308,7 @@ fn laser_lambda_pair(l: f32) -> vec2<f32> {
 fn laser_compatible(pa: u32, pb: u32) -> bool {
     if (S[pa] != S[pb] || S[pa + 1u] != S[pb + 1u]) { return false; }
     for (var s: u32 = 0u; s < S[pa]; s = s + 1u) {
-        if (S[pa + 16u + s * 12u + 3u] != S[pb + 16u + s * 12u + 3u]) { return false; }
+        if (S[laser_seg(pa, s) + 3u] != S[laser_seg(pb, s) + 3u]) { return false; }
     }
     return true;
 }
@@ -332,14 +332,14 @@ fn laser_beams_s(o: vec3<f32>, d: vec3<f32>, t_end: f32) -> vec4<f32> {
             var pb = p0;
             if (!lerp && kp.y >= 0.5) { pb = p1; }
             for (var s: u32 = 0u; s < S[pb]; s = s + 1u) {
-                let sb = pb + 16u + s * 12u;
+                let sb = laser_seg(pb, s);
                 var a = sv3(sb);
                 var e = sv3(sb + 4u);
                 var tp = sf(sb + 8u);
                 var ns = unpack_dir(sf(sb + 7u));
                 var ne = unpack_dir(sf(sb + 11u));
                 if (lerp) {
-                    let sb1 = p1 + 16u + s * 12u;
+                    let sb1 = laser_seg(p1, s);
                     a = mix(a, sv3(sb1), kp.y);
                     e = mix(e, sv3(sb1 + 4u), kp.y);
                     tp = mix(tp, sf(sb1 + 8u), kp.y);
@@ -366,30 +366,28 @@ fn laser_spots_s(bs: Bsdf, col: vec4<f32>, wo: vec3<f32>, p: vec3<f32>, ng: vec3
             let kp = laser_lambda_pair(lam[i]);
             let p0 = laser_path(li, 1u + u32(kp.x));
             let p1 = laser_path(li, 2u + u32(kp.x));
-            let has0 = S[p0 + 1u] != 0u;
-            let has1 = S[p1 + 1u] != 0u;
-            var spot: vec3<f32>;
-            var dir: vec3<f32>;
-            var tp: f32;
-            if (has0 && has1 && laser_compatible(p0, p1)) {
-                spot = mix(sv3(p0 + 4u), sv3(p1 + 4u), kp.y);
-                dir = normalize(mix(sv3(p0 + 8u), sv3(p1 + 8u), kp.y));
-                tp = mix(sf(p0 + 12u), sf(p1 + 12u), kp.y);
-            } else if (has0 && (kp.y < 0.5 || !has1)) {
-                spot = sv3(p0 + 4u);
-                dir = sv3(p0 + 8u);
-                tp = sf(p0 + 12u);
-            } else if (has1) {
-                spot = sv3(p1 + 4u);
-                dir = sv3(p1 + 8u);
-                tp = sf(p1 + 12u);
-            } else {
-                continue;
-            }
-            let sp = laser_spot_at(spot, dir, r, p, ng);
-            if (sp.w > 0.0) {
-                let e = bsdf_eval_s(bs, col, wo, sp.xyz);
-                c[i] = c[i] + e.f[i] * power[i] * tp * sp.w;
+            // Macchie interpolate se i due percorsi hanno la stessa struttura, altrimenti quelle
+            // del percorso più vicino (come sulla CPU).
+            let lerp = laser_compatible(p0, p1);
+            var pn = p0;
+            if (!lerp && kp.y >= 0.5) { pn = p1; }
+            for (var k: u32 = 0u; k < S[pn + 1u]; k = k + 1u) {
+                let kb = laser_spot_base(pn, k);
+                var spot = sv3(kb);
+                var dir = sv3(kb + 4u);
+                var tp = sf(kb + 8u);
+                if (lerp) {
+                    let ka = laser_spot_base(p0, k);
+                    let k1 = laser_spot_base(p1, k);
+                    spot = mix(sv3(ka), sv3(k1), kp.y);
+                    dir = normalize(mix(sv3(ka + 4u), sv3(k1 + 4u), kp.y));
+                    tp = mix(sf(ka + 8u), sf(k1 + 8u), kp.y);
+                }
+                let sp = laser_spot_at(spot, dir, r, p, ng);
+                if (sp.w > 0.0) {
+                    let e = bsdf_eval_s(bs, col, wo, sp.xyz);
+                    c[i] = c[i] + e.f[i] * power[i] * tp * sp.w;
+                }
             }
         }
     }

@@ -1361,14 +1361,18 @@ fn media_transmittance(t: f32) -> vec3<f32> {
 // Percorsi del fascio già calcolati sulla CPU (`forge_render_core::laser`): macchia gaussiana
 // dove arriva e fascio visibile (diffusione singola), entrambi analitici.
 const LASER_HDR: u32 = 8u;
-const LASER_MAX_SEG: u32 = 16u;
-const LASER_PATH_WORDS: u32 = 208u;
+const LASER_MAX_SEG: u32 = 64u;
+const LASER_MAX_SPOTS: u32 = 16u;
+const LASER_PATH_WORDS: u32 = 964u;
 const LASER_N_LAMBDA: u32 = 64u;
-const LASER_WORDS: u32 = 13528u;
+const LASER_WORDS: u32 = 62668u;
 
 fn laser_base(i: u32) -> u32 { return pu(P_OFF_LASERS) + i * LASER_WORDS; }
 // Percorso k del laser i: 0 = RGB, 1 + n = lunghezza d'onda n.
 fn laser_path(i: u32, k: u32) -> u32 { return laser_base(i) + LASER_HDR + k * LASER_PATH_WORDS; }
+// Macchia k e tratto s del percorso pb (vedi il layout in layout.rs).
+fn laser_spot_base(pb: u32, k: u32) -> u32 { return pb + 4u + k * 12u; }
+fn laser_seg(pb: u32, s: u32) -> u32 { return pb + 4u + LASER_MAX_SPOTS * 12u + s * 12u; }
 
 fn gauss_irr(rho: f32, r: f32) -> f32 { return 2.0 / (PI * r * r) * exp(-2.0 * rho * rho / (r * r)); }
 
@@ -1404,12 +1408,6 @@ fn laser_beam_ab(a: vec3<f32>, e_pt: vec3<f32>, ns: vec3<f32>, ne: vec3<f32>, r:
     return dens * line / (4.0 * PI);
 }
 
-// Macchia del percorso pb sul punto p: (direzione verso la luce, irradianza per potenza 1).
-fn laser_spot(pb: u32, r: f32, p: vec3<f32>, ng: vec3<f32>) -> vec4<f32> {
-    if (S[pb + 1u] == 0u) { return vec4<f32>(0.0); }
-    return laser_spot_at(sv3(pb + 4u), sv3(pb + 8u), r, p, ng);
-}
-
 // Macchia con punto d'arrivo e direzione del fascio già noti (macchie interpolate).
 fn laser_spot_at(spot: vec3<f32>, dir: vec3<f32>, r: f32, p: vec3<f32>, ng: vec3<f32>) -> vec4<f32> {
     let to = p - spot;
@@ -1429,7 +1427,7 @@ fn laser_beams_rgb(o: vec3<f32>, d: vec3<f32>, t_end: f32) -> vec3<f32> {
         let r = sf(lb + 3u);
         let pb = laser_path(i, 0u);
         for (var s: u32 = 0u; s < S[pb]; s = s + 1u) {
-            let sb = pb + 16u + s * 12u;
+            let sb = laser_seg(pb, s);
             let b = laser_beam_seg(sb, r, dens, o, d, t_end);
             if (b > 0.0) { c = c + sv3(lb) * sv3(sb + 8u) * b; }
         }
@@ -1442,10 +1440,14 @@ fn laser_spots_rgb(bs: Bsdf, wo: vec3<f32>, p: vec3<f32>, ng: vec3<f32>) -> vec3
     for (var i: u32 = 0u; i < pu(P_N_LASERS); i = i + 1u) {
         let lb = laser_base(i);
         let pb = laser_path(i, 0u);
-        let sp = laser_spot(pb, sf(lb + 3u), p, ng);
-        if (sp.w > 0.0) {
-            let e = bsdf_eval(bs, wo, sp.xyz);
-            c = c + e.xyz * sv3(lb) * sv3(pb + 12u) * sp.w;
+        // Una macchia per ramo (con i riflessi parziali più d'una).
+        for (var k: u32 = 0u; k < S[pb + 1u]; k = k + 1u) {
+            let kb = laser_spot_base(pb, k);
+            let sp = laser_spot_at(sv3(kb), sv3(kb + 4u), sf(lb + 3u), p, ng);
+            if (sp.w > 0.0) {
+                let e = bsdf_eval(bs, wo, sp.xyz);
+                c = c + e.xyz * sv3(lb) * sv3(kb + 8u) * sp.w;
+            }
         }
     }
     return c;

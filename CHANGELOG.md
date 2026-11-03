@@ -13,6 +13,26 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## In sviluppo (branch `sviluppo`)
+
+**Laser: riflessi parziali**
+- Nuova opzione **Riflessi parziali** nella scheda del laser (spenta di base): come un laser
+  vero, a ogni faccia di vetro una parte della luce (la frazione di Fresnel) si riflette e diventa
+  un fascio a sé con la sua macchia, così attorno a un cristallo o a un diamante compaiono tanti
+  puntini. I rami sotto l'1% della potenza del laser si lasciano perdere; fino a 64 tratti e 16
+  macchie per laser. CPU e GPU, RGB e Spettrale (verificato dai test: stessa immagine entro il 4%).
+  Spenta, il laser segue un solo percorso come prima.
+
+**Scene demo**
+- Nuova **Lenti convergenti e divergenti** (Luce e dispersione): il banco di Valerio con tre laser
+  (due bianchi da laboratorio e uno viola UV) che attraversano una fila di lenti, si incrociano nel
+  fuoco e si riaprono verso lo schermo.
+- Nuova **Banco ottico: laser e prisma** (Luce e dispersione): il banco ottico da laboratorio di
+  Valerio, con un laser bianco da laboratorio che si apre in uno spettro e un laser blu che non si
+  scompone, lenti e prisma in cristallo dispersivo, render Spettrale con le caustiche. È un
+  pacchetto `.frpack` in `samples/`: si estrae nella cartella dell'utente e Salva chiede dove
+  salvarlo (mai dentro i file del programma).
+
 ## 0.31.0 — 02/11/2026
 
 **Progetti con tutti i loro file (pacchetto)**

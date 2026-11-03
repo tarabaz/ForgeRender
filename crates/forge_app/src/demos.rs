@@ -25,6 +25,8 @@ pub enum DemoSource {
     Generated(fn() -> (Scene, RenderSettings)),
     /// Progetto in `samples/` (percorso relativo).
     Project(&'static str),
+    /// Pacchetto `.frpack` in `samples/` (percorso relativo): si estrae nella cartella dell'utente.
+    Pack(&'static str),
     /// La scena di test (File → Nuova scena di test).
     TestScene,
 }
@@ -42,7 +44,7 @@ pub struct Demo {
     pub source: DemoSource,
 }
 
-pub static DEMOS: [Demo; 6] = [
+pub static DEMOS: [Demo; 8] = [
     Demo {
         category: 0,
         title: tk("Prisma e luce (Dark Side of the Moon)"),
@@ -65,6 +67,56 @@ pub static DEMOS: [Demo; 6] = [
             tk("Render, Colore: Spettrale; almeno 1024 campioni"),
         ],
         source: DemoSource::Generated(crate::presets::prism_demo_scene),
+    },
+    Demo {
+        category: 0,
+        title: tk("Banco ottico: laser e prisma"),
+        summary: tk(
+            "Un banco ottico da laboratorio su fondo scuro: un laser bianco attraversa le lenti e un prisma e \
+             si apre in uno spettro che disegna una riga di colori sullo schermo; un laser blu, di un solo \
+             colore, passa dallo stesso prisma e arriva sull'altro schermo senza scomporsi.",
+        ),
+        features: &[
+            tk("Laser bianco da laboratorio (si scompone) e laser blu (non si scompone)"),
+            tk("Prisma e lenti in cristallo con dispersione forte, render Spettrale"),
+            tk("Caustiche con il photon mapping (raggio di raccolta molto piccolo, fasci nitidi)"),
+            tk("Modelli STEP importati: banco, supporti, lenti"),
+            tk("Progetto in un pacchetto .frpack: modelli e materiali tutti dentro"),
+        ],
+        steps: &[
+            tk("Importa il banco e le lenti (STEP) e aggiungi un Prisma dal menu Aggiungi"),
+            tk("Prisma e lenti: Cristallo al piombo, Trasmissione 1, Ruvidità 0; abbassa la Dispersione (Abbe) per colori più aperti"),
+            tk("Aggiungi una luce Laser, tipo Bianco da laboratorio, diametro 0,1 mm, fascio visibile leggero, puntata sul prisma"),
+            tk("Aggiungi un secondo Laser di tipo Blu: passa dallo stesso prisma senza scomporsi"),
+            tk("Spegni le luci ad area: la scena è illuminata solo dai laser"),
+            tk("Render: Colore Spettrale, Caustiche attive (550 k fotoni, raggio 0,1 mm), Rimbalzi massimi 24"),
+            tk("Salva con File, Salva pacchetto completo (.frpack) per avere tutto in un file"),
+        ],
+        source: DemoSource::Pack("scene/banco-ottico/banco-ottico.frpack"),
+    },
+    Demo {
+        category: 0,
+        title: tk("Lenti convergenti e divergenti"),
+        summary: tk(
+            "Tre laser su un banco ottico, due bianchi da laboratorio e uno viola UV, attraversano una fila \
+             di lenti: i fasci si piegano, si incrociano nel fuoco e si riaprono verso lo schermo. I bianchi \
+             a ogni lente si aprono un po' di più in un ventaglio di colori; il viola, di un solo colore, \
+             resta una linea.",
+        ),
+        features: &[
+            tk("Rifrazione nelle lenti: fasci che convergono, si incrociano e divergono"),
+            tk("Dispersione: i laser bianchi si aprono in colori, il viola UV no"),
+            tk("Render Spettrale con le caustiche"),
+            tk("Modello STEP del banco in un pacchetto .frpack"),
+        ],
+        steps: &[
+            tk("Importa il banco con le lenti (STEP) e dai alle lenti il materiale Lente ottica (Trasmissione 1, Ruvidità 0)"),
+            tk("Abbassa la Dispersione (Abbe) delle lenti per colori più aperti: un vetro ottico vero è attorno a 60"),
+            tk("Aggiungi tre luci Laser lungo l'asse delle lenti: due Bianco da laboratorio da 0,1 mm e una Viola UV"),
+            tk("Fascio visibile leggero (0,002–0,004) per vedere il percorso nell'aria"),
+            tk("Render: Colore Spettrale, Caustiche attive, Rimbalzi massimi 25"),
+        ],
+        source: DemoSource::Pack("scene/lenti/lenti.frpack"),
     },
     Demo {
         category: 0,
@@ -186,7 +238,7 @@ pub fn samples_root() -> Option<PathBuf> {
 /// La demo è disponibile? (I progetti richiedono la cartella `samples`.)
 pub fn available(d: &Demo) -> bool {
     match d.source {
-        DemoSource::Project(rel) => samples_root().is_some_and(|r| r.join(rel).is_file()),
+        DemoSource::Project(rel) | DemoSource::Pack(rel) => samples_root().is_some_and(|r| r.join(rel).is_file()),
         _ => true,
     }
 }
@@ -340,6 +392,7 @@ pub fn diamond_laser_scene() -> (Scene, RenderSettings) {
     laser.kind = LightKind::Laser {
         diameter_mm: 3.0,
         source: forge_scene::LaserSource::White,
+        split: false,
     };
     laser.target = centre + Vec3::new(0.0, 0.03, 0.0);
     laser.beam_density = 0.15;
@@ -583,7 +636,7 @@ mod tests {
     #[test]
     fn project_demos_exist() {
         for d in &DEMOS {
-            if let DemoSource::Project(rel) = d.source {
+            if let DemoSource::Project(rel) | DemoSource::Pack(rel) = d.source {
                 assert!(available(d), "manca {rel}");
             }
         }

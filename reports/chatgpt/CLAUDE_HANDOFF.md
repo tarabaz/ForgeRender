@@ -2357,3 +2357,38 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
   fascio largo che sporgeva dal prisma ("porcata": era la margine di 3 raggi oltre i tratti).
 - Limite rimasto: un fascio più largo della faccia che colpisce è trattato tutto come rifratto (servirebbe
   un fascio di più raggi).
+
+## Claude Code — 02/11/2026: scena demo "Banco ottico" (branch `sviluppo`)
+
+- Il pacchetto `dist/MCP/Optical Experiment.frpack` di Valerio copiato in
+  `samples/scene/banco-ottico/banco-ottico.frpack` (5,7 MB; modelli STEP dentro). `DemoSource::Pack`:
+  `open_pack` e niente `pack_path` (Salva chiede dove). Da portare su main alla prossima build.
+
+## Claude Code — 03/11/2026: riflessi parziali del laser, demo delle lenti (branch `sviluppo`)
+
+- `LightKind::Laser { split }` (serde default false). `laser::trace` segue un albero di rami
+  (pila `Branch`: o, d, potenza, volumi, faccia): a ogni faccia di vetro senza riflessione totale il
+  riflesso (Fresnel) diventa un ramo se sopra `SPLIT_MIN_POWER` (1%). `LaserPath::spots: Vec`
+  (prima `spot`), `MAX_SEGMENTS` 64, `MAX_SPOTS` 16; layout GPU con 16 macchie per percorso
+  (`LASER_PATH_WORDS` 964, `laser_spot_base`, `laser_seg`). Test `partial_reflections_split_the_beam`
+  e variante in `gpu_laser_matches_cpu`.
+- Demo "Lenti convergenti e divergenti": pacchetto di Valerio in `samples/scene/lenti/lenti.frpack`.
+
+
+## ChatGPT — 03/11/2026: documentazione RGB, Spettrale e caustiche (branch `sviluppo`)
+
+- Su richiesta di Valerio, aggiornata la documentazione per spiegare le quattro combinazioni tra modalità luce RGB/Spettrale e Caustiche ON/OFF, con tabella comparativa e indicazioni pratiche.
+- Aggiornati `README.md`, `README.it.md`, `docs/SPECTRAL.md` e `docs/SPECTRAL.it.md`.
+- Chiarito che la modalità spettrale rende visibili gli effetti dipendenti dalla lunghezza d'onda; la separazione cromatica richiede un materiale trasparente con dispersione non nulla. Le caustiche sono un'opzione indipendente basata su photon mapping progressivo e funzionano con luci puntiformi, spot, direzionali e ad area.
+- Modifiche documentali, nessun codice di rendering modificato. Nessun test o build eseguiti.
+- Commit documentazione: `fec87b7b9070459732d810d11fe5db82d8524225` (ultimo dei quattro aggiornamenti).
+
+
+## ChatGPT — 03/11/2026: galleria funzionalità nei README (branch `sviluppo`)
+
+- Su richiesta di Valerio, riorganizzata la parte introduttiva dei README: intro, download, What's new / Novità, quindi galleria delle funzionalità prima della sezione tecnica estesa.
+- Aggiunte sezioni individuali in `README.md` (inglese) e `README.it.md` (italiano): trasporto luce RGB/Spectral + caustiche, materiali PBR e texture CAD, studio fotografico, illuminazione volumetrica, camera e viste prodotto, workflow IA/MCP, render pass.
+- Riutilizzate immagini già presenti nel repository per materiali, studio, fascio volumetrico, viste prodotto e MCP.
+- **Asset da completare:** la galleria RGB/Spectral punta a `docs/img/features/rgb-spectral-caustics.jpg`, ma l'immagine originale fornita nella chat non è stata caricata nel repository perché il connettore GitHub disponibile non espone un trasferimento binario da file locale. Non considerare completata la demo finché questo asset non viene aggiunto e verificato; evitare di sostituirlo con immagini generiche.
+- README aggiornati: `README.md` commit `2dfb51294663b528824b374b93ffe80444683bb0`; `README.it.md` commit `3bb43c8ebd24c2512ed562e16e18d3d5dbe78bb5` (poi README inglese corretto con commit `2dfb51294663b528824b374b93ffe80444683bb0`).
+- Nessun codice applicativo modificato; nessun test/build eseguito. Modifiche non portate su `main`.

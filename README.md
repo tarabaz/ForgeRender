@@ -67,6 +67,62 @@ For the full technical notes, see [CHANGELOG.en.md](CHANGELOG.en.md) (Italian, a
 
 </details>
 
+## Explore ForgeRender
+
+The images below show real ForgeRender results and workflows. Each section highlights a specific capability of the renderer.
+
+### 1. Advanced light transport — RGB, Spectral & Caustics
+
+![RGB and Spectral comparison with caustics disabled and enabled](docs/img/features/rgb-spectral-caustics.jpg)
+
+**Four configurations, one scene.** RGB uses conventional three-channel light transport. Spectral mode samples wavelengths, allowing dispersive materials to separate colours during refraction. Caustics enables progressive photon mapping to reveal focused light patterns created by glass, crystals and gemstones.
+
+- **RGB + Caustics OFF:** RGB path tracing without the dedicated caustic contribution.
+- **RGB + Caustics ON:** caustics rendered in RGB, without wavelength-dependent colour separation.
+- **Spectral + Caustics OFF:** wavelength-sampled transport; dispersion can colour refraction.
+- **Spectral + Caustics ON:** caustics can show coloured fringes and spectral separation when the transparent material has non-zero dispersion.
+
+Visible dispersion requires a transparent material with an Abbe number. Lower Abbe values produce stronger dispersion. Caustics is independent of RGB/Spectral mode and supports point, spot, directional and area lights on both CPU and GPU. In the GPU backend, photon paths are currently built on the CPU and gathered by the GPU.
+
+[Technical details: Spectral rendering](docs/SPECTRAL.md).
+
+### 2. PBR materials and textures for CAD models
+
+![ForgeRender material and texture examples](docs/img/mcp/esempi/materiali.jpg)
+
+Diffuse materials, GGX metals and plastics, Fresnel glass, frosted glass and emissive surfaces. PBR maps include base colour, roughness, metallic, normal, bump, true displacement, ambient occlusion and opacity. For CAD models without UVs, metric Box projection is available, with Piece, Assembly or World anchoring.
+
+### 3. Product studio and lighting
+
+![ForgeRender photographic studio look](docs/img/mcp/esempi/aspetto_studio.jpg)
+
+Prepare a product scene with a backdrop and studio lights, then choose a light, dark or dramatic background. Lights remain individually adjustable, and the studio can be fitted to the product dimensions without taking control away from the user.
+
+### 4. Volumetric lighting and visible beams
+
+![ForgeRender volumetric light beam](reports/fascio-volumetrico/dopo_fascio_solo_camera.png)
+
+Spotlights can create visible beams with adjustable density and length. Volumetric fog is a participating medium with scattering and shadows: light interacts with the volume and becomes visible in space, not only on surfaces.
+
+### 5. Camera, multiple views and product presentation
+
+![Three-quarter product view](docs/img/mcp/esempi/vista_tre_quarti.jpg)
+
+Render cameras provide focal length, aperture, depth of field and lens shift. Automatic front, rear, side, top and three-quarter views help present a product from multiple angles; turntable videos can be exported as MP4.
+
+### 6. AI-assisted workflow — MCP
+
+![ForgeRender controlled through MCP](docs/img/mcp/en/finestra_comandata.jpg)
+
+Connect Claude Desktop, Claude Code or Codex through the MCP bridge to control supported operations using natural language: scene preparation, model import, lighting, materials, camera setup and rendering. AI control is explicit and can be switched off from the interface.
+
+[MCP setup guide](docs/MCP.en.md).
+
+### 7. Render passes and post-production
+
+ForgeRender can export separate **Albedo, Normals, Depth, Product Mask and Component ID** passes for compositing, masking and further image editing. These are technical output buffers, not additional beauty renders.
+
+
 > **Control ForgeRender with AI — MCP**
 >
 > Open ForgeRender, turn on **AI control** and ask Claude to prepare a scene, import a CAD model, position studio lights, assign materials, set the camera and render. 26 tools, live changes and render previews sent back to the assistant. You decide when the AI may take control: when it disconnects, ForgeRender stays open with your work.
@@ -78,6 +134,7 @@ For the full technical notes, see [CHANGELOG.en.md](CHANGELOG.en.md) (Italian, a
 > See [docs/ROADMAP.md](docs/ROADMAP.md) for what really works today, what comes next and
 > how complex each next step is.
 
+:
 ## What it does today
 
 - **Simple / Advanced interface** (switch at the top, Simple by default): "Product photo in

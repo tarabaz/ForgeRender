@@ -48,6 +48,7 @@ fn scene() -> Scene {
     laser.kind = LightKind::Laser {
         diameter_mm: 3.0,
         source: forge_scene::LaserSource::White,
+        split: false,
     };
     laser.target = Vec3::new(-0.075, 0.0433, 0.0);
     laser.beam_density = 0.02;

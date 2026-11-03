@@ -1395,6 +1395,7 @@ fn gpu_laser_matches_cpu() {
     laser.kind = forge_scene::LightKind::Laser {
         diameter_mm: 60.0,
         source: forge_scene::LaserSource::White,
+        split: false,
     };
     laser.target = Vec3::new(-0.075, 0.0433, 0.0);
     laser.beam_density = 0.3;
@@ -1422,6 +1423,29 @@ fn gpu_laser_matches_cpu() {
         for k in 0..3 {
             let (ca, gb) = (sum(&a, k), sum(&b, k));
             eprintln!("{mode:?} canale {k}: CPU {ca:.3}, GPU {gb:.3}");
+            assert!(ca > 0.0 && (ca - gb).abs() / ca < 0.05, "{mode:?} canale {k}: CPU {ca} vs GPU {gb}");
+        }
+    }
+    // Riflessi parziali: più rami e più macchie, uguali sulla GPU.
+    if let forge_scene::LightKind::Laser { split, .. } = &mut s.lights[0].kind {
+        *split = true;
+    }
+    let rs = RenderScene::compile(&s);
+    assert!(rs.lasers[0].rgb.spots.len() >= 2, "{:?}", rs.lasers[0].rgb.spots);
+    for mode in [forge_render_core::ColorMode::Rgb, forge_render_core::ColorMode::Spectral] {
+        let st = RenderSettings {
+            width: 96,
+            height: 54,
+            max_bounces: 8,
+            color_mode: mode,
+            ..Default::default()
+        };
+        let a = render_with(&mut cpu, &s, &st, 256);
+        let b = render_with(&mut g, &s, &st, 256);
+        let sum = |x: &[[f32; 3]], k: usize| x.iter().map(|p| p[k] as f64).sum::<f64>();
+        for k in 0..3 {
+            let (ca, gb) = (sum(&a, k), sum(&b, k));
+            eprintln!("riflessi {mode:?} canale {k}: CPU {ca:.3}, GPU {gb:.3}");
             assert!(ca > 0.0 && (ca - gb).abs() / ca < 0.05, "{mode:?} canale {k}: CPU {ca} vs GPU {gb}");
         }
     }

@@ -11,6 +11,21 @@ ForgeRender ha due modi di trasportare la luce, da scegliere in **Render → Col
 
 Lo spettrale è un'opzione: i progetti si aprono in RGB, a meno che non siano stati salvati in modalità spettrale. Funziona sia sul backend CPU sia su quello GPU, che danno lo stesso risultato.
 
+## Caustiche e le quattro combinazioni di rendering
+
+L'interruttore **Caustiche** è indipendente dalla modalità luce RGB/Spettrale. Attiva il photon mapping progressivo per la luce concentrata dagli oggetti trasparenti lisci; non cambia di per sé il modello delle lunghezze d'onda.
+
+| Modalità luce | Caustiche disattivate | Caustiche attivate |
+|---|---|---|
+| **RGB** | Trasporto standard a tre canali. Nessun contributo dedicato delle caustiche calcolato con i fotoni. | Disegni luminosi concentrati da vetri, cristalli e gemme, resi in RGB senza separazione cromatica dipendente dalla lunghezza d'onda. |
+| **Spettrale** | Trasporto a lunghezze d'onda campionate; i materiali dispersivi possono separare i colori durante la rifrazione. | Caustiche spettrali: i disegni concentrati possono mostrare frange colorate e arcobaleni perché l'indice di rifrazione varia con la lunghezza d'onda. |
+
+I fotoni delle caustiche vengono emessi da luci puntiformi, spot, direzionali e ad area. Attraversano i vetri lisci seguendo riflessione/rifrazione di Fresnel, legge di Snell, riflessione totale interna, tinta e assorbimento di Beer–Lambert, poi vengono raccolti sulla prima superficie non speculare. Il photon mapping progressivo (Knaus–Zwicker) restringe il raggio di raccolta a ogni passata. Il path tracer della camera esclude in quel punto i percorsi vetro-luce corrispondenti, per evitare doppi conteggi.
+
+La funzione è supportata sia da CPU sia da GPU. Nel backend GPU i percorsi dei fotoni vengono attualmente costruiti dalla CPU e raccolti dallo shader GPU. In modalità Spettrale ogni fotone trasporta una lunghezza d'onda: il vetro dispersivo può quindi aprire la caustica in uno spettro. In modalità RGB la caustica resta un risultato a tre canali.
+
+Per vedere la separazione cromatica spettrale, usa un materiale trasparente con **Dispersione** (numero di Abbe) diverso da zero. Un numero di Abbe più basso produce una dispersione più forte. La modalità RGB ignora il valore di Abbe.
+
 ## Dispersione
 
 I materiali trasparenti hanno l'impostazione **Dispersione** (numero di Abbe V, 0 = nessuna). V più basso = colori più separati. Predefiniti: vetro crown BK7 (V 64,2, IOR 1,517), flint (36,4, 1,62), cristallo al piombo (30, 1,7), policarbonato (30, 1,586), diamante (55, 2,417). L'indice di rifrazione segue l'equazione di Cauchy n(λ) = A + B/λ², ricavata dall'IOR alla riga d (587,6 nm) e da V. La dispersione si vede solo in modalità spettrale.

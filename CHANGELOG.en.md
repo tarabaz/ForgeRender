@@ -10,6 +10,15 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## Unreleased (`sviluppo` branch)
+
+**Laser: partial reflections**
+- New **Partial reflections** option in the laser card (off by default): like a real laser, at every glass face part of the light (the Fresnel fraction) is reflected and becomes a beam of its own with its own spot, so many dots appear around a crystal or a diamond. Branches below 1% of the laser's power are dropped; up to 64 stretches and 16 spots per laser. CPU and GPU, RGB and Spectral (checked by tests: same image within 4%). Off, the laser follows a single path as before.
+
+**Demo scenes**
+- New **Converging and diverging lenses** (Light and dispersion): Valerio's bench with three lasers (two white lab lasers and one UV violet) going through a row of lenses, crossing at the focus and opening again towards the screen.
+- New **Optical bench: lasers and prism** (Light and dispersion): Valerio's laboratory optical bench, with a white lab laser that opens into a spectrum and a blue laser that does not split, lenses and a prism in dispersive crystal, Spectral render with caustics. It is a `.frpack` package in `samples/`: it is extracted into the user's folder, and Save asks where to save it (never inside the program's files).
+
 ## 0.31.0 — 2 Nov 2026
 
 **Projects with all their files (package)**
