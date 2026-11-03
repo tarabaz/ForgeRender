@@ -134,7 +134,7 @@ ForgeRender genera nebbia scenografica con una simulazione fluida 3D determinist
 
 [Apri la scena demo del cocktail con ghiaccio secco](samples/scene/cocktail-ghiaccio-secco/cocktail-ghiaccio-secco.frproject) · [Istruzioni e controlli](samples/scene/cocktail-ghiaccio-secco/LEGGIMI.md).
 
-### 9. Materiali PBR e texture per modelli CAD
+### 5. Materiali PBR e texture per modelli CAD
 
 ![Esempi di materiali e texture di ForgeRender](docs/img/mcp/esempi/materiali.jpg)
 
