@@ -80,7 +80,7 @@ Per le note tecniche complete consulta [CHANGELOG.md](CHANGELOG.md) (in italiano
 
 ## Funzionalità in evidenza
 
-Le immagini seguenti mostrano risultati e flussi di lavoro reali di ForgeRender. Ogni confronto mette in evidenza una capacità specifica del motore.
+Le immagini seguenti mostrano risultati e flussi di lavoro reali di ForgeRender. Ogni sezione mette in evidenza una capacità specifica del motore.
 
 ### 1. Trasporto avanzato della luce — RGB, Spettrale e Caustiche
 
@@ -97,41 +97,55 @@ Per ottenere una dispersione visibile serve un materiale trasparente con un nume
 
 [Dettagli tecnici sul rendering spettrale](docs/SPECTRAL.it.md).
 
-### 2. Materiali PBR e texture per modelli CAD
+### 2. Controllo della scena tramite IA — MCP
+
+![Controllo della scena ForgeRender tramite IA e MCP con un comando in linguaggio naturale](docs/img/features/ai-scene-control.jpg)
+
+Collega Claude Desktop, Claude Code o Codex tramite il bridge MCP di ForgeRender e controlla in linguaggio naturale le operazioni supportate sulla scena. Puoi chiedere all'assistente di modificare l'illuminazione, assegnare materiali, configurare la camera o preparare un render: ForgeRender applica le operazioni supportate direttamente alla scena aperta. Il controllo IA è esplicito e può essere disattivato dall'interfaccia.
+
+[Guida alla configurazione MCP](docs/MCP.md).
+
+### 3. Ottica laser — fasci, prismi e lenti
+
+![Banco ottico con dispersione del fascio laser attraverso prismi e lenti](docs/img/features/laser-optics-lenses.png)
+
+Usa ForgeRender come un banco ottico virtuale. Scegli tra sorgenti laser rosse, verdi, blu, viola UV (405 nm) e bianche da laboratorio, quindi osserva il percorso del fascio attraverso componenti ottici trasparenti.
+
+- **Sorgenti laser:** preset dedicati rosso, verde, blu, viola UV e bianco da laboratorio.
+- **Percorsi del fascio visibili:** tracciamento e visualizzazione del fascio anche all'interno di vetri e liquidi.
+- **Rifrazione e riflessioni parziali:** le interfacce trasparenti possono deviare il fascio e generare rami riflessi secondari.
+- **Dispersione spettrale:** con luce bianca e materiali trasparenti dispersivi, la rifrazione dipendente dalla lunghezza d'onda può separare lo spettro visibile.
+- **Esperimenti con le lenti:** scena demo inclusa con lenti convergenti e divergenti.
+
+Il percorso del laser viene tracciato in modo deterministico a partire dalla sorgente, senza affidarsi al path tracing dalla camera per intercettare casualmente un fascio sottile. Il risultato è una visualizzazione pulita e stabile.
+
+### 4. Materiali PBR e texture per modelli CAD
 
 ![Esempi di materiali e texture di ForgeRender](docs/img/mcp/esempi/materiali.jpg)
 
 Materiali diffusi, metalli e plastiche GGX, vetro Fresnel, vetro satinato ed emissivi. Le mappe PBR includono colore base, rugosità, metallicità, normal, bump, displacement reale, occlusione ambientale e opacità. Per i modelli CAD senza UV è disponibile la proiezione Box in scala metrica, con ancoraggio a pezzo, assieme o mondo.
 
-### 3. Studio fotografico e illuminazione
+### 5. Studio fotografico e illuminazione
 
 ![Aspetto studio fotografico di ForgeRender](docs/img/mcp/esempi/aspetto_studio.jpg)
 
 Prepara una scena prodotto con fondale e luci da studio, quindi scegli sfondo chiaro, scuro o scenografico. Le luci possono essere regolate singolarmente; la scena può essere adattata alle dimensioni del prodotto senza perdere il controllo sui componenti.
 
-### 4. Illuminazione volumetrica e fasci visibili
+### 6. Illuminazione volumetrica e fasci visibili
 
 ![Confronto del fascio volumetrico](reports/fascio-volumetrico/dopo_fascio_solo_camera.png)
 
 Le luci spot possono generare fasci visibili con densità e lunghezza regolabili. La nebbia volumetrica è un mezzo partecipante simulato, con scattering e ombre: la luce interagisce con il volume e diventa visibile nello spazio, non soltanto sulle superfici.
 
-### 5. Camera, viste multiple e presentazione prodotto
+### 7. Camera, viste multiple e presentazione prodotto
 
 ![Vista prodotto a tre quarti](docs/img/mcp/esempi/vista_tre_quarti.jpg)
 
-Camera di rendering con focale, diaframma, profondità di campo e decentramento. Sono disponibili viste frontali, posteriori, laterali, superiori e a tre quarti, oltre all'esportazione di turntable MP4 per presentare un prodotto da più angolazioni.
+Le camere di rendering offrono focale, diaframma, profondità di campo e decentramento. Le viste automatiche frontale, posteriore, laterali, superiore e a tre quarti aiutano a presentare un prodotto da più angolazioni; è possibile esportare video turntable in MP4.
 
-### 6. Controllo tramite IA — MCP
+### 8. Render pass e workflow di post-produzione
 
-![ForgeRender controllato tramite MCP](docs/img/mcp/it/finestra_comandata.jpg)
-
-Collega Claude Desktop, Claude Code o Codex tramite il bridge MCP per comandare le operazioni supportate in linguaggio naturale: preparazione della scena, importazione, luci, materiali, camera e rendering. Il controllo è esplicito e può essere disattivato dall'interfaccia.
-
-[Guida alla configurazione MCP](docs/MCP.md).
-
-### 7. Render pass e workflow di post-produzione
-
-ForgeRender può esportare pass separati per **Albedo, Normals, Depth, Product Mask e Component ID**, utili per compositing, mascherature e interventi successivi sull'immagine. Questi pass sono dati di output tecnici: non vanno confusi con una seconda immagine beauty.
+ForgeRender può esportare pass separati **Albedo, Normals, Depth, Product Mask e Component ID**, utili per compositing, mascherature e interventi successivi sull'immagine. Sono buffer tecnici di output, non ulteriori render beauty.
 
 
 ## Cosa fa oggi

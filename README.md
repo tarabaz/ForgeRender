@@ -86,55 +86,57 @@ Visible dispersion requires a transparent material with an Abbe number. Lower Ab
 
 [Technical details: Spectral rendering](docs/SPECTRAL.md).
 
-### 2. PBR materials and textures for CAD models
+### 2. AI-assisted scene control — MCP
+
+![ForgeRender AI scene control through MCP, with Claude issuing a natural-language command](docs/img/features/ai-scene-control.jpg)
+
+Connect Claude Desktop, Claude Code or Codex through the ForgeRender MCP bridge and control supported scene operations using natural language. Ask the assistant to adjust lighting, assign materials, configure the camera or prepare a render; ForgeRender applies the supported operations directly to the open scene. AI control is explicit and can be switched off from the interface.
+
+[MCP setup guide](docs/MCP.en.md).
+
+### 3. Laser optics — beams, prisms and lenses
+
+![Optical bench with laser beam dispersion through prisms and optical lenses](docs/img/features/laser-optics-lenses.png)
+
+Use ForgeRender as a virtual optical bench. Choose from red, green, blue, UV violet (405 nm) and white laboratory laser sources, then inspect how the beam travels through transparent optical components.
+
+- **Laser sources:** dedicated red, green, blue, UV violet and white laboratory presets.
+- **Visible beam paths:** trace and display the beam through glass and liquids.
+- **Refraction and partial reflections:** transparent interfaces can bend the beam and produce secondary reflected branches.
+- **Spectral dispersion:** with white light and dispersive transparent materials, wavelength-dependent refraction can separate the visible spectrum.
+- **Lens experiments:** explore the included converging and diverging lens demonstration scene.
+
+The laser path is traced deterministically from the source, rather than relying on camera path tracing to randomly discover a narrow beam. This produces a clean, stable beam visualization.
+
+### 4. PBR materials and textures for CAD models
 
 ![ForgeRender material and texture examples](docs/img/mcp/esempi/materiali.jpg)
 
 Diffuse materials, GGX metals and plastics, Fresnel glass, frosted glass and emissive surfaces. PBR maps include base colour, roughness, metallic, normal, bump, true displacement, ambient occlusion and opacity. For CAD models without UVs, metric Box projection is available, with Piece, Assembly or World anchoring.
 
-### 3. Product studio and lighting
+### 5. Product studio and lighting
 
 ![ForgeRender photographic studio look](docs/img/mcp/esempi/aspetto_studio.jpg)
 
 Prepare a product scene with a backdrop and studio lights, then choose a light, dark or dramatic background. Lights remain individually adjustable, and the studio can be fitted to the product dimensions without taking control away from the user.
 
-### 4. Volumetric lighting and visible beams
+### 6. Volumetric lighting and visible beams
 
 ![ForgeRender volumetric light beam](reports/fascio-volumetrico/dopo_fascio_solo_camera.png)
 
 Spotlights can create visible beams with adjustable density and length. Volumetric fog is a participating medium with scattering and shadows: light interacts with the volume and becomes visible in space, not only on surfaces.
 
-### 5. Camera, multiple views and product presentation
+### 7. Camera, multiple views and product presentation
 
 ![Three-quarter product view](docs/img/mcp/esempi/vista_tre_quarti.jpg)
 
 Render cameras provide focal length, aperture, depth of field and lens shift. Automatic front, rear, side, top and three-quarter views help present a product from multiple angles; turntable videos can be exported as MP4.
 
-### 6. AI-assisted workflow — MCP
-
-![ForgeRender controlled through MCP](docs/img/mcp/en/finestra_comandata.jpg)
-
-Connect Claude Desktop, Claude Code or Codex through the MCP bridge to control supported operations using natural language: scene preparation, model import, lighting, materials, camera setup and rendering. AI control is explicit and can be switched off from the interface.
-
-[MCP setup guide](docs/MCP.en.md).
-
-### 7. Render passes and post-production
+### 8. Render passes and post-production
 
 ForgeRender can export separate **Albedo, Normals, Depth, Product Mask and Component ID** passes for compositing, masking and further image editing. These are technical output buffers, not additional beauty renders.
 
 
-> **Control ForgeRender with AI — MCP**
->
-> Open ForgeRender, turn on **AI control** and ask Claude to prepare a scene, import a CAD model, position studio lights, assign materials, set the camera and render. 26 tools, live changes and render previews sent back to the assistant. You decide when the AI may take control: when it disconnects, ForgeRender stays open with your work.
->
-> ![AI control on and Claude connected](docs/img/mcp/en/barra_controllato.png)
->
-> **[Set up Claude Code or Claude Desktop →](docs/MCP.en.md)** · [Italian guide](docs/MCP.md)
-
-> See [docs/ROADMAP.md](docs/ROADMAP.md) for what really works today, what comes next and
-> how complex each next step is.
-
-:
 ## What it does today
 
 - **Simple / Advanced interface** (switch at the top, Simple by default): "Product photo in
