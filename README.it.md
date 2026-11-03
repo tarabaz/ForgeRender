@@ -18,16 +18,17 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
-### Novità della versione 0.31.0
+### Novità della versione 0.32.0
 
-- **Pacchetto completo (.frpack):** un file con progetto, modelli importati, texture e HDRI, da aprire ovunque; anche come cartella o ZIP con tutti i file.
-- **Libreria materiali:** finestre staccabili (anche fuori dal programma) e pulsante **Applica alla selezione** grande.
-- **Laser:** nuovo viola UV (405 nm), il blu ora è davvero blu; i fasci larghi finiscono esattamente sulle facce del vetro.
-- **Modalità Semplice:** gli aspetti non cancellano più le luci che hai aggiunto. Nuova schermata di benvenuto.
+- **Nebbia da ghiaccio secco molto più veloce:** la simulazione lavora solo dove c'è la nebbia: Ultra 182 → 37 s (4,9×), Molto alta 61 → 14,5 s sulla demo del cocktail, stessa nebbia. Si calcola in sottofondo subito dopo le tue modifiche, con la barra di avanzamento accanto ai campioni.
+- **Riflessi parziali del laser:** divisione facoltativa del fascio su ogni faccia di vetro, come un laser vero (tanti puntini attorno a cristalli e diamanti).
+- **Scene demo nuove:** banco ottico con laser e prisma, lenti convergenti e divergenti.
+- Interruttore **AI MCP: ON / OFF** nella barra in alto, con l'ingranaggio per le impostazioni dell'integrazione AI.
 
 <details>
 <summary><strong>Versioni precedenti — storico completo delle release</strong></summary>
 
+- **0.31.0 — Pacchetto completo e libreria staccabile:** .frpack, cartella o ZIP con tutti i file; libreria dei materiali staccabile con Applica alla selezione grande; laser viola UV e blu corretto; fasci larghi tagliati sulle facce del vetro; gli aspetti tengono le tue luci; nuova schermata di benvenuto.
 - **0.30.0 — Laser come luce a sé, preset che aggiungono:** laser rosso, verde, blu e bianco da laboratorio (i colorati non si scompongono); i preset delle luci aggiungono invece di sostituire; fascio visibile dentro i liquidi.
 - **0.29.0 — Luce nei bicchieri con il liquido:** piega giusta vetro-liquido per il laser e le caustiche, fascio che si affievolisce nei drink colorati; nuova categoria di materiali Liquidi.
 - **0.28.0–0.28.1 — Caustiche e scene demo:** caustiche con il photon mapping con tutte le luci (CPU e GPU, RGB e Spettrale); File → Scene demo divise per tipo con la scheda che le spiega; forme Prisma, Diamante e Pendente di cristallo; le scene demo salvate come progetto tengono i loro oggetti.
@@ -69,7 +70,7 @@ Per le note tecniche complete consulta [CHANGELOG.md](CHANGELOG.md) (in italiano
 
 > **Controlla ForgeRender con l'IA — MCP**
 >
-> Apri ForgeRender, accendi **Controllo IA** e chiedi a Claude di preparare la scena, importare un modello CAD, posizionare le luci da studio, assegnare i materiali, impostare la camera e lanciare il render. 25 comandi, modifiche visibili in tempo reale e anteprime dei render restituite all'assistente. Decidi tu quando l'IA può comandare: quando si scollega, ForgeRender resta aperto con il tuo lavoro.
+> Apri ForgeRender, accendi **AI MCP** e chiedi a Claude di preparare la scena, importare un modello CAD, posizionare le luci da studio, assegnare i materiali, impostare la camera e lanciare il render. 25 comandi, modifiche visibili in tempo reale e anteprime dei render restituite all'assistente. Decidi tu quando l'IA può comandare: quando si scollega, ForgeRender resta aperto con il tuo lavoro.
 >
 > ![Controllo IA acceso e Claude collegato](docs/img/mcp/it/barra_controllato.png)
 >
@@ -129,6 +130,7 @@ ForgeRender genera nebbia scenografica con una simulazione fluida 3D determinist
 - **Collisioni:** gli oggetti vengono voxelizzati come ostacoli solidi; la nebbia li aggira, si raccoglie nei contenitori, trabocca e si diffonde sulle superfici.
 - **Rendering volumetrico:** il risultato viene trasferito in un volume di densità più dettagliato. Il path tracer usa delta tracking e scattering Henyey–Greenstein, con illuminazione e ombre volumetriche.
 - **Controlli:** tempo simulato, emissione, raggio sorgente, turbolenza, risalita, dissolvenza, densità, scala dei dettagli e qualità. Il seed rende ripetibile il risultato.
+- **Veloce e pronta prima del render:** ogni passo lavora solo dove c'è la nebbia (entro poche celle), non su tutta la griglia, e la pressione legge una tabella dei vicini compatta: sulla demo del cocktail la qualità Ultra è passata da circa 3 minuti a circa 37 secondi (4,9×), Molto alta da 61 s a 14,5 s (4,2×), Alta da 11,4 s a 3,7 s. La nebbia si calcola in sottofondo poco dopo l'ultima modifica, così di solito è già pronta quando premi Render, e la barra in basso ne mostra l'avanzamento (ostacoli, simulazione, dettaglio) accanto ai campioni.
 
 È un'approssimazione fluidodinamica ispirata alla fisica, non un modello CFD termodinamico della sublimazione della CO2 o del trasferimento di calore.
 
@@ -140,25 +142,25 @@ ForgeRender genera nebbia scenografica con una simulazione fluida 3D determinist
 
 Materiali diffusi, metalli e plastiche GGX, vetro Fresnel, vetro satinato ed emissivi. Le mappe PBR includono colore base, rugosità, metallicità, normal, bump, displacement reale, occlusione ambientale e opacità. Per i modelli CAD senza UV è disponibile la proiezione Box in scala metrica, con ancoraggio a pezzo, assieme o mondo.
 
-### 5. Studio fotografico e illuminazione
+### 6. Studio fotografico e illuminazione
 
 ![Aspetto studio fotografico di ForgeRender](docs/img/mcp/esempi/aspetto_studio.jpg)
 
 Prepara una scena prodotto con fondale e luci da studio, quindi scegli sfondo chiaro, scuro o scenografico. Le luci possono essere regolate singolarmente; la scena può essere adattata alle dimensioni del prodotto senza perdere il controllo sui componenti.
 
-### 6. Illuminazione volumetrica e fasci visibili
+### 7. Illuminazione volumetrica e fasci visibili
 
 ![Confronto del fascio volumetrico](reports/fascio-volumetrico/dopo_fascio_solo_camera.png)
 
 Le luci spot possono generare fasci visibili con densità e lunghezza regolabili. La nebbia volumetrica è un mezzo partecipante simulato, con scattering e ombre: la luce interagisce con il volume e diventa visibile nello spazio, non soltanto sulle superfici.
 
-### 7. Camera, viste multiple e presentazione prodotto
+### 8. Camera, viste multiple e presentazione prodotto
 
 ![Vista prodotto a tre quarti](docs/img/mcp/esempi/vista_tre_quarti.jpg)
 
 Le camere di rendering offrono focale, diaframma, profondità di campo e decentramento. Le viste automatiche frontale, posteriore, laterali, superiore e a tre quarti aiutano a presentare un prodotto da più angolazioni; è possibile esportare video turntable in MP4.
 
-### 8. Render pass e workflow di post-produzione
+### 9. Render pass e workflow di post-produzione
 
 ForgeRender può esportare pass separati **Albedo, Normals, Depth, Product Mask e Component ID**, utili per compositing, mascherature e interventi successivi sull'immagine. Sono buffer tecnici di output, non ulteriori render beauty.
 
@@ -177,7 +179,7 @@ ForgeRender può esportare pass separati **Albedo, Normals, Depth, Product Mask 
 - **Lingue**: italiano e inglese, cambio immediato di tutta l'interfaccia (in alto o in
   Impostazioni → Lingua). Le traduzioni sono file separati `lang/Lan_*.json`: se ne aggiungono
   altri copiando `Lan_eng.json`.
-- **Controllo IA (MCP)**: comanda ForgeRender in linguaggio naturale tramite Claude Code o Claude Desktop, con il ponte `forgerender-mcp.exe` e l'interruttore "Controllo IA" nella barra. Consulta la [guida di configurazione MCP](docs/MCP.md) per installazione, esempi, strumenti disponibili e sicurezza.
+- **Controllo IA (MCP)**: comanda ForgeRender in linguaggio naturale tramite Claude Code o Claude Desktop, con il ponte `forgerender-mcp.exe` e l'interruttore "AI MCP" nella barra (ON/OFF, con l'ingranaggio per le impostazioni dell'integrazione AI). Consulta la [guida di configurazione MCP](docs/MCP.md) per installazione, esempi, strumenti disponibili e sicurezza.
 - **Schermata di benvenuto** all'avvio con immagine (`assets/splash.png`), versione e commit;
   si chiude con "Chiudi" e si riapre da File.
 - **Path tracing** su CPU (tutti i core) e su GPU (compute shader wgpu, Vulkan/DX12) con accumulo
@@ -388,6 +390,14 @@ Remove-Item Env:FORGE_FOG_PROFILE
 pressione…), per decidere dove ottimizzare.
 
 **Cosa guardare**: le righe `nebbia «…»: simulazione … passi in N ms` e `profilo nebbia: …`.
+
+Per cronometrare solo la nebbia a tutte le qualità (ostacoli, simulazione, dettaglio; 3
+ripetizioni, mediana) e confrontare il risultato con una misura precedente (`FOG_BENCH_REF`,
+differenza e massa), dal repository:
+
+```powershell
+cargo run --release -p forge_project --example fog_bench -- fog_bench 3
+```
 
 ### 7. Risoluzione e campioni della scena finale
 

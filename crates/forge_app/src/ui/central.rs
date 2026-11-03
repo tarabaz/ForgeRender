@@ -773,8 +773,14 @@ fn render_view(app: &mut ForgeApp, ui: &mut egui::Ui) {
         );
     }
     let mut overlay = Vec::new();
-    if preparing {
+    if app.is_building_bvh() {
         overlay.push((tr("Preparazione della scena (costruzione BVH)…").to_string(), style::WARN));
+    } else if preparing {
+        // Il render aspetta la nebbia: avanzamento come nella barra in basso.
+        let pct = forge_render_core::fog::progress::get()
+            .map(|p| format!(" {:.0}%", p.fraction * 100.0))
+            .unwrap_or_default();
+        overlay.push((tf("Calcolo della nebbia{}: il render parte appena è pronta", &[pct]), style::WARN));
     }
     if stale && !matches!(progress.state, SessionState::Idle) {
         overlay.push((

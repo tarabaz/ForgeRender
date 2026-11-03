@@ -15,7 +15,7 @@ sul tuo PC.
 ## Come funziona (dalla versione 0.5.0)
 
 - **ForgeRender lo apri tu**, come sempre, e resta aperto finché lo chiudi tu.
-- **Decidi tu quando l'IA può comandarlo**: pulsante **"Controllo IA"** nella barra in alto.
+- **Decidi tu quando l'IA può comandarlo**: interruttore **"AI MCP"** nella barra in alto (ON/OFF; l'ingranaggio accanto apre le impostazioni dell'integrazione AI).
   Spento (all'avvio è sempre spento) nessun assistente può toccare la scena.
 - Claude avvia un piccolo programma separato, **`forgerender-mcp.exe`** (il "ponte"), che sta
   nella stessa cartella di `forgerender.exe`. Il ponte inoltra i comandi alla finestra aperta.
@@ -23,14 +23,14 @@ sul tuo PC.
   scollega sparisce. La finestra e il tuo lavoro restano: puoi continuare a mano o ricollegare
   Claude più tardi sulla stessa scena.
 - Se ForgeRender è chiuso o il controllo è spento, Claude riceve il messaggio "apri ForgeRender
-  e accendi Controllo IA" e te lo chiede.
+  e accendi AI MCP" e te lo chiede.
 
 I tre stati della barra in alto:
 
 | Stato | Barra |
 |---|---|
-| **Spento**: nessun assistente può comandare (così parte ForgeRender) | ![Controllo IA spento](img/mcp/it/barra_spento.png) |
-| **Acceso**: Claude può collegarsi | ![Controllo IA acceso](img/mcp/it/barra_acceso.png) |
+| **Spento**: nessun assistente può comandare (così parte ForgeRender) | ![AI MCP spento](img/mcp/it/barra_spento.png) |
+| **Acceso**: Claude può collegarsi | ![AI MCP acceso](img/mcp/it/barra_acceso.png) |
 | **Controllato da IA**: Claude è collegato in questo momento | ![Controllato da IA](img/mcp/it/barra_controllato.png) |
 
 Quando Claude si scollega la scritta "Controllato da IA" sparisce e la barra torna come nello
@@ -56,9 +56,9 @@ configurazione (oppure assegna al disco una lettera fissa da Gestione disco).
 ## 2. Collegarlo con un clic (dalla versione 0.18.0)
 
 Non serve il terminale. In ForgeRender: **Strumenti → Integrazione AI…** (si apre da sola anche
-al primo clic su "Controllo IA", se nessun assistente è collegato).
+al primo clic su "AI MCP", se nessun assistente è collegato).
 
-- In alto lo stato del **server MCP di ForgeRender** (Controllo IA acceso o spento) e il ponte
+- In alto lo stato del **server MCP di ForgeRender** (AI MCP acceso o spento) e il ponte
   `forgerender-mcp.exe`, che il programma copia da solo in una cartella fissa
   (`%LOCALAPPDATA%\ForgeRender\mcp\`): i collegamenti restano validi anche quando aggiorni o
   sposti ForgeRender.
@@ -76,8 +76,8 @@ al primo clic su "Controllo IA", se nessun assistente è collegato).
 | **Codex** (OpenAI) | Apri una sessione nuova. |
 | **ChatGPT** | Non supportato: ChatGPT collega solo server remoti su internet, non programmi del PC. Per OpenAI usa Codex. |
 
-Al primo collegamento riuscito il Controllo IA si accende da solo; dalla volta dopo il pulsante
-"Controllo IA" è un semplice acceso/spento. Nella barra compare chi comanda: "Controllato da
+Al primo collegamento riuscito il AI MCP si accende da solo; dalla volta dopo il pulsante
+"AI MCP" è un semplice acceso/spento. Nella barra compare chi comanda: "Controllato da
 Claude Code" (o Claude Desktop, Codex).
 
 ## 3. Collegarlo a mano (riserva)
@@ -101,7 +101,7 @@ claude mcp list
 Poi apri una **sessione nuova** di Claude Code (le sessioni già aperte non vedono il server
 appena aggiunto). Il collegamento resta attivo per tutta la sessione: Claude esegue una
 richiesta dopo l'altra. A decidere se i comandi arrivano a ForgeRender è solo il pulsante
-"Controllo IA".
+"AI MCP".
 
 **Nuova versione in un'altra cartella** (per esempio una portable `ForgeRender-0.9.0-…`): il
 percorso registrato punta ancora a quella vecchia. Toglilo e registra quello nuovo:
@@ -149,16 +149,16 @@ Poi riavvia Claude Desktop.
 ## 4. Come si usa
 
 1. Apri ForgeRender (doppio clic, come sempre).
-2. Clicca **"Controllo IA"** in alto: diventa arancione.
+2. Clicca **"AI MCP"** in alto: diventa arancione.
 3. Scrivi a Claude cosa vuoi. Al primo comando in alto compare **"Controllato da IA"**.
-4. Quando hai finito, spegni "Controllo IA" (o chiudi Claude): ForgeRender resta aperto.
+4. Quando hai finito, spegni "AI MCP" (o chiudi Claude): ForgeRender resta aperto.
 
 Così si presenta la finestra mentre Claude lavora (qui ha preparato lo studio, aggiunto una luce
 calda a destra, messo la sfera in acciaio satinato e lanciato il render):
 
 ![ForgeRender comandato da Claude](img/mcp/it/finestra_comandata.jpg)
 
-1. **Controllo IA** acceso: sei tu ad averlo permesso.
+1. **AI MCP** acceso: sei tu ad averlo permesso.
 2. **Controllato da IA**: Claude è collegato adesso.
 3. La luce che Claude ha aggiunto compare nell'elenco come quelle create a mano (si può
    modificare o eliminare).
@@ -224,7 +224,7 @@ in `renders` accanto ai log (portable: cartella del programma; installata:
 
 ## 6. Sicurezza
 
-- Nessuno può comandare ForgeRender finché non accendi "Controllo IA"; spegnendolo, i
+- Nessuno può comandare ForgeRender finché non accendi "AI MCP"; spegnendolo, i
   collegamenti si chiudono subito.
 - Il collegamento tra ponte e finestra resta dentro il PC (`127.0.0.1`) e richiede una chiave
   segreta nuova a ogni accensione, scritta in un file della tua cartella utente
@@ -239,15 +239,15 @@ in `renders` accanto ai log (portable: cartella del programma; installata:
 
 ## 7. Se qualcosa non va
 
-- **Claude dice "ForgeRender non è collegato"**: apri ForgeRender e accendi "Controllo IA".
+- **Claude dice "ForgeRender non è collegato"**: apri ForgeRender e accendi "AI MCP".
 - **Funziona solo il primo comando, poi Claude dice che il collegamento si è interrotto**: il
   ponte è registrato con un `.mcp.json` di cartella. Registralo a livello utente (punto 2 o 3),
   rinomina il `.mcp.json` e apri una sessione nuova. Il ponte da solo non si chiude mai: resta
-  acceso finché Claude non lo chiude, anche con "Controllo IA" spento o ForgeRender chiuso.
+  acceso finché Claude non lo chiude, anche con "AI MCP" spento o ForgeRender chiuso.
 - **"ForgeRender non risponde: la finestra è ridotta a icona…"**: i comandi si eseguono come
   i clic, a ogni aggiornamento della finestra. Tienila aperta (non ridotta a icona) e senza
   finestre di dialogo davanti.
-- **Prova del ponte senza Claude**: con ForgeRender aperto e "Controllo IA" acceso, in
+- **Prova del ponte senza Claude**: con ForgeRender aperto e "AI MCP" acceso, in
   PowerShell (con `$ponte` impostato come sopra):
 
   ```powershell
@@ -255,7 +255,7 @@ in `renders` accanto ai log (portable: cartella del programma; installata:
   ```
 
   Funziona se compaiono due righe JSON: la seconda descrive la scena (gli accenti si vedono
-  storti in PowerShell, Claude li legge giusti). Con "Controllo IA" spento la seconda riga dice
+  storti in PowerShell, Claude li legge giusti). Con "AI MCP" spento la seconda riga dice
   di accenderlo.
 - **Render lento**: per le prove chiedi pochi campioni (32–64) e risoluzione bassa; per il finale
   la GPU (`set_render_settings` con device gpu).
@@ -273,7 +273,7 @@ in `renders` accanto ai log (portable: cartella del programma; installata:
   a `initialize` e `tools/list` (anche con la finestra chiusa) e inoltra `tools/call`. Non
   rimanda mai un comando già consegnato.
 - `crates/forge_app/src/mcp/`: lato finestra. `mod.rs` ascolta su `127.0.0.1` solo con
-  "Controllo IA" acceso; ogni chiamata passa alla finestra con un canale e si esegue in
+  "AI MCP" acceso; ogni chiamata passa alla finestra con un canale e si esegue in
   `ForgeApp::tick` (nessun accesso concorrente alla scena). `tools.rs` esegue gli strumenti con
   le stesse funzioni dei pulsanti; `ops.rs` contiene le parti senza finestra, con test.
 - `forgerender --controllo-ia` accende il controllo all'avvio (prove automatiche);

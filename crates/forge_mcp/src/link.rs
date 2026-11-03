@@ -1,7 +1,7 @@
 //! Collegamento tra il ponte `forgerender-mcp` (avviato da Claude) e la finestra di
 //! ForgeRender aperta dall'utente.
 //!
-//! - Quando l'utente accende "Controllo IA", ForgeRender ascolta su `127.0.0.1` (porta scelta
+//! - Quando l'utente accende "AI MCP", ForgeRender ascolta su `127.0.0.1` (porta scelta
 //!   dal sistema) e scrive porta e chiave segreta nel file di contatto ([`contact_file`]),
 //!   leggibile solo dall'utente. Spegnendo, il file viene tolto.
 //! - Il ponte legge il file, si collega e manda la chiave. Poi, una riga JSON per messaggio:
@@ -21,7 +21,7 @@ pub const ENV_CONTACT: &str = "FORGE_MCP_FILE";
 
 /// Messaggio per l'assistente quando la finestra non accetta comandi.
 pub const NOT_CONNECTED: &str = "ForgeRender non è collegato: l'utente deve aprire ForgeRender e accendere \
-\"Controllo IA\" nella barra in alto. Chiediglielo e poi riprova.";
+\"AI MCP\" nella barra in alto. Chiediglielo e poi riprova.";
 
 /// Contenuto del file di contatto.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -145,7 +145,7 @@ impl Client {
     fn recv(&mut self) -> Result<Value, String> {
         let mut line = String::new();
         match self.reader.read_line(&mut line) {
-            Ok(0) | Err(_) => Err("ForgeRender si è chiuso, oppure l'utente ha spento \"Controllo IA\"".into()),
+            Ok(0) | Err(_) => Err("ForgeRender si è chiuso, oppure l'utente ha spento \"AI MCP\"".into()),
             Ok(_) => serde_json::from_str(&line).map_err(|e| format!("risposta non valida da ForgeRender: {e}")),
         }
     }

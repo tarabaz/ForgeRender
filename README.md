@@ -18,16 +18,17 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
-### What's new in 0.31.0
+### What's new in 0.32.0
 
-- **Complete package (.frpack):** one file with the project, imported models, textures and HDRI, to open anywhere; also as a folder or ZIP with all files.
-- **Materials library:** detachable windows (even outside the program) and a big **Apply to selection** button.
-- **Lasers:** new UV violet (405 nm), blue that really looks blue; wide beams end exactly on the glass faces.
-- **Simple mode:** aspects no longer delete the lights you added. New welcome screen.
+- **Much faster dry-ice fog:** the simulation works only where the fog is: Ultra 182 → 37 s (4.9×), Very high 61 → 14.5 s on the cocktail demo, same fog. It is computed in the background right after your changes, with a progress bar next to the samples.
+- **Laser partial reflections:** optional splitting of the beam at every glass face, like a real laser (many dots around crystals and diamonds).
+- **New demo scenes:** optical bench with lasers and a prism, converging and diverging lenses.
+- **AI MCP: ON / OFF** switch in the top bar, with a gear for the AI integration settings.
 
 <details>
 <summary><strong>Previous versions — complete release history</strong></summary>
 
+- **0.31.0 — Complete package and detachable library:** .frpack, folder or ZIP with all files; detachable materials library with a big Apply to selection; UV violet laser and true blue; wide beams cut on glass faces; aspects keep your lights; new welcome screen.
 - **0.30.0 — Laser as its own light, presets that add:** red, green, blue and white lab lasers (coloured ones never split); light presets add instead of replacing; visible beam inside liquids.
 - **0.29.0 — Light through glasses with liquid:** correct glass-liquid bending for the laser and caustics, beam fading in coloured drinks; new Liquids material category.
 - **0.28.0–0.28.1 — Caustics and demo scenes:** photon-mapped caustics with every light (CPU and GPU, RGB and Spectral); File → Demo scenes grouped by type with an explanation card; Prism, Diamond and Crystal pendant shapes; demo scenes saved as projects keep their objects.
@@ -118,6 +119,7 @@ ForgeRender creates dry-ice-style fog with a deterministic, seeded fluid simulat
 - **Scene collisions:** scene geometry is voxelised as solid obstacles, so fog flows around objects, pools inside containers, spills over their edges and spreads across nearby surfaces.
 - **Volumetric rendering:** the simulation is baked into a higher-resolution density volume. The path tracer traverses it with delta tracking and Henyey–Greenstein phase scattering, allowing lights to illuminate the fog and cast volumetric shadows.
 - **Reproducible controls:** simulated time, emission rate, source radius, turbulence, rise, dissipation, density, detail scale and simulation quality can be adjusted. A seed makes the same settings reproducible.
+- **Fast and ready before you render:** each step works only where the fog is (within a few cells of it), not on the whole grid, and the pressure solve reads a compact neighbour table: on the cocktail demo the Ultra quality simulation went from about 3 minutes to about 37 seconds (4.9×), Very high from 61 s to 14.5 s (4.2×), High from 11.4 s to 3.7 s. The fog is computed in the background shortly after the last change, so it is usually ready when you press Render, and the status bar shows its progress (obstacles, simulation, detail) next to the samples.
 
 This is a physically motivated fluid approximation for dry-ice-style effects, not a thermodynamic CFD model of CO2 sublimation or heat transfer.
 
@@ -129,25 +131,25 @@ This is a physically motivated fluid approximation for dry-ice-style effects, no
 
 Diffuse materials, GGX metals and plastics, Fresnel glass, frosted glass and emissive surfaces. PBR maps include base colour, roughness, metallic, normal, bump, true displacement, ambient occlusion and opacity. For CAD models without UVs, metric Box projection is available, with Piece, Assembly or World anchoring.
 
-### 5. Product studio and lighting
+### 6. Product studio and lighting
 
 ![ForgeRender photographic studio look](docs/img/mcp/esempi/aspetto_studio.jpg)
 
 Prepare a product scene with a backdrop and studio lights, then choose a light, dark or dramatic background. Lights remain individually adjustable, and the studio can be fitted to the product dimensions without taking control away from the user.
 
-### 6. Volumetric lighting and visible beams
+### 7. Volumetric lighting and visible beams
 
 ![ForgeRender volumetric light beam](reports/fascio-volumetrico/dopo_fascio_solo_camera.png)
 
 Spotlights can create visible beams with adjustable density and length. Volumetric fog is a participating medium with scattering and shadows: light interacts with the volume and becomes visible in space, not only on surfaces.
 
-### 7. Camera, multiple views and product presentation
+### 8. Camera, multiple views and product presentation
 
 ![Three-quarter product view](docs/img/mcp/esempi/vista_tre_quarti.jpg)
 
 Render cameras provide focal length, aperture, depth of field and lens shift. Automatic front, rear, side, top and three-quarter views help present a product from multiple angles; turntable videos can be exported as MP4.
 
-### 8. Render passes and post-production
+### 9. Render passes and post-production
 
 ForgeRender can export separate **Albedo, Normals, Depth, Product Mask and Component ID** passes for compositing, masking and further image editing. These are technical output buffers, not additional beauty renders.
 
@@ -166,7 +168,7 @@ ForgeRender can export separate **Albedo, Normals, Depth, Product Mask and Compo
 - **Languages**: Italian and English, the whole interface switches immediately (at the top or in
   Settings → Language). Translations are separate `lang/Lan_*.json` files: copy `Lan_eng.json`
   to add more.
-- **AI control (MCP)**: control ForgeRender in natural language through Claude Code or Claude Desktop, with the `forgerender-mcp.exe` bridge and the "AI control" switch in the top bar. See the [MCP setup guide](docs/MCP.en.md) for installation, examples, available tools and safety.
+- **AI control (MCP)**: control ForgeRender in natural language through Claude Code or Claude Desktop, with the `forgerender-mcp.exe` bridge and the "AI MCP" switch in the top bar (ON/OFF, with the gear for the AI integration settings). See the [MCP setup guide](docs/MCP.en.md) for installation, examples, available tools and safety.
 - **Welcome screen** at start-up with an image (`assets/splash.png`), version and commit; it
   closes with "Close" and reopens from File.
 - **Path tracing** on the CPU (all cores) and on the GPU (wgpu compute shaders, Vulkan/DX12)
@@ -368,6 +370,13 @@ Remove-Item Env:FORGE_FOG_PROFILE
 
 **Purpose**: show the time of each fluid-simulation phase (forces, advection, pressure…), to
 decide where to optimize.
+
+To time the fog alone at every quality (obstacles, simulation, detail; 3 runs, median) and compare
+the result with a previous run (`FOG_BENCH_REF`, difference and mass), from the repository:
+
+```powershell
+cargo run --release -p forge_project --example fog_bench -- fog_bench 3
+```
 
 ### 7. Final image with the project settings
 

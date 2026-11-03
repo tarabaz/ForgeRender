@@ -139,68 +139,152 @@ impl Bx {
     }
 }
 
-/// Celle entro `r` celle (in ogni direzione, massimo separabile) da una cella con nebbia,
-/// calcolate solo nel riquadro. Ogni passata lungo un asse usa somme progressive:
-/// costo costante per cella qualunque sia `r`.
-fn near_fog(g: &GridSpec, b: &Bx, rho: &[f32], r: usize) -> Vec<bool> {
-    let [nx, _, nz] = g.res;
-    let mut cur: Vec<u8> = vec![0; g.len()];
-    // Linee del riquadro lungo un asse: (indice di partenza, passo, lunghezza).
-    let lines = |axis: usize| -> Vec<(usize, usize, usize)> {
-        let (a1, a2) = ((axis + 1) % 3, (axis + 2) % 3);
-        let mut out = Vec::new();
-        for u in b.lo[a1]..=b.hi[a1] {
-            for v in b.lo[a2]..=b.hi[a2] {
-                let mut c = [0usize; 3];
-                c[axis] = b.lo[axis];
-                c[a1] = u;
-                c[a2] = v;
-                let stride = [1, nx * nz, nx][axis];
-                out.push((g.index(c[0], c[1], c[2]), stride, b.hi[axis] - b.lo[axis] + 1));
-            }
-        }
-        out
-    };
-    let ptr = Shared8(cur.as_mut_ptr());
-    lines(0).par_iter().for_each(|&(start, stride, len)| {
-        for k in 0..len {
-            let i = start + k * stride;
-            // SAFETY: ogni linea scrive solo le proprie celle.
-            unsafe { *ptr.at(i) = (rho[i] > 1e-6) as u8 };
-        }
-    });
-    for axis in 0..3 {
-        let ls = lines(axis);
-        let ptr = Shared8(cur.as_mut_ptr());
-        ls.par_iter().for_each_init(Vec::new, |pre: &mut Vec<u32>, &(start, stride, len)| {
-            // SAFETY: le linee lungo lo stesso asse sono disgiunte.
-            let get = |k: usize| unsafe { *ptr.at(start + k * stride) };
-            pre.clear();
-            pre.resize(len + 1, 0);
-            for k in 0..len {
-                pre[k + 1] = pre[k] + get(k) as u32;
-            }
-            for k in 0..len {
-                let (lo, hi) = (k.saturating_sub(r), (k + r).min(len - 1));
-                let v = (pre[hi + 1] - pre[lo] > 0) as u8;
-                unsafe { *ptr.at(start + k * stride) = v };
-            }
-        });
-    }
-    cur.into_iter().map(|v| v != 0).collect()
+/// Il riquadro di lavoro come griglia a sé: i campi di un passo sono grandi quanto il riquadro,
+/// non quanto tutta la griglia (la nebbia ne occupa spesso una piccola parte). Stesso ordine
+/// delle celle della griglia (x più veloce, poi z, poi y).
+#[derive(Clone, Copy)]
+struct Local {
+    b: Bx,
+    d: [usize; 3],
 }
 
-/// Riquadro delle celle con nebbia allargato di `margin` celle (None se non c'è nebbia).
-fn fog_box(g: &GridSpec, rho: &[f32], margin: usize) -> Option<Bx> {
-    let [nx, _, nz] = g.res;
-    // Per riga (y, z): prima e ultima x con nebbia.
-    let (lo, hi) = rho
-        .par_chunks(nx)
-        .enumerate()
-        .filter_map(|(row, chunk)| {
-            let first = chunk.iter().position(|v| *v > 1e-6)?;
-            let last = chunk.iter().rposition(|v| *v > 1e-6)?;
-            let (y, z) = (row / nz, row % nz);
+impl Local {
+    fn new(b: Bx) -> Self {
+        Self {
+            b,
+            d: [0, 1, 2].map(|k| b.hi[k] - b.lo[k] + 1),
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.d[0] * self.d[1] * self.d[2]
+    }
+
+    /// Indice nel riquadro della cella (x, y, z) della griglia, che deve esserci dentro.
+    #[inline]
+    fn idx(&self, x: usize, y: usize, z: usize) -> usize {
+        ((y - self.b.lo[1]) * self.d[2] + (z - self.b.lo[2])) * self.d[0] + (x - self.b.lo[0])
+    }
+
+    /// Indice nel riquadro, se la cella è dentro.
+    #[inline]
+    fn get(&self, x: usize, y: usize, z: usize) -> Option<usize> {
+        self.b.contains(x, y, z).then(|| self.idx(x, y, z))
+    }
+
+    /// Valori calcolati in tutte le celle del riquadro (coordinate della griglia).
+    fn fill<T: Copy + Default + Send + Sync>(&self, f: impl Fn(usize, usize, usize) -> T + Sync) -> Vec<T> {
+        let mut out = vec![T::default(); self.len()];
+        let (lo, d) = (self.b.lo, self.d);
+        out.par_chunks_mut(d[0]).enumerate().for_each(|(row, chunk)| {
+            let (y, z) = (lo[1] + row / d[2], lo[2] + row % d[2]);
+            for (k, o) in chunk.iter_mut().enumerate() {
+                *o = f(lo[0] + k, y, z);
+            }
+        });
+        out
+    }
+
+    /// Righe (y, z) del riquadro.
+    fn rows(&self) -> Vec<(usize, usize)> {
+        self.b.rows(None)
+    }
+}
+
+/// Celle del riquadro entro `r` celle (in ogni direzione, massimo separabile) da una cella con
+/// nebbia. Una passata per asse con una finestra scorrevole di conteggi (costo costante per cella
+/// qualunque sia `r`); lungo y e z si fanno scorrere righe intere di x, così la memoria si legge
+/// in ordine invece che a salti.
+fn near_fog(g: &GridSpec, l: &Local, rho: &[f32], r: usize) -> Vec<u8> {
+    dilate_mask(l, l.fill(|x, y, z| (rho[g.index(x, y, z)] > 1e-6) as u8), r)
+}
+
+/// Maschera 0/1 del riquadro allargata di `r` celle (vedi [`near_fog`]).
+fn dilate_mask(l: &Local, a: Vec<u8>, r: usize) -> Vec<u8> {
+    let [d0, d1, d2] = l.d;
+    // Asse x: ogni riga per conto suo.
+    let mut b = vec![0u8; a.len()];
+    b.par_chunks_mut(d0)
+        .zip(a.par_chunks(d0))
+        .for_each(|(out, inp)| dilate(inp, out, d0, 1, r));
+    // Asse z: in ogni strato y, finestra sulle righe z (ogni riga è una fila di x contigue).
+    let plane = d0 * d2;
+    let mut c = vec![0u8; a.len()];
+    c.par_chunks_mut(plane)
+        .zip(b.par_chunks(plane))
+        .for_each(|(out, inp)| dilate(inp, out, d2, d0, r));
+    // Asse y: finestra sugli strati, a blocchi di colonne (x, z) contigue.
+    const COLS: usize = 4096;
+    let out = Shared8(b.as_mut_ptr());
+    (0..plane.div_ceil(COLS)).into_par_iter().for_each(|k| {
+        let (s, e) = (k * COLS, ((k + 1) * COLS).min(plane));
+        let w = e - s;
+        let mut cnt = vec![0u16; w];
+        let add = |cnt: &mut [u16], y: usize, sign: i32| {
+            for (j, v) in cnt.iter_mut().enumerate() {
+                *v = (*v as i32 + sign * c[y * plane + s + j] as i32) as u16;
+            }
+        };
+        for y in 0..=r.min(d1 - 1) {
+            add(&mut cnt, y, 1);
+        }
+        for y in 0..d1 {
+            for (j, v) in cnt.iter().enumerate() {
+                // SAFETY: ogni blocco di colonne scrive solo le sue celle.
+                unsafe { *out.at(y * plane + s + j) = (*v > 0) as u8 };
+            }
+            if y + r + 1 < d1 {
+                add(&mut cnt, y + r + 1, 1);
+            }
+            if y >= r {
+                add(&mut cnt, y - r, -1);
+            }
+        }
+    });
+    b
+}
+
+/// Dilatazione di raggio `r` lungo un asse: `inp` e `out` sono `n` file di `w` valori (0/1)
+/// consecutive; il valore di uscita di una fila è 1 dove almeno una fila entro `r` vale 1.
+fn dilate(inp: &[u8], out: &mut [u8], n: usize, w: usize, r: usize) {
+    let mut cnt = vec![0u16; w];
+    let add = |cnt: &mut [u16], k: usize, sign: i32| {
+        for (j, v) in cnt.iter_mut().enumerate() {
+            *v = (*v as i32 + sign * inp[k * w + j] as i32) as u16;
+        }
+    };
+    for k in 0..=r.min(n - 1) {
+        add(&mut cnt, k, 1);
+    }
+    for k in 0..n {
+        for (j, v) in cnt.iter().enumerate() {
+            out[k * w + j] = (*v > 0) as u8;
+        }
+        if k + r + 1 < n {
+            add(&mut cnt, k + r + 1, 1);
+        }
+        if k >= r {
+            add(&mut cnt, k - r, -1);
+        }
+    }
+}
+
+/// Riquadro delle celle con nebbia allargato di `margin` celle (None se non c'è nebbia). Si
+/// cerca solo in `search` quando è noto dove può essere la nebbia (il riquadro del passo prima:
+/// in un passo la nebbia si sposta meno del margine).
+fn fog_box(g: &GridSpec, rho: &[f32], search: Option<Bx>, margin: usize) -> Option<Bx> {
+    let [nx, ny, nz] = g.res;
+    let s = search.unwrap_or(Bx {
+        lo: [0; 3],
+        hi: [nx - 1, ny - 1, nz - 1],
+    });
+    let (lo, hi) = s
+        .rows(None)
+        .into_par_iter()
+        .filter_map(|(y, z)| {
+            let row = &rho[g.index(s.lo[0], y, z)..=g.index(s.hi[0], y, z)];
+            let first = row.iter().position(|v| *v > 1e-6)? + s.lo[0];
+            let last = row.iter().rposition(|v| *v > 1e-6)? + s.lo[0];
             Some(([first, y, z], [last, y, z]))
         })
         .reduce_with(|a, b| ([0, 1, 2].map(|k| a.0[k].min(b.0[k])), [0, 1, 2].map(|k| a.1[k].max(b.1[k]))))?;
@@ -210,35 +294,147 @@ fn fog_box(g: &GridSpec, rho: &[f32], margin: usize) -> Option<Bx> {
     })
 }
 
-/// Valori calcolati solo nelle celle del riquadro (fuori: `T::default()`).
-fn fill_box<T: Copy + Default + Send + Sync>(g: &GridSpec, b: &Bx, f: impl Fn(usize, usize, usize, usize) -> T + Sync) -> Vec<T> {
-    let mut out = vec![T::default(); g.len()];
-    let [nx, _, nz] = g.res;
-    out.par_chunks_mut(nx).enumerate().for_each(|(row, chunk)| {
-        let (y, z) = (row / nz, row % nz);
-        if y < b.lo[1] || y > b.hi[1] || z < b.lo[2] || z > b.hi[2] {
-            return;
-        }
-        for (x, o) in chunk.iter_mut().enumerate().take(b.hi[0] + 1).skip(b.lo[0]) {
-            *o = f(g.index(x, y, z), x, y, z);
+/// Azzera, nel campo di dimensioni `d`, le celle del riquadro `prev` (allargato di `grow`) che non
+/// sono nel riquadro `cur`: fuori dal riquadro i campi restano a zero (aria ferma, p = 0), anche
+/// quando la nebbia si ritira.
+fn clear_outside(data: &mut [f32], d: [usize; 3], prev: Bx, cur: Option<Bx>, grow: usize) {
+    let ptr = Shared(data.as_mut_ptr());
+    let hi = [0, 1, 2].map(|k| (prev.hi[k] + grow).min(d[k] - 1));
+    let lo = [0, 1, 2].map(|k| prev.lo[k].saturating_sub(grow));
+    let keep = cur.map(|c| Bx {
+        lo: [0, 1, 2].map(|k| c.lo[k].saturating_sub(grow)),
+        hi: [0, 1, 2].map(|k| (c.hi[k] + grow).min(d[k] - 1)),
+    });
+    let rows: Vec<(usize, usize)> = (lo[1]..=hi[1]).flat_map(|y| (lo[2]..=hi[2]).map(move |z| (y, z))).collect();
+    rows.par_iter().for_each(|&(y, z)| {
+        for x in lo[0]..=hi[0] {
+            if keep.is_some_and(|k| k.contains(x, y, z)) {
+                continue;
+            }
+            // SAFETY: ogni riga è scritta da un solo thread.
+            unsafe { *ptr.at(Mac::idx(d, x, y, z)) = 0.0 };
         }
     });
+}
+
+/// Tratto di una riga di celle: (y, z, prima x, ultima x).
+type Span = (usize, usize, usize, usize);
+
+/// Puntatore condiviso a un campo qualsiasi, per scrivere in parallelo righe disgiunte.
+#[derive(Clone, Copy)]
+struct SharedT<T>(*mut T);
+unsafe impl<T> Send for SharedT<T> {}
+unsafe impl<T> Sync for SharedT<T> {}
+
+impl<T> SharedT<T> {
+    #[inline]
+    fn at(self, i: usize) -> *mut T {
+        // SAFETY: `i` è un indice valido del buffer da cui è stato creato il puntatore.
+        unsafe { self.0.add(i) }
+    }
+}
+
+/// Tratti delle righe del riquadro che contengono celle di `mask` (dalla prima all'ultima).
+fn spans_of(l: &Local, mask: &[u8]) -> Vec<Span> {
+    let (lo, d) = (l.b.lo, l.d);
+    mask.par_chunks(d[0])
+        .enumerate()
+        .filter_map(|(row, m)| {
+            let first = m.iter().position(|v| *v != 0)?;
+            let last = m.iter().rposition(|v| *v != 0)?;
+            Some((lo[1] + row / d[2], lo[2] + row % d[2], lo[0] + first, lo[0] + last))
+        })
+        .collect()
+}
+
+/// Righe delle facce del campo `a` che toccano le celle dei tratti: la faccia tra una cella e
+/// quella prima lungo `a` ha l'indice della cella, quindi servono anche le righe spostate di uno.
+fn face_rows(spans: &[Span], a: usize) -> Vec<Span> {
+    if a == 0 {
+        return spans.iter().map(|&(y, z, x0, x1)| (y, z, x0, x1 + 1)).collect();
+    }
+    let shift = |&(y, z, x0, x1): &Span| if a == 1 { (y + 1, z, x0, x1) } else { (y, z + 1, x0, x1) };
+    let mut all: Vec<Span> = spans.iter().copied().chain(spans.iter().map(shift)).collect();
+    all.sort_unstable_by_key(|s| (s.0, s.1));
+    // Una riga sola per (y, z): due thread non scrivono mai la stessa faccia.
+    let mut out: Vec<Span> = Vec::with_capacity(all.len());
+    for s in all {
+        match out.last_mut() {
+            Some(l) if l.0 == s.0 && l.1 == s.1 => {
+                l.2 = l.2.min(s.2);
+                l.3 = l.3.max(s.3);
+            }
+            _ => out.push(s),
+        }
+    }
     out
 }
 
-/// Aggiorna le facce del campo `a` nel riquadro (allargato di una faccia sull'asse `a`).
-fn update_faces(m: &Mac, a: usize, b: &Bx, data: &mut [f32], f: impl Fn(usize, usize, usize, usize, &mut f32) + Sync) {
+/// Aggiorna le facce del campo `a` sulle righe `rows` (righe tutte diverse).
+fn update_rows(m: &Mac, a: usize, rows: &[Span], data: &mut [f32], f: impl Fn(usize, usize, usize, usize, &mut f32) + Sync) {
     let d = m.dims(Some(a));
-    let mut hi = b.hi;
-    hi[a] += 1;
-    data.par_chunks_mut(d[0]).enumerate().for_each(|(row, chunk)| {
+    let ptr = Shared(data.as_mut_ptr());
+    rows.par_iter().for_each(|&(y, z, x0, x1)| {
+        for x in x0..=x1.min(d[0] - 1) {
+            let i = Mac::idx(d, x, y, z);
+            // SAFETY: le righe sono diverse, ogni faccia è scritta da un solo thread.
+            f(i, x, y, z, unsafe { &mut *ptr.at(i) });
+        }
+    });
+}
+
+/// Come [`update_rows`], e restituisce il modulo massimo delle facce aggiornate.
+fn update_rows_max(m: &Mac, a: usize, rows: &[Span], data: &mut [f32], f: impl Fn(usize, usize, usize, &mut f32) + Sync) -> f32 {
+    let d = m.dims(Some(a));
+    let ptr = Shared(data.as_mut_ptr());
+    rows.par_iter()
+        .map(|&(y, z, x0, x1)| {
+            let mut vm = 0.0f32;
+            for x in x0..=x1.min(d[0] - 1) {
+                // SAFETY: le righe sono diverse, ogni faccia è scritta da un solo thread.
+                let v = unsafe { &mut *ptr.at(Mac::idx(d, x, y, z)) };
+                f(x, y, z, v);
+                vm = vm.max(v.abs());
+            }
+            vm
+        })
+        .reduce(|| 0.0, f32::max)
+}
+
+impl Local {
+    /// Come [`Local::fill`], ma solo nelle celle dei tratti, nel buffer `out` riusato da un passo
+    /// all'altro (allungato se serve, non azzerato: fuori dai tratti i valori non si leggono mai).
+    fn fill_spans<T: Copy + Default + Send + Sync>(
+        &self,
+        spans: &[Span],
+        mut out: Vec<T>,
+        f: impl Fn(usize, usize, usize) -> T + Sync,
+    ) -> Vec<T> {
+        if out.len() < self.len() {
+            out.resize(self.len(), T::default());
+        }
+        let ptr = SharedT(out.as_mut_ptr());
+        spans.par_iter().for_each(|&(y, z, x0, x1)| {
+            for x in x0..=x1 {
+                // SAFETY: un tratto per riga, ogni cella è scritta da un solo thread.
+                unsafe { *ptr.at(self.idx(x, y, z)) = f(x, y, z) };
+            }
+        });
+        out
+    }
+}
+
+/// Copia in `dst` la parte di `src` (campo di dimensioni `d`) nel riquadro allargato di `grow`.
+fn copy_region(src: &[f32], dst: &mut [f32], d: [usize; 3], b: Bx, grow: usize) {
+    let lo = [0, 1, 2].map(|k| b.lo[k].saturating_sub(grow));
+    let hi = [0, 1, 2].map(|k| (b.hi[k] + grow).min(d[k] - 1));
+    dst.par_chunks_mut(d[0]).enumerate().for_each(|(row, chunk)| {
         let (y, z) = (row / d[2], row % d[2]);
-        if y < b.lo[1] || y > hi[1] || z < b.lo[2] || z > hi[2] {
+        if y < lo[1] || y > hi[1] || z < lo[2] || z > hi[2] {
             return;
         }
-        for (x, v) in chunk.iter_mut().enumerate().take(hi[0] + 1).skip(b.lo[0]) {
-            f(Mac::idx(d, x, y, z), x, y, z, v);
-        }
+        let start = row * d[0];
+        chunk[lo[0]..=hi[0]].copy_from_slice(&src[start + lo[0]..=start + hi[0]]);
     });
 }
 
@@ -416,49 +612,58 @@ pub fn simulate(inp: &SimInput) -> SimResult {
     let mut heavy = vec![0.0f32; n];
     let mut pressure = vec![0.0f32; n];
 
-    // Vicini di ogni cella per la pressione: celle libere interne (indici) e numero di
-    // facce non solide (le facce verso l'aria fuori dalla griglia contano, con p = 0).
-    #[derive(Clone, Copy, Default)]
-    struct Nb {
-        idx: [u32; 6],
-        n: u8,
-        k: u8,
-    }
-    let neighbors: Vec<Nb> = (0..n)
+    // Vicini di ogni cella per la pressione, in 2 byte: quali dei 6 vicini sono celle libere
+    // dentro la griglia (bit, nell'ordine di `NB_DIRS`) e quante facce non sono solide (le facce
+    // verso l'aria fuori dalla griglia contano, con p = 0). La pressione legge questi dati 32
+    // volte per passo: una tabella di indici (28 byte per cella) costava soprattutto memoria.
+    const NB_DIRS: [(i64, i64, i64); 6] = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)];
+    let nb_offset: [isize; 6] = NB_DIRS.map(|(dx, dy, dz)| dx as isize + (dz as isize) * nx as isize + (dy as isize) * (nx * nz) as isize);
+    let neighbors: Vec<[u8; 2]> = (0..n)
         .into_par_iter()
         .map(|i| {
-            let mut nb = Nb::default();
             if inp.solid[i] {
-                return nb;
+                return [0, 0];
             }
             let (x, y, z) = g.coords(i);
             let (xi, yi, zi) = (x as i64, y as i64, z as i64);
-            for (dx, dy, dz) in [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)] {
+            let (mut mask, mut k) = (0u8, 0u8);
+            for (bit, (dx, dy, dz)) in NB_DIRS.into_iter().enumerate() {
                 let (qx, qy, qz) = (xi + dx, yi + dy, zi + dz);
                 if solid(qx, qy, qz) {
                     continue;
                 }
-                nb.k += 1;
+                k += 1;
                 if qx >= 0 && qz >= 0 && qx < nx as i64 && qy < ny as i64 && qz < nz as i64 {
-                    nb.idx[nb.n as usize] = g.index(qx as usize, qy as usize, qz as usize) as u32;
-                    nb.n += 1;
+                    mask |= 1 << bit;
                 }
             }
-            nb
+            [mask, k]
         })
         .collect();
 
     // Passo temporale: 1/30 s, ridotto se le velocità superano MAX_CFL celle per passo.
+    // Fuori dal riquadro della nebbia tutti i campi restano a zero (aria ferma): ogni passo
+    // lavora e alloca solo nel riquadro, e i buffer grandi come la griglia si riusano.
     let mut clock = Clock::new();
     let mut t = 0.0f32;
     let mut steps = 0u32;
     let mut last_dt = 1.0 / 30.0;
+    let mut prev_box: Option<Bx> = None;
+    let mut old_c: [Vec<f32>; 3] = [0, 1, 2].map(|a| vec![0.0f32; m.dims(Some(a)).iter().product()]);
+    let mut fa = vec![0.0f32; n];
+    let mut fb = vec![0.0f32; n];
+    let mut active_cells = 0u64;
+
+    let mut next_vmax = 0.0f32;
+    // Campi di lavoro dei passi, riusati (grandi quanto il riquadro più grande visto).
+    let (mut b_cv, mut b_om, mut b_force) = (Vec::<Vec3>::new(), Vec::<Vec3>::new(), Vec::<Vec3>::new());
+    let (mut b_div, mut b_fwd, mut b_out) = (Vec::<f32>::new(), Vec::<S2>::new(), Vec::<[f32; 2]>::new());
+    let profile = std::env::var_os("FORGE_FOG_PROFILE").is_some();
+    let (mut near_cells, mut domain_cells) = (0u64, 0u64);
     while t < inp.sim_time - 1e-5 {
-        let vmax = vel
-            .c
-            .iter()
-            .map(|c| c.par_iter().fold(|| 0.0f32, |a, v| a.max(v.abs())).reduce(|| 0.0, f32::max))
-            .fold(0.0f32, f32::max);
+        // Velocità massima sulle facce del dominio del passo prima (entro il margine dalla
+        // nebbia: lì si muove l'aria che conta), misurata alla fine di quel passo.
+        let vmax = next_vmax;
         let mut dt = (1.0f32 / 30.0).min(MAX_CFL * h / vmax.max(1e-6)).min(inp.sim_time - t);
         if dt < 1e-5 {
             dt = 1e-5;
@@ -476,21 +681,47 @@ pub fn simulate(inp: &SimInput) -> SimResult {
         }
 
         // Riquadro di lavoro: nebbia più un margine. Fuori l'aria è considerata ferma e la
-        // nebbia non può arrivarci in un passo (spostamento < 1 cella).
-        let Some(bx) = fog_box(&g, &rho, WORK_MARGIN) else {
+        // nebbia non può arrivarci in un passo (spostamento < 1 cella). La nebbia si cerca solo
+        // nel riquadro di prima (in un passo si sposta meno del margine).
+        let found = fog_box(&g, &rho, prev_box, WORK_MARGIN);
+        if let Some(pb) = prev_box {
+            // La nebbia si è ritirata: le celle lasciate tornano aria ferma.
+            for a in 0..3 {
+                clear_outside(&mut vel.c[a], m.dims(Some(a)), pb, found, 1);
+            }
+            clear_outside(&mut pressure, g.res, pb, found, 0);
+            clear_outside(&mut fa, g.res, pb, found, 0);
+            clear_outside(&mut fb, g.res, pb, found, 0);
+        }
+        prev_box = found;
+        let Some(bx) = found else {
             t += dt;
             steps += 1;
             continue;
         };
+        let loc = Local::new(bx);
+        active_cells += loc.len() as u64;
 
         clock.lap(1);
         // Celle vicine alla nebbia (entro 3 celle): solo lì servono trasporto e forze.
-        let near = near_fog(&g, &bx, &rho, 3);
+        let near = near_fog(&g, &loc, &rho, 3);
+        // Dominio: celle entro il margine dalla nebbia, per righe. Forze e trasporti agiscono
+        // solo vicino alla nebbia e la pressione si risolve qui (oltre, p = 0: aria aperta),
+        // invece che in tutto il riquadro, che con colate e tappeti è quasi tutto aria vuota.
+        let domain = dilate_mask(&loc, near.clone(), WORK_MARGIN - 3);
+        let spans = spans_of(&loc, &domain);
+        let faces: [Vec<Span>; 3] = [0, 1, 2].map(|a| face_rows(&spans, a));
+        if profile {
+            near_cells += near.iter().filter(|v| **v != 0).count() as u64;
+            domain_cells += domain.iter().filter(|v| **v != 0).count() as u64;
+        }
+        let near_at = |x: usize, y: usize, z: usize| loc.get(x, y, z).is_some_and(|j| near[j] != 0);
+        let clamp_g = |v: i64, a: usize| v.clamp(0, g.res[a] as i64 - 1) as usize;
 
         // 2. Forze (al centro delle celle, poi riportate sulle facce).
         let phase = 0.5 + 0.5 * (t * std::f32::consts::TAU / 6.0).sin();
-        let center_vel: Vec<Vec3> = fill_box(&g, &bx, |i, x, y, z| {
-            if !near[i] {
+        let center_vel: Vec<Vec3> = loc.fill_spans(&spans, std::mem::take(&mut b_cv), |x, y, z| {
+            if !near_at(x, y, z) {
                 return Vec3::ZERO;
             }
             let a = |c: usize, dx: usize, dy: usize, dz: usize| vel.c[c][Mac::idx(m.dims(Some(c)), x + dx, y + dy, z + dz)];
@@ -500,20 +731,25 @@ pub fn simulate(inp: &SimInput) -> SimResult {
                 0.5 * (a(2, 0, 0, 0) + a(2, 0, 0, 1)),
             )
         });
-        let at = |x: i64, y: i64, z: i64| -> Vec3 {
-            let c = |v: i64, a: usize| v.clamp(0, g.res[a] as i64 - 1) as usize;
-            center_vel[g.index(c(x, 0), c(y, 1), c(z, 2))]
+        // Valore di un campo del riquadro nella cella (x, y, z), portata dentro la griglia;
+        // fuori dal riquadro zero (come prima, quando i campi erano grandi come la griglia).
+        let at_loc = |field: &[Vec3], x: i64, y: i64, z: i64| -> Vec3 {
+            loc.get(clamp_g(x, 0), clamp_g(y, 1), clamp_g(z, 2))
+                .map_or(Vec3::ZERO, |j| field[j])
         };
-        let omega: Vec<Vec3> = fill_box(&g, &bx, |i, x, y, z| {
-            if !near[i] {
+        let omega: Vec<Vec3> = loc.fill_spans(&spans, std::mem::take(&mut b_om), |x, y, z| {
+            if !near_at(x, y, z) {
                 return Vec3::ZERO;
             }
             let (x, y, z) = (x as i64, y as i64, z as i64);
-            let d = |dx: i64, dy: i64, dz: i64| (at(x + dx, y + dy, z + dz) - at(x - dx, y - dy, z - dz)) / (2.0 * h);
+            let d = |dx: i64, dy: i64, dz: i64| {
+                (at_loc(&center_vel, x + dx, y + dy, z + dz) - at_loc(&center_vel, x - dx, y - dy, z - dz)) / (2.0 * h)
+            };
             let (dx, dy, dz) = (d(1, 0, 0), d(0, 1, 0), d(0, 0, 1));
             Vec3::new(dy.z - dz.y, dz.x - dx.z, dx.y - dy.x)
         });
-        let force: Vec<Vec3> = fill_box(&g, &bx, |i, x, y, z| {
+        let force: Vec<Vec3> = loc.fill_spans(&spans, std::mem::take(&mut b_force), |x, y, z| {
+            let i = g.index(x, y, z);
             if inp.solid[i] || rho[i] <= 0.0 {
                 return Vec3::ZERO;
             }
@@ -523,24 +759,22 @@ pub fn simulate(inp: &SimInput) -> SimResult {
             f += (turb[0][i] * phase + turb[1][i] * (1.0 - phase)) * (k_turb * presence);
             // Confinamento della vorticità: N × ω, con N = ∇|ω| normalizzato.
             if eps > 0.0 && presence > 0.0 {
-                let mag = |dx: i64, dy: i64, dz: i64| {
-                    let c = |v: i64, a: usize| v.clamp(0, g.res[a] as i64 - 1) as usize;
-                    omega[g.index(c(x as i64 + dx, 0), c(y as i64 + dy, 1), c(z as i64 + dz, 2))].length()
-                };
+                let (xi, yi, zi) = (x as i64, y as i64, z as i64);
+                let mag = |dx: i64, dy: i64, dz: i64| at_loc(&omega, xi + dx, yi + dy, zi + dz).length();
                 let grad = Vec3::new(
                     mag(1, 0, 0) - mag(-1, 0, 0),
                     mag(0, 1, 0) - mag(0, -1, 0),
                     mag(0, 0, 1) - mag(0, 0, -1),
                 );
                 let nrm = grad.normalize_or_zero();
-                f += nrm.cross(omega[i]) * (eps * h * presence);
+                f += nrm.cross(omega[loc.idx(x, y, z)]) * (eps * h * presence);
             }
             f
         });
         let damp = (-DRAG * dt).exp();
         let wall_damp = (-(DRAG + WALL_DRAG * (BOUNDARY_LAYER / h).min(1.0)) * dt).exp();
         for a in 0..3 {
-            update_faces(&m, a, &bx, &mut vel.c[a], |_, x, y, z, v| {
+            update_rows(&m, a, &faces[a], &mut vel.c[a], |_, x, y, z, v| {
                 let mut lo = [x as i64, y as i64, z as i64];
                 lo[a] -= 1;
                 let hi = [x as i64, y as i64, z as i64];
@@ -549,14 +783,14 @@ pub fn simulate(inp: &SimInput) -> SimResult {
                     return;
                 }
                 // Lontano dalla nebbia nessuna forza (l'aria ferma resta ferma).
-                if !near[g.index(x.min(nx - 1), y.min(ny - 1), z.min(nz - 1))] {
+                if !near_at(x.min(nx - 1), y.min(ny - 1), z.min(nz - 1)) {
                     return;
                 }
                 let fa = |c: [i64; 3]| {
                     if c[0] < 0 || c[1] < 0 || c[2] < 0 || c[0] >= nx as i64 || c[1] >= ny as i64 || c[2] >= nz as i64 {
                         0.0
                     } else {
-                        force[g.index(c[0] as usize, c[1] as usize, c[2] as usize)][a]
+                        loc.get(c[0] as usize, c[1] as usize, c[2] as usize).map_or(0.0, |j| force[j][a])
                     }
                 };
                 // Sopra una superficie d'appoggio il moto orizzontale è frenato dall'attrito
@@ -568,11 +802,17 @@ pub fn simulate(inp: &SimInput) -> SimResult {
         }
 
         clock.lap(2);
-        // 3. Trasporto della velocità.
-        let old = Vel { c: vel.c.clone() };
+        // 3. Trasporto della velocità: si legge la velocità di prima, copiata solo attorno al
+        // riquadro (il trasporto non pesca oltre MAX_CFL celle).
+        for (a, dst) in old_c.iter_mut().enumerate() {
+            copy_region(&vel.c[a], dst, m.dims(Some(a)), bx, 3);
+        }
+        let old = Vel {
+            c: std::mem::take(&mut old_c),
+        };
         for a in 0..3 {
             let d = m.dims(Some(a));
-            update_faces(&m, a, &bx, &mut vel.c[a], |_, x, y, z, v| {
+            update_rows(&m, a, &faces[a], &mut vel.c[a], |_, x, y, z, v| {
                 let mut lo = [x as i64, y as i64, z as i64];
                 lo[a] -= 1;
                 if solid(lo[0], lo[1], lo[2]) || solid(x as i64, y as i64, z as i64) {
@@ -580,7 +820,7 @@ pub fn simulate(inp: &SimInput) -> SimResult {
                     return;
                 }
                 // Lontano dalla nebbia l'aria si muove poco: il trasporto si salta.
-                if !near[g.index(x.min(nx - 1), y.min(ny - 1), z.min(nz - 1))] {
+                if !near_at(x.min(nx - 1), y.min(ny - 1), z.min(nz - 1)) {
                     return;
                 }
                 let p = m.pos(Some(a), x, y, z);
@@ -595,54 +835,72 @@ pub fn simulate(inp: &SimInput) -> SimResult {
                 }
             });
         }
+        old_c = old.c;
 
         clock.lap(3);
-        // 4. Proiezione (pressione).
-        let div: Vec<f32> = fill_box(&g, &bx, |i, x, y, z| {
-            if inp.solid[i] {
+        // 4. Proiezione (pressione), nel riquadro; fuori p = 0 (aria ferma, bordo aperto).
+        let mut div: Vec<f32> = loc.fill_spans(&spans, std::mem::take(&mut b_div), |x, y, z| {
+            if inp.solid[g.index(x, y, z)] {
                 return 0.0;
             }
             let f = |a: usize, dx: usize, dy: usize, dz: usize| vel.c[a][Mac::idx(m.dims(Some(a)), x + dx, y + dy, z + dz)];
             (f(0, 1, 0, 0) - f(0, 0, 0, 0) + f(1, 0, 1, 0) - f(1, 0, 0, 0) + f(2, 0, 0, 1) - f(2, 0, 0, 0)) / h
         });
         // Il gas prodotto occupa volume: divergenza imposta nelle celle della sorgente.
-        let mut div = div;
         for &i in &source {
-            div[i] -= src_div;
+            let (x, y, z) = g.coords(i);
+            if let Some(j) = loc.get(x, y, z) {
+                div[j] -= src_div;
+            }
         }
         let rhs_scale = h * h / dt;
-        // Fuori dal riquadro la pressione è 0 (aria ferma, come un bordo aperto).
-        pressure.par_chunks_mut(nx).enumerate().for_each(|(row, chunk)| {
-            let (y, z) = (row / nz, row % nz);
-            for (x, p) in chunk.iter_mut().enumerate() {
-                if !bx.contains(x, y, z) {
-                    *p = 0.0;
-                }
+        // Fuori dal dominio p = 0 (aria aperta): si azzerano le celle del riquadro fuori dai
+        // tratti, così chi ne esce non tiene una pressione vecchia.
+        {
+            let mut span_of = vec![None; loc.d[1] * loc.d[2]];
+            for &(y, z, x0, x1) in &spans {
+                span_of[(y - bx.lo[1]) * loc.d[2] + (z - bx.lo[2])] = Some((x0, x1));
             }
-        });
-        let rows = bx.rows(None);
+            let ptr = Shared(pressure.as_mut_ptr());
+            loc.rows().par_iter().for_each(|&(y, z)| {
+                let keep = span_of[(y - bx.lo[1]) * loc.d[2] + (z - bx.lo[2])];
+                for x in bx.lo[0]..=bx.hi[0] {
+                    if keep.is_some_and(|(x0, x1)| x >= x0 && x <= x1) {
+                        continue;
+                    }
+                    // SAFETY: ogni riga è scritta da un solo thread.
+                    unsafe { *ptr.at(g.index(x, y, z)) = 0.0 };
+                }
+            });
+        }
         for _ in 0..PRESSURE_ITERS {
             for color in 0..2usize {
                 // Gauss–Seidel rosso/nero sul posto: le celle di un colore leggono solo celle
                 // dell'altro colore, quindi le scritture parallele non si sovrappongono e il
                 // risultato non dipende dall'ordine.
                 let ptr = Shared(pressure.as_mut_ptr());
-                let (neighbors, div) = (&neighbors, &div);
-                rows.par_iter().for_each(|&(y, z)| {
-                    let start = bx.lo[0] + (bx.lo[0] + y + z + color) % 2;
-                    for x in (start..=bx.hi[0]).step_by(2) {
+                let (neighbors, div, nb_offset) = (&neighbors, &div, &nb_offset);
+                spans.par_iter().for_each(|&(y, z, x0, x1)| {
+                    let start = x0 + (x0 + y + z + color) % 2;
+                    for x in (start..=x1).step_by(2) {
                         let i = g.index(x, y, z);
-                        let nb = &neighbors[i];
-                        if nb.k == 0 {
+                        let [mask, k] = neighbors[i];
+                        if k == 0 {
                             continue;
                         }
                         // SAFETY: `i` ha il colore corrente; i vicini letti hanno l'altro colore e
                         // in questa mezza iterazione nessun thread li scrive. Ogni `i` è scritto
                         // da un solo thread (una riga a testa).
                         unsafe {
-                            let sum: f32 = nb.idx[..nb.n as usize].iter().map(|&j| *ptr.at(j as usize)).sum();
+                            // Stesso ordine dei vicini di prima: somma identica.
+                            let mut sum = 0.0f32;
+                            for (bit, off) in nb_offset.iter().enumerate() {
+                                if mask & (1 << bit) != 0 {
+                                    sum += *ptr.at(i.wrapping_add_signed(*off));
+                                }
+                            }
                             let cur = *ptr.at(i);
-                            let gs = (sum - rhs_scale * div[i]) / nb.k as f32;
+                            let gs = (sum - rhs_scale * div[loc.idx(x, y, z)]) / k as f32;
                             *ptr.at(i) = cur + SOR * (gs - cur);
                         }
                     }
@@ -658,8 +916,11 @@ pub fn simulate(inp: &SimInput) -> SimResult {
                 pressure[g.index(x as usize, y as usize, z as usize)]
             }
         };
+        // Ultimo aggiornamento delle velocità del passo: insieme si misura la velocità massima
+        // che fissa il passo temporale successivo (sulle stesse facce del dominio).
+        next_vmax = 0.0;
         for a in 0..3 {
-            update_faces(&m, a, &bx, &mut vel.c[a], |_, x, y, z, v| {
+            let vm = update_rows_max(&m, a, &faces[a], &mut vel.c[a], |x, y, z, v| {
                 let mut lo = [x as i64, y as i64, z as i64];
                 lo[a] -= 1;
                 if solid(lo[0], lo[1], lo[2]) || solid(x as i64, y as i64, z as i64) {
@@ -668,6 +929,7 @@ pub fn simulate(inp: &SimInput) -> SimResult {
                 }
                 *v -= dt / h * (p_at(x as i64, y as i64, z as i64) - p_at(lo[0], lo[1], lo[2]));
             });
+            next_vmax = next_vmax.max(vm);
         }
 
         clock.lap(4);
@@ -716,46 +978,84 @@ pub fn simulate(inp: &SimInput) -> SimResult {
                 hi,
             }
         };
-        let fwd: Vec<S2> = fill_box(&g, &bx, |i, x, y, z| {
-            if inp.solid[i] || !near[i] {
+        let fwd: Vec<S2> = loc.fill_spans(&spans, std::mem::take(&mut b_fwd), |x, y, z| {
+            let i = g.index(x, y, z);
+            if inp.solid[i] || !near_at(x, y, z) {
                 S2::default()
             } else {
                 sl2(&rho, &heavy, i, x, y, z, 1.0)
             }
         });
-        let fa: Vec<f32> = fwd.par_iter().map(|s| s.v[0]).collect();
-        let fb: Vec<f32> = fwd.par_iter().map(|s| s.v[1]).collect();
-        let out: Vec<[f32; 2]> = fill_box(&g, &bx, |i, x, y, z| {
-            if inp.solid[i] || !near[i] {
+        // Passo in avanti nei buffer della griglia (solo nel riquadro): il passo indietro li
+        // campiona con l'interpolazione trilineare.
+        {
+            let (pa, pb) = (Shared(fa.as_mut_ptr()), Shared(fb.as_mut_ptr()));
+            spans.par_iter().for_each(|&(y, z, x0, x1)| {
+                for x in x0..=x1 {
+                    let s = fwd[loc.idx(x, y, z)];
+                    let i = g.index(x, y, z);
+                    // SAFETY: ogni riga è scritta da un solo thread.
+                    unsafe {
+                        *pa.at(i) = s.v[0];
+                        *pb.at(i) = s.v[1];
+                    }
+                }
+            });
+        }
+        let out: Vec<[f32; 2]> = loc.fill_spans(&spans, std::mem::take(&mut b_out), |x, y, z| {
+            let i = g.index(x, y, z);
+            if inp.solid[i] || !near_at(x, y, z) {
                 return [0.0; 2];
             }
-            let s = fwd[i];
+            let s = fwd[loc.idx(x, y, z)];
             let back = sl2(&fa, &fb, i, x, y, z, -1.0);
             [
                 (s.v[0] + 0.5 * (rho[i] - back.v[0])).clamp(s.lo[0], s.hi[0]).max(0.0),
                 (s.v[1] + 0.5 * (heavy[i] - back.v[1])).clamp(s.lo[1], s.hi[1]).max(0.0),
             ]
         });
-        rho = out.par_iter().map(|v| v[0]).collect();
-        heavy = out.par_iter().map(|v| v[1]).collect();
 
         clock.lap(5);
-        // 6. Dissolvenza.
+        // 6. Dissolvenza (scritta insieme al risultato del trasporto, solo nel riquadro).
         let fade_vis = |v: f32| {
             // Il velo sottile svanisce prima del corpo denso.
             let thin = 1.0 - (v / 0.15).min(1.0);
             v * (-(k_vis * (1.0 + 4.0 * thin)) * dt).exp()
         };
-        rho.par_iter_mut().for_each(|v| *v = fade_vis(*v));
         let kh = (-k_heavy * dt).exp();
-        heavy.par_iter_mut().zip(rho.par_iter()).for_each(|(c, r)| *c = (*c * kh).min(*r));
+        {
+            let (pr, ph) = (Shared(rho.as_mut_ptr()), Shared(heavy.as_mut_ptr()));
+            spans.par_iter().for_each(|&(y, z, x0, x1)| {
+                for x in x0..=x1 {
+                    let [r, c] = out[loc.idx(x, y, z)];
+                    let r = fade_vis(r);
+                    let i = g.index(x, y, z);
+                    // SAFETY: ogni riga è scritta da un solo thread.
+                    unsafe {
+                        *pr.at(i) = r;
+                        *ph.at(i) = (c * kh).min(r);
+                    }
+                }
+            });
+        }
 
+        (b_cv, b_om, b_force) = (center_vel, omega, force);
+        (b_div, b_fwd, b_out) = (div, fwd, out);
         clock.lap(6);
+        crate::progress::set(crate::progress::Phase::Simulation, (t + dt) / inp.sim_time.max(1e-6));
         t += dt;
         steps += 1;
     }
+    // Celle lavorate in media per passo, come frazione della griglia.
+    let active = active_cells as f64 / (n as u64 * steps.max(1) as u64) as f64;
     if std::env::var_os("FORGE_FOG_PROFILE").is_some() {
-        eprintln!("profilo nebbia: {steps} passi, ms {:?}", clock.ms.map(|v| v.round()));
+        eprintln!(
+            "profilo nebbia: {steps} passi, riquadro medio {:.1}% della griglia, vicino alla nebbia {:.1}%, entro il margine {:.1}%, ms {:?}",
+            active * 100.0,
+            near_cells as f64 / (n as u64 * steps.max(1) as u64) as f64 * 100.0,
+            domain_cells as f64 / (n as u64 * steps.max(1) as u64) as f64 * 100.0,
+            clock.ms.map(|v| v.round())
+        );
     }
     tracing::info!(
         "simulazione nebbia: {steps} passi; ms per fase: passo {:.0}, sorgente/riquadro {:.0}, forze {:.0}, trasporto velocità {:.0}, pressione {:.0}, trasporto nebbia {:.0}, dissolvenza {:.0}",

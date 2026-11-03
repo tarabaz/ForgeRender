@@ -1,4 +1,4 @@
-//! Finestra "Integrazione AI" (Strumenti → Integrazione AI…, e al primo clic su "Controllo IA"
+//! Finestra "Integrazione AI" (Strumenti → Integrazione AI…, e al primo clic su "AI MCP"
 //! se nessun assistente è collegato): stato del server MCP di ForgeRender e, per ogni
 //! assistente, se è installato, collegato o da aggiornare, con i pulsanti per collegarlo o
 //! scollegarlo. Niente terminale né percorsi da copiare: la logica è in `mcp::setup`.
@@ -12,7 +12,7 @@ use std::path::PathBuf;
 
 pub struct AiSetupUi {
     pub open: bool,
-    /// Aperta dal primo clic su "Controllo IA": al primo collegamento riuscito il controllo si accende.
+    /// Aperta dal primo clic su "AI MCP": al primo collegamento riuscito il controllo si accende.
     first_use: bool,
     env: Option<Env>,
     /// Ponte nella cartella fissa (o perché non c'è).
@@ -65,7 +65,7 @@ impl AiSetupUi {
     pub fn open_for_first_use(&mut self) {
         self.first_use = true;
         self.message = Some((
-            tr("Prima collega l'assistente che vuoi usare: un clic, poi il Controllo IA si accende da solo.").into(),
+            tr("Prima collega l'assistente che vuoi usare: un clic, poi AI MCP si accende da solo.").into(),
             false,
         ));
         self.open();
@@ -146,7 +146,7 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
                     let label = if control_on { tr("Spegni") } else { tr("Accendi") };
                     if ui
                         .button(label)
-                        .on_hover_text(tr("Controllo IA: quando è spento nessun assistente può toccare la scena"))
+                        .on_hover_text(tr("AI MCP: quando è spento nessun assistente può toccare la scena"))
                         .clicked()
                     {
                         action = Some(Action::ToggleControl);

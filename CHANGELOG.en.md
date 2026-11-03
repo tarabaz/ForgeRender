@@ -10,7 +10,16 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
-## Unreleased (`sviluppo` branch)
+## 0.32.0 — 3 Nov 2026
+
+**Dry-ice fog: much faster simulation**
+- Each simulation step now works only where the fog is: arrays sized to the fog's box instead of the whole grid, forces, transport and pressure on the cells within 6 cells of the fog, a 2-byte neighbour table for the pressure, reused buffers, and the maximum velocity measured in the pass that already updates the velocities. Physics unchanged (same forces, MacCormack transport, pressure solver and collisions); the pressure is now solved on the fog's shape with open air beyond 6 cells.
+- Measured on the cocktail demo (Ryzen 9 9900X, median of 3 runs, first computation without cache): Medium 20.9 → 8.0 s (2.6×), High 11.4 → 3.7 s (3.1×), Very high 60.9 → 14.5 s (4.2×), Ultra 182 → 37 s (4.9×). Same fog mass; overall shape within 3.5–6% (block averages). Full report: `reports/2026-11-03_ottimizzazione-simulazione-fumo/REPORT.md`; benchmark: `cargo run --release -p forge_project --example fog_bench`.
+- **Computed in advance**: shortly after the last change to the fog or the scene the fog is computed in the background, so it is usually ready when you press Render (the Render button stays available meanwhile).
+- **Progress bar** in the bottom bar, next to the samples: "Fog: simulation 45%" (obstacles, simulation, detail). "Building BVH" now appears only while the BVH is really being built.
+
+**AI MCP switch**
+- The top bar button is now **AI MCP: ON / OFF**, with a **gear** next to it that opens the AI integration settings (connect or disconnect Claude Desktop, Claude Code, Codex).
 
 **Laser: partial reflections**
 - New **Partial reflections** option in the laser card (off by default): like a real laser, at every glass face part of the light (the Fresnel fraction) is reflected and becomes a beam of its own with its own spot, so many dots appear around a crystal or a diamond. Branches below 1% of the laser's power are dropped; up to 64 stretches and 16 spots per laser. CPU and GPU, RGB and Spectral (checked by tests: same image within 4%). Off, the laser follows a single path as before.

@@ -65,7 +65,7 @@ l'immagine: guardala e correggi). Per capire che cosa sono i pezzi (forma e funz
 scegliere i materiali usa inspect_components: immagini veloci, non cambia la scena. \"Destra\", \"sinistra\", \"davanti\" sono rispetto \
 all'inquadratura attuale. Ogni modifica si vede subito nella finestra di ForgeRender. \
 Non sovrascrivere file esistenti senza che l'utente lo chieda (overwrite). \
-ForgeRender lo apre l'utente e decide lui quando accettare comandi (\"Controllo IA\" nella \
+ForgeRender lo apre l'utente e decide lui quando accettare comandi (\"AI MCP\" nella \
 barra in alto): se un comando risponde che non è collegato, chiedigli di aprirlo e di attivarlo.";
 
 /// Nome dell'assistente (`params.clientInfo.name`) se la riga è la richiesta `initialize`.

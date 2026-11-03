@@ -7,6 +7,8 @@
 use crate::RenderGeometry;
 use forge_math::Vec3;
 use forge_scene::{FogVolume, Scene};
+/// Avanzamento del calcolo della nebbia (per la barra nell'interfaccia).
+pub use forge_volume::progress;
 use forge_volume::{BakedFog, GridSpec, SimState};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -199,14 +201,18 @@ pub fn fogs_ready(scene: &Scene, geo: &RenderGeometry) -> bool {
 
 /// Nebbie attive della scena, calcolate se non sono già in cache.
 pub fn bake_fogs(scene: &Scene, geo: &RenderGeometry) -> Vec<Arc<BakedFog>> {
+    use forge_volume::progress::{self, Phase};
     let mut out = Vec::new();
-    for f in scene.fogs.iter().filter(|f| f.enabled) {
+    let fogs: Vec<&FogVolume> = scene.fogs.iter().filter(|f| f.enabled).collect();
+    for (n, f) in fogs.iter().enumerate() {
+        progress::begin(Phase::Obstacles, n + 1, fogs.len());
         let k = key(f, geo);
         if let Some(b) = cache().lock().unwrap().get(&k) {
             out.push(b.clone());
             continue;
         }
         let obs = obstacles(f, geo);
+        progress::set(Phase::Simulation, 0.0);
         let solid = |spec: &GridSpec| obs.solid(geo, spec);
         let ground = obs.ground;
         let sk = (forge_volume::sim_key(f), obs.hash);
@@ -231,6 +237,7 @@ pub fn bake_fogs(scene: &Scene, geo: &RenderGeometry) -> Vec<Arc<BakedFog>> {
         c.insert(k, b.clone());
         out.push(b);
     }
+    progress::clear();
     out
 }
 

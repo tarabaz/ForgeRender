@@ -1,5 +1,5 @@
 //! Controllo di ForgeRender da un assistente IA (Claude Code, Claude Desktop…) con il
-//! Model Context Protocol. L'utente apre ForgeRender e accende "Controllo IA" nella barra:
+//! Model Context Protocol. L'utente apre ForgeRender e accende "AI MCP" nella barra:
 //! la finestra ascolta su `127.0.0.1` e Claude ci arriva tramite il ponte `forgerender-mcp`
 //! (crate `forge_mcp_bridge`), che è il programma che Claude avvia e chiude. La finestra resta
 //! dell'utente: quando Claude si scollega rimane aperta con il lavoro. Guida: `docs/MCP.md`.
@@ -35,7 +35,7 @@ pub struct Call {
     reply: Sender<ToolOutput>,
 }
 
-/// "Controllo IA" acceso: ascolto locale e chiamate in arrivo.
+/// "AI MCP" acceso: ascolto locale e chiamate in arrivo.
 pub struct Server {
     rx: Receiver<Call>,
     waiting: Option<(Sender<ToolOutput>, tools::Waiter)>,
@@ -129,7 +129,7 @@ impl Server {
     pub fn shutdown(mut self) {
         self.stop.store(true, Ordering::Release);
         if let Some((reply, _)) = self.waiting.take() {
-            let _ = reply.send(ToolOutput::error("l'utente ha spento \"Controllo IA\""));
+            let _ = reply.send(ToolOutput::error("l'utente ha spento \"AI MCP\""));
         }
         for s in self.streams.lock().expect("collegamenti").drain(..) {
             let _ = s.shutdown(std::net::Shutdown::Both);
@@ -223,7 +223,7 @@ fn forward(tx: &Sender<Call>, ctx: &egui::Context, name: &str, args: &Value) -> 
         reply: rtx,
     };
     if tx.send(call).is_err() {
-        return ToolOutput::error("l'utente ha spento \"Controllo IA\"");
+        return ToolOutput::error("l'utente ha spento \"AI MCP\"");
     }
     ctx.request_repaint();
     let start = Instant::now();
@@ -239,7 +239,7 @@ fn forward(tx: &Sender<Call>, ctx: &egui::Context, name: &str, args: &Value) -> 
                 }
                 ctx.request_repaint();
             }
-            Err(RecvTimeoutError::Disconnected) => return ToolOutput::error("l'utente ha spento \"Controllo IA\""),
+            Err(RecvTimeoutError::Disconnected) => return ToolOutput::error("l'utente ha spento \"AI MCP\""),
         }
     }
 }
@@ -278,7 +278,7 @@ pub fn process(app: &mut ForgeApp, ctx: &egui::Context) {
     app.mcp = Some(b);
 }
 
-/// Accende o spegne "Controllo IA" (pulsante nella barra, `--controllo-ia`).
+/// Accende o spegne "AI MCP" (pulsante nella barra, `--controllo-ia`).
 pub fn set_enabled(app: &mut ForgeApp, ctx: &egui::Context, on: bool) {
     match (on, app.mcp.take()) {
         (true, Some(s)) => app.mcp = Some(s),
@@ -333,7 +333,7 @@ mod tests {
         server.shutdown();
         assert!(!file.exists(), "file di contatto tolto");
         let err = link::Client::connect(None).err().expect("spento");
-        assert!(err.contains("Controllo IA"), "{err}");
+        assert!(err.contains("AI MCP"), "{err}");
         std::env::remove_var(link::ENV_CONTACT);
     }
 }

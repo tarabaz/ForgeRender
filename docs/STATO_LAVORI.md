@@ -649,5 +649,17 @@
 - `Light::from_look` e `presets::{look_lights, set_look_lights, mark_legacy_look_lights}`.
 - Splash: `assets/splash.png` nuova (banco ottico), logo al 24%, versione, titolo e funzioni.
 
+
+### 0.32.0 (03/11/2026): nebbia 2,6–4,9× più veloce, calcolo in anticipo con barra, interruttore AI MCP
+- `forge_volume::sim`: campi del riquadro (`Local`), dominio entro 6 celle per tratti di riga
+  (`spans_of`, `face_rows`, `update_rows`, `update_rows_max`, `fill_spans`), pressione con tabella
+  vicini da 2 byte, buffer riusati, dilatazione a finestra scorrevole (`dilate`, `dilate_mask`).
+  Report: `reports/2026-11-03_ottimizzazione-simulazione-fumo/REPORT.md`; misura
+  `forge_project/examples/fog_bench.rs`.
+- `forge_volume::progress` (fase e frazione), letto dalla barra in `ui/status.rs` e dal riquadro
+  in `ui/central.rs`; `ForgeApp::precompute_fog` (0,8 s di quiete, poi calcolo in sottofondo),
+  `fog_then_render`, `is_building_bvh`.
+- Barra in alto: `menubar::ai_control` mostra "AI MCP: ON/OFF" e l'ingranaggio (`Cmd::AiSetup`).
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

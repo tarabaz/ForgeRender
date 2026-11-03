@@ -13,7 +13,31 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
-## In sviluppo (branch `sviluppo`)
+## 0.32.0 — 03/11/2026
+
+**Nebbia da ghiaccio secco: simulazione molto più veloce**
+- Ogni passo della simulazione lavora solo dove c'è la nebbia: campi grandi quanto il suo
+  riquadro invece che tutta la griglia, forze, trasporti e pressione sulle celle entro 6 dalla
+  nebbia, tabella dei vicini da 2 byte per la pressione, buffer riusati e velocità massima
+  misurata nel passaggio che aggiorna già le velocità. Fisica invariata (stesse forze, trasporto
+  MacCormack, pressione e collisioni); la pressione ora si risolve sulla forma della nebbia, con
+  aria aperta oltre le 6 celle.
+- Misurato sulla demo del cocktail (Ryzen 9 9900X, mediana di 3 corse, primo calcolo senza
+  cache): Media 20,9 → 8,0 s (2,6×), Alta 11,4 → 3,7 s (3,1×), Molto alta 60,9 → 14,5 s (4,2×),
+  Ultra 182 → 37 s (4,9×). Stessa massa di nebbia; forma complessiva entro il 3,5–6% (medie a
+  blocchi). Report completo: `reports/2026-11-03_ottimizzazione-simulazione-fumo/REPORT.md`;
+  misura: `cargo run --release -p forge_project --example fog_bench`.
+- **Calcolo in anticipo**: poco dopo l'ultima modifica della nebbia o della scena la nebbia si
+  calcola in sottofondo, così di solito è pronta quando premi Render (il pulsante Render resta
+  libero nel frattempo).
+- **Barra di avanzamento** nella barra in basso, accanto ai campioni: «Nebbia: simulazione 45%»
+  (ostacoli, simulazione, dettaglio). «costruzione BVH» compare ora solo mentre si costruisce
+  davvero la BVH.
+
+**Interruttore AI MCP**
+- Il pulsante nella barra in alto ora è **AI MCP: ON / OFF**, con accanto l'**ingranaggio** che
+  apre le impostazioni dell'integrazione AI (collegare o scollegare Claude Desktop, Claude Code,
+  Codex).
 
 **Laser: riflessi parziali**
 - Nuova opzione **Riflessi parziali** nella scheda del laser (spenta di base): come un laser

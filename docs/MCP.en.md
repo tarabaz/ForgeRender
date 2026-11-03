@@ -14,22 +14,22 @@ everything stays on your computer.
 ## How it works (from version 0.5.0)
 
 - **You open ForgeRender** as usual; it stays open until you close it.
-- **You decide when the AI may control it**: the **"AI control"** button in the top bar. While it
+- **You decide when the AI may control it**: the **"AI MCP"** switch in the top bar (ON/OFF; the gear next to it opens the AI integration settings). While it
   is off (always off at start-up) no assistant can touch the scene.
 - Claude starts a small separate program, **`forgerender-mcp.exe`** (the "bridge"), which sits in
   the same folder as `forgerender.exe` and forwards commands to the open window.
 - While Claude is connected, **"Controlled by AI"** appears next to the button; it disappears when
   Claude disconnects. The window and your work stay: continue by hand or reconnect Claude later
   on the same scene.
-- If ForgeRender is closed or AI control is off, Claude is told to ask you to open ForgeRender and
-  turn on AI control.
+- If ForgeRender is closed or AI MCP is off, Claude is told to ask you to open ForgeRender and
+  turn on AI MCP.
 
 The three states of the top bar:
 
 | State | Bar |
 |---|---|
-| **Off**: no assistant can control ForgeRender (this is how it starts) | ![AI control off](img/mcp/en/barra_spento.png) |
-| **On**: Claude can connect | ![AI control on](img/mcp/en/barra_acceso.png) |
+| **Off**: no assistant can control ForgeRender (this is how it starts) | ![AI MCP off](img/mcp/en/barra_spento.png) |
+| **On**: Claude can connect | ![AI MCP on](img/mcp/en/barra_acceso.png) |
 | **Controlled by AI**: Claude is connected right now | ![Controlled by AI](img/mcp/en/barra_controllato.png) |
 
 When Claude disconnects, "Controlled by AI" disappears and the bar goes back to the "On" state.
@@ -53,9 +53,9 @@ update it in the configuration (or give the drive a fixed letter in Disk Managem
 ## 2. Connect it with one click (from version 0.18.0)
 
 No terminal needed. In ForgeRender: **Tools → AI integration…** (it also opens by itself on the
-first click on "AI control" if no assistant is connected).
+first click on "AI MCP" if no assistant is connected).
 
-- At the top, the state of the **ForgeRender MCP server** (AI control on or off) and the bridge
+- At the top, the state of the **ForgeRender MCP server** (AI MCP on or off) and the bridge
   `forgerender-mcp.exe`, which the program copies by itself to a fixed folder
   (`%LOCALAPPDATA%\ForgeRender\mcp\`): connections stay valid when you update or move ForgeRender.
 - Below, one row per assistant with its state: *Not installed*, *Not configured*, *Needs update*
@@ -71,7 +71,7 @@ first click on "AI control" if no assistant is connected).
 | **Codex** (OpenAI) | Open a new session. |
 | **ChatGPT** | Not supported: ChatGPT only connects remote servers on the internet, not programs on the PC. For OpenAI use Codex. |
 
-On the first successful connection AI control turns on by itself; after that the "AI control"
+On the first successful connection AI MCP turns on by itself; after that the "AI MCP"
 button is a plain on/off switch. The bar shows who is in control: "Controlled by Claude Code" (or
 Claude Desktop, Codex).
 
@@ -95,7 +95,7 @@ claude mcp list
 
 Then open a **new** Claude Code session (sessions already open do not see a newly added
 server). The connection stays up for the whole session: Claude carries out one request after
-another. Only the "AI control" button decides whether commands reach ForgeRender.
+another. Only the "AI MCP" button decides whether commands reach ForgeRender.
 
 **New version in another folder** (for example a portable `ForgeRender-0.9.0-…`): the
 registered path still points to the old one. Remove it and register the new one:
@@ -142,16 +142,16 @@ Then restart Claude Desktop.
 ## 4. Use
 
 1. Open ForgeRender (double-click, as usual).
-2. Click **"AI control"** in the top bar: it turns orange.
+2. Click **"AI MCP"** in the top bar: it turns orange.
 3. Tell Claude what you want. At the first command **"Controlled by AI"** appears at the top.
-4. When you are done, turn "AI control" off (or close Claude): ForgeRender stays open.
+4. When you are done, turn "AI MCP" off (or close Claude): ForgeRender stays open.
 
 This is the window while Claude works (here it prepared the studio, added a warm light on the
 right, made the sphere satin steel and started the render):
 
 ![ForgeRender controlled by Claude](img/mcp/en/finestra_comandata.jpg)
 
-1. **AI control** on: you allowed it.
+1. **AI MCP** on: you allowed it.
 2. **Controlled by AI**: Claude is connected now.
 3. The light Claude added appears in the list like the ones you create by hand (you can edit or
    delete it).
@@ -215,7 +215,7 @@ logs (portable: program folder; installed: `%LOCALAPPDATA%\ForgeRender\renders`)
 
 ## 6. Security
 
-- Nobody can control ForgeRender until you turn "AI control" on; turning it off closes the
+- Nobody can control ForgeRender until you turn "AI MCP" on; turning it off closes the
   connections immediately.
 - The bridge ↔ window connection stays on the computer (`127.0.0.1`) and requires a secret key,
   new every time control is turned on, stored in a file in your user folder
@@ -231,14 +231,14 @@ logs (portable: program folder; installed: `%LOCALAPPDATA%\ForgeRender\renders`)
 ## 7. Troubleshooting
 
 - **Claude says "ForgeRender is not connected"** (in Italian): open ForgeRender and turn on
-  "AI control".
+  "AI MCP".
 - **Only the first command works, then Claude says the connection was lost**: the bridge is
   registered through a folder `.mcp.json`. Register it at user level (section 2 or 3), rename the
   `.mcp.json` and open a new session. The bridge never closes by itself: it stays up until
-  Claude closes it, even with "AI control" off or ForgeRender closed.
+  Claude closes it, even with "AI MCP" off or ForgeRender closed.
 - **"ForgeRender does not respond: the window is minimised…"**: commands run like clicks, at each
   window update. Keep the window open (not minimised) and without dialogs in front.
-- **Bridge test without Claude**: with ForgeRender open and "AI control" on, in PowerShell (with
+- **Bridge test without Claude**: with ForgeRender open and "AI MCP" on, in PowerShell (with
   `$bridge` set as above):
 
   ```powershell
@@ -246,7 +246,7 @@ logs (portable: program folder; installed: `%LOCALAPPDATA%\ForgeRender\renders`)
   ```
 
   It works if two JSON lines appear and the second describes the scene (accented letters may look
-  garbled in PowerShell; Claude reads them correctly). With "AI control" off the second line asks
+  garbled in PowerShell; Claude reads them correctly). With "AI MCP" off the second line asks
   to turn it on.
 - **Slow renders**: for tests ask for few samples (32–64) and low resolution; for the final image
   use the GPU (`set_render_settings` with device gpu).

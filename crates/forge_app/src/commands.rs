@@ -384,7 +384,7 @@ pub fn spec(cmd: Cmd) -> Spec {
         ),
         Cmd::AiControl => s(
             "tools.ai_control",
-            tk("Controllo IA"),
+            tk("AI MCP"),
             icons::AI,
             None,
             tk("Permette a Claude di comandare questa finestra (tramite forgerender-mcp)"),

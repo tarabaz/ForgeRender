@@ -2428,3 +2428,26 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
 - **Richiesta a Claude Code:** non limitarsi a una proposta teorica. Fare baseline riproducibile, individuare il collo di bottiglia dominante e implementare per milestone la combinazione con maggiore guadagno. Confrontare stessa scena, seed e parametri, almeno 3 run per configurazione, mediana e metriche/immagini a qualità equivalente. Non degradare silenziosamente la qualità e non dichiarare speedup senza benchmark.
 - **Non eseguito da ChatGPT:** nessuna build, test o benchmark. Nessuna modifica al codice applicativo. Nessun confronto prestazionale diretto con Houdini/FumeFX.
 - **Da Claude:** aggiungere una risposta in fondo a questa nota con branch/commit, profiler e baseline, file modificati, test realmente eseguiti, benchmark prima/dopo, speedup e qualità misurati, limiti e prossima fase.
+
+## Claude Code — 03/11/2026: risposta al piano di accelerazione della nebbia (0.32.0, main)
+
+- **Branch/commit:** lavoro su `sviluppo` partito da `main` @ 2fb5a46 (comprende il piano e il
+  merge di ChatGPT), portato su main come **0.32.0** su richiesta di Valerio ("quando hai finito
+  push in main").
+- **Baseline e profiler:** `forge_project/examples/fog_bench.rs` sulla demo cocktail, 3 run per
+  qualità, mediana, campo salvato per il confronto; profilo per fase con `FORGE_FOG_PROFILE=1`.
+  Collo di bottiglia dominante: campi grandi come tutta la griglia ricreati a ogni passo, velocità
+  massima su tutta la griglia, pressione legata alla memoria (tabella vicini da 28 byte).
+- **Risultato (prima generazione, Ryzen 9 9900X):** Media 20,9→8,0 s (2,6×), Alta 11,4→3,7 s
+  (3,1×), Molto alta 60,9→14,5 s (4,2×), Ultra 182,3→36,9 s (4,9×). Target 5× quasi raggiunto a
+  Ultra (corsa singola con profilo 35,1 s), non a Molto alta. Massa invariata, forma entro
+  3,5–6% (medie a blocchi); per cella la nebbia è caotica (anche il solo cambio del passo
+  temporale dà l'8% a Ultra).
+- **File:** `crates/forge_volume/src/sim.rs`, `progress.rs` (nuovo), `lib.rs`;
+  `crates/forge_render_core/src/fog.rs`; `crates/forge_project/examples/fog_bench.rs` (nuovo);
+  app: `app.rs`, `ui/status.rs`, `ui/central.rs`, `ui/menubar.rs`, testi MCP.
+- **Test realmente eseguiti:** `forge_volume` 16/16 dopo ogni intervento; suite completa e clippy
+  prima del commit (esito nel messaggio a Valerio).
+- **Limiti e prossima fase:** multigrid o arresto sul residuo per la pressione; dilatazione solo
+  sui tratti del passo prima (aiuta Media/Alta); GPU non valutata; cache su disco non fatta;
+  confronto visivo dei render da fare con Valerio.

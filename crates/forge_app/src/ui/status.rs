@@ -68,10 +68,42 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             ))
             .on_hover_text(tr("Campionamento adattivo: le zone già pulite non ricevono più campioni"));
         }
-        if app.is_preparing() {
-            ui.spinner();
-            ui.label(tr("costruzione BVH…"));
-        }
+        // A destra: i calcoli che servono prima del render (BVH, nebbia), con il loro avanzamento.
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if app.is_baking_fog() {
+                use forge_render_core::fog::progress::{self, Phase};
+                let hint = tr("Calcolo della nebbia prima del render: parte da solo poco dopo l'ultima modifica, \
+                     così quando avvii il render la trovi già pronta. Puoi continuare a lavorare.");
+                match progress::get() {
+                    Some(p) => {
+                        let phase = match p.phase {
+                            Phase::Obstacles => tr("ostacoli"),
+                            Phase::Simulation => tr("simulazione"),
+                            Phase::Detail => tr("dettaglio"),
+                        };
+                        let pct = format!("{:.0}", p.fraction * 100.0);
+                        let text = if p.fogs > 1 {
+                            tf(
+                                "Nebbia {} di {}: {} {}%",
+                                &[p.fog.to_string(), p.fogs.to_string(), phase.to_string(), pct],
+                            )
+                        } else {
+                            tf("Nebbia: {} {}%", &[phase.to_string(), pct])
+                        };
+                        ui.add(egui::ProgressBar::new(p.fraction).desired_width(240.0).text(text))
+                            .on_hover_text(hint);
+                    }
+                    None => {
+                        ui.label(tr("Nebbia: calcolo…")).on_hover_text(hint);
+                        ui.spinner();
+                    }
+                }
+            }
+            if app.is_building_bvh() {
+                ui.label(tr("costruzione BVH…"));
+                ui.spinner();
+            }
+        });
     });
     egui::Grid::new("stats").num_columns(6).spacing([18.0, 2.0]).show(ui, |ui| {
         ui.label(tf("Tempo: {}", &[fmt_dur(p.elapsed).to_string()]));

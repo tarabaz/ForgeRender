@@ -15,6 +15,7 @@
 
 pub mod grid;
 pub mod noise;
+pub mod progress;
 pub mod sim;
 
 use forge_math::Vec3;
@@ -355,6 +356,7 @@ pub fn bake_detail(fog: &FogVolume, sim_state: &SimState, solid: Option<SolidFn>
     };
 
     let t1 = std::time::Instant::now();
+    crate::progress::set(crate::progress::Phase::Detail, 0.0);
     let spec = grid_specs(&f, ground).1;
     let fine_solid = solid_for(&spec);
     // Dettaglio sotto la risoluzione della simulazione:

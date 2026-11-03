@@ -139,7 +139,7 @@ pub struct StartupOptions {
     pub mesh: bool,
     /// Finestra "Integrazione AI" aperta all'avvio (`--integrazione-ai`).
     pub ai_setup: bool,
-    /// "Controllo IA" acceso all'avvio (`--controllo-ia`, prove automatiche).
+    /// "AI MCP" acceso all'avvio (`--controllo-ia`, prove automatiche).
     pub mcp: bool,
     /// Esegue "Prepara scena prodotto" all'avvio con l'aspetto indicato (test e screenshot).
     pub prepare: Option<crate::presets::Look>,
@@ -261,6 +261,12 @@ pub struct ForgeApp {
     pending_geometry: Option<PendingGeometry>,
     /// Calcolo delle nebbie in corso (in background); al termine parte il render.
     pending_fog: Option<Receiver<()>>,
+    /// Il render aspetta la nebbia in calcolo (altrimenti è un calcolo in anticipo).
+    fog_then_render: bool,
+    /// Calcolo in anticipo: impronta delle nebbie e della geometria con l'ora dell'ultimo cambio,
+    /// e l'ultima impronta già controllata.
+    fog_watch: Option<(String, std::time::Instant)>,
+    fog_checked: Option<String>,
     job: Option<JobInfo>,
     pub session: RenderSession,
 
@@ -345,7 +351,7 @@ pub struct ForgeApp {
     screenshot_requested: bool,
     screenshot_done: Arc<std::sync::atomic::AtomicBool>,
     pub(crate) frames: u64,
-    /// "Controllo IA" acceso: Claude può comandare la finestra (`docs/MCP.md`).
+    /// "AI MCP" acceso: Claude può comandare la finestra (`docs/MCP.md`).
     pub mcp: Option<crate::mcp::Server>,
     /// Modalità Semplice: la GPU è già stata proposta come dispositivo predefinito (una volta
     /// sola, poi vale la scelta dell'utente).
@@ -411,6 +417,9 @@ impl ForgeApp {
             geometry: None,
             pending_geometry: None,
             pending_fog: None,
+            fog_then_render: false,
+            fog_watch: None,
+            fog_checked: None,
             job: None,
             session: RenderSession::new(),
             viewport,
@@ -1258,8 +1267,64 @@ impl ForgeApp {
         self.pending_geometry = Some(PendingGeometry { rev, rx, then_render });
     }
 
+    /// Il render aspetta qualcosa (la BVH, o la nebbia se il render l'ha chiesta): un calcolo
+    /// della nebbia in anticipo non blocca niente.
     pub fn is_preparing(&self) -> bool {
-        self.pending_geometry.is_some() || self.pending_fog.is_some()
+        self.pending_geometry.is_some() || (self.pending_fog.is_some() && self.fog_then_render)
+    }
+
+    /// Costruzione della BVH in corso (per l'indicazione nell'interfaccia).
+    pub fn is_building_bvh(&self) -> bool {
+        self.pending_geometry.is_some()
+    }
+
+    /// Nebbie calcolate in anticipo: poco dopo l'ultima modifica della nebbia o della scena il
+    /// calcolo parte da solo in sottofondo, così all'avvio del render è già pronto. Si aspetta
+    /// che non cambi niente per un attimo, per non ricominciare a ogni movimento di un cursore.
+    fn precompute_fog(&mut self) {
+        if self.pending_fog.is_some() || !self.scene.fogs.iter().any(|f| f.enabled) {
+            return;
+        }
+        let fp = format!("{:?}|{}", self.scene.fogs, self.geometry_rev);
+        match &self.fog_watch {
+            Some((f, t)) if *f == fp => {
+                if t.elapsed() < std::time::Duration::from_millis(800) {
+                    return;
+                }
+            }
+            _ => {
+                self.fog_watch = Some((fp, std::time::Instant::now()));
+                return;
+            }
+        }
+        if self.fog_checked.as_deref() == Some(fp.as_str()) {
+            return;
+        }
+        let Some(geometry) = self.current_geometry() else {
+            // La nebbia ha bisogno della geometria (collisioni): la si prepara in sottofondo.
+            if self.pending_geometry.is_none() {
+                self.request_geometry(false);
+            }
+            return;
+        };
+        self.fog_checked = Some(fp);
+        if !forge_render_core::fog::fogs_ready(&self.scene, &geometry) {
+            self.spawn_fog_bake(geometry);
+        }
+    }
+
+    /// Calcola le nebbie della scena su un thread a sé.
+    fn spawn_fog_bake(&mut self, geometry: Arc<RenderGeometry>) {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let scene = self.scene.clone();
+        std::thread::Builder::new()
+            .name("forge-fog".into())
+            .spawn(move || {
+                forge_render_core::fog::bake_fogs(&scene, &geometry);
+                let _ = tx.send(());
+            })
+            .expect("thread della nebbia");
+        self.pending_fog = Some(rx);
     }
 
     /// Nebbie in calcolo (per l'indicazione nell'interfaccia).
@@ -1272,11 +1337,16 @@ impl ForgeApp {
         match rx.try_recv() {
             Ok(()) => {
                 self.pending_fog = None;
-                self.start_render();
+                // Calcolo in anticipo: il render parte solo se era stato chiesto (la scena può
+                // essere cambiata nel frattempo: start_render ricontrolla).
+                if std::mem::take(&mut self.fog_then_render) {
+                    self.start_render();
+                }
             }
             Err(std::sync::mpsc::TryRecvError::Empty) => {}
             Err(_) => {
                 self.pending_fog = None;
+                self.fog_then_render = false;
                 self.error = Some(tr("calcolo della nebbia fallito").into());
             }
         }
@@ -1312,20 +1382,15 @@ impl ForgeApp {
             return;
         };
         // Nebbie da calcolare: in background, poi si riparte da qui (le trova in cache).
+        // Se è già in calcolo (anche in anticipo) si aspetta quello.
+        if self.pending_fog.is_some() {
+            self.fog_then_render = true;
+            self.view = View::Render;
+            return;
+        }
         if !forge_render_core::fog::fogs_ready(&self.scene, &geometry) {
-            if self.pending_fog.is_none() {
-                let (tx, rx) = std::sync::mpsc::channel();
-                let scene = self.scene.clone();
-                let geo = geometry.clone();
-                std::thread::Builder::new()
-                    .name("forge-fog".into())
-                    .spawn(move || {
-                        forge_render_core::fog::bake_fogs(&scene, &geo);
-                        let _ = tx.send(());
-                    })
-                    .expect("thread della nebbia");
-                self.pending_fog = Some(rx);
-            }
+            self.spawn_fog_bake(geometry);
+            self.fog_then_render = true;
             self.view = View::Render;
             return;
         }
@@ -2351,6 +2416,7 @@ impl ForgeApp {
         self.frames += 1;
         self.poll_geometry();
         self.poll_fog();
+        self.precompute_fog();
         self.poll_pending();
         self.apply_startup_select();
         if let Some(rx) = &self.gpu_warmup {
@@ -2373,6 +2439,9 @@ impl ForgeApp {
         let state = self.render_state();
         if state == SessionState::Rendering
             || self.is_preparing()
+            || self.pending_fog.is_some()
+            // Calcolo della nebbia in anticipo in attesa di partire.
+            || self.fog_watch.as_ref().is_some_and(|(f, _)| self.fog_checked.as_deref() != Some(f.as_str()))
             || self.pending.is_some()
             || self.sequence_running()
             || self.sequence.passes_job.is_some()

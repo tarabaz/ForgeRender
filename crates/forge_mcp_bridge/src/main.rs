@@ -2,7 +2,7 @@
 //!
 //! Non apre ForgeRender e non contiene il renderer: risponde da solo a inizializzazione ed
 //! elenco degli strumenti, e inoltra ogni comando alla finestra di ForgeRender che l'utente ha
-//! aperto con "Controllo IA" acceso. Quando Claude chiude il ponte, la finestra resta aperta.
+//! aperto con "AI MCP" acceso. Quando Claude chiude il ponte, la finestra resta aperta.
 //! Se la finestra non c'è, i comandi rispondono con un errore che spiega cosa fare.
 //!
 //! All'inizializzazione il ponte si presenta subito alla finestra (se il controllo è acceso)

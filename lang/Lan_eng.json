@@ -378,7 +378,7 @@
     "Connesso": "Connected",
     "Controlla di nuovo": "Check again",
     "Controllato da {}": "Controlled by {}",
-    "Controllo IA: quando è spento nessun assistente può toccare la scena": "AI control: when it is off no assistant can touch the scene",
+    "AI MCP: quando è spento nessun assistente può toccare la scena": "AI MCP: when it is off no assistant can touch the scene",
     "Da aggiornare": "Needs update",
     "File illeggibile": "Unreadable file",
     "Integrazione AI": "AI integration",
@@ -393,7 +393,7 @@
     "Permette agli assistenti AI di controllare ForgeRender": "Lets AI assistants control ForgeRender",
     "Ponte non installato: {}": "Bridge not installed: {}",
     "Ponte: {}": "Bridge: {}",
-    "Prima collega l'assistente che vuoi usare: un clic, poi il Controllo IA si accende da solo.": "First connect the assistant you want to use: one click, then AI control turns on by itself.",
+    "Prima collega l'assistente che vuoi usare: un clic, poi AI MCP si accende da solo.": "First connect the assistant you want to use: one click, then AI MCP turns on by itself.",
     "Registrato con un ponte di un'altra cartella (versione vecchia): premi Aggiorna": "Registered with a bridge in another folder (old version): press Update",
     "Riavvia Claude Desktop": "Restart Claude Desktop",
     "Riavvia ora": "Restart now",
@@ -1007,7 +1007,7 @@
     "Emettitore a 20–40 cm da terra (la bocca della macchina): tappeto basso e compatto che copre il pavimento.": "Emitter 20–40 cm above the ground (the machine nozzle): low, compact carpet covering the floor.",
     "Molto alta": "Very high",
     "Ultra": "Ultra",
-    "Controllo IA": "AI control",
+    "AI MCP": "AI MCP",
     "Controllato da IA": "Controlled by AI",
     "Acceso: Claude può comandare questa finestra (tramite forgerender-mcp). Clic per spegnere.": "On: Claude can control this window (through forgerender-mcp). Click to turn off.",
     "Spento: nessun assistente può comandare ForgeRender. Clic per permettere a Claude di collegarsi.": "Off: no assistant can control ForgeRender. Click to let Claude connect.",
@@ -1261,6 +1261,15 @@
     "Render: Colore Spettrale, Caustiche attive, Rimbalzi massimi 25": "Render: Colour Spectral, Caustics on, Max bounces 25",
     "Riflessi parziali": "Partial reflections",
     "Rifrazione nelle lenti: fasci che convergono, si incrociano e divergono": "Refraction in the lenses: beams that converge, cross and diverge",
-    "Tre laser su un banco ottico, due bianchi da laboratorio e uno viola UV, attraversano una fila di lenti: i fasci si piegano, si incrociano nel fuoco e si riaprono verso lo schermo. I bianchi a ogni lente si aprono un po' di più in un ventaglio di colori; il viola, di un solo colore, resta una linea.": "Three lasers on an optical bench, two white lab lasers and one UV violet, go through a row of lenses: the beams bend, cross at the focus and open again towards the screen. At every lens the white ones open a little more into a fan of colours; the violet one, a single colour, stays a line."
+    "Tre laser su un banco ottico, due bianchi da laboratorio e uno viola UV, attraversano una fila di lenti: i fasci si piegano, si incrociano nel fuoco e si riaprono verso lo schermo. I bianchi a ogni lente si aprono un po' di più in un ventaglio di colori; il viola, di un solo colore, resta una linea.": "Three lasers on an optical bench, two white lab lasers and one UV violet, go through a row of lenses: the beams bend, cross at the focus and open again towards the screen. At every lens the white ones open a little more into a fan of colours; the violet one, a single colour, stays a line.",
+    "Calcolo della nebbia prima del render: parte da solo poco dopo l'ultima modifica, così quando avvii il render la trovi già pronta. Puoi continuare a lavorare.": "Fog computation before the render: it starts by itself shortly after the last change, so the fog is already ready when you start the render. You can keep working.",
+    "Calcolo della nebbia{}: il render parte appena è pronta": "Computing the fog{}: the render starts as soon as it is ready",
+    "Impostazioni dell'integrazione AI: collega o scollega Claude Desktop, Claude Code e Codex": "AI integration settings: connect or disconnect Claude Desktop, Claude Code and Codex",
+    "Nebbia {} di {}: {} {}%": "Fog {} of {}: {} {}%",
+    "Nebbia: calcolo…": "Fog: computing…",
+    "Nebbia: {} {}%": "Fog: {} {}%",
+    "dettaglio": "detail",
+    "ostacoli": "obstacles",
+    "simulazione": "simulation"
   }
 }
