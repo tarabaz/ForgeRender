@@ -2373,3 +2373,12 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
   (`LASER_PATH_WORDS` 964, `laser_spot_base`, `laser_seg`). Test `partial_reflections_split_the_beam`
   e variante in `gpu_laser_matches_cpu`.
 - Demo "Lenti convergenti e divergenti": pacchetto di Valerio in `samples/scene/lenti/lenti.frpack`.
+
+
+## ChatGPT — 03/11/2026: documentazione RGB, Spettrale e caustiche (branch `sviluppo`)
+
+- Su richiesta di Valerio, aggiornata la documentazione per spiegare le quattro combinazioni tra modalità luce RGB/Spettrale e Caustiche ON/OFF, con tabella comparativa e indicazioni pratiche.
+- Aggiornati `README.md`, `README.it.md`, `docs/SPECTRAL.md` e `docs/SPECTRAL.it.md`.
+- Chiarito che la modalità spettrale rende visibili gli effetti dipendenti dalla lunghezza d'onda; la separazione cromatica richiede un materiale trasparente con dispersione non nulla. Le caustiche sono un'opzione indipendente basata su photon mapping progressivo e funzionano con luci puntiformi, spot, direzionali e ad area.
+- Modifiche documentali, nessun codice di rendering modificato. Nessun test o build eseguiti.
+- Commit documentazione: `fec87b7b9070459732d810d11fe5db82d8524225` (ultimo dei quattro aggiornamenti).
