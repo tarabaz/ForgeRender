@@ -2382,3 +2382,13 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
 - Chiarito che la modalità spettrale rende visibili gli effetti dipendenti dalla lunghezza d'onda; la separazione cromatica richiede un materiale trasparente con dispersione non nulla. Le caustiche sono un'opzione indipendente basata su photon mapping progressivo e funzionano con luci puntiformi, spot, direzionali e ad area.
 - Modifiche documentali, nessun codice di rendering modificato. Nessun test o build eseguiti.
 - Commit documentazione: `fec87b7b9070459732d810d11fe5db82d8524225` (ultimo dei quattro aggiornamenti).
+
+
+## ChatGPT — 03/11/2026: galleria funzionalità nei README (branch `sviluppo`)
+
+- Su richiesta di Valerio, riorganizzata la parte introduttiva dei README: intro, download, What's new / Novità, quindi galleria delle funzionalità prima della sezione tecnica estesa.
+- Aggiunte sezioni individuali in `README.md` (inglese) e `README.it.md` (italiano): trasporto luce RGB/Spectral + caustiche, materiali PBR e texture CAD, studio fotografico, illuminazione volumetrica, camera e viste prodotto, workflow IA/MCP, render pass.
+- Riutilizzate immagini già presenti nel repository per materiali, studio, fascio volumetrico, viste prodotto e MCP.
+- **Asset da completare:** la galleria RGB/Spectral punta a `docs/img/features/rgb-spectral-caustics.jpg`, ma l'immagine originale fornita nella chat non è stata caricata nel repository perché il connettore GitHub disponibile non espone un trasferimento binario da file locale. Non considerare completata la demo finché questo asset non viene aggiunto e verificato; evitare di sostituirlo con immagini generiche.
+- README aggiornati: `README.md` commit `2dfb51294663b528824b374b93ffe80444683bb0`; `README.it.md` commit `3bb43c8ebd24c2512ed562e16e18d3d5dbe78bb5` (poi README inglese corretto con commit `2dfb51294663b528824b374b93ffe80444683bb0`).
+- Nessun codice applicativo modificato; nessun test/build eseguito. Modifiche non portate su `main`.
