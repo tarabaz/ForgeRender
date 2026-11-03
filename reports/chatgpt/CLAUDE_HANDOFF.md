@@ -2400,3 +2400,12 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
 - Aggiunta la schermata reale del controllo IA `docs/img/features/ai-scene-control.jpg` e la scena del banco ottico `docs/img/features/laser-optics-lenses.png`.
 - La sezione laser documenta i preset rosso, verde, blu, viola UV (405 nm) e bianco da laboratorio; il tracciamento deterministico, i fasci visibili in vetri e liquidi, le riflessioni parziali, la dispersione con luce bianca/materiali dispersivi e la demo con lenti convergenti e divergenti.
 - Aggiornati soltanto README e documentazione di handoff; nessun codice applicativo modificato. Nessun test o build eseguito.
+
+
+## ChatGPT — 03/11/2026: sezione nebbia da ghiaccio secco nei README (main)
+
+- Su richiesta di Valerio, aggiunta la sezione 4 sulla nebbia da ghiaccio secco in README.md e README.it.md; rinumerate le sezioni successive (PBR ora al punto 5).
+- Descritti simulazione fluida MAC 3D, velocità/pressione, gravità e risalita, curl noise, confinamento della vorticità, advezione MacCormack limitata, collisioni con geometria voxelizzata, volume di densità e rendering con delta tracking/Henyey–Greenstein.
+- Precisato che si tratta di un'approssimazione fluidodinamica ispirata alla fisica, non di CFD termodinamica della sublimazione CO2/trasferimento di calore. Collegata la demo cocktail e le istruzioni.
+- Nome concordato per l'immagine: docs/img/features/dry-ice-fog-simulation.jpg. Il file immagine non è stato verificato nel repository in questo aggiornamento e resta da caricare.
+- Modifiche documentali soltanto; nessun build o test eseguito.
