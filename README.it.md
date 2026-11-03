@@ -78,6 +78,26 @@ Per le note tecniche complete consulta [CHANGELOG.md](CHANGELOG.md) (in italiano
 > Vedi [docs/ROADMAP.it.md](docs/ROADMAP.it.md) per cosa funziona davvero oggi, cosa viene dopo
 > e quanto è complesso ogni passo.
 
+## Trasporto della luce e caustiche: RGB o Spettrale
+
+ForgeRender permette di scegliere come rappresentare la luce in **Render → Colore** e, separatamente, di attivare le **Caustiche** nelle impostazioni di rendering. I due controlli lavorano insieme: il primo sceglie il modello di trasporto della luce, il secondo aggiunge i percorsi luminosi difficili da trovare che generano disegni concentrati attraverso gli oggetti trasparenti.
+
+| Modalità luce | Caustiche OFF | Caustiche ON |
+|---|---|---|
+| **RGB** | Path tracing tradizionale a tre canali (rosso, verde e blu). Gli oggetti trasparenti rifrangono e riflettono la luce, ma il passaggio dedicato dei fotoni per le caustiche è disattivato. | Aggiunge i disegni di luce concentrata prodotti dal passaggio attraverso vetri lisci, cristalli e gemme. Funziona con luci puntiformi, spot, direzionali e ad area. Il risultato resta RGB: non calcola la separazione cromatica dipendente dalla lunghezza d'onda. |
+| **Spettrale** | Traccia la luce a lunghezze d'onda campionate. I vetri dispersivi possono separare i colori: prismi e gemme possono quindi produrre una separazione cromatica legata alla fisica della rifrazione. | Unisce il trasporto spettrale al photon mapping delle caustiche: i disegni luminosi concentrati possono separarsi in frange colorate e arcobaleni, perché le diverse lunghezze d'onda vengono rifratte in modo differente. |
+
+**Cosa cambia concretamente**
+- Scegli **RGB** per il rendering generale più veloce. Scegli **Spettrale** per vetri, cristalli, pietre preziose, prismi e interazioni con luci sature in cui conta il comportamento dipendente dalla lunghezza d'onda. Nella misura documentata su RTX 5070 lo spettrale richiede circa il doppio del tempo e, in generale, più campioni per ridurre il rumore cromatico.
+- Attiva **Caustiche** quando vuoi vedere i disegni luminosi concentrati che gli oggetti trasparenti e lisci proiettano sulle superfici vicine. Se è disattivato, questi disegni dedicati non vengono calcolati con il photon mapping.
+- Per ottenere una separazione cromatica spettrale visibile, usa un materiale trasparente con **Dispersione** diversa da zero (numero di Abbe). Più il numero di Abbe è basso, più la separazione è forte. La modalità RGB ignora la dispersione di Abbe.
+- Le caustiche sono calcolate con il photon mapping progressivo. I fotoni partono dalle luci, attraversano le superfici trasparenti lisce seguendo riflessione, rifrazione e assorbimento, poi vengono raccolti sulla prima superficie non speculare. Il raggio di raccolta si restringe a ogni passata, rendendo il disegno sempre più definito durante la convergenza del render.
+- Le caustiche funzionano con luci puntiformi, spot, direzionali (sole) e ad area, sia su CPU sia su GPU. Nel rendering GPU i percorsi dei fotoni vengono costruiti dalla CPU e raccolti dallo shader GPU.
+
+Le quattro combinazioni sono impostazioni indipendenti, non quattro motori di rendering diversi. L'immagine comparativa mostra la stessa scena del cristallo con RGB/Spettrale e caustiche disattivate/attivate; l'effetto arcobaleno dipende dalla modalità spettrale e da un materiale trasparente dispersivo.
+
+Per i dettagli su implementazione, campionamento, dispersione e verifiche, consulta [Rendering spettrale](docs/SPECTRAL.it.md) (italiano) e [Spectral rendering](docs/SPECTRAL.md) (inglese).
+
 ## Cosa fa oggi
 
 - **Interfaccia Semplice / Avanzata** (selettore in alto, predefinita Semplice): "Foto prodotto in
