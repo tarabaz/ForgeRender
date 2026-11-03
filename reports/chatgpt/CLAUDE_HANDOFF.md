@@ -2392,3 +2392,11 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
 - **Asset da completare:** la galleria RGB/Spectral punta a `docs/img/features/rgb-spectral-caustics.jpg`, ma l'immagine originale fornita nella chat non è stata caricata nel repository perché il connettore GitHub disponibile non espone un trasferimento binario da file locale. Non considerare completata la demo finché questo asset non viene aggiunto e verificato; evitare di sostituirlo con immagini generiche.
 - README aggiornati: `README.md` commit `2dfb51294663b528824b374b93ffe80444683bb0`; `README.it.md` commit `3bb43c8ebd24c2512ed562e16e18d3d5dbe78bb5` (poi README inglese corretto con commit `2dfb51294663b528824b374b93ffe80444683bb0`).
 - Nessun codice applicativo modificato; nessun test/build eseguito. Modifiche non portate su `main`.
+
+
+## ChatGPT — 03/11/2026: galleria README aggiornata con IA e ottica laser (main)
+
+- Su richiesta di Valerio, riordinata la galleria delle funzionalità nei README inglese e italiano: RGB/Spectral e caustiche al punto 1, controllo IA/MCP al punto 2, ottica laser al punto 3; le altre sezioni seguono con numerazione aggiornata.
+- Aggiunta la schermata reale del controllo IA `docs/img/features/ai-scene-control.jpg` e la scena del banco ottico `docs/img/features/laser-optics-lenses.png`.
+- La sezione laser documenta i preset rosso, verde, blu, viola UV (405 nm) e bianco da laboratorio; il tracciamento deterministico, i fasci visibili in vetri e liquidi, le riflessioni parziali, la dispersione con luce bianca/materiali dispersivi e la demo con lenti convergenti e divergenti.
+- Aggiornati soltanto README e documentazione di handoff; nessun codice applicativo modificato. Nessun test o build eseguito.
