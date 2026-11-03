@@ -123,7 +123,7 @@ This is a physically motivated fluid approximation for dry-ice-style effects, no
 
 [Open the cocktail with dry-ice demo scene](samples/scene/cocktail-ghiaccio-secco/cocktail-ghiaccio-secco.frproject) · [Demo instructions and controls](samples/scene/cocktail-ghiaccio-secco/LEGGIMI.md).
 
-### 9. PBR materials and textures for CAD models
+### 5. PBR materials and textures for CAD models
 
 ![ForgeRender material and texture examples](docs/img/mcp/esempi/materiali.jpg)
 
