@@ -143,6 +143,8 @@ Tiny real specks (sub-millimetre, up to 150,000) scattered in the air, as their 
 
 ### 7. Decals — labels and logos on any surface
 
+![ForgeRender logo applied as a decal on a glass sphere and a red cube](docs/img/effetti/adesivi.webp)
+
 Apply an image (a logo, a label, a PNG with transparency) to the selected object where the camera is looking. The decal is cut from the object's own triangles inside a projection box, so it wraps curved surfaces such as bottles and cups, and it moves with the object. The transparent parts of the PNG let the object show through. Width (the height follows the image proportions), rotation, position on the surface, projection depth, roughness and metalness are adjustable, and the image travels with the project and inside `.frpack` packages.
 
 ### 8. PBR materials and textures for CAD models

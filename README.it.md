@@ -154,6 +154,8 @@ Granelli veri minuscoli (sotto il millimetro, fino a 150 000) sparsi nell'aria, 
 
 ### 7. Adesivi (decal) — etichette e loghi su qualsiasi superficie
 
+![Logo di ForgeRender applicato come adesivo su una sfera di vetro e su un cubo rosso](docs/img/effetti/adesivi.webp)
+
 Applica un'immagine (un logo, un'etichetta, un PNG con trasparenza) sull'oggetto selezionato, nel punto che la camera sta guardando. L'adesivo si ricava dai triangoli dell'oggetto dentro una scatola di proiezione, quindi segue le superfici curve come bottiglie e tazze, e si sposta con l'oggetto. Le parti trasparenti del PNG lasciano vedere l'oggetto. Si regolano larghezza (l'altezza segue le proporzioni dell'immagine), rotazione, posizione sulla superficie, profondità della proiezione, ruvidità e metallicità; l'immagine viaggia con il progetto e dentro i pacchetti `.frpack`.
 
 ### 8. Materiali PBR e texture per modelli CAD
