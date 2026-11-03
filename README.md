@@ -78,26 +78,7 @@ For the full technical notes, see [CHANGELOG.en.md](CHANGELOG.en.md) (Italian, a
 > See [docs/ROADMAP.md](docs/ROADMAP.md) for what really works today, what comes next and
 > how complex each next step is.
 
-## Light transport and caustics: RGB or Spectral
-
-ForgeRender lets you choose how light is represented in **Render → Colour** and independently enable **Caustics** in the Render settings. These two controls work together: one chooses the light-transport model, the other adds the difficult light paths that create focused patterns through transparent objects.
-
-| Light mode | Caustics OFF | Caustics ON |
-|---|---|---|
-| **RGB** | Standard three-channel path tracing (red, green and blue). Transparent objects refract and reflect light, but the dedicated caustic photon pass is disabled. | Adds focused light patterns produced when light passes through smooth glass, crystals and gems. It works with point, spot, directional and area lights. The result is RGB; it does not resolve wavelength-dependent colour separation. |
-| **Spectral** | Tracks light at sampled wavelengths. Dispersive glass can separate colours, so prisms and gems can produce physically motivated colour separation. | Combines wavelength-dependent transport with caustic photon mapping: focused caustic patterns can split into coloured fringes and rainbows as different wavelengths refract by different amounts. |
-
-**What changes in practice**
-- Choose **RGB** for the fastest general-purpose rendering. Choose **Spectral** for glass, crystal, gemstones, prisms and saturated-light interactions where wavelength-dependent behaviour matters. Spectral rendering is roughly twice as slow in the documented RTX 5070 measurement and generally needs more samples to clean up colour noise.
-- Turn **Caustics** on when you want the concentrated light patterns cast by transparent, smooth objects onto nearby surfaces. With it off, those dedicated photon-mapped patterns are not calculated.
-- For visible spectral separation, use a transparent material with a non-zero **Dispersion** value (Abbe number). A lower Abbe number means stronger separation. RGB mode ignores the Abbe dispersion setting.
-- Caustics are calculated with progressive photon mapping. Photons leave the lights, travel through smooth transparent surfaces using reflection/refraction and absorption, then gather on the first non-specular surface. The gathering radius shrinks over successive passes, sharpening the pattern as the render converges.
-- Caustics work with point, spot, directional (sun) and area lights, on CPU and GPU. In GPU rendering, photon paths are built on the CPU and gathered by the GPU shader.
-
-The four combinations are independent settings, not four different render engines. The comparison below illustrates the same crystal scene with RGB/Spectral and caustics off/on; the visible rainbow effect depends on spectral mode and a dispersive transparent material.
-
-For the implementation, sampling model, dispersion and validation details, see [Spectral rendering](docs/SPECTRAL.md) (English) and [Rendering spettrale](docs/SPECTRAL.it.md) (Italian).
-
+:
 ## What it does today
 
 - **Simple / Advanced interface** (switch at the top, Simple by default): "Product photo in
