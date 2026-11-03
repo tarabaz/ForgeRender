@@ -11,6 +11,21 @@ ForgeRender has two light-transport modes, chosen in **Render → Colour**:
 
 Spectral is an option: projects open in RGB unless they were saved in spectral mode. Both CPU and GPU backends support it, and they produce the same result.
 
+## Caustics and the four render combinations
+
+The **Caustics** switch is independent of the RGB/Spectral light mode. It enables progressive photon mapping for light focused by smooth transparent objects; it does not change the wavelength model itself.
+
+| Light mode | Caustics off | Caustics on |
+|---|---|---|
+| **RGB** | Standard three-channel transport. No dedicated photon-mapped caustic contribution. | Focused light patterns from glass, crystals and gems, rendered in RGB without wavelength-dependent colour splitting. |
+| **Spectral** | Wavelength-sampled transport; dispersive materials can separate colours in refraction. | Wavelength-sampled caustics: the focused patterns can show coloured fringes and rainbows because the refractive index varies with wavelength. |
+
+Caustic photons are emitted from point, spot, directional and area lights. They travel through smooth glass using Fresnel reflection/refraction, Snell's law, total internal reflection, tint and Beer–Lambert absorption, then are gathered at the first non-specular surface. Progressive photon mapping (Knaus–Zwicker) shrinks the gathering radius over successive passes. The camera path tracer excludes the corresponding glass-to-light paths at that vertex to avoid double counting.
+
+The feature is supported by both CPU and GPU. In the GPU backend, photon paths are currently built on the CPU and gathered by the GPU shader. In Spectral mode each photon carries a wavelength, so dispersive glass can spread the caustic into a spectrum. In RGB mode the caustic remains a three-channel result.
+
+To see spectral colour separation, use a transparent material with a non-zero **Dispersion** (Abbe number). A lower Abbe number produces stronger dispersion. RGB mode ignores the Abbe value.
+
 ## Dispersion
 
 Transparent materials have a **Dispersion** setting (Abbe number V, 0 = none). Lower V = colours spread further apart. Presets: crown glass BK7 (V 64.2, IOR 1.517), flint (36.4, 1.62), lead crystal (30, 1.7), polycarbonate (30, 1.586), diamond (55, 2.417). The index of refraction follows Cauchy's equation n(λ) = A + B/λ², derived from the IOR at the d line (587.6 nm) and V. Dispersion is visible only in spectral mode.
