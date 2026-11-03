@@ -1306,7 +1306,7 @@ impl ForgeApp {
             }
             return;
         }
-        if !self.scene.fogs.iter().any(|f| f.enabled) {
+        if !self.scene.fogs.iter().any(|f| f.enabled) && !forge_render_core::fog::haze_on(&self.scene) {
             return;
         }
         match &self.fog_watch {
@@ -1337,7 +1337,16 @@ impl ForgeApp {
     }
 
     fn fog_fingerprint(&self) -> String {
-        format!("{:?}|{}", self.scene.fogs, self.geometry_rev)
+        // La foschia copre scena, camera e luci: spostarle cambia il suo riquadro.
+        let lights: Vec<_> = self.scene.lights.iter().map(|l| (l.enabled, l.position)).collect();
+        format!(
+            "{:?}|{}|{:?}|{:?}|{:?}",
+            self.scene.fogs,
+            self.geometry_rev,
+            self.scene.haze,
+            self.scene.render_camera().position,
+            lights
+        )
     }
 
     /// Annulla il calcolo della nebbia in corso (pulsante X): non riparte da solo, si rifà

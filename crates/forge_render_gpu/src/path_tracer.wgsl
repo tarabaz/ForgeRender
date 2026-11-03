@@ -1324,6 +1324,15 @@ fn media_false_hit(m: u32, front: bool) -> bool {
     return u32(cur) != m && media_contains(m) && p < pc;
 }
 
+// Tratto dentro un volume trasparente da cui si sta per uscire (retro di un volume della
+// pila): niente aria, niente nebbia. Come `Media::inside_solid` sulla CPU.
+fn media_inside_solid(found: bool, prim: u32, d: vec3<f32>) -> bool {
+    if (!found || media_n == 0u) { return false; }
+    let pb = pu(P_OFF_PRIMS) + prim * PRIM_WORDS;
+    if (dot(sv3(pb + 12u), d) < 0.0) { return false; }
+    return media_contains(S[pb + 3u]);
+}
+
 fn media_cross(m: u32, front: bool) {
     if (front) {
         if (media_n < 4u) { media_ids[media_n] = m; media_n = media_n + 1u; }
@@ -1577,7 +1586,7 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
             if (t_end < INF) { beta = beta * media_transmittance(t_end); }
         }
         // Nebbie: collisione prima della superficie o della luce (delta tracking).
-        if (pu(P_N_FOGS) > 0u) {
+        if (pu(P_N_FOGS) > 0u && !media_inside_solid(hit.found, hit.prim, d)) {
             var t_end = t_surf;
             if (lt > 0.0) { t_end = lt; }
             let ev = fog_collision(o, d, t_end, camera_path);

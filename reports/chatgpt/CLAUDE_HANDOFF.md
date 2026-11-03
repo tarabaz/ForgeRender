@@ -2468,3 +2468,16 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
 - **Test realmente eseguiti:** fmt, clippy `-D warnings`, suite completa (esito nel messaggio).
 - **Limiti:** la foschia non ha ancora un'anteprima nella viewport; gli adesivi non seguono il
   displacement; la polvere riempie un riquadro attorno alla scena (max 6 m per lato).
+
+## Claude Code — 03/11/2026: niente foschia dentro gli oggetti (sviluppo)
+- Path tracer CPU (`integrator.rs`, `spectral.rs`) e GPU (`path_tracer.wgsl`): nessuna collisione
+  con le nebbie nel tratto che finisce sul retro di un volume trasparente della pila
+  (`Media::inside_solid`, `media_inside_solid`). Un vetro senza retro non esclude nulla.
+- `fog::interior_cells`: zone di celle libere non collegate al bordo, classificate con 6 raggi
+  (retro in ≥ 4 direzioni = interno). `haze_fog(scene, geo)` azzera solo l'interno, non il
+  guscio (niente alone attorno ai pezzi piccoli); chiave della cache con `geo.id`.
+  Base pronta per una futura simulazione della foschia (guscio + interno = pareti).
+- Test: `haze_stays_out_of_solid_objects`. Non provato a vista in un render.
+- Stessa giornata: la foschia entra nel calcolo anticipato (`bake_fogs` la calcola per ultima,
+  in sequenza dopo le nebbie, `Phase::Haze`, `progress::update` chiamabile dai thread di rayon);
+  `fogs_ready` e `ForgeApp::fog_fingerprint` tengono conto di foschia, camera e luci.

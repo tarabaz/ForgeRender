@@ -14,6 +14,8 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 
 **Ambient haze and floating dust**
 - Effects tab, **Ambient haze**: hazy air throughout the scene, with banks, curls and gaps (domain-warped fractal noise), lit like the fog (multiple scattering, object shadows in the rays), on CPU and GPU. Density, colour, backlit rays, swirls, swirl size, thinning with height, shape. Presets: Light veil, Light rays, Dusty attic, Thick haze, Low fog.
+- **No haze inside objects**: path segments inside glass and liquids do not cross any fog (lenses and glasses stay clear), on CPU and GPU; single-sheet glass without a back face does not count. The haze is also cleared from the solid interior of the parts, found by voxelising the objects and filling their inside (`fog::interior_cells`): the same grid will be used to simulate the haze. The air of a closed room stays air.
+- **Progress bar for the haze too**: it is computed ahead of time like the fog. The effects are computed **one at a time** on the same bar, which starts again from zero for each one ("Effect 1 of 2: simulation…", then "Effect 2 of 2: ambient haze…"); the ✕ stops them all. Moving the camera or the lights recomputes the haze (its box changes).
 - **Floating dust**: real sub-millimetre specks (up to 150,000) that sparkle where a ray or bounced light hits them. Amount, size, colour.
 
 **Decals**

@@ -21,6 +21,15 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
   ombre degli oggetti nei raggi), su CPU e GPU. Densità, colore, raggi in controluce, vortici,
   grandezza dei vortici, diradamento salendo, forma. Preset: Velo leggero, Raggi di luce,
   Soffitta polverosa, Foschia fitta, Nebbia bassa.
+- **Niente foschia dentro gli oggetti**: i tratti percorsi dentro vetri e liquidi non attraversano
+  nebbie (lenti e bicchieri restano limpidi), su CPU e GPU; i vetri "a foglio" senza retro non
+  contano. La foschia si azzera anche nell'interno pieno dei pezzi, trovato con la
+  voxelizzazione degli oggetti più un riempimento dell'interno (`fog::interior_cells`): la
+  stessa griglia servirà a simulare la foschia. L'aria di una stanza chiusa resta aria.
+- **Barra di avanzamento anche per la foschia**: si calcola in anticipo come la nebbia. Gli
+  effetti si calcolano **uno alla volta** sulla stessa barra, che riparte da zero per ognuno
+  ("Effetto 1 di 2: simulazione…", poi "Effetto 2 di 2: foschia d'ambiente…"); la ✕ li ferma
+  tutti. Spostare camera o luci ricalcola la foschia (ne cambia il riquadro).
 - **Polvere in sospensione**: granelli veri sotto il millimetro (fino a 150 000) che brillano
   dove li colpisce un raggio o la luce di rimbalzo. Quantità, dimensione, colore.
 

@@ -81,21 +81,27 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 {
                     app.cancel_fog();
                 }
-                let hint = tr("Calcolo della nebbia prima del render: parte da solo poco dopo l'ultima modifica, \
-                     così quando avvii il render la trovi già pronta. Puoi continuare a lavorare.");
+                let hint = tr(
+                    "Calcolo degli effetti (nebbia, foschia) prima del render, uno alla volta: parte da solo \
+                     poco dopo l'ultima modifica, così quando avvii il render li trovi già pronti. Puoi continuare a lavorare.",
+                );
                 match progress::get() {
                     Some(p) => {
                         let phase = match p.phase {
                             Phase::Obstacles => tr("ostacoli"),
                             Phase::Simulation => tr("simulazione"),
                             Phase::Detail => tr("dettaglio"),
+                            Phase::Haze => tr("foschia d'ambiente"),
                         };
                         let pct = format!("{:.0}", p.fraction * 100.0);
+                        // Più effetti: uno alla volta, la barra riparte da zero per ognuno.
                         let text = if p.fogs > 1 {
                             tf(
-                                "Nebbia {} di {}: {} {}%",
+                                "Effetto {} di {}: {} {}%",
                                 &[p.fog.to_string(), p.fogs.to_string(), phase.to_string(), pct],
                             )
+                        } else if p.phase == Phase::Haze {
+                            tf("Foschia d'ambiente: {}%", &[pct])
                         } else {
                             tf("Nebbia: {} {}%", &[phase.to_string(), pct])
                         };

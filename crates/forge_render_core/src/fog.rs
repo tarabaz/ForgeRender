@@ -55,6 +55,88 @@ pub fn voxelize(geo: &RenderGeometry, spec: &GridSpec) -> Vec<bool> {
     solid
 }
 
+/// Celle *interne* agli oggetti (il guscio `shell` di [`voxelize`] escluso): le zone di
+/// celle libere non collegate al bordo della griglia sono chiuse da superfici; ognuna si
+/// classifica con 6 raggi lungo gli assi da una sua cella: è interna se la prima superficie
+/// incontrata mostra il retro in almeno 4 direzioni. Così l'aria di una stanza chiusa
+/// (pareti viste dal davanti) resta aria, il pieno di un oggetto no.
+/// Serve alla foschia (niente foschia dentro i pezzi) e a una sua futura simulazione.
+pub fn interior_cells(geo: &RenderGeometry, spec: &GridSpec, shell: &[bool]) -> Vec<bool> {
+    let n = spec.len();
+    let mut inside = vec![false; n];
+    if geo.accel.is_empty() || shell.len() != n {
+        return inside;
+    }
+    let mut seen = vec![false; n];
+    let [rx, ry, rz] = spec.res;
+    let on_border = |x: usize, y: usize, z: usize| x == 0 || y == 0 || z == 0 || x + 1 == rx || y + 1 == ry || z + 1 == rz;
+    let mut stack = Vec::new();
+    let mut comp = Vec::new();
+    for start in 0..n {
+        if seen[start] || shell[start] {
+            continue;
+        }
+        // Zona connessa (6 vicini) di celle libere.
+        comp.clear();
+        let mut open = false;
+        seen[start] = true;
+        stack.push(start);
+        while let Some(i) = stack.pop() {
+            comp.push(i);
+            let (x, y, z) = spec.coords(i);
+            open |= on_border(x, y, z);
+            let mut visit = |x: usize, y: usize, z: usize| {
+                let j = spec.index(x, y, z);
+                if !seen[j] && !shell[j] {
+                    seen[j] = true;
+                    stack.push(j);
+                }
+            };
+            if x > 0 {
+                visit(x - 1, y, z);
+            }
+            if x + 1 < rx {
+                visit(x + 1, y, z);
+            }
+            if y > 0 {
+                visit(x, y - 1, z);
+            }
+            if y + 1 < ry {
+                visit(x, y + 1, z);
+            }
+            if z > 0 {
+                visit(x, y, z - 1);
+            }
+            if z + 1 < rz {
+                visit(x, y, z + 1);
+            }
+        }
+        if open {
+            continue;
+        }
+        let (x, y, z) = spec.coords(comp[comp.len() / 2]);
+        let p = spec.center(x, y, z);
+        let mut back = 0;
+        for axis in 0..3 {
+            for s in [-1.0f32, 1.0] {
+                let mut d = Vec3::ZERO;
+                d[axis] = s;
+                if let Some(h) = geo.accel.intersect(p, d, 0.0, f32::INFINITY) {
+                    if geo.geometric_normals[h.prim as usize].dot(d) > 0.0 {
+                        back += 1;
+                    }
+                }
+            }
+        }
+        if back >= 4 {
+            for &i in &comp {
+                inside[i] = true;
+            }
+        }
+    }
+    inside
+}
+
 type Cache<T> = Mutex<HashMap<(String, u64), Arc<T>>>;
 
 /// Nebbie pronte (simulazione + dettaglio), per tutti i parametri.
@@ -195,18 +277,29 @@ fn key(f: &FogVolume, geo: &RenderGeometry) -> (String, u64) {
 
 /// Nebbie attive della scena già calcolate (senza calcolarne di nuove)?
 pub fn fogs_ready(scene: &Scene, geo: &RenderGeometry) -> bool {
-    let c = cache().lock().unwrap();
-    scene.fogs.iter().filter(|f| f.enabled).all(|f| c.contains_key(&key(f, geo)))
+    let fogs_done = {
+        let c = cache().lock().unwrap();
+        scene.fogs.iter().filter(|f| f.enabled).all(|f| c.contains_key(&key(f, geo)))
+    };
+    fogs_done
+        && match haze_params(scene, geo) {
+            Some(p) => haze_cache().lock().unwrap().contains_key(&p.key),
+            None => true,
+        }
 }
 
-/// Nebbie attive della scena, calcolate se non sono già in cache.
+/// Nebbie attive della scena, calcolate se non sono già in cache. Gli effetti si calcolano
+/// uno alla volta (ognuno usa già tutti i core), sulla stessa barra che riparte da zero:
+/// prima le nebbie di ghiaccio secco, poi la foschia d'ambiente (che resta in cache per
+/// [`haze_fog`]). Restituisce le nebbie di ghiaccio secco.
 pub fn bake_fogs(scene: &Scene, geo: &RenderGeometry) -> Vec<Arc<BakedFog>> {
     use forge_volume::progress::{self, Phase};
     progress::start_job();
     let mut out = Vec::new();
     let fogs: Vec<&FogVolume> = scene.fogs.iter().filter(|f| f.enabled).collect();
+    let total = fogs.len() + haze_on(scene) as usize;
     for (n, f) in fogs.iter().enumerate() {
-        progress::begin(Phase::Obstacles, n + 1, fogs.len());
+        progress::begin(Phase::Obstacles, n + 1, total);
         let k = key(f, geo);
         if let Some(b) = cache().lock().unwrap().get(&k) {
             out.push(b.clone());
@@ -244,6 +337,10 @@ pub fn bake_fogs(scene: &Scene, geo: &RenderGeometry) -> Vec<Arc<BakedFog>> {
         }
         c.insert(k, b.clone());
         out.push(b);
+    }
+    if haze_on(scene) && !progress::cancelled() {
+        progress::begin(Phase::Haze, total, total);
+        haze_fog(scene, geo);
     }
     progress::clear();
     out
@@ -392,9 +489,21 @@ fn haze_cache() -> &'static Mutex<HashMap<String, Arc<BakedFog>>> {
 
 /// Foschia d'ambiente: un mezzo che copre la scena, la camera e le luci, illuminato come le
 /// altre nebbie (luce diffusa più volte, ombre degli oggetti nei raggi).
-pub fn haze_fog(scene: &Scene) -> Option<Arc<BakedFog>> {
+/// La foschia d'ambiente è accesa?
+pub fn haze_on(scene: &Scene) -> bool {
+    scene.haze.enabled && scene.haze.density > 0.0
+}
+
+/// Riquadro e chiave di cache della foschia (None se è spenta).
+struct HazeParams {
+    min: Vec3,
+    max: Vec3,
+    key: String,
+}
+
+fn haze_params(scene: &Scene, geo: &RenderGeometry) -> Option<HazeParams> {
     let h = &scene.haze;
-    if !h.enabled || h.density <= 0.0 {
+    if !haze_on(scene) {
         return None;
     }
     let mut b = scene.bounds();
@@ -411,10 +520,19 @@ pub fn haze_fog(scene: &Scene) -> Option<Arc<BakedFog>> {
     let center = (b.min + b.max) * 0.5;
     let half = ((b.max - b.min) * 0.5 * 1.05 + Vec3::splat(0.05)).min(Vec3::splat(20.0));
     let (min, max) = (center - half, center + half);
-    let key = format!("{h:?}|{min:?}|{max:?}");
+    let key = format!("{h:?}|{min:?}|{max:?}|{}", geo.id);
+    Some(HazeParams { min, max, key })
+}
+
+/// Foschia d'ambiente pronta (dalla cache, o calcolata qui). L'avanzamento va sulla barra
+/// della nebbia, se c'è un calcolo in corso.
+pub fn haze_fog(scene: &Scene, geo: &RenderGeometry) -> Option<Arc<BakedFog>> {
+    use forge_volume::progress;
+    let HazeParams { min, max, key } = haze_params(scene, geo)?;
     if let Some(f) = haze_cache().lock().unwrap().get(&key) {
         return Some(f.clone());
     }
+    let h = &scene.haze;
     let ext = max - min;
     // Celle: abbastanza per i vortici (circa 6 per vortice) senza superare ~4 milioni.
     let mut cell = if h.variation > 0.0 {
@@ -425,19 +543,51 @@ pub fn haze_fog(scene: &Scene) -> Option<Arc<BakedFog>> {
     if h.falloff_height > 0.0 {
         cell = cell.min(h.falloff_height / 4.0);
     }
-    cell = cell.max(ext.max_element() / 256.0);
+    // Anche senza vortici abbastanza celle da riconoscere l'interno degli oggetti.
+    cell = cell.min(ext.max_element() / 64.0).max(ext.max_element() / 256.0);
     while (ext.x / cell).ceil() * (ext.y / cell).ceil() * (ext.z / cell).ceil() > 4.0e6 {
         cell *= 1.15;
     }
     let longest = ((ext.max_element() / cell).ceil() as usize).clamp(4, 256);
+    // Niente foschia dentro gli oggetti: solo le celle interne, non il guscio (che è in parte
+    // aria: azzerarlo lascerebbe un alone pulito attorno ai pezzi piccoli). I tratti dentro
+    // vetri e liquidi li esclude esattamente il path tracer.
+    let t0 = std::time::Instant::now();
+    let spec = GridSpec::covering(min, max, longest);
+    progress::update(0.0);
+    let shell = voxelize(geo, &spec);
+    progress::update(0.2);
+    let inside = interior_cells(geo, &spec, &shell);
+    progress::update(0.3);
+    let n_inside = inside.iter().filter(|&&b| b).count();
+    let mask_ms = t0.elapsed().as_secs_f64() * 1e3;
     let hz = h.clone();
     let floor = min.y;
     let albedo = Vec3::from(h.color).clamp(Vec3::ZERO, Vec3::splat(0.999));
+    let done = std::sync::atomic::AtomicUsize::new(0);
+    let n = spec.len().max(1);
     let fog = BakedFog::from_fn(min, max, longest, albedo, h.anisotropy.clamp(-0.95, 0.95), move |p| {
-        haze_density_at(&hz, p, floor)
+        let i = done.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if i.is_multiple_of(32_768) {
+            progress::update(0.3 + 0.7 * i as f32 / n as f32);
+        }
+        match spec.cell_of(p) {
+            Some((x, y, z)) if inside[spec.index(x, y, z)] => 0.0,
+            _ => haze_density_at(&hz, p, floor),
+        }
     });
+    // Annullato durante il calcolo: niente cache (si rifà all'avvio del render).
+    if progress::cancelled() {
+        return None;
+    }
     let f = Arc::new(fog);
-    tracing::info!("foschia d'ambiente: {:?} celle in {:.0} ms", f.spec.res, f.bake_ms);
+    tracing::info!(
+        "foschia d'ambiente: {:?} celle in {:.0} ms (+ {:.0} ms per trovare {} celle dentro gli oggetti)",
+        f.spec.res,
+        f.bake_ms,
+        mask_ms,
+        n_inside
+    );
     let mut c = haze_cache().lock().unwrap();
     if c.len() > 8 {
         c.clear();
@@ -503,6 +653,24 @@ mod tests {
 
     /// Spostare un oggetto fuori dalla zona della nebbia non cambia la chiave (niente nuova
     /// simulazione); spostarne uno dentro sì.
+    #[test]
+    fn haze_stays_out_of_solid_objects() {
+        let mut s = Scene::default();
+        let m = s.add_mesh(primitives::cuboid(Vec3::splat(0.5)));
+        s.add_node(None, ComponentId("cubo".into()), "cubo", Mat4::IDENTITY, Some(m));
+        s.haze = forge_scene::Haze {
+            enabled: true,
+            variation: 0.0,
+            ..Default::default()
+        };
+        let geo = RenderGeometry::build(&s);
+        let f = haze_fog(&s, &geo).expect("foschia");
+        assert_eq!(f.density(Vec3::ZERO), 0.0, "dentro il cubo");
+        let (lo, _) = f.bounds();
+        let outside = Vec3::new(lo.x + f.spec.cell, 0.0, 0.0);
+        assert!(f.density(outside) > 0.0, "fuori dal cubo");
+    }
+
     #[test]
     fn only_obstacles_inside_the_zone_invalidate_the_fog() {
         let build = |far_x: f32, near_x: f32| {

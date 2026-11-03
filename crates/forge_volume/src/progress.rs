@@ -12,6 +12,8 @@ pub enum Phase {
     Simulation,
     /// Dettaglio sulla griglia fine.
     Detail,
+    /// Foschia d'ambiente (interno degli oggetti, poi densità).
+    Haze,
 }
 
 /// Fase, frazione fatta (0–1) e numero della nebbia (1 = prima) su quante.
@@ -56,6 +58,14 @@ pub fn set(phase: Phase, fraction: f32) {
                 fogs: 1,
             })
         }
+    }
+}
+
+/// Avanzamento della fase in corso, solo se c'è un calcolo in corso (un calcolo annullato
+/// non fa ricomparire la barra). Si può chiamare da qualsiasi thread.
+pub fn update(fraction: f32) {
+    if let Some(p) = STATE.lock().unwrap().as_mut() {
+        p.fraction = fraction.clamp(0.0, 1.0);
     }
 }
 

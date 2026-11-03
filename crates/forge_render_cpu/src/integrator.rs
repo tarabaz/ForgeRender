@@ -136,7 +136,7 @@ pub fn radiance_with(
         }
         // Nebbie: collisione nel mezzo prima della superficie o della luce (delta tracking:
         // se non avviene la throughput resta invariata).
-        if !scene.fogs.is_empty() {
+        if !scene.fogs.is_empty() && !media.inside_solid(scene, hit, d) {
             let t_end = light_hit.map(|x| x.0).unwrap_or(t_surf);
             if let Some((tm, fi)) = crate::medium::sample_collision(scene, o, d, t_end, camera_path, rng) {
                 let fog = &scene.fogs[fi];
@@ -401,6 +401,18 @@ impl Media {
         } else {
             cur as usize != mat && self.ids[..self.n].contains(&(mat as u32)) && p < pc
         }
+    }
+
+    /// Il tratto fino alla superficie `hit` corre dentro un volume trasparente da cui il
+    /// percorso sta per uscire (la faccia è il retro di un volume della pila): lì dentro non
+    /// c'è aria, quindi niente nebbia. Un vetro "a foglio" (senza retro) non conta.
+    pub(crate) fn inside_solid(&self, scene: &RenderScene, hit: Option<forge_accel::TriangleHit>, d: Vec3) -> bool {
+        let Some(h) = hit else { return false };
+        if self.n == 0 || scene.geometry.geometric_normals[h.prim as usize].dot(d) < 0.0 {
+            return false;
+        }
+        let m = scene.material_index(h.prim as usize) as u32;
+        self.ids[..self.n].contains(&m)
     }
 
     /// Entra nel volume (faccia frontale) o ne esce.

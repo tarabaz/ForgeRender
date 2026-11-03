@@ -235,7 +235,7 @@ pub fn radiance_spectral_with(
                 beta *= transmittance(&media, scene, t_end, w);
             }
         }
-        if !scene.fogs.is_empty() {
+        if !scene.fogs.is_empty() && !media.inside_solid(scene, hit, d) {
             let t_end = light_hit.map(|x| x.0).unwrap_or(t_surf);
             if let Some((tm, fi)) = crate::medium::sample_collision(scene, o, d, t_end, camera_path, rng) {
                 let fog = &scene.fogs[fi];
