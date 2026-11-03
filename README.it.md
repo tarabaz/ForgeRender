@@ -78,25 +78,61 @@ Per le note tecniche complete consulta [CHANGELOG.md](CHANGELOG.md) (in italiano
 > Vedi [docs/ROADMAP.it.md](docs/ROADMAP.it.md) per cosa funziona davvero oggi, cosa viene dopo
 > e quanto è complesso ogni passo.
 
-## Trasporto della luce e caustiche: RGB o Spettrale
+## Funzionalità in evidenza
 
-ForgeRender permette di scegliere come rappresentare la luce in **Render → Colore** e, separatamente, di attivare le **Caustiche** nelle impostazioni di rendering. I due controlli lavorano insieme: il primo sceglie il modello di trasporto della luce, il secondo aggiunge i percorsi luminosi difficili da trovare che generano disegni concentrati attraverso gli oggetti trasparenti.
+Le immagini seguenti mostrano risultati e flussi di lavoro reali di ForgeRender. Ogni confronto mette in evidenza una capacità specifica del motore.
 
-| Modalità luce | Caustiche OFF | Caustiche ON |
-|---|---|---|
-| **RGB** | Path tracing tradizionale a tre canali (rosso, verde e blu). Gli oggetti trasparenti rifrangono e riflettono la luce, ma il passaggio dedicato dei fotoni per le caustiche è disattivato. | Aggiunge i disegni di luce concentrata prodotti dal passaggio attraverso vetri lisci, cristalli e gemme. Funziona con luci puntiformi, spot, direzionali e ad area. Il risultato resta RGB: non calcola la separazione cromatica dipendente dalla lunghezza d'onda. |
-| **Spettrale** | Traccia la luce a lunghezze d'onda campionate. I vetri dispersivi possono separare i colori: prismi e gemme possono quindi produrre una separazione cromatica legata alla fisica della rifrazione. | Unisce il trasporto spettrale al photon mapping delle caustiche: i disegni luminosi concentrati possono separarsi in frange colorate e arcobaleni, perché le diverse lunghezze d'onda vengono rifratte in modo differente. |
+### 1. Trasporto avanzato della luce — RGB, Spettrale e Caustiche
 
-**Cosa cambia concretamente**
-- Scegli **RGB** per il rendering generale più veloce. Scegli **Spettrale** per vetri, cristalli, pietre preziose, prismi e interazioni con luci sature in cui conta il comportamento dipendente dalla lunghezza d'onda. Nella misura documentata su RTX 5070 lo spettrale richiede circa il doppio del tempo e, in generale, più campioni per ridurre il rumore cromatico.
-- Attiva **Caustiche** quando vuoi vedere i disegni luminosi concentrati che gli oggetti trasparenti e lisci proiettano sulle superfici vicine. Se è disattivato, questi disegni dedicati non vengono calcolati con il photon mapping.
-- Per ottenere una separazione cromatica spettrale visibile, usa un materiale trasparente con **Dispersione** diversa da zero (numero di Abbe). Più il numero di Abbe è basso, più la separazione è forte. La modalità RGB ignora la dispersione di Abbe.
-- Le caustiche sono calcolate con il photon mapping progressivo. I fotoni partono dalle luci, attraversano le superfici trasparenti lisce seguendo riflessione, rifrazione e assorbimento, poi vengono raccolti sulla prima superficie non speculare. Il raggio di raccolta si restringe a ogni passata, rendendo il disegno sempre più definito durante la convergenza del render.
-- Le caustiche funzionano con luci puntiformi, spot, direzionali (sole) e ad area, sia su CPU sia su GPU. Nel rendering GPU i percorsi dei fotoni vengono costruiti dalla CPU e raccolti dallo shader GPU.
+![Confronto RGB e Spettrale con caustiche disattivate e attivate](docs/img/features/rgb-spectral-caustics.jpg)
 
-Le quattro combinazioni sono impostazioni indipendenti, non quattro motori di rendering diversi. L'immagine comparativa mostra la stessa scena del cristallo con RGB/Spettrale e caustiche disattivate/attivate; l'effetto arcobaleno dipende dalla modalità spettrale e da un materiale trasparente dispersivo.
+**Quattro configurazioni, una stessa scena.** RGB utilizza il trasporto della luce tradizionale a tre canali; la modalità Spettrale campiona le lunghezze d'onda e permette ai materiali dispersivi di separare i colori durante la rifrazione. Le Caustiche attivano il photon mapping progressivo per mostrare la luce concentrata da vetri, cristalli e gemme.
 
-Per i dettagli su implementazione, campionamento, dispersione e verifiche, consulta [Rendering spettrale](docs/SPECTRAL.it.md) (italiano) e [Spectral rendering](docs/SPECTRAL.md) (inglese).
+- **RGB + Caustiche OFF:** path tracing RGB senza il contributo dedicato delle caustiche.
+- **RGB + Caustiche ON:** caustiche calcolate in RGB, senza separazione cromatica spettrale.
+- **Spettrale + Caustiche OFF:** trasporto a lunghezze d'onda campionate; la dispersione può colorare la rifrazione.
+- **Spettrale + Caustiche ON:** caustiche con frange cromatiche e separazione dello spettro, se il materiale trasparente ha dispersione non nulla.
+
+Per ottenere una dispersione visibile serve un materiale trasparente con un numero di Abbe impostato. Un numero più basso produce una dispersione più forte. Le caustiche sono indipendenti dalla modalità RGB/Spettrale e sono supportate da luci puntiformi, spot, direzionali e ad area, su CPU e GPU. Nel backend GPU il tracciamento dei fotoni viene costruito dalla CPU e raccolto dalla GPU.
+
+[Dettagli tecnici sul rendering spettrale](docs/SPECTRAL.it.md).
+
+### 2. Materiali PBR e texture per modelli CAD
+
+![Esempi di materiali e texture di ForgeRender](docs/img/mcp/esempi/materiali.jpg)
+
+Materiali diffusi, metalli e plastiche GGX, vetro Fresnel, vetro satinato ed emissivi. Le mappe PBR includono colore base, rugosità, metallicità, normal, bump, displacement reale, occlusione ambientale e opacità. Per i modelli CAD senza UV è disponibile la proiezione Box in scala metrica, con ancoraggio a pezzo, assieme o mondo.
+
+### 3. Studio fotografico e illuminazione
+
+![Aspetto studio fotografico di ForgeRender](docs/img/mcp/esempi/aspetto_studio.jpg)
+
+Prepara una scena prodotto con fondale e luci da studio, quindi scegli sfondo chiaro, scuro o scenografico. Le luci possono essere regolate singolarmente; la scena può essere adattata alle dimensioni del prodotto senza perdere il controllo sui componenti.
+
+### 4. Illuminazione volumetrica e fasci visibili
+
+![Confronto del fascio volumetrico](reports/fascio-volumetrico/dopo_fascio_solo_camera.png)
+
+Le luci spot possono generare fasci visibili con densità e lunghezza regolabili. La nebbia volumetrica è un mezzo partecipante simulato, con scattering e ombre: la luce interagisce con il volume e diventa visibile nello spazio, non soltanto sulle superfici.
+
+### 5. Camera, viste multiple e presentazione prodotto
+
+![Vista prodotto a tre quarti](docs/img/mcp/esempi/vista_tre_quarti.jpg)
+
+Camera di rendering con focale, diaframma, profondità di campo e decentramento. Sono disponibili viste frontali, posteriori, laterali, superiori e a tre quarti, oltre all'esportazione di turntable MP4 per presentare un prodotto da più angolazioni.
+
+### 6. Controllo tramite IA — MCP
+
+![ForgeRender controllato tramite MCP](docs/img/mcp/it/finestra_comandata.jpg)
+
+Collega Claude Desktop, Claude Code o Codex tramite il bridge MCP per comandare le operazioni supportate in linguaggio naturale: preparazione della scena, importazione, luci, materiali, camera e rendering. Il controllo è esplicito e può essere disattivato dall'interfaccia.
+
+[Guida alla configurazione MCP](docs/MCP.md).
+
+### 7. Render pass e workflow di post-produzione
+
+ForgeRender può esportare pass separati per **Albedo, Normals, Depth, Product Mask e Component ID**, utili per compositing, mascherature e interventi successivi sull'immagine. Questi pass sono dati di output tecnici: non vanno confusi con una seconda immagine beauty.
+
 
 ## Cosa fa oggi
 
