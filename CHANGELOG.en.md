@@ -10,6 +10,22 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.34.0 — 4 Nov 2026
+
+**Haze in five kinds, with fractal and quality controls**
+- Ambient haze has a **Type**: *Low fog* (on the ground, thinning out going up), *Gas clouds* (almost clear air with dense clumps), *Toxic smoke on the floor* (a layer a few cm thick on the floor, gathered into filaments), *Floating layers* (horizontal veils at different heights, wavy and full of holes), *Vapour curls* (swirls inside swirls, high contrast). In the Effects tab the **Haze** button opens the menu of types; the type can be changed afterwards.
+- Fractal controls: **Swirl strength** (domain warp, 0–4), **Fractal detail** (1–8 octaves), **Roughness** (gain between octaves), plus swirl amount and size. The floor smoke uses a low box (fine cells only where needed).
+- **Quality** 1–4: from 1 to 24 million cells (48 MB), up to 512 per side.
+- Removed the Light veil, Light rays, Dusty attic and Thick haze presets.
+
+**Floating dust as its own effect, only in beams**
+- **Floating dust** button in the Effects tab, no haze needed.
+- The specks are transparent to every ray; camera rays add only the direct light of the scene lights (spot, sun, point, area), with shadows and forward scattering: no environment or bounce light, so they show only inside a beam. CPU (RGB and spectral) and GPU (RGB and spectral). Test `tests/dust.rs`.
+
+**Interface**
+- The ✕ buttons and the decal arrows showed a square (symbols missing from the font): they are now icons (bin, X, arrows). A test forbids those symbols in the interface code.
+- Video error message without the missing arrow.
+
 ## 0.33.0 — 3 Nov 2026
 
 **Ambient haze and floating dust**

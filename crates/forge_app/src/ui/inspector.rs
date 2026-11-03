@@ -1525,7 +1525,7 @@ fn effects(app: &mut ForgeApp, ui: &mut egui::Ui) {
         }
     });
     if app.scene.fogs.is_empty() {
-        if !app.scene.haze.enabled && app.scene.decals.is_empty() {
+        if !app.scene.haze.enabled && !app.scene.haze_dust.enabled && app.scene.decals.is_empty() {
             ui.label(egui::RichText::new(tr("Nessun effetto: aggiungine uno dai pulsanti qui sopra.")).weak());
         }
         return;

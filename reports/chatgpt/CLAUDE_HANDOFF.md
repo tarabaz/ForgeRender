@@ -2483,3 +2483,15 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
   `fogs_ready` e `ForgeApp::fog_fingerprint` tengono conto di foschia, camera e luci.
 - 03/11/2026: Valerio ha chiesto di portare tutto su main: versione 0.33.0 (Cargo.toml,
   forgerender.iss, changelog), main avanzato in fast-forward da `sviluppo`.
+
+## Claude Code — 04/11/2026: foschia in cinque tipi, polvere solo nei fasci (0.34.0)
+- `forge_scene::{HazeKind, Haze::of_kind}`, campi `warp`, `octaves`, `roughness`, `quality`;
+  densità per tipo in `forge_render_core::fog` (`ambient_density`, `gas_cloud_density`,
+  `toxic_floor_density`, `layer_density`, `billow_density`), `noise::fbm_gain`,
+  `HAZE_QUALITY` (fino a 24 M celle).
+- Polvere: `RenderMaterial::dust` (id del materiale `effetto:polvere`), `RenderScene::has_dust`;
+  trasparente in `opaque_at` (CPU e GPU, bit 2 dei flag del materiale), luce diretta in
+  `integrator::dust_glints` / `dust_glints` nella shader (anche spettrale). Test `tests/dust.rs`.
+- Simboli assenti dal font sostituiti da icone (`icons::{CLOSE, ARROWS_H, ARROWS_V}`), test
+  `no_missing_symbols_in_interface_code`.
+- Non provato a vista in un render: i test controllano solo media e visibilità della polvere.

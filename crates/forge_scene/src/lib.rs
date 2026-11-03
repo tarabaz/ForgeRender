@@ -20,7 +20,7 @@ pub use added::{AddedKind, AddedRecord};
 pub use camera::{Camera, OrbitController, RenderCamera};
 pub use effects::{Decal, Dust};
 pub use environment::Environment;
-pub use fog::{FogPreset, FogVolume, Haze, FOG_PRESETS, FOG_QUALITY};
+pub use fog::{FogPreset, FogVolume, Haze, HazeKind, FOG_PRESETS, FOG_QUALITY};
 pub use light::{LaserSource, Light, LightKind};
 pub use material::{Material, MaterialId, MaterialLibrary, Projection, TextureAnchor, TextureMapping, LIQUIDS_CATEGORY};
 pub use mesh::Mesh;

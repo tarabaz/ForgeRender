@@ -86,6 +86,8 @@ pub const P_TILES_X: usize = 79;
 /// Laser: offset e numero (vedi [`LASER_WORDS`]).
 pub const P_OFF_LASERS: usize = 80;
 pub const P_N_LASERS: usize = 81;
+/// 1 se c'è la polvere in sospensione (bit 2 dei flag del materiale).
+pub const P_HAS_DUST: usize = 82;
 /// Laser: potenza(3), raggio, densità del fascio, 0, 0, 0; poi 1 + [`forge_render_core::laser::N_LAMBDA`]
 /// percorsi (RGB, poi le lunghezze d'onda) di [`LASER_PATH_WORDS`] parole.
 pub const LASER_HEADER_WORDS: usize = 8;
@@ -276,7 +278,8 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
         w.u(th as u32);
         w.u(ta as u32);
         w.u(to as u32);
-        w.u(flags);
+        // Bit 0 = normal map DirectX, bit 1 = gloss, bit 2 = polvere.
+        w.u(flags | (m.dust as u32) << 2);
         w.f(bump);
         w.f(ao_s);
         w.v3(m.sigma_a);
@@ -556,6 +559,7 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
 
     p[P_N_SELECT] = scene.lights.len() as u32 + scene.samples_environment() as u32 + scene.emissive.is_some() as u32;
     p[P_HAS_CUTOUT] = scene.has_cutout as u32;
+    p[P_HAS_DUST] = scene.has_dust as u32;
     if w.w.is_empty() {
         w.u(0);
     }

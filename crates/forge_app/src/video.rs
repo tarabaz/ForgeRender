@@ -130,7 +130,7 @@ mod media_foundation {
             in_type.SetUINT64(&MF_MT_PIXEL_ASPECT_RATIO, square)?;
             writer
                 .SetInputMediaType(stream, &in_type, None)
-                .context("conversione RGB → H.264")?;
+                .context("conversione da RGB a H.264")?;
             writer.BeginWriting()?;
 
             let len = w * h * 4;

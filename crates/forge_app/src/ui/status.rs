@@ -73,7 +73,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             if app.is_baking_fog() {
                 use forge_render_core::fog::progress::{self, Phase};
                 if ui
-                    .small_button("✕")
+                    .small_button(crate::ui::icons::CLOSE)
                     .on_hover_text(tr(
                         "Annulla il calcolo della nebbia. Attenzione: verrà rifatto da capo quando avvii il render",
                     ))

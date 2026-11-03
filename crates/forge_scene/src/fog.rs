@@ -214,6 +214,101 @@ pub struct Haze {
     pub swirl_scale: f32,
     /// Seme della forma dei vortici.
     pub seed: u32,
+    /// Tipo di foschia: come la densità si distribuisce nello spazio.
+    pub kind: HazeKind,
+    /// Forza dei vortici (distorsione del dominio del rumore): 0 = macchie tonde, 3 = riccioli.
+    pub warp: f32,
+    /// Ottave del frattale (1–8): più ottave = dettagli sempre più fini.
+    pub octaves: u32,
+    /// Ruvidità del frattale (guadagno tra le ottave, 0,3–0,8): alta = dettagli fini marcati.
+    pub roughness: f32,
+    /// Qualità della griglia (1–4): celle più fitte, calcolo più lungo e più memoria.
+    pub quality: u32,
+}
+
+/// Tipo di foschia d'ambiente.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HazeKind {
+    /// Aria velata con banchi e riccioli, che può diradarsi salendo (la "nebbia bassa").
+    #[default]
+    Ambient,
+    /// Aria quasi limpida con ammassi densi qua e là, come nuvole di gas.
+    GasClouds,
+    /// Strato di pochi centimetri sul pavimento, tirato in filamenti come fumo tossico.
+    ToxicFloor,
+    /// Veli orizzontali sovrapposti a quote diverse, ondulati e bucati.
+    Layers,
+    /// Riccioli di vapore: vortici molto marcati (distorsione doppia), contrasto alto.
+    Billows,
+}
+
+impl HazeKind {
+    pub const ALL: [HazeKind; 5] = [
+        HazeKind::Ambient,
+        HazeKind::GasClouds,
+        HazeKind::ToxicFloor,
+        HazeKind::Layers,
+        HazeKind::Billows,
+    ];
+}
+
+impl Haze {
+    /// Foschia accesa del tipo `kind` con le impostazioni di partenza adatte.
+    pub fn of_kind(kind: HazeKind) -> Haze {
+        let base = Haze {
+            enabled: true,
+            kind,
+            ..Default::default()
+        };
+        match kind {
+            HazeKind::Ambient => Haze {
+                density: 0.9,
+                variation: 0.7,
+                swirl_scale: 0.5,
+                anisotropy: 0.3,
+                falloff_height: 0.25,
+                ..base
+            },
+            HazeKind::GasClouds => Haze {
+                density: 1.2,
+                variation: 0.45,
+                swirl_scale: 0.9,
+                anisotropy: 0.4,
+                warp: 1.4,
+                octaves: 5,
+                roughness: 0.55,
+                ..base
+            },
+            HazeKind::ToxicFloor => Haze {
+                density: 4.0,
+                color: [0.8, 0.95, 0.7],
+                variation: 0.85,
+                swirl_scale: 0.35,
+                anisotropy: 0.3,
+                falloff_height: 0.06,
+                warp: 1.0,
+                ..base
+            },
+            HazeKind::Layers => Haze {
+                density: 0.8,
+                variation: 0.6,
+                swirl_scale: 0.8,
+                anisotropy: 0.5,
+                falloff_height: 0.35,
+                ..base
+            },
+            HazeKind::Billows => Haze {
+                density: 0.7,
+                variation: 0.9,
+                swirl_scale: 0.7,
+                anisotropy: 0.45,
+                warp: 2.6,
+                octaves: 6,
+                roughness: 0.6,
+                ..base
+            },
+        }
+    }
 }
 
 impl Default for Haze {
@@ -227,6 +322,11 @@ impl Default for Haze {
             variation: 0.55,
             swirl_scale: 0.8,
             seed: 1,
+            kind: HazeKind::Ambient,
+            warp: 1.6,
+            octaves: 4,
+            roughness: 0.5,
+            quality: 2,
         }
     }
 }

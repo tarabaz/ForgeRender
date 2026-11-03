@@ -688,5 +688,11 @@
   `voxelize`) usato da `haze_fog(scene, geo)`.
 - La foschia si calcola in anticipo con la barra (`Phase::Haze`), in sequenza dopo le nebbie.
 
+### 0.34.0 (04/11/2026): foschia in cinque tipi, polvere solo nei fasci
+- `HazeKind` (nebbia bassa, nuvole di gas, fumo tossico a terra, strati sospesi, riccioli di vapore),
+  comandi del frattale e qualità 1–4 (fino a 24 M celle); preset vecchi tolti.
+- Polvere come effetto a sé, trasparente, visibile solo con la luce diretta (CPU e GPU).
+- Icone al posto dei simboli che il font non ha (✕, frecce).
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

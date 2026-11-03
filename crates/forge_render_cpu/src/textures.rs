@@ -176,10 +176,14 @@ pub fn apply(tex: &MaterialTextures, scene: &RenderScene, hit: &TriangleHit, p: 
     *ns = blended.normalize_or(n0);
 }
 
-/// Vero se il punto è opaco (nessuna mappa di opacità, oppure opacità ≥ 50 %).
+/// Vero se il punto è opaco (nessuna mappa di opacità, oppure opacità ≥ 50 %). La polvere
+/// non lo è mai: i raggi la attraversano (la sua luce la aggiunge [`dust_glints`]).
 #[inline]
 pub fn opaque_at(scene: &RenderScene, prim: u32, t: f32, u: f32, v: f32, o: Vec3, d: Vec3) -> bool {
     let mi = scene.material_index(prim as usize);
+    if scene.materials[mi].dust {
+        return false;
+    }
     let Some(tex) = &scene.material_textures[mi] else { return true };
     let Some(op) = &tex.opacity else { return true };
     let geo = &scene.geometry;
@@ -198,6 +202,29 @@ pub fn intersect(scene: &RenderScene, o: Vec3, d: Vec3, t_min: f32, t_max: f32) 
     } else {
         accel.intersect(o, d, t_min, t_max)
     }
+}
+
+/// Granelli di polvere lungo il raggio entro `t_max` (al più 8, i più vicini): (distanza, prim).
+pub fn dust_hits(scene: &RenderScene, o: Vec3, d: Vec3, t_max: f32) -> ([(f32, u32); 8], usize) {
+    let mut out = [(0.0, 0); 8];
+    let mut n = 0;
+    if !scene.has_dust {
+        return (out, 0);
+    }
+    let accel = &scene.geometry.accel;
+    let mut t0 = 0.0;
+    while n < out.len() {
+        let Some(h) = accel.intersect_filtered(o, d, t0, t_max, |prim, _, _, _| {
+            scene.materials[scene.material_index(prim as usize)].dust
+        }) else {
+            break;
+        };
+        out[n] = (h.t, h.prim);
+        n += 1;
+        // Oltre il granello (al massimo 3 mm): non si ricolpisce la sua faccia posteriore.
+        t0 = h.t + 4e-3;
+    }
+    (out, n)
 }
 
 /// Raggio d'ombra: le parti ritagliate lasciano passare la luce.

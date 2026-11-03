@@ -18,16 +18,19 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
-### Novità della versione 0.32.0
+### Novità della versione 0.34.0
 
-- **Nebbia da ghiaccio secco molto più veloce:** la simulazione lavora solo dove c'è la nebbia: Ultra 182 → 37 s (4,9×), Molto alta 61 → 14,5 s sulla demo del cocktail, stessa nebbia. Si calcola in sottofondo subito dopo le tue modifiche, con la barra di avanzamento accanto ai campioni.
-- **Riflessi parziali del laser:** divisione facoltativa del fascio su ogni faccia di vetro, come un laser vero (tanti puntini attorno a cristalli e diamanti).
-- **Scene demo nuove:** banco ottico con laser e prisma, lenti convergenti e divergenti.
-- Interruttore **AI MCP: ON / OFF** nella barra in alto, con l'ingranaggio per le impostazioni dell'integrazione AI.
+- **Foschia d'ambiente in cinque tipi:** nebbia bassa, nuvole di gas, fumo tossico a terra, strati sospesi e riccioli di vapore, con i comandi del frattale (forza dei vortici, dettaglio, ruvidità) e lo slider di qualità fino a 24 milioni di celle.
+- **Polvere in sospensione come effetto a sé:** granelli che si vedono solo dentro i fasci di luce, come la polvere nei raggi di una finestra.
+- **Adesivi (decal):** loghi ed etichette su qualsiasi superficie, anche curva.
+- **STEP convertito una volta sola:** progetti e pacchetti tengono la conversione (demo del banco ottico: da 27 s a 0,2 s per aprirla).
+- **Niente foschia dentro vetri e pezzi pieni**, effetti calcolati uno alla volta con una sola barra di avanzamento, e il render parte su GPU di serie.
 
 <details>
 <summary><strong>Versioni precedenti — storico completo delle release</strong></summary>
 
+- **0.33.0 — Foschia d'ambiente, polvere, adesivi:** foschia con banchi e riccioli illuminata con diffusione multipla; granelli di polvere; adesivi sulle superfici curve; conversione STEP salvata con progetti e pacchetti; calcolo della nebbia annullabile e che riparte alle modifiche.
+- **0.32.0 — Nebbia da ghiaccio secco molto più veloce:** la simulazione lavora solo dove c'è la nebbia (Ultra 182 → 37 s sulla demo del cocktail), calcolata in sottofondo con la barra di avanzamento; riflessi parziali del laser; demo del banco ottico e delle lenti; interruttore AI MCP ON/OFF.
 - **0.31.0 — Pacchetto completo e libreria staccabile:** .frpack, cartella o ZIP con tutti i file; libreria dei materiali staccabile con Applica alla selezione grande; laser viola UV e blu corretto; fasci larghi tagliati sulle facce del vetro; gli aspetti tengono le tue luci; nuova schermata di benvenuto.
 - **0.30.0 — Laser come luce a sé, preset che aggiungono:** laser rosso, verde, blu e bianco da laboratorio (i colorati non si scompongono); i preset delle luci aggiungono invece di sostituire; fascio visibile dentro i liquidi.
 - **0.29.0 — Luce nei bicchieri con il liquido:** piega giusta vetro-liquido per il laser e le caustiche, fascio che si affievolisce nei drink colorati; nuova categoria di materiali Liquidi.
@@ -136,42 +139,54 @@ ForgeRender genera nebbia scenografica con una simulazione fluida 3D determinist
 
 [Apri la scena demo del cocktail con ghiaccio secco](samples/scene/cocktail-ghiaccio-secco/cocktail-ghiaccio-secco.frproject) · [Istruzioni e controlli](samples/scene/cocktail-ghiaccio-secco/LEGGIMI.md).
 
-### 5. Materiali PBR e texture per modelli CAD
+### 5. Foschia d'ambiente — cinque tipi di nebbia procedurale
+
+Un mezzo partecipante che riempie la scena (o solo uno strato) e che ogni luce attraversa: spot, sole e lampade disegnano raggi con le ombre degli oggetti, e la luce si diffonde più volte, su CPU e GPU. Non è una texture né un blocco grigio uniforme: la densità viene da un rumore frattale a dominio distorto calcolato su una griglia 3D, quindi ha banchi, riccioli e vuoti.
+
+- **Cinque tipi:** *Nebbia bassa* che si stende a terra e si dirada salendo; *Nuvole di gas*, aria quasi limpida con ammassi densi qua e là; *Fumo tossico a terra*, uno strato di pochi centimetri che aleggia sul pavimento raccolto in filamenti; *Strati sospesi*, veli orizzontali a quote diverse, ondulati e bucati; *Riccioli di vapore*, vortici dentro i vortici con contrasto alto.
+- **Comandi del frattale:** forza dei vortici (da macchie tonde a spirali ben visibili), dettaglio frattale (1–8 ottave), ruvidità (bordi morbidi o frastagliati), grandezza e quantità dei vortici, colore e diffusione in avanti (quanto brillano i raggi in controluce).
+- **Slider di qualità:** da una bozza di 1 milione di celle a 24 milioni (48 MB) per dettagli fini e bordi netti. La foschia si calcola in anticipo, un effetto alla volta, con la barra di avanzamento in basso.
+- **Mai dentro gli oggetti:** i raggi che viaggiano nel vetro o nel liquido la saltano (lenti e bicchieri restano limpidi) e si toglie dall'interno pieno dei pezzi, mentre l'aria di una stanza chiusa resta velata.
+
+### 6. Polvere in sospensione — granelli che brillano solo in un fascio
+
+Granelli veri minuscoli (sotto il millimetro, fino a 150 000) sparsi nell'aria, come effetto a sé. Sono invisibili tranne dove li colpisce direttamente una luce: dentro il fascio di una spot o il sole che entra da una finestra brillano, come la polvere nei raggi di una soffitta, mentre la luce dell'ambiente e quella di rimbalzo non li illuminano. Quantità, dimensione e colore sono regolabili.
+
+### 7. Adesivi (decal) — etichette e loghi su qualsiasi superficie
+
+Applica un'immagine (un logo, un'etichetta, un PNG con trasparenza) sull'oggetto selezionato, nel punto che la camera sta guardando. L'adesivo si ricava dai triangoli dell'oggetto dentro una scatola di proiezione, quindi segue le superfici curve come bottiglie e tazze, e si sposta con l'oggetto. Le parti trasparenti del PNG lasciano vedere l'oggetto. Si regolano larghezza (l'altezza segue le proporzioni dell'immagine), rotazione, posizione sulla superficie, profondità della proiezione, ruvidità e metallicità; l'immagine viaggia con il progetto e dentro i pacchetti `.frpack`.
+
+### 8. Materiali PBR e texture per modelli CAD
 
 ![Esempi di materiali e texture di ForgeRender](docs/img/mcp/esempi/materiali.jpg)
 
 Materiali diffusi, metalli e plastiche GGX, vetro Fresnel, vetro satinato ed emissivi. Le mappe PBR includono colore base, rugosità, metallicità, normal, bump, displacement reale, occlusione ambientale e opacità. Per i modelli CAD senza UV è disponibile la proiezione Box in scala metrica, con ancoraggio a pezzo, assieme o mondo.
 
-### 6. Studio fotografico e illuminazione
+### 9. Studio fotografico e illuminazione
 
 ![Aspetto studio fotografico di ForgeRender](docs/img/mcp/esempi/aspetto_studio.jpg)
 
 Prepara una scena prodotto con fondale e luci da studio, quindi scegli sfondo chiaro, scuro o scenografico. Le luci possono essere regolate singolarmente; la scena può essere adattata alle dimensioni del prodotto senza perdere il controllo sui componenti.
 
-### 7. Illuminazione volumetrica e fasci visibili
+### 10. Illuminazione volumetrica e fasci visibili
 
 ![Confronto del fascio volumetrico](reports/fascio-volumetrico/dopo_fascio_solo_camera.png)
 
 Le luci spot possono generare fasci visibili con densità e lunghezza regolabili. La nebbia volumetrica è un mezzo partecipante simulato, con scattering e ombre: la luce interagisce con il volume e diventa visibile nello spazio, non soltanto sulle superfici.
 
-- **Foschia d'ambiente:** un mezzo partecipante che riempie tutta la scena, la camera e le luci. Non è un blocco grigio uniforme: un rumore frattale a dominio distorto le dà banchi più densi, riccioli e vuoti, con i controlli di densità, colore, quantità e grandezza dei vortici, diffusione in avanti (quanto brillano i raggi guardando verso la luce) e diradamento con l'altezza per la nebbia a terra. La luce si diffonde più volte al suo interno, quindi ogni luce disegna lame di luce con le ombre degli oggetti; funziona su CPU e GPU. Preset: Velo leggero, Raggi di luce, Soffitta polverosa, Foschia fitta, Nebbia bassa. Dentro gli oggetti la foschia non c'è: i raggi che viaggiano nel vetro o nel liquido la saltano (le lenti restano limpide) e si toglie anche dall'interno pieno dei pezzi, mentre l'aria di una stanza chiusa resta velata.
-- **Polvere in sospensione:** granelli veri minuscoli (geometria sotto il millimetro, fino a 150 000) sparsi nell'aria. Al buio quasi non si vedono e brillano dove li raggiunge un fascio, o la luce di rimbalzo, come in una soffitta controluce. Quantità, dimensione e colore sono regolabili.
+Per la nebbia che riempie la scena vedi [Foschia d'ambiente](#5-foschia-dambiente--cinque-tipi-di-nebbia-procedurale), per i granelli che brillano nei fasci vedi [Polvere in sospensione](#6-polvere-in-sospensione--granelli-che-brillano-solo-in-un-fascio).
 
-### 8. Camera, viste multiple e presentazione prodotto
+### 11. Camera, viste multiple e presentazione prodotto
 
 ![Vista prodotto a tre quarti](docs/img/mcp/esempi/vista_tre_quarti.jpg)
 
 Le camere di rendering offrono focale, diaframma, profondità di campo e decentramento. Le viste automatiche frontale, posteriore, laterali, superiore e a tre quarti aiutano a presentare un prodotto da più angolazioni; è possibile esportare video turntable in MP4.
 
-### 9. Render pass e workflow di post-produzione
+### 12. Render pass e workflow di post-produzione
 
 ForgeRender può esportare pass separati **Albedo, Normals, Depth, Product Mask e Component ID**, utili per compositing, mascherature e interventi successivi sull'immagine. Sono buffer tecnici di output, non ulteriori render beauty.
 
-### 10. Adesivi (decal) — etichette e loghi su qualsiasi superficie
-
-Applica un'immagine (un logo, un'etichetta, un PNG con trasparenza) sull'oggetto selezionato, nel punto che la camera sta guardando. L'adesivo si ricava dai triangoli dell'oggetto dentro una scatola di proiezione, quindi segue le superfici curve come bottiglie e tazze, e si sposta con l'oggetto. Le parti trasparenti del PNG lasciano vedere l'oggetto. Si regolano larghezza (l'altezza segue le proporzioni dell'immagine), rotazione, posizione sulla superficie, profondità della proiezione, ruvidità e metallicità; l'immagine viaggia con il progetto e dentro i pacchetti `.frpack`.
-
-### 11. Modelli STEP: convertiti una volta, poi riaperti subito
+### 13. Modelli STEP: convertiti una volta, poi riaperti subito
 
 Un file STEP si converte in mesh una volta sola. Il risultato resta in una cache delle conversioni e si salva accanto al progetto (`modelli-convertiti/`) e dentro i pacchetti `.frpack`, così riaprendo il progetto lo STEP non si riconverte. Sulla demo del banco ottico l'apertura è passata da 27 s a 0,2 s. Se lo STEP cambia (o cambiano i pezzi di un assieme a più file, o la qualità), si riconverte. I pacchetti ora includono anche i file dei pezzi a cui rimanda un assieme STEP a più file.
 

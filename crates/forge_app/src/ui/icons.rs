@@ -61,6 +61,9 @@ pub const VIEWPORT: &str = "\u{E1DA}"; // cube
 pub const IMAGE: &str = "\u{E2CA}"; // image
 pub const GPU: &str = "\u{E612}"; // graphics-card
 pub const QUALITY: &str = "\u{E434}"; // sliders-horizontal
+pub const CLOSE: &str = "\u{E4F6}"; // x
+pub const ARROWS_H: &str = "\u{EB06}"; // arrows-horizontal
+pub const ARROWS_V: &str = "\u{EB04}"; // arrows-vertical
 
 #[cfg(test)]
 mod tests {
@@ -83,5 +86,37 @@ mod glyph_tests {
     fn no_missing_arrow_glyph_in_interface_texts() {
         let lang = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../lang/Lan_eng.json")).unwrap();
         assert!(!lang.contains('→'), "Lan_eng.json contiene →");
+    }
+
+    /// Simboli che i caratteri dell'interfaccia non hanno (si vedrebbe un quadratino): al loro
+    /// posto le icone (`icons::CLOSE`, `icons::ARROWS_H`, …).
+    #[test]
+    fn no_missing_symbols_in_interface_code() {
+        fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+            for e in std::fs::read_dir(dir).unwrap().flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    walk(&p, out);
+                } else if p.extension().is_some_and(|x| x == "rs") {
+                    out.push(p);
+                }
+            }
+        }
+        let mut files = Vec::new();
+        walk(std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/src")), &mut files);
+        let missing = ['\u{2715}', '\u{2194}', '\u{2195}', '\u{2192}', '\u{2716}', '\u{2717}'];
+        for f in files {
+            let s = std::fs::read_to_string(&f).unwrap();
+            for (i, line) in s.lines().enumerate() {
+                // Nei commenti e nei messaggi dei test non si vedono.
+                let code = line.split("//").next().unwrap_or("");
+                if code.contains("assert") || code.contains("panic!") || code.contains(".replace(") {
+                    continue;
+                }
+                if let Some(c) = code.chars().find(|c| missing.contains(c)) {
+                    panic!("{}:{}: simbolo {c:?} assente dal carattere dell'interfaccia", f.display(), i + 1);
+                }
+            }
+        }
     }
 }

@@ -459,27 +459,118 @@ pub fn beam_fogs(scene: &Scene) -> Vec<Arc<BakedFog>> {
     out
 }
 
-/// Densità della foschia d'ambiente nel punto `p` (1/m): base, diradata salendo da `floor`,
-/// con banchi e vortici da un rumore frattale a dominio distorto (riccioli, non macchie).
+/// Densità della foschia d'ambiente nel punto `p` (1/m), secondo il tipo: rumore frattale a
+/// dominio distorto (riccioli, non macchie) con ottave, ruvidità e forza dei vortici scelte.
 pub fn haze_density_at(h: &forge_scene::Haze, p: Vec3, floor: f32) -> f32 {
+    use forge_scene::HazeKind;
+    match h.kind {
+        HazeKind::Ambient => ambient_density(h, p, floor),
+        HazeKind::GasClouds => gas_cloud_density(h, p, floor),
+        HazeKind::ToxicFloor => toxic_floor_density(h, p, floor),
+        HazeKind::Layers => layer_density(h, p, floor),
+        HazeKind::Billows => billow_density(h, p, floor),
+    }
+}
+
+/// Frattale della foschia nel punto (già diviso per la grandezza dei vortici): ottave e
+/// ruvidità dalla foschia.
+fn haze_fbm(h: &forge_scene::Haze, q: Vec3, seed: u32) -> f32 {
+    forge_volume::noise::fbm_gain(q, seed, h.octaves.clamp(1, 8), h.roughness.clamp(0.2, 0.85))
+}
+
+/// Distorsione del dominio: spostare il punto con altro rumore fa i vortici.
+fn haze_warp(q: Vec3, s: u32) -> Vec3 {
     use forge_volume::noise::fbm;
+    Vec3::new(
+        fbm(q + Vec3::new(5.2, 1.3, 9.1), s ^ 0x68e3_1da4, 3),
+        fbm(q + Vec3::new(-7.7, 3.9, 2.4), s ^ 0x1b56_c4e9, 3),
+        fbm(q + Vec3::new(1.7, -9.2, 6.3), s ^ 0x2f8a_7d11, 3),
+    )
+}
+
+fn smoothstep(a: f32, b: f32, x: f32) -> f32 {
+    let t = ((x - a) / (b - a)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+/// Aria velata con banchi e riccioli (anche la nebbia bassa, che si dirada salendo).
+fn ambient_density(h: &forge_scene::Haze, p: Vec3, floor: f32) -> f32 {
     let base = h.density_at(p.y, floor);
     let v = h.variation.clamp(0.0, 1.0);
     if v <= 0.0 || base <= 0.0 {
         return base;
     }
     let q = p / h.swirl_scale.max(0.02);
-    let s = h.seed;
-    // Distorsione del dominio: il rumore letto in un punto spostato da altro rumore fa i vortici.
-    let warp = Vec3::new(
-        fbm(q + Vec3::new(5.2, 1.3, 9.1), s ^ 0x68e3_1da4, 3),
-        fbm(q + Vec3::new(-7.7, 3.9, 2.4), s ^ 0x1b56_c4e9, 3),
-        fbm(q + Vec3::new(1.7, -9.2, 6.3), s ^ 0x2f8a_7d11, 3),
-    );
-    let n = fbm(q + warp * 1.6, s, 4);
+    let n = haze_fbm(h, q + haze_warp(q, h.seed) * h.warp, h.seed);
     // Banchi: da quasi vuoto (n basso) a circa il doppio della base; media ≈ la base.
     let shape = ((n * 1.4 + 0.5).clamp(0.0, 1.0)).powf(1.5) * 2.2;
     base * ((1.0 - v) + v * shape)
+}
+
+/// Nuvole di gas: aria quasi limpida (3 % della densità) e ammassi densi dove il rumore
+/// supera una soglia; `variation` decide quanta aria coprono (0 = pochi ammassi, 1 = metà).
+fn gas_cloud_density(h: &forge_scene::Haze, p: Vec3, floor: f32) -> f32 {
+    let base = h.density_at(p.y, floor);
+    if base <= 0.0 {
+        return 0.0;
+    }
+    let q = p / h.swirl_scale.max(0.02);
+    let n = haze_fbm(h, q + haze_warp(q, h.seed) * h.warp, h.seed);
+    let threshold = 0.22 - 0.3 * h.variation.clamp(0.0, 1.0);
+    base * (0.03 + 0.97 * smoothstep(threshold, threshold + 0.15, n))
+}
+
+/// Fumo tossico a terra: uno strato spesso `falloff_height` sopra il punto più basso, che sfuma
+/// subito sopra; dentro, filamenti allungati (creste del rumore, stirato lungo x).
+/// `variation` = quanto il fumo è raccolto in filamenti invece che steso uniforme.
+fn toxic_floor_density(h: &forge_scene::Haze, p: Vec3, floor: f32) -> f32 {
+    let thick = h.falloff_height.max(0.01);
+    let y = p.y - floor;
+    let profile = if y <= thick { 1.0 } else { (-(y - thick) / (0.5 * thick)).exp() };
+    let d = h.density.max(0.0) * profile;
+    if d <= 1e-6 {
+        return 0.0;
+    }
+    let sc = h.swirl_scale.max(0.02);
+    let q = Vec3::new(p.x / (sc * 4.0), p.y / sc, p.z / sc);
+    let n = haze_fbm(h, q + haze_warp(q, h.seed) * h.warp, h.seed);
+    let ridge = (1.0 - (n * 3.0).abs()).max(0.0).powi(3);
+    let v = h.variation.clamp(0.0, 1.0);
+    d * ((1.0 - v) * 0.3 + v * ridge * 1.6)
+}
+
+/// Strati sospesi: veli orizzontali a distanza `falloff_height` l'uno dall'altro, ondulati dal
+/// rumore e bucati dove il rumore è basso.
+fn layer_density(h: &forge_scene::Haze, p: Vec3, floor: f32) -> f32 {
+    let d = h.density.max(0.0);
+    if d <= 0.0 {
+        return 0.0;
+    }
+    let spacing = h.falloff_height.max(0.05);
+    let q = p / h.swirl_scale.max(0.02);
+    let wave = haze_fbm(h, q * 0.5 + haze_warp(q * 0.5, h.seed) * h.warp * 0.5, h.seed ^ 0x51ed_270b);
+    let phase = (p.y - floor) / spacing + wave * 1.5;
+    let sheet = (0.5 + 0.5 * (std::f32::consts::TAU * phase).cos()).powi(6);
+    let n = haze_fbm(h, q + haze_warp(q, h.seed) * h.warp, h.seed);
+    let holes = (n * 1.6 + 0.5).clamp(0.0, 1.0);
+    let v = h.variation.clamp(0.0, 1.0);
+    d * (0.06 + sheet * 3.0 * ((1.0 - v) + v * holes))
+}
+
+/// Riccioli di vapore: distorsione applicata due volte (vortici dentro i vortici) e contrasto
+/// alto, così i riccioli si vedono netti.
+fn billow_density(h: &forge_scene::Haze, p: Vec3, floor: f32) -> f32 {
+    let base = h.density_at(p.y, floor);
+    if base <= 0.0 {
+        return 0.0;
+    }
+    let q = p / h.swirl_scale.max(0.02);
+    let w1 = haze_warp(q, h.seed);
+    let w2 = haze_warp(q + w1 * h.warp + Vec3::new(3.1, 7.4, 1.9), h.seed ^ 0x7f4a_7c15);
+    let n = haze_fbm(h, q + w2 * h.warp, h.seed);
+    let v = h.variation.clamp(0.0, 1.0);
+    let shape = smoothstep(-0.12, 0.28, n).powi(2) * 2.6;
+    base * ((1.0 - v) * 0.5 + v * shape)
 }
 
 fn haze_cache() -> &'static Mutex<HashMap<String, Arc<BakedFog>>> {
@@ -489,6 +580,14 @@ fn haze_cache() -> &'static Mutex<HashMap<String, Arc<BakedFog>>> {
 
 /// Foschia d'ambiente: un mezzo che copre la scena, la camera e le luci, illuminato come le
 /// altre nebbie (luce diffusa più volte, ombre degli oggetti nei raggi).
+/// Qualità della foschia: (celle per vortice, celle al massimo, celle al massimo per lato).
+const HAZE_QUALITY: [(f32, f32, f32); 4] = [
+    (4.0, 1.0e6, 160.0),
+    (6.0, 4.0e6, 256.0),
+    (9.0, 12.0e6, 384.0),
+    (12.0, 24.0e6, 512.0),
+];
+
 /// La foschia d'ambiente è accesa?
 pub fn haze_on(scene: &Scene) -> bool {
     scene.haze.enabled && scene.haze.density > 0.0
@@ -519,7 +618,11 @@ fn haze_params(scene: &Scene, geo: &RenderGeometry) -> Option<HazeParams> {
     // Pavimenti enormi: la foschia resta entro 20 m dal centro della scena.
     let center = (b.min + b.max) * 0.5;
     let half = ((b.max - b.min) * 0.5 * 1.05 + Vec3::splat(0.05)).min(Vec3::splat(20.0));
-    let (min, max) = (center - half, center + half);
+    let (min, mut max) = (center - half, center + half);
+    // Fumo a terra: il riquadro si ferma poco sopra lo strato (celle fitte dove serve).
+    if h.kind == forge_scene::HazeKind::ToxicFloor {
+        max.y = max.y.min(min.y + 0.05 + h.falloff_height.max(0.01) * 5.0);
+    }
     let key = format!("{h:?}|{min:?}|{max:?}|{}", geo.id);
     Some(HazeParams { min, max, key })
 }
@@ -534,21 +637,23 @@ pub fn haze_fog(scene: &Scene, geo: &RenderGeometry) -> Option<Arc<BakedFog>> {
     }
     let h = &scene.haze;
     let ext = max - min;
-    // Celle: abbastanza per i vortici (circa 6 per vortice) senza superare ~4 milioni.
+    // Qualità 1–4: celle per vortice, tetto di celle e di celle per lato (con 4: 24 milioni di
+    // celle, 48 MB, entro la memoria che la GPU dà a un buffer).
+    let (per_swirl, max_cells, max_side) = HAZE_QUALITY[(h.quality.clamp(1, 4) - 1) as usize];
     let mut cell = if h.variation > 0.0 {
-        h.swirl_scale.max(0.02) / 6.0
+        h.swirl_scale.max(0.02) / per_swirl
     } else {
         ext.max_element() / 8.0
     };
     if h.falloff_height > 0.0 {
-        cell = cell.min(h.falloff_height / 4.0);
+        cell = cell.min(h.falloff_height / (per_swirl * 0.66));
     }
     // Anche senza vortici abbastanza celle da riconoscere l'interno degli oggetti.
-    cell = cell.min(ext.max_element() / 64.0).max(ext.max_element() / 256.0);
-    while (ext.x / cell).ceil() * (ext.y / cell).ceil() * (ext.z / cell).ceil() > 4.0e6 {
-        cell *= 1.15;
+    cell = cell.min(ext.max_element() / 64.0).max(ext.max_element() / max_side);
+    while (ext.x / cell).ceil() * (ext.y / cell).ceil() * (ext.z / cell).ceil() > max_cells {
+        cell *= 1.1;
     }
-    let longest = ((ext.max_element() / cell).ceil() as usize).clamp(4, 256);
+    let longest = ((ext.max_element() / cell).ceil() as usize).clamp(4, max_side as usize);
     // Niente foschia dentro gli oggetti: solo le celle interne, non il guscio (che è in parte
     // aria: azzerarlo lascerebbe un alone pulito attorno ai pezzi piccoli). I tratti dentro
     // vetri e liquidi li esclude esattamente il path tracer.

@@ -127,6 +127,14 @@ pub fn radiance_with(
                 add(&mut l, beta * c, depth);
             }
         }
+        // Polvere in sospensione: brilla solo dove la colpisce la luce diretta.
+        if camera_path && scene.has_dust {
+            let t_end = light_hit.map(|x| x.0).unwrap_or(t_surf);
+            let c = dust_glints(scene, o, d, t_end, rng);
+            if c != Vec3::ZERO {
+                add(&mut l, beta * c, depth);
+            }
+        }
         // Assorbimento del volume trasparente attraversato fino alla superficie (o alla luce).
         if media.n > 0 {
             let t_end = light_hit.map(|x| x.0).unwrap_or(t_surf);
@@ -507,6 +515,36 @@ pub(crate) fn sample_any_light(scene: &RenderScene, s: &LightSlots, p: Vec3, rng
             )
         })
     }
+}
+
+/// Luce dei granelli di polvere lungo il raggio fino a `t_end`: per ognuno la luce diretta di una
+/// luce della scena scelta a caso (niente ambiente né superfici emissive né rimbalzi: la polvere
+/// si vede solo in un fascio), diffusa soprattutto in avanti come dai granelli veri.
+pub(crate) fn dust_glints(scene: &RenderScene, o: Vec3, d: Vec3, t_end: f32, rng: &mut Pcg32) -> Vec3 {
+    let n_lights = scene.lights.len();
+    if n_lights == 0 {
+        return Vec3::ZERO;
+    }
+    let (hits, n) = crate::textures::dust_hits(scene, o, d, t_end);
+    let mut c = Vec3::ZERO;
+    for &(t, prim) in &hits[..n] {
+        let p = o + d * t;
+        let k = ((rng.next_f32() * n_lights as f32) as usize).min(n_lights - 1);
+        let light = &scene.lights[k];
+        let (u1, u2) = rng.next_2d();
+        let Some(ls) = sample_light(light, p, u1, u2) else { continue };
+        let li = if ls.delta { ls.li } else { ls.li / ls.pdf.max(1e-8) };
+        if li == Vec3::ZERO {
+            continue;
+        }
+        let vis = shadow(scene, p, &ls, light.cast_shadows, rng);
+        if vis <= 0.0 {
+            continue;
+        }
+        let albedo = scene.material_of(prim as usize).base_color;
+        c += albedo * li * (vis * n_lights as f32 * 2.0 * crate::medium::hg_pdf(0.5, d.dot(ls.wi)));
+    }
+    c
 }
 
 /// Visibilità della luce dal punto `so` (già spostato dalla superficie): 0 se un

@@ -13,6 +13,32 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.34.0 — 04/11/2026
+
+**Foschia in cinque tipi, con il frattale e la qualità**
+- La foschia d'ambiente ha un **Tipo**: *Nebbia bassa* (a terra, si dirada salendo), *Nuvole di
+  gas* (aria quasi limpida con ammassi densi), *Fumo tossico a terra* (strato di pochi cm sul
+  pavimento, raccolto in filamenti), *Strati sospesi* (veli orizzontali a quote diverse, ondulati e
+  bucati), *Riccioli di vapore* (vortici dentro i vortici, contrasto alto). Nella scheda Effetti
+  il pulsante **Foschia** apre il menu dei tipi; il tipo si cambia anche dopo.
+- Comandi del frattale: **Forza dei vortici** (distorsione del dominio, 0–4), **Dettaglio
+  frattale** (1–8 ottave), **Ruvidità** (guadagno tra le ottave), oltre a quantità e grandezza
+  dei vortici. Lo strato del fumo a terra ha il riquadro basso (celle fitte solo dove serve).
+- **Qualità** 1–4: da 1 a 24 milioni di celle (48 MB), fino a 512 per lato.
+- Tolti i preset Velo leggero, Raggi di luce, Soffitta polverosa e Foschia fitta.
+
+**Polvere in sospensione come effetto a sé, solo nei fasci**
+- Pulsante **Polvere in sospensione** nella scheda Effetti, senza bisogno della foschia.
+- I granelli sono trasparenti per tutti i raggi; quelli dalla camera aggiungono solo la luce
+  diretta delle luci della scena (spot, sole, punti, aree), con ombre e diffusione in avanti:
+  nessuna luce dall'ambiente o di rimbalzo, quindi si vedono solo dentro un fascio. CPU (RGB e
+  spettrale) e GPU (RGB e spettrale). Test `tests/dust.rs`.
+
+**Interfaccia**
+- I pulsanti ✕ e le frecce dell'adesivo mostravano un quadratino (simboli assenti dal carattere):
+  ora sono icone (cestino, X, frecce). Un test vieta quei simboli nel codice dell'interfaccia.
+- Messaggio d'errore dei video senza la freccia mancante.
+
 ## 0.33.0 — 03/11/2026
 
 **Foschia d'ambiente e polvere in sospensione**

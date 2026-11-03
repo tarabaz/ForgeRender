@@ -108,6 +108,7 @@ const P_PORTAL_AREA: u32 = 78u;
 const P_TILES_X: u32 = 79u;
 const P_OFF_LASERS: u32 = 80u;
 const P_N_LASERS: u32 = 81u;
+const P_HAS_DUST: u32 = 82u;
 const ADAPTIVE_TILE: u32 = 16u;
 const PORTAL_WORDS: u32 = 16u;
 
@@ -602,10 +603,17 @@ fn apply_textures(m: ptr<function, Mat>, prim: u32, bu: f32, bv: f32, p: vec3<f3
     if (dot(blended, blended) > 0.0) { *ns = normalize(blended); }
 }
 
+// Vero mentre si cercano solo i granelli di polvere (`dust_glints`).
+var<private> dust_only: bool = false;
+
 // Ritaglio: vero se il punto del triangolo è opaco (come forge_render_cpu::textures::opaque_at).
+// La polvere non lo è mai (i raggi la attraversano); cercando la polvere lo è solo lei.
 fn opaque_at(prim: u32, t: f32, bu: f32, bv: f32, o: vec3<f32>, d: vec3<f32>) -> bool {
     let pb = pu(P_OFF_PRIMS) + prim * PRIM_WORDS;
     let mb = pu(P_OFF_MATS) + S[pb + 3u] * MAT_WORDS;
+    let is_dust = (S[mb + 27u] & 4u) != 0u;
+    if (dust_only) { return is_dust; }
+    if (is_dust) { return false; }
     let top = bitcast<i32>(S[mb + 26u]);
     if (top < 0) { return true; }
     let m = load_mat(S[pb + 3u]);
@@ -1289,6 +1297,34 @@ fn light_visibility(so: vec3<f32>, ls: LSample) -> f32 {
     return fog_transmittance(so, ls.wi, tmax);
 }
 
+// Luce dei granelli di polvere lungo il raggio fino a `t_end` (come `dust_glints` sulla CPU):
+// luce diretta di una luce della scena scelta a caso, diffusa soprattutto in avanti.
+fn dust_glints(o: vec3<f32>, d: vec3<f32>, t_end: f32) -> vec3<f32> {
+    let n_lights = pu(P_N_LIGHTS);
+    var c = vec3<f32>(0.0);
+    if (n_lights == 0u) { return c; }
+    var t0 = 0.0;
+    for (var k: u32 = 0u; k < 8u; k = k + 1u) {
+        dust_only = true;
+        let h = trace(o, d, t0, t_end, false);
+        dust_only = false;
+        if (!h.found) { break; }
+        t0 = h.t + 4e-3;
+        let p = o + d * h.t;
+        let li_idx = min(u32(rnd() * f32(n_lights)), n_lights - 1u);
+        let ls = sample_light(li_idx, p, rnd(), rnd());
+        if (!ls.ok) { continue; }
+        var li = ls.li;
+        if (!ls.delta) { li = li / max(ls.pdf, 1e-8); }
+        let vis = light_visibility(p, ls);
+        if (vis <= 0.0) { continue; }
+        let pb = pu(P_OFF_PRIMS) + h.prim * PRIM_WORDS;
+        let albedo = sv3(pu(P_OFF_MATS) + S[pb + 3u] * MAT_WORDS);
+        c = c + albedo * li * (vis * f32(n_lights) * 2.0 * hg_pdf(0.5, dot(d, ls.wi)));
+    }
+    return c;
+}
+
 // ---------------------------------------------------------------- Volumi trasparenti
 // Volumi in cui si trova il percorso (vetro, liquido), al più 4 annidati: il corrente è
 // quello con priorità più alta (a pari priorità l'ultimo in cui si è entrati). Stesso
@@ -1578,6 +1614,12 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
             var t_end = t_surf;
             if (lt > 0.0) { t_end = lt; }
             l = l + beta * laser_beams_rgb(o, d, t_end);
+        }
+        // Polvere in sospensione: brilla solo dove la colpisce la luce diretta.
+        if (camera_path && pu(P_HAS_DUST) != 0u) {
+            var t_end = t_surf;
+            if (lt > 0.0) { t_end = lt; }
+            l = l + beta * dust_glints(o, d, t_end);
         }
         // Assorbimento del volume trasparente attraversato.
         if (media_n > 0u) {

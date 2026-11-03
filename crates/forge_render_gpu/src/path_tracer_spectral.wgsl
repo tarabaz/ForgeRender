@@ -472,6 +472,11 @@ fn radiance_spectral(o_in: vec3<f32>, d_in: vec3<f32>) -> vec4<f32> {
             if (lt > 0.0) { t_end = lt; }
             l = l + beta * laser_beams_s(o, d, t_end);
         }
+        if (camera_path && pu(P_HAS_DUST) != 0u) {
+            var t_end = t_surf;
+            if (lt > 0.0) { t_end = lt; }
+            l = l + beta * illum4(dust_glints(o, d, t_end));
+        }
         if (media_n > 0u) {
             var t_end = t_surf;
             if (lt > 0.0) { t_end = lt; }

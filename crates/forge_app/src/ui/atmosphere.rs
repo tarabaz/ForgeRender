@@ -1,96 +1,61 @@
-//! Scheda Effetti: foschia d'ambiente (con la polvere in sospensione) e adesivi (decal).
+//! Scheda Effetti: foschia d'ambiente (cinque tipi), polvere in sospensione e adesivi (decal).
 
 use crate::app::ForgeApp;
-use crate::i18n::{tf, tk, tr};
+use crate::i18n::{tf, tr};
+use crate::ui::icons;
 use eframe::egui;
-use forge_scene::{Decal, Haze, NodeIndex};
+use forge_scene::{Decal, Haze, HazeKind, NodeIndex};
 
-/// Preset della foschia: (nome, descrizione, foschia, polvere accesa).
-type HazePreset = (&'static str, &'static str, fn() -> Haze, bool);
+fn kind_name(k: HazeKind) -> &'static str {
+    match k {
+        HazeKind::Ambient => tr("Nebbia bassa"),
+        HazeKind::GasClouds => tr("Nuvole di gas"),
+        HazeKind::ToxicFloor => tr("Fumo tossico a terra"),
+        HazeKind::Layers => tr("Strati sospesi"),
+        HazeKind::Billows => tr("Riccioli di vapore"),
+    }
+}
 
-const HAZE_PRESETS: [HazePreset; 5] = [
-    (
-        tk("Velo leggero"),
-        tk("Aria appena velata: lo sfondo si allontana, i fasci si intuiscono"),
-        || Haze {
-            enabled: true,
-            density: 0.05,
-            variation: 0.4,
-            swirl_scale: 1.2,
-            anisotropy: 0.5,
-            ..Default::default()
-        },
-        false,
-    ),
-    (
-        tk("Raggi di luce"),
-        tk("Foschia da controluce: le luci e le spot disegnano lame di luce con le ombre degli oggetti"),
-        || Haze {
-            enabled: true,
-            density: 0.2,
-            variation: 0.5,
-            swirl_scale: 0.8,
-            anisotropy: 0.75,
-            ..Default::default()
-        },
-        false,
-    ),
-    (
-        tk("Soffitta polverosa"),
-        tk("Aria calda e polverosa: raggi dorati e granelli che brillano dove passa la luce"),
-        || Haze {
-            enabled: true,
-            density: 0.25,
-            color: [0.95, 0.9, 0.8],
-            variation: 0.45,
-            swirl_scale: 0.9,
-            anisotropy: 0.7,
-            ..Default::default()
-        },
-        true,
-    ),
-    (
-        tk("Foschia fitta"),
-        tk("Aria densa con banchi e vortici: gli oggetti lontani sbiadiscono"),
-        || Haze {
-            enabled: true,
-            density: 0.6,
-            variation: 0.6,
-            swirl_scale: 0.6,
-            anisotropy: 0.4,
-            ..Default::default()
-        },
-        false,
-    ),
-    (
-        tk("Nebbia bassa"),
-        tk("Nebbia che si stende a terra e si dirada salendo"),
-        || Haze {
-            enabled: true,
-            density: 0.9,
-            variation: 0.7,
-            swirl_scale: 0.5,
-            anisotropy: 0.3,
-            falloff_height: 0.25,
-            ..Default::default()
-        },
-        false,
-    ),
-];
+fn kind_hint(k: HazeKind) -> &'static str {
+    match k {
+        HazeKind::Ambient => tr("Nebbia che si stende a terra e si dirada salendo, con banchi e riccioli"),
+        HazeKind::GasClouds => tr("Aria quasi limpida con ammassi densi qua e là, come nuvole di gas sospese"),
+        HazeKind::ToxicFloor => tr("Uno strato di pochi centimetri che aleggia sul pavimento, raccolto in filamenti come fumo tossico"),
+        HazeKind::Layers => tr("Veli orizzontali sovrapposti a quote diverse, ondulati e bucati, come foschia in una valle"),
+        HazeKind::Billows => tr("Vortici dentro i vortici, con contrasto alto: riccioli e spirali di vapore ben visibili"),
+    }
+}
 
-/// Pulsanti "Foschia d'ambiente" e "Adesivo" della riga "Aggiungi effetto".
+/// Pulsanti "Foschia", "Polvere in sospensione" e "Adesivo" della riga "Aggiungi effetto".
 pub fn add_buttons(app: &mut ForgeApp, ui: &mut egui::Ui) {
-    if ui
-        .add_enabled(!app.scene.haze.enabled, egui::Button::new(tr("Foschia d'ambiente")))
+    // Foschia: un menu con i tipi (una sola foschia per scena; il tipo si cambia anche dopo).
+    ui.add_enabled_ui(!app.scene.haze.enabled, |ui| {
+        ui.menu_button(tr("Foschia"), |ui| {
+            for k in HazeKind::ALL {
+                if ui.button(kind_name(k)).on_hover_text(kind_hint(k)).clicked() {
+                    app.scene.haze = Haze::of_kind(k);
+                    app.shading_changed();
+                    ui.close();
+                }
+            }
+        })
+        .response
         .on_hover_text(tr(
-            "Aria velata in tutta la scena: rende visibili i raggi delle luci (con le ombre degli oggetti), \
-             con banchi e vortici. Si può aggiungere la polvere in sospensione",
+            "Aria con nebbia, gas o fumo: le luci che la attraversano disegnano raggi con le ombre degli oggetti",
+        ))
+        .on_disabled_hover_text(tr("Già nella scena: le impostazioni sono qui sotto"));
+    });
+    if ui
+        .add_enabled(!app.scene.haze_dust.enabled, egui::Button::new(tr("Polvere in sospensione")))
+        .on_hover_text(tr(
+            "Granelli minuscoli nell'aria che si vedono solo dove li colpisce direttamente una luce, come \
+             la polvere nei raggi che entrano da una finestra: altrove sono invisibili",
         ))
         .on_disabled_hover_text(tr("Già nella scena: le impostazioni sono qui sotto"))
         .clicked()
     {
-        app.scene.haze = (HAZE_PRESETS[1].2)();
-        app.shading_changed();
+        app.scene.haze_dust.enabled = true;
+        dust_changed(app);
     }
     if ui
         .button(tr("Adesivo (decal)"))
@@ -157,10 +122,14 @@ fn add_decal(app: &mut ForgeApp) {
     app.appearance_changed();
 }
 
-/// Foschia d'ambiente e polvere (se presenti) e adesivi della scena.
+/// Nebbia bassa, polvere e adesivi della scena (quelli presenti).
 pub fn sections(app: &mut ForgeApp, ui: &mut egui::Ui) {
     if app.scene.haze.enabled {
         haze(app, ui);
+        ui.separator();
+    }
+    if app.scene.haze_dust.enabled {
+        dust(app, ui);
         ui.separator();
     }
     if !app.scene.decals.is_empty() {
@@ -171,41 +140,44 @@ pub fn sections(app: &mut ForgeApp, ui: &mut egui::Ui) {
 
 fn haze(app: &mut ForgeApp, ui: &mut egui::Ui) {
     let mut changed = false;
-    let mut dust_changed = false;
     let mut remove = false;
     let id = ui.make_persistent_id("foschia-ambiente");
     egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, true)
         .show_header(ui, |ui| {
-            ui.strong(tr("Foschia d'ambiente"));
+            ui.strong(tf("Foschia: {}", &[kind_name(app.scene.haze.kind).to_string()]));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.small_button("✕").on_hover_text(tr("Togli la foschia (e la polvere)")).clicked() {
+                if ui.small_button(icons::DELETE).on_hover_text(tr("Togli la foschia")).clicked() {
                     remove = true;
                 }
             });
         })
         .body(|ui| {
             let h = &mut app.scene.haze;
-            ui.horizontal_wrapped(|ui| {
-                ui.label(tr("Preset:"));
-                for (name, tip, make, dust) in HAZE_PRESETS {
-                    if ui.small_button(tr(name)).on_hover_text(tr(tip)).clicked() {
-                        // Il seme resta: cambia l'aria, non la forma dei vortici.
-                        let seed = h.seed;
-                        *h = make();
-                        h.seed = seed;
-                        if dust && !app.scene.haze_dust.enabled {
-                            app.scene.haze_dust.enabled = true;
-                            dust_changed = true;
-                        }
-                        changed = true;
-                    }
-                }
-            });
-            let h = &mut app.scene.haze;
             egui::Grid::new("foschia").num_columns(2).show(ui, |ui| {
+                ui.label(tr("Tipo"));
+                let mut kind = h.kind;
+                egui::ComboBox::from_id_salt("tipo-foschia")
+                    .selected_text(kind_name(kind))
+                    .show_ui(ui, |ui| {
+                        for k in HazeKind::ALL {
+                            ui.selectable_value(&mut kind, k, kind_name(k)).on_hover_text(kind_hint(k));
+                        }
+                    })
+                    .response
+                    .on_hover_text(tr(
+                        "Cambiare tipo riparte dalle sue impostazioni di partenza (colore e forma restano)",
+                    ));
+                if kind != h.kind {
+                    let (seed, quality) = (h.seed, h.quality);
+                    *h = Haze::of_kind(kind);
+                    h.seed = seed;
+                    h.quality = quality;
+                    changed = true;
+                }
+                ui.end_row();
                 ui.label(tr("Densità"));
                 changed |= ui
-                    .add(egui::Slider::new(&mut h.density, 0.005..=3.0).logarithmic(true).max_decimals(3))
+                    .add(egui::Slider::new(&mut h.density, 0.005..=10.0).logarithmic(true).max_decimals(3))
                     .on_hover_text(tr(
                         "Quanto è spessa l'aria (1/m): 0,05 = velo, 0,2 = raggi ben visibili, oltre 1 = nebbia",
                     ))
@@ -228,16 +200,30 @@ fn haze(app: &mut ForgeApp, ui: &mut egui::Ui) {
                     ))
                     .changed();
                 ui.end_row();
-                ui.label(tr("Vortici"));
+                let (var_label, var_hint) = match h.kind {
+                    HazeKind::GasClouds => (
+                        tr("Quante nuvole"),
+                        tr("Quanta aria coprono gli ammassi: 0 = pochi e piccoli, 1 = metà dell'aria"),
+                    ),
+                    HazeKind::ToxicFloor => (
+                        tr("Filamenti"),
+                        tr("Quanto il fumo si raccoglie in linee: 0 = strato uniforme, 1 = solo filamenti"),
+                    ),
+                    _ => (
+                        tr("Vortici"),
+                        tr("Quanto l'aria è irregolare: 0 = uniforme, 1 = banchi densi, riccioli e vuoti"),
+                    ),
+                };
+                ui.label(var_label);
                 changed |= ui
                     .add(egui::Slider::new(&mut h.variation, 0.0..=1.0))
-                    .on_hover_text(tr("Quanto l'aria è irregolare: 0 = uniforme, 1 = banchi densi, riccioli e vuoti"))
+                    .on_hover_text(var_hint)
                     .changed();
                 ui.end_row();
                 ui.label(tr("Grandezza dei vortici"));
                 changed |= ui
                     .add(
-                        egui::Slider::new(&mut h.swirl_scale, 0.1..=5.0)
+                        egui::Slider::new(&mut h.swirl_scale, 0.05..=5.0)
                             .logarithmic(true)
                             .suffix(" m")
                             .max_decimals(2),
@@ -245,11 +231,64 @@ fn haze(app: &mut ForgeApp, ui: &mut egui::Ui) {
                     .on_hover_text(tr("Dimensione tipica dei banchi e dei riccioli"))
                     .changed();
                 ui.end_row();
-                ui.label(tr("Si dirada salendo"));
+                ui.label(tr("Forza dei vortici"));
                 changed |= ui
-                    .add(egui::Slider::new(&mut h.falloff_height, 0.0..=5.0).suffix(" m").max_decimals(2))
-                    .on_hover_text(tr("Altezza in cui la foschia si dimezza salendo dal punto più basso della scena: \
-                         0 = uguale ovunque, piccola = nebbia a terra"))
+                    .add(egui::Slider::new(&mut h.warp, 0.0..=4.0).max_decimals(2))
+                    .on_hover_text(tr(
+                        "Quanto il rumore viene attorcigliato: 0 = macchie tonde, 1,5 = banchi mossi, 3–4 = riccioli \
+                         e spirali ben visibili",
+                    ))
+                    .changed();
+                ui.end_row();
+                ui.label(tr("Dettaglio frattale"));
+                changed |= ui
+                    .add(egui::Slider::new(&mut h.octaves, 1..=8))
+                    .on_hover_text(tr(
+                        "Ottave del frattale: 1–2 = forme morbide e grandi, 6–8 = dettagli sempre più fini dentro le \
+                         forme (servono qualità alte per vederli)",
+                    ))
+                    .changed();
+                ui.end_row();
+                ui.label(tr("Ruvidità"));
+                changed |= ui
+                    .add(egui::Slider::new(&mut h.roughness, 0.25..=0.8).max_decimals(2))
+                    .on_hover_text(tr(
+                        "Quanto pesano i dettagli fini: bassa = bordi morbidi, alta = bordi frastagliati e accentuati",
+                    ))
+                    .changed();
+                ui.end_row();
+                let (fall_label, fall_hint, range) = match h.kind {
+                    HazeKind::ToxicFloor => (
+                        tr("Spessore dello strato"),
+                        tr("Altezza dello strato di fumo sopra il punto più basso della scena"),
+                        0.01..=0.5,
+                    ),
+                    HazeKind::Layers => (
+                        tr("Distanza tra gli strati"),
+                        tr("Distanza verticale tra un velo e il successivo"),
+                        0.05..=2.0,
+                    ),
+                    _ => (
+                        tr("Si dirada salendo"),
+                        tr("Altezza in cui la foschia si dimezza salendo dal punto più basso della scena: \
+                            0 = uguale ovunque, piccola = nebbia a terra"),
+                        0.0..=5.0,
+                    ),
+                };
+                ui.label(fall_label);
+                changed |= ui
+                    .add(egui::Slider::new(&mut h.falloff_height, range).suffix(" m").max_decimals(2))
+                    .on_hover_text(fall_hint)
+                    .changed();
+                ui.end_row();
+                ui.label(tr("Qualità"));
+                changed |= ui
+                    .add(egui::Slider::new(&mut h.quality, 1..=4))
+                    .on_hover_text(tr(
+                        "Quanto è fitta la griglia della foschia: 1 = bozza (1 milione di celle), 2 = normale (4 milioni), \
+                         3 = alta (12 milioni), 4 = massima (24 milioni, 48 MB). Più alta = dettagli fini e bordi netti, \
+                         calcolo più lungo (la barra in basso mostra l'avanzamento)",
+                    ))
                     .changed();
                 ui.end_row();
                 ui.label(tr("Forma"));
@@ -266,55 +305,79 @@ fn haze(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 });
                 ui.end_row();
             });
-            ui.separator();
-            let dust = &mut app.scene.haze_dust;
-            dust_changed |= ui
-                .checkbox(&mut dust.enabled, tr("Polvere in sospensione"))
-                .on_hover_text(tr(
-                    "Granelli minuscoli nell'aria: al buio quasi non si vedono, dove li colpisce un raggio (o la luce \
-                     di rimbalzo) brillano, come in soffitta controluce",
-                ))
-                .changed();
-            if dust.enabled {
-                egui::Grid::new("polvere").num_columns(2).show(ui, |ui| {
-                    ui.label(tr("Quantità"));
-                    dust_changed |= ui
-                        .add(
-                            egui::Slider::new(&mut dust.per_m3, 100.0..=30000.0)
-                                .logarithmic(true)
-                                .suffix(tr(" /m³"))
-                                .max_decimals(0),
-                        )
-                        .on_hover_text(tr("Granelli per metro cubo (al massimo 150 000 in tutto)"))
-                        .changed();
-                    ui.end_row();
-                    ui.label(tr("Dimensione"));
-                    dust_changed |= ui
-                        .add(egui::Slider::new(&mut dust.size_mm, 0.1..=3.0).suffix(" mm").max_decimals(2))
-                        .on_hover_text(tr("Diametro medio dei granelli: più grandi = puntini più visibili e sfocati"))
-                        .changed();
-                    ui.end_row();
-                    ui.label(tr("Colore"));
-                    dust_changed |= ui.color_edit_button_rgb(&mut dust.color).changed();
-                    ui.end_row();
-                });
-            }
         });
     if remove {
         app.scene.haze.enabled = false;
-        dust_changed = true;
         changed = true;
     }
-    if dust_changed && !(app.scene.haze.enabled && app.scene.haze_dust.enabled) {
+    if changed {
+        app.shading_changed();
+    }
+}
+
+/// Polvere aggiunta, tolta o cambiata: si rifà il suo nodo.
+fn dust_changed(app: &mut ForgeApp) {
+    if !app.scene.haze_dust.enabled {
         // Il nodo della polvere sparisce: gli indici dei nodi dopo di lui cambiano.
         app.selection.clear();
     }
-    if dust_changed {
-        app.scene.sync_effects();
-        app.geometry_changed();
-        app.appearance_changed();
-    } else if changed {
-        app.shading_changed();
+    app.scene.sync_effects();
+    app.geometry_changed();
+    app.appearance_changed();
+}
+
+fn dust(app: &mut ForgeApp, ui: &mut egui::Ui) {
+    let mut changed = false;
+    let mut remove = false;
+    let id = ui.make_persistent_id("polvere-sospesa");
+    egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, true)
+        .show_header(ui, |ui| {
+            ui.strong(tr("Polvere in sospensione"));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui.small_button(icons::DELETE).on_hover_text(tr("Togli la polvere")).clicked() {
+                    remove = true;
+                }
+            });
+        })
+        .body(|ui| {
+            ui.label(
+                egui::RichText::new(tr(
+                    "Si vede solo dove la colpisce direttamente una luce (spot, sole, luci della scena): serve \
+                     un fascio che attraversi l'aria. La luce dell'ambiente e quella di rimbalzo non la illuminano.",
+                ))
+                .small()
+                .weak(),
+            );
+            let dust = &mut app.scene.haze_dust;
+            egui::Grid::new("polvere").num_columns(2).show(ui, |ui| {
+                ui.label(tr("Quantità"));
+                changed |= ui
+                    .add(
+                        egui::Slider::new(&mut dust.per_m3, 100.0..=30000.0)
+                            .logarithmic(true)
+                            .suffix(tr(" /m³"))
+                            .max_decimals(0),
+                    )
+                    .on_hover_text(tr("Granelli per metro cubo (al massimo 150 000 in tutto)"))
+                    .changed();
+                ui.end_row();
+                ui.label(tr("Dimensione"));
+                changed |= ui
+                    .add(egui::Slider::new(&mut dust.size_mm, 0.1..=3.0).suffix(" mm").max_decimals(2))
+                    .on_hover_text(tr("Diametro medio dei granelli: più grandi = puntini più visibili e sfocati"))
+                    .changed();
+                ui.end_row();
+                ui.label(tr("Colore"));
+                changed |= ui.color_edit_button_rgb(&mut dust.color).changed();
+                ui.end_row();
+            });
+        });
+    if remove {
+        app.scene.haze_dust.enabled = false;
+        changed = true;
+    }
+    if changed {
+        dust_changed(app);
     }
 }
 
@@ -336,7 +399,7 @@ fn decals(app: &mut ForgeApp, ui: &mut egui::Ui) {
                         .changed();
                     ui.label(&d.name);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.small_button("✕").on_hover_text(tr("Elimina l'adesivo")).clicked() {
+                        if ui.small_button(icons::DELETE).on_hover_text(tr("Elimina l'adesivo")).clicked() {
                             remove = Some(i);
                         }
                     });
@@ -377,7 +440,7 @@ fn decals(app: &mut ForgeApp, ui: &mut egui::Ui) {
                         ui.end_row();
                         ui.label(tr("Sposta"));
                         ui.horizontal(|ui| {
-                            for (k, label) in [(0, "↔"), (1, "↕")] {
+                            for (k, label) in [(0, icons::ARROWS_H), (1, icons::ARROWS_V)] {
                                 geometry |= ui
                                     .add(
                                         egui::DragValue::new(&mut d.offset[k])

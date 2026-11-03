@@ -18,16 +18,19 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
-### What's new in 0.32.0
+### What's new in 0.34.0
 
-- **Much faster dry-ice fog:** the simulation works only where the fog is: Ultra 182 → 37 s (4.9×), Very high 61 → 14.5 s on the cocktail demo, same fog. It is computed in the background right after your changes, with a progress bar next to the samples.
-- **Laser partial reflections:** optional splitting of the beam at every glass face, like a real laser (many dots around crystals and diamonds).
-- **New demo scenes:** optical bench with lasers and a prism, converging and diverging lenses.
-- **AI MCP: ON / OFF** switch in the top bar, with a gear for the AI integration settings.
+- **Ambient haze in five kinds:** low fog, gas clouds, toxic smoke on the floor, floating layers and vapour curls, with fractal controls (swirl strength, detail, roughness) and a quality slider up to 24 million cells.
+- **Floating dust as its own effect:** specks that show only inside light beams, like dust in the rays from a window.
+- **Decals:** logos and labels applied on any surface, also curved ones.
+- **STEP converted once:** projects and packages keep the conversion (optical bench demo: 27 s → 0.2 s to open).
+- **No haze inside glass and solid parts**, effects computed one at a time with a single progress bar, and the render starts on the GPU by default.
 
 <details>
 <summary><strong>Previous versions — complete release history</strong></summary>
 
+- **0.33.0 — Ambient haze, floating dust, decals:** haze with banks and curls lit with multiple scattering; dust specks; decals on curved surfaces; STEP conversion saved with projects and packages; fog computation can be cancelled and restarts on changes.
+- **0.32.0 — Much faster dry-ice fog:** the simulation works only where the fog is (Ultra 182 → 37 s on the cocktail demo), computed in the background with a progress bar; laser partial reflections; optical bench and lens demos; AI MCP ON/OFF switch.
 - **0.31.0 — Complete package and detachable library:** .frpack, folder or ZIP with all files; detachable materials library with a big Apply to selection; UV violet laser and true blue; wide beams cut on glass faces; aspects keep your lights; new welcome screen.
 - **0.30.0 — Laser as its own light, presets that add:** red, green, blue and white lab lasers (coloured ones never split); light presets add instead of replacing; visible beam inside liquids.
 - **0.29.0 — Light through glasses with liquid:** correct glass-liquid bending for the laser and caustics, beam fading in coloured drinks; new Liquids material category.
@@ -125,42 +128,54 @@ This is a physically motivated fluid approximation for dry-ice-style effects, no
 
 [Open the cocktail with dry-ice demo scene](samples/scene/cocktail-ghiaccio-secco/cocktail-ghiaccio-secco.frproject) · [Demo instructions and controls](samples/scene/cocktail-ghiaccio-secco/LEGGIMI.md).
 
-### 5. PBR materials and textures for CAD models
+### 5. Ambient haze — five kinds of procedural fog
+
+A participating medium that fills the scene (or only a layer of it) and that every light crosses: spots, sun and lamps draw rays with the shadows of the objects inside it, and light is scattered several times, on CPU and GPU. It is not a texture or a uniform grey block: the density comes from a domain-warped fractal noise computed on a 3D grid, so it has banks, curls and gaps.
+
+- **Five kinds:** *Low fog* lying on the ground and thinning out going up; *Gas clouds*, almost clear air with dense clumps here and there; *Toxic smoke on the floor*, a layer a few centimetres thick that hovers over the floor gathered into filaments; *Floating layers*, horizontal veils at different heights, wavy and full of holes; *Vapour curls*, swirls inside swirls with high contrast.
+- **Fractal controls:** swirl strength (from round blobs to clearly visible spirals), fractal detail (1–8 octaves), roughness (soft or ragged edges), swirl size, amount, colour and forward scattering (how bright the rays are against the light).
+- **Quality slider:** from a 1-million-cell draft to 24 million cells (48 MB) for fine detail and sharp edges. The haze is computed ahead of time, one effect at a time, with the progress bar at the bottom.
+- **Never inside the objects:** rays travelling inside glass or liquid skip it (lenses and glasses stay clear) and the solid inside of the parts is cleared, while the air of a closed room stays hazy.
+
+### 6. Floating dust — specks that shine only in a beam
+
+Tiny real specks (sub-millimetre, up to 150,000) scattered in the air, as their own effect. They are invisible except where a light hits them directly: inside a spot beam or the sun coming through a window they sparkle, like the dust in the rays of an attic, while environment and bounce light do not light them. Amount, size and colour are adjustable.
+
+### 7. Decals — labels and logos on any surface
+
+Apply an image (a logo, a label, a PNG with transparency) to the selected object where the camera is looking. The decal is cut from the object's own triangles inside a projection box, so it wraps curved surfaces such as bottles and cups, and it moves with the object. The transparent parts of the PNG let the object show through. Width (the height follows the image proportions), rotation, position on the surface, projection depth, roughness and metalness are adjustable, and the image travels with the project and inside `.frpack` packages.
+
+### 8. PBR materials and textures for CAD models
 
 ![ForgeRender material and texture examples](docs/img/mcp/esempi/materiali.jpg)
 
 Diffuse materials, GGX metals and plastics, Fresnel glass, frosted glass and emissive surfaces. PBR maps include base colour, roughness, metallic, normal, bump, true displacement, ambient occlusion and opacity. For CAD models without UVs, metric Box projection is available, with Piece, Assembly or World anchoring.
 
-### 6. Product studio and lighting
+### 9. Product studio and lighting
 
 ![ForgeRender photographic studio look](docs/img/mcp/esempi/aspetto_studio.jpg)
 
 Prepare a product scene with a backdrop and studio lights, then choose a light, dark or dramatic background. Lights remain individually adjustable, and the studio can be fitted to the product dimensions without taking control away from the user.
 
-### 7. Volumetric lighting and visible beams
+### 10. Volumetric lighting and visible beams
 
 ![ForgeRender volumetric light beam](reports/fascio-volumetrico/dopo_fascio_solo_camera.png)
 
 Spotlights can create visible beams with adjustable density and length. Volumetric fog is a participating medium with scattering and shadows: light interacts with the volume and becomes visible in space, not only on surfaces.
 
-- **Ambient haze:** a participating medium that fills the whole scene, the camera and the lights. It is not a uniform grey block: a domain-warped fractal noise gives it denser banks, curls and clear gaps, with controls for density, colour, swirl amount and size, forward scattering (how bright the rays are when looking towards the light) and an optional falloff with height for ground fog. Light is scattered several times inside it, so every light draws shafts with the shadows of the objects; it works on CPU and GPU. Presets: Light veil, Light rays, Dusty attic, Thick haze, Low fog. There is no haze inside the objects: rays travelling inside glass or liquid skip it (lenses stay clear), and the solid inside of the parts is cleared too, while the air of a closed room stays hazy.
-- **Floating dust:** tiny real specks (sub-millimetre geometry, up to 150,000) scattered in the air. They are almost invisible in the dark and sparkle where a beam, or bounced light, reaches them, as in a backlit attic. Amount, size and colour are adjustable.
+For fog that fills the whole scene see [Ambient haze](#5-ambient-haze--five-kinds-of-procedural-fog), and for specks that sparkle in the beams see [Floating dust](#6-floating-dust--specks-that-shine-only-in-a-beam).
 
-### 8. Camera, multiple views and product presentation
+### 11. Camera, multiple views and product presentation
 
 ![Three-quarter product view](docs/img/mcp/esempi/vista_tre_quarti.jpg)
 
 Render cameras provide focal length, aperture, depth of field and lens shift. Automatic front, rear, side, top and three-quarter views help present a product from multiple angles; turntable videos can be exported as MP4.
 
-### 9. Render passes and post-production
+### 12. Render passes and post-production
 
 ForgeRender can export separate **Albedo, Normals, Depth, Product Mask and Component ID** passes for compositing, masking and further image editing. These are technical output buffers, not additional beauty renders.
 
-### 10. Decals — labels and logos on any surface
-
-Apply an image (a logo, a label, a PNG with transparency) to the selected object where the camera is looking. The decal is cut from the object's own triangles inside a projection box, so it wraps curved surfaces such as bottles and cups, and it moves with the object. The transparent parts of the PNG let the object show through. Width (the height follows the image proportions), rotation, position on the surface, projection depth, roughness and metalness are adjustable, and the image travels with the project and inside `.frpack` packages.
-
-### 11. STEP models: converted once, then reopened instantly
+### 13. STEP models: converted once, then reopened instantly
 
 A STEP file is converted to meshes once. The result is kept in a conversion cache and saved next to the project (`modelli-convertiti/`) and inside `.frpack` packages, so reopening a project does not convert the STEP again. On the optical bench demo, opening went from 27 s to 0.2 s. When the STEP changes (or the parts of a multi-file assembly change, or the quality changes), it is converted again. Packages now also include the part files that a multi-file STEP assembly refers to.
 

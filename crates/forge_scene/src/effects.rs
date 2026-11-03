@@ -393,7 +393,7 @@ impl Scene {
 
     fn sync_dust(&mut self) -> bool {
         let id = ComponentId(DUST_ID.into());
-        let on = self.haze.enabled && self.haze_dust.enabled;
+        let on = self.haze_dust.enabled;
         let existing = self.find(&id);
         if !on {
             if let Some(i) = existing {

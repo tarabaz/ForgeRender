@@ -229,6 +229,14 @@ pub fn radiance_spectral_with(
                 add(&mut l, beta * c, depth);
             }
         }
+        // Polvere in sospensione (come nel render RGB, colore portato sulle lunghezze d'onda).
+        if camera_path && scene.has_dust {
+            let t_end = light_hit.map(|x| x.0).unwrap_or(t_surf);
+            let c = crate::integrator::dust_glints(scene, o, d, t_end, rng);
+            if c != Vec3::ZERO {
+                add(&mut l, beta * illuminant(c, w), depth);
+            }
+        }
         if media.n > 0 {
             let t_end = light_hit.map(|x| x.0).unwrap_or(t_surf);
             if t_end.is_finite() {

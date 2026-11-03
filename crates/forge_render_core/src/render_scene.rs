@@ -33,6 +33,9 @@ pub struct RenderMaterial {
     /// l'assorbimento per lunghezza d'onda.
     pub volume_color: Vec3,
     pub volume_depth: f32,
+    /// Polvere in sospensione: trasparente per tutti i raggi; i raggi dalla camera vi aggiungono
+    /// la luce diretta delle luci della scena (si vede solo dentro un fascio).
+    pub dust: bool,
 }
 
 /// Texture di un materiale, già caricate.
@@ -128,6 +131,7 @@ impl RenderMaterial {
             abbe: m.abbe,
             volume_color: Vec3::from_array(m.volume_color),
             volume_depth: m.volume_depth_cm * 0.01,
+            dust: m.id.0 == forge_scene::effects::DUST_ID,
         }
     }
 }
@@ -586,8 +590,12 @@ pub struct RenderScene {
     pub camera: Camera,
     /// Portali di luce: se presenti l'ambiente si campiona attraverso di loro.
     pub portals: Portals,
-    /// Qualche materiale ha una mappa di opacità (ritaglio): le intersezioni vanno filtrate.
+    /// Qualche materiale ha una mappa di opacità (ritaglio) o c'è la polvere: le intersezioni
+    /// vanno filtrate.
     pub has_cutout: bool,
+    /// C'è la polvere in sospensione (granelli che i raggi attraversano, vedi
+    /// [`RenderMaterial::dust`]).
+    pub has_dust: bool,
     /// Riferimento della proiezione Box di ogni nodo (indice = nodo), secondo l'ancoraggio del
     /// suo materiale: lo legge lo shading di CPU e GPU.
     pub node_frames: Vec<crate::displace::BoxFrame>,
@@ -723,13 +731,15 @@ impl RenderScene {
 
         let emissive = build_emissive(&geometry, &node_material, &materials).map(Arc::new);
 
-        let has_cutout = material_textures.iter().flatten().any(|t| t.opacity.is_some());
+        let has_dust = node_material.iter().any(|&m| materials[m as usize].dust);
+        let has_cutout = has_dust || material_textures.iter().flatten().any(|t| t.opacity.is_some());
         let mut fogs = crate::fog::bake_fogs(scene, &geometry);
         fogs.extend(crate::fog::beam_fogs(scene));
         fogs.extend(crate::fog::haze_fog(scene, &geometry));
         let id = next_scene_id();
         let mut rs = RenderScene {
             has_cutout,
+            has_dust,
             node_frames: box_frames(scene),
             fogs,
             id,
@@ -770,6 +780,7 @@ impl RenderScene {
             camera,
             portals: self.portals.clone(),
             has_cutout: self.has_cutout,
+            has_dust: self.has_dust,
             node_frames: self.node_frames.clone(),
             fogs: self.fogs.clone(),
             lasers: self.lasers.clone(),

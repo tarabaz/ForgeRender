@@ -65,12 +65,18 @@ pub fn gradient(p: Vec3, seed: u32) -> f32 {
 
 /// Somma frattale di `octaves` ottave (lacunarità 2, guadagno 0.5), normalizzata in circa [-1, 1].
 pub fn fbm(p: Vec3, seed: u32, octaves: u32) -> f32 {
+    fbm_gain(p, seed, octaves, 0.5)
+}
+
+/// Come [`fbm`] con il guadagno tra un'ottava e la successiva: alto (0,7) = dettagli fini
+/// marcati, frastagliati; basso (0,3) = forme morbide.
+pub fn fbm_gain(p: Vec3, seed: u32, octaves: u32, gain: f32) -> f32 {
     let (mut sum, mut amp, mut freq, mut norm) = (0.0, 1.0, 1.0, 0.0);
     for o in 0..octaves {
         // Ogni ottava ha il suo seed e un piccolo spostamento: niente allineamenti tra ottave.
         sum += amp * gradient(p * freq + Vec3::splat(o as f32 * 17.13), seed.wrapping_add(o * 1013));
         norm += amp;
-        amp *= 0.5;
+        amp *= gain;
         freq *= 2.0;
     }
     sum / norm
