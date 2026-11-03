@@ -2409,3 +2409,22 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
 - Precisato che si tratta di un'approssimazione fluidodinamica ispirata alla fisica, non di CFD termodinamica della sublimazione CO2/trasferimento di calore. Collegata la demo cocktail e le istruzioni.
 - Nome concordato per l'immagine: docs/img/features/dry-ice-fog-simulation.jpg. Il file immagine non è stato verificato nel repository in questo aggiornamento e resta da caricare.
 - Modifiche documentali soltanto; nessun build o test eseguito.
+
+
+## ChatGPT — 03/11/2026: priorità alta, accelerazione simulazione fumo/nebbia
+
+- Richiesta di Valerio: la generazione della nebbia da ghiaccio secco è eccessivamente lenta, in particolare alle qualità alte. Chiede che il prossimo step importante sia dedicato a velocizzare e ottimizzare la simulazione con un guadagno molto superiore a 2×.
+- **Branch e commit di riferimento:** `main`, commit `13f5bf3d9c2d69f3b0219a675ed01c2206782168` prima di questa nota. Il branch `sviluppo` è stato confrontato con `main`: risulta 16 commit indietro e 0 avanti; non usarlo come base per questo lavoro.
+- Ultima risposta di Claude Code individuata nella nota: 03/11/2026, branch `sviluppo`, riflessi parziali Fresnel del laser e demo lenti. Nessuna risposta di Claude sulla nuova ottimizzazione è ancora presente.
+- `reports/CLAUDE_HANDOFF.md` non esiste (404). La nota principale è stata letta integralmente su `main`; le ultime sezioni documentano anche le modifiche README sulla nebbia da ghiaccio secco.
+- **Codice controllato su main:** `crates/forge_volume/src/sim.rs`, `crates/forge_volume/src/lib.rs`, `crates/forge_render_core/src/fog.rs`.
+  - La simulazione usa griglia MAC 3D, trasporto semi-Lagrangiano, pressione Gauss–Seidel rosso/nero (16 iterazioni), trasporto MacCormack limitato, forze, curl noise e collisioni.
+  - Esistono già bounding box di lavoro e `near_fog`, ma vari campi/buffer restano densi: Claude deve verificare col profiler quante celle sono realmente visitate e dove si concentra il costo.
+  - La simulazione è circa il 70% della risoluzione di dettaglio, limitata da `sim_cells`/`SIM_MAX`; il dettaglio viene cotto successivamente su griglia fine.
+  - Le cache di simulazione e bake sono in memoria; non sopravvivono al riavvio. La voxelizzazione collisioni, simulazione e bake dettaglio vanno cronometrati separatamente.
+- **Piano operativo preparato per Claude:** `reports/2026-11-03_ottimizzazione-simulazione-fumo/PLAN.md` (commit `79a52497f565a21f77ff85f32132783b9a0784b3`).
+- Target di progetto esplicito, da misurare e non da presumere: almeno **5×** più veloce sulla prima generazione a qualità visiva equivalente; obiettivo ambizioso **8–10× o oltre**. Il riuso della cache non conta come accelerazione del primo calcolo.
+- Direzioni prioritarie: profiling per fase; sparse grid/active tiles che riducano davvero le celle processate; solver di pressione più efficiente (warm start/multigrid o alternativa misurata); riduzione allocazioni e costi di advezione; risoluzione adattiva; valutazione concreta di GPU compute wgpu/Vulkan con fallback CPU; cache persistente come miglioramento separato per i calcoli successivi.
+- **Richiesta a Claude Code:** non limitarsi a una proposta teorica. Fare baseline riproducibile, individuare il collo di bottiglia dominante e implementare per milestone la combinazione con maggiore guadagno. Confrontare stessa scena, seed e parametri, almeno 3 run per configurazione, mediana e metriche/immagini a qualità equivalente. Non degradare silenziosamente la qualità e non dichiarare speedup senza benchmark.
+- **Non eseguito da ChatGPT:** nessuna build, test o benchmark. Nessuna modifica al codice applicativo. Nessun confronto prestazionale diretto con Houdini/FumeFX.
+- **Da Claude:** aggiungere una risposta in fondo a questa nota con branch/commit, profiler e baseline, file modificati, test realmente eseguiti, benchmark prima/dopo, speedup e qualità misurati, limiti e prossima fase.
