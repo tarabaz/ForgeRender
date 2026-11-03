@@ -119,7 +119,22 @@ Usa ForgeRender come un banco ottico virtuale. Scegli tra sorgenti laser rosse, 
 
 Il percorso del laser viene tracciato in modo deterministico a partire dalla sorgente, senza affidarsi al path tracing dalla camera per intercettare casualmente un fascio sottile. Il risultato è una visualizzazione pulita e stabile.
 
-### 4. Materiali PBR e texture per modelli CAD
+### 4. Nebbia da ghiaccio secco — simulazione fluida e rendering volumetrico
+
+ForgeRender genera nebbia scenografica con una simulazione fluida 3D deterministica e basata su seed. Il solver modella la discesa del gas freddo e pesante, il suo accumulo e la propagazione laterale sulle superfici, oltre agli sbuffi turbolenti che risalgono mentre la nube evolve.
+
+- **Griglia MAC 3D:** calcolo di velocità e pressione e trasporto dei campi della nebbia.
+- **Gravità e risalita:** la nube cade dall'emettitore, si raccoglie e si allarga lateralmente; il parametro *Risalita* controlla il moto verso l'alto degli sbuffi.
+- **Turbolenza:** curl noise con seed, confinamento della vorticità e advezione MacCormack limitata generano vortici e filamenti preservando i dettagli.
+- **Collisioni:** gli oggetti vengono voxelizzati come ostacoli solidi; la nebbia li aggira, si raccoglie nei contenitori, trabocca e si diffonde sulle superfici.
+- **Rendering volumetrico:** il risultato viene trasferito in un volume di densità più dettagliato. Il path tracer usa delta tracking e scattering Henyey–Greenstein, con illuminazione e ombre volumetriche.
+- **Controlli:** tempo simulato, emissione, raggio sorgente, turbolenza, risalita, dissolvenza, densità, scala dei dettagli e qualità. Il seed rende ripetibile il risultato.
+
+È un'approssimazione fluidodinamica ispirata alla fisica, non un modello CFD termodinamico della sublimazione della CO2 o del trasferimento di calore.
+
+[Apri la scena demo del cocktail con ghiaccio secco](samples/scene/cocktail-ghiaccio-secco/cocktail-ghiaccio-secco.frproject) · [Istruzioni e controlli](samples/scene/cocktail-ghiaccio-secco/LEGGIMI.md).
+
+### 9. Materiali PBR e texture per modelli CAD
 
 ![Esempi di materiali e texture di ForgeRender](docs/img/mcp/esempi/materiali.jpg)
 
