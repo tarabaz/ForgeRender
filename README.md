@@ -108,7 +108,22 @@ Use ForgeRender as a virtual optical bench. Choose from red, green, blue, UV vio
 
 The laser path is traced deterministically from the source, rather than relying on camera path tracing to randomly discover a narrow beam. This produces a clean, stable beam visualization.
 
-### 4. PBR materials and textures for CAD models
+### 4. Dry-ice fog — fluid simulation and volumetric rendering
+
+ForgeRender creates dry-ice-style fog with a deterministic, seeded fluid simulation. It is not a static smoke texture: a 3D fluid solver models the downward flow of cold, heavy gas, its accumulation and lateral spread along surfaces, and the turbulent wisps that rise as the cloud evolves.
+
+- **3D MAC fluid grid:** the solver evolves velocity and pressure while transporting the fog fields through the simulation volume.
+- **Gravity and rise:** the cold cloud falls from its emitter, settles and spreads sideways; the *Rise* parameter controls the upward motion of older wisps.
+- **Turbulence:** seeded curl-noise forces and vorticity confinement create rolling eddies and filaments. Limited MacCormack advection helps preserve transported detail.
+- **Scene collisions:** scene geometry is voxelised as solid obstacles, so fog flows around objects, pools inside containers, spills over their edges and spreads across nearby surfaces.
+- **Volumetric rendering:** the simulation is baked into a higher-resolution density volume. The path tracer traverses it with delta tracking and Henyey–Greenstein phase scattering, allowing lights to illuminate the fog and cast volumetric shadows.
+- **Reproducible controls:** simulated time, emission rate, source radius, turbulence, rise, dissipation, density, detail scale and simulation quality can be adjusted. A seed makes the same settings reproducible.
+
+This is a physically motivated fluid approximation for dry-ice-style effects, not a thermodynamic CFD model of CO2 sublimation or heat transfer.
+
+[Open the cocktail with dry-ice demo scene](samples/scene/cocktail-ghiaccio-secco/cocktail-ghiaccio-secco.frproject) · [Demo instructions and controls](samples/scene/cocktail-ghiaccio-secco/LEGGIMI.md).
+
+### 9. PBR materials and textures for CAD models
 
 ![ForgeRender material and texture examples](docs/img/mcp/esempi/materiali.jpg)
 
