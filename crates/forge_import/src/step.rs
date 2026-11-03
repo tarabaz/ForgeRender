@@ -50,13 +50,117 @@ fn temp_path(stem: &str, ext: &str) -> PathBuf {
     std::env::temp_dir().join(format!("forgerender_{stem}_{}_{nanos}.{ext}", std::process::id()))
 }
 
+/// File a cui rimanda uno STEP salvato "a più file" (assieme con le parti in file separati,
+/// `DOCUMENT_FILE('pezzo.STEP', …)`): percorsi relativi alla cartella dello STEP.
+pub fn external_refs(path: &Path) -> Vec<PathBuf> {
+    let Ok(bytes) = std::fs::read(path) else {
+        return Vec::new();
+    };
+    let text = String::from_utf8_lossy(&bytes);
+    let mut out: Vec<PathBuf> = Vec::new();
+    let mut rest = &text[..];
+    while let Some(i) = rest.find("DOCUMENT_FILE") {
+        rest = &rest[i + 13..];
+        let Some(open) = rest.find('\x27') else { break };
+        let after = &rest[open + 1..];
+        let Some(close) = after.find('\x27') else { break };
+        let name = after[..close].trim();
+        let ext = Path::new(name)
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        if matches!(ext.as_str(), "step" | "stp") && !name.contains("..") {
+            let p = PathBuf::from(name);
+            if !out.contains(&p) {
+                out.push(p);
+            }
+        }
+        rest = &after[close + 1..];
+    }
+    out
+}
+
+/// Impronta di una conversione: contenuto dello STEP e dei pezzi a cui rimanda, e qualità.
+/// Uguale = la conversione salvata vale ancora.
+pub fn fingerprint(path: &Path, opts: &ImportOptions) -> Option<String> {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    let mut eat = |b: &[u8]| {
+        let (chunks, tail) = b.as_chunks::<8>();
+        for c in chunks {
+            h = (h ^ u64::from_le_bytes(*c)).wrapping_mul(0x0000_0100_0000_01b3).rotate_left(29);
+        }
+        for &x in tail {
+            h = (h ^ x as u64).wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        h ^= b.len() as u64;
+    };
+    eat(&std::fs::read(path).ok()?);
+    let dir = path.parent().unwrap_or(Path::new("."));
+    for r in external_refs(path) {
+        match std::fs::read(dir.join(&r)) {
+            Ok(b) => eat(&b),
+            Err(_) => eat(b"mancante"),
+        }
+    }
+    eat(opts.step_quality.arg().as_bytes());
+    Some(format!("{h:016x}"))
+}
+
+/// Mancano dei pezzi a cui lo STEP rimanda (convertirlo darebbe un assieme vuoto o a metà).
+pub fn missing_refs(path: &Path) -> bool {
+    let dir = path.parent().unwrap_or(Path::new("."));
+    external_refs(path).iter().any(|r| !dir.join(r).is_file())
+}
+
+/// Cartella della cache delle conversioni (accanto alle impostazioni dell'utente).
+pub fn cache_dir() -> PathBuf {
+    std::env::var_os("FORGE_STEP_CACHE")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("LOCALAPPDATA").map(|p| PathBuf::from(p).join("ForgeRender").join("conversioni-step")))
+        .unwrap_or_else(|| std::env::temp_dir().join("forgerender-conversioni-step"))
+}
+
+/// Conversione già fatta per questa impronta (cache dell'utente).
+pub fn cached_conversion(key: &str) -> PathBuf {
+    cache_dir().join(format!("{key}.frmesh"))
+}
+
 /// Converte un file STEP (o SolidWorks) nel modello intermedio. Operazione lenta:
 /// va eseguita fuori dal thread dell'interfaccia. `progress` riceve messaggi testuali.
+/// Una conversione già fatta (stesso contenuto, stessa qualità) si rilegge dalla cache.
 pub fn convert(path: &Path, opts: &ImportOptions, mut progress: impl FnMut(String)) -> Result<FrMesh, ImportError> {
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
     if !path.is_file() {
         return Err(ImportError::Converter(format!("file non trovato: {}", path.display())));
     }
+    // Assiemi SolidWorks: le parti stanno in altri file che l'impronta non vede, niente cache.
+    let key = if matches!(ext.as_str(), "step" | "stp") {
+        fingerprint(path, opts)
+    } else {
+        None
+    };
+    if let Some(k) = &key {
+        let c = cached_conversion(k);
+        if let Ok(mut model) = FrMesh::read(&c) {
+            progress("conversione già fatta: riletta dalla cache".into());
+            model.header.source = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+            return Ok(model);
+        }
+    }
+    let model = convert_uncached(path, &ext, opts, &mut progress)?;
+    if let Some(k) = &key {
+        let c = cached_conversion(k);
+        let _ = std::fs::create_dir_all(cache_dir());
+        let tmp = c.with_extension("tmp");
+        if model.write(&tmp).is_ok() {
+            let _ = std::fs::rename(&tmp, &c);
+        }
+    }
+    Ok(model)
+}
+
+fn convert_uncached(path: &Path, ext: &str, opts: &ImportOptions, progress: &mut impl FnMut(String)) -> Result<FrMesh, ImportError> {
     let (step_path, cleanup) = if ext == "sldprt" || ext == "sldasm" {
         progress("esportazione STEP da SolidWorks…".into());
         let out = temp_path("solidworks", "step");
@@ -65,7 +169,7 @@ pub fn convert(path: &Path, opts: &ImportOptions, mut progress: impl FnMut(Strin
     } else {
         (path.to_path_buf(), None)
     };
-    let result = run_converter(&step_path, opts, &mut progress);
+    let result = run_converter(&step_path, opts, progress);
     if let Some(p) = cleanup {
         let _ = std::fs::remove_file(p);
     }

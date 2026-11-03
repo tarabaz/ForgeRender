@@ -10,6 +10,28 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## In development (next 0.33.0, `sviluppo` branch)
+
+**Ambient haze and floating dust**
+- Effects tab, **Ambient haze**: hazy air throughout the scene, with banks, curls and gaps (domain-warped fractal noise), lit like the fog (multiple scattering, object shadows in the rays), on CPU and GPU. Density, colour, backlit rays, swirls, swirl size, thinning with height, shape. Presets: Light veil, Light rays, Dusty attic, Thick haze, Low fog.
+- **Floating dust**: real sub-millimetre specks (up to 150,000) that sparkle where a ray or bounced light hits them. Amount, size, colour.
+
+**Decals**
+- Effects tab, **Decal**: an image on the selected object, where the camera is looking; it wraps curved surfaces and moves with the object. A transparent PNG lets the object show through (the same image as colour and cut-out: its alpha channel is used). Width, rotation, offset, depth, roughness, metalness, "Reposition from the view".
+- Saved in the project and in `.frpack` packages (with the image).
+
+**STEP: saved conversion**
+- A STEP is converted once: the conversion stays in a user cache and is saved with the project (`modelli-convertiti/`) and in packages; on opening it is read back instead of converting again. Optical bench demo: from 27 s to 0.2 s. It is converted again if the STEP, an assembly part or the quality changes.
+- Packages also include the parts of multi-file STEP assemblies. Fixed the **Converging and diverging lenses** demo: the package only held the empty assembly (only the lasers showed); it now has lenses, mounts and lasers.
+
+**Dry-ice fog**
+- **✕** button next to the fog progress bar: cancels the background calculation (with a warning that it will be redone when the render starts).
+- Changing the fog (quality included) or the scene during the calculation stops it at once and restarts it from scratch with the new values.
+
+**Other**
+- Rendering starts on the **GPU** by default; without a suitable graphics card it falls back to the CPU (command line too).
+- AI integration: the MCP bridge updates even while an assistant is using it (the file in use is renamed), no more "Access denied".
+
 ## 0.32.0 — 3 Nov 2026
 
 **Dry-ice fog: much faster simulation**

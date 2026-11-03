@@ -30,6 +30,59 @@ pub struct SourceRef {
     pub relative_path: Option<PathBuf>,
     pub absolute_path: PathBuf,
     pub import_options: ImportOptions,
+    /// Modello STEP già convertito in mesh, salvato con il progetto (relativo alla sua
+    /// cartella): all'apertura si rilegge questo invece di riconvertire lo STEP.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub converted: Option<PathBuf>,
+    /// Impronta dello STEP (e dei pezzi a cui rimanda) da cui viene la conversione salvata.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub converted_key: Option<String>,
+}
+
+/// Cartella, accanto al progetto, delle conversioni STEP salvate.
+pub const CONVERTED_DIR: &str = "modelli-convertiti";
+
+fn is_step(p: &Path) -> bool {
+    p.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("step") || e.eq_ignore_ascii_case("stp"))
+}
+
+/// Salva accanto al progetto la conversione in mesh di ogni STEP (presa dalla cache delle
+/// conversioni), così il progetto si riapre senza riconvertire. Le conversioni che non si
+/// trovano restano quelle già salvate.
+fn store_conversions(project_dir: &Path, sources: &mut [SourceRef]) {
+    for s in sources.iter_mut() {
+        if !is_step(&s.absolute_path) || !s.absolute_path.is_file() {
+            continue;
+        }
+        let Some(key) = forge_import::step::fingerprint(&s.absolute_path, &s.import_options) else {
+            continue;
+        };
+        let stem = s
+            .absolute_path
+            .file_stem()
+            .map(|x| x.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "modello".into());
+        // Già salvata e ancora valida.
+        if s.converted_key.as_deref() == Some(key.as_str()) && s.converted.as_ref().is_some_and(|c| project_dir.join(c).is_file()) {
+            continue;
+        }
+        let rel = Path::new(CONVERTED_DIR).join(format!("{stem}.frmesh"));
+        let dst = project_dir.join(&rel);
+        let cached = forge_import::step::cached_conversion(&key);
+        if !cached.is_file() {
+            continue;
+        }
+        let _ = std::fs::create_dir_all(project_dir.join(CONVERTED_DIR));
+        match std::fs::copy(&cached, &dst) {
+            Ok(_) => {
+                s.converted = Some(rel);
+                s.converted_key = Some(key);
+            }
+            Err(e) => tracing::warn!("conversione di {} non salvata: {e}", s.absolute_path.display()),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -80,6 +133,14 @@ pub struct ProjectFile {
     /// Nebbie volumetriche.
     #[serde(default)]
     pub fogs: Vec<forge_scene::FogVolume>,
+    /// Foschia d'ambiente e polvere in sospensione.
+    #[serde(default)]
+    pub haze: forge_scene::Haze,
+    #[serde(default)]
+    pub haze_dust: forge_scene::Dust,
+    /// Adesivi (decal), ricreati all'apertura sugli oggetti.
+    #[serde(default)]
+    pub decals: Vec<forge_scene::Decal>,
     #[serde(default)]
     pub render: RenderSettings,
     /// Materiali Box messi su ancoraggio "mondo" dalla migrazione di un progetto precedente
@@ -121,6 +182,8 @@ pub fn source_ref(project_dir: Option<&Path>, file: &Path, opts: ImportOptions) 
         relative_path,
         absolute_path,
         import_options: opts,
+        converted: None,
+        converted_key: None,
     }
 }
 
@@ -163,7 +226,10 @@ pub fn to_project_file(scene: &Scene, meta: &ProjectMeta, settings: &RenderSetti
         components: scene
             .nodes
             .iter()
-            .map(|n| {
+            .enumerate()
+            // I nodi degli effetti (adesivi, polvere) si ricreano dai loro parametri.
+            .filter(|(i, _)| !scene.is_effect_node(*i))
+            .map(|(_, n)| {
                 (
                     n.id.clone(),
                     ComponentState {
@@ -183,6 +249,9 @@ pub fn to_project_file(scene: &Scene, meta: &ProjectMeta, settings: &RenderSetti
         render_cameras: scene.render_cameras.clone(),
         active_camera: scene.active_camera,
         fogs: scene.fogs.clone(),
+        haze: scene.haze.clone(),
+        haze_dust: scene.haze_dust.clone(),
+        decals: scene.decals.clone(),
         render: settings.clone(),
         migrated_world_anchor: 0,
     }
@@ -194,7 +263,15 @@ pub fn save(path: &Path, scene: &Scene, meta: &ProjectMeta, settings: &RenderSet
         path: Some(path.to_path_buf()),
         ..meta.clone()
     };
-    let pf = to_project_file(scene, &meta, settings);
+    let mut pf = to_project_file(scene, &meta, settings);
+    if let Some(dir) = path.parent() {
+        // Le conversioni già note per queste sorgenti (il progetto le ricorda).
+        for (s, m) in pf.sources.iter_mut().zip(&meta.sources) {
+            s.converted = m.converted.clone();
+            s.converted_key = m.converted_key.clone();
+        }
+        store_conversions(dir, &mut pf.sources);
+    }
     let json = serde_json::to_vec_pretty(&pf)?;
     let mut tmp_name = path.file_name().context("percorso del progetto non valido")?.to_os_string();
     tmp_name.push(".tmp");
@@ -307,7 +384,46 @@ pub fn load(path: &Path) -> anyhow::Result<LoadedProject> {
             .filter_map(|r| project_dir.map(|d| d.join(r)))
             .chain(std::iter::once(src.absolute_path.clone()))
             .collect();
-        let Some(found) = candidates.iter().find(|p| p.is_file()) else {
+        let found = candidates.iter().find(|p| p.is_file());
+        // Conversione STEP salvata con il progetto: vale se lo STEP non è cambiato, oppure se
+        // lo STEP (o qualche pezzo a cui rimanda) non c'è più.
+        let saved = src
+            .converted
+            .as_ref()
+            .and_then(|c| project_dir.map(|d| d.join(c)))
+            .filter(|c| c.is_file())
+            .filter(|_| match found {
+                None => true,
+                Some(f) => {
+                    forge_import::step::missing_refs(f)
+                        || forge_import::step::fingerprint(f, &src.import_options).as_deref() == src.converted_key.as_deref()
+                }
+            });
+        if let Some(conv) = saved {
+            let file_name = src
+                .absolute_path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "modello".into());
+            let r = forge_import::frmesh::FrMesh::read(&conv)
+                .map_err(|e| anyhow::anyhow!("{e}"))
+                .and_then(|m| {
+                    forge_import::step::insert(&mut scene, &file_name, m, &src.import_options).map_err(|e| anyhow::anyhow!("{e}"))
+                });
+            match r {
+                Ok(r) => {
+                    tracing::info!("{}: conversione salvata riletta senza riconvertire lo STEP", file_name);
+                    report.warnings.extend(r.warnings);
+                    sources.push(SourceRef {
+                        absolute_path: found.cloned().unwrap_or_else(|| src.absolute_path.clone()),
+                        ..src.clone()
+                    });
+                    continue;
+                }
+                Err(e) => report.warnings.push(format!("{}: {e}", conv.display())),
+            }
+        }
+        let Some(found) = found else {
             report.missing_sources.push(src.absolute_path.clone());
             continue;
         };
@@ -393,6 +509,15 @@ pub fn load(path: &Path) -> anyhow::Result<LoadedProject> {
     scene.active_camera = pf.active_camera.filter(|&i| i < pf.render_cameras.len());
     scene.render_cameras = pf.render_cameras;
     scene.fogs = pf.fogs;
+    scene.haze = pf.haze;
+    scene.haze_dust = pf.haze_dust;
+    scene.decals = pf.decals;
+    for d in &mut scene.decals {
+        if let Some(img) = &mut d.image {
+            relocate_asset(img, project_dir, &["textures", "texture"], &texture_dirs, &mut report);
+        }
+    }
+    scene.sync_effects();
 
     if !report.missing_components.is_empty() {
         tracing::warn!(

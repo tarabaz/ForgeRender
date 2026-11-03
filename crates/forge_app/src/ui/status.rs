@@ -72,6 +72,15 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if app.is_baking_fog() {
                 use forge_render_core::fog::progress::{self, Phase};
+                if ui
+                    .small_button("✕")
+                    .on_hover_text(tr(
+                        "Annulla il calcolo della nebbia. Attenzione: verrà rifatto da capo quando avvii il render",
+                    ))
+                    .clicked()
+                {
+                    app.cancel_fog();
+                }
                 let hint = tr("Calcolo della nebbia prima del render: parte da solo poco dopo l'ultima modifica, \
                      così quando avvii il render la trovi già pronta. Puoi continuare a lavorare.");
                 match progress::get() {

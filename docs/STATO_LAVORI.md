@@ -661,5 +661,26 @@
   `fog_then_render`, `is_building_bvh`.
 - Barra in alto: `menubar::ai_control` mostra "AI MCP: ON/OFF" e l'ingranaggio (`Cmd::AiSetup`).
 
+### In sviluppo (03/11/2026, branch sviluppo): foschia d'ambiente, polvere, adesivi, STEP convertito salvato, annullo nebbia
+- `forge_scene::Haze` (in `fog.rs`, campo `Scene::haze`) e `forge_render_core::fog::{haze_density_at, haze_fog}`:
+  mezzo `BakedFog::from_fn` su scena + camera + luci (max 20 m dal centro, ≤ 4 M celle), rumore
+  fbm a dominio distorto; aggiunto alle nebbie in `RenderScene::compile`.
+- `forge_scene::effects` (nuovo): `Decal` (pellicola ritagliata sui triangoli del bersaglio,
+  nodo figlio `adesivo:<n>`, materiale con l'immagine come colore e opacità), `Dust` (granelli
+  icosaedro, nodo `effetto:polvere`), `Scene::{sync_effects, raycast, new_decal, is_effect_node}`.
+  I nodi degli effetti non si salvano come componenti: il progetto salva `haze`, `haze_dust`,
+  `decals` e li ricrea con `sync_effects`.
+- `texture::load_alpha_cached`: opacità dal canale alfa quando la mappa di opacità è la stessa
+  immagine del colore base.
+- `forge_import::step::{external_refs, fingerprint, missing_refs, cache_dir, cached_conversion}`:
+  cache delle conversioni (`%LOCALAPPDATA%/ForgeRender/conversioni-step`, `FORGE_STEP_CACHE`);
+  `SourceRef::{converted, converted_key}` e `CONVERTED_DIR` in `forge_project`; i pacchetti
+  copiano conversioni e pezzi degli assiemi STEP. Strumento: `examples/inspect_pack.rs`
+  (`--repack`). Demo `lenti.frpack` e `banco-ottico.frpack` ricostruite.
+- Nebbia: `progress::{start_job, cancel, cancelled}` a generazioni; `ForgeApp::{cancel_fog,
+  fog_running, fog_fingerprint}`; pulsante ✕ in `ui/status.rs`.
+- UI: `ui/atmosphere.rs` (foschia con preset, polvere, adesivi) nella scheda Effetti.
+- Ancora da fare: stili di rendering (cel/toon, illustrazione tecnica, contorni) chiesti da Valerio.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

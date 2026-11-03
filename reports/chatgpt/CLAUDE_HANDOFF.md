@@ -2451,3 +2451,20 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
 - **Limiti e prossima fase:** multigrid o arresto sul residuo per la pressione; dilatazione solo
   sui tratti del passo prima (aiuta Media/Alta); GPU non valutata; cache su disco non fatta;
   confronto visivo dei render da fare con Valerio.
+
+## Claude Code — 03/11/2026: foschia d'ambiente, polvere, adesivi, conversione STEP salvata (sviluppo)
+- **Foschia d'ambiente:** mezzo partecipante su tutta la scena (`forge_render_core::fog::haze_fog`),
+  densità da fbm a dominio distorto (banchi e vortici, media ≈ densità scelta: test
+  `haze_swirls_keep_the_mean_density`), diffusione multipla come le altre nebbie, CPU e GPU senza
+  modifiche agli shader (riusa `BakedFog`).
+- **Polvere:** geometria vera (icosaedri sotto il mm, ≤ 150 000) in un nodo gestito; si illumina
+  con la luce diretta e di rimbalzo.
+- **Adesivi:** mesh decal ritagliata (Sutherland–Hodgman sui 6 piani della scatola) dai triangoli
+  del bersaglio, figlio del bersaglio; test su cubo e cilindro.
+- **STEP:** la conversione si salva (cache + `modelli-convertiti/` nel progetto e nei pacchetti);
+  banco ottico demo 27 s → 0,2 s misurati con `examples/inspect_pack.rs` a cache vuota e senza
+  convertitore. La demo lenti era rotta perché lo STEP è un assieme "a più file" e il pacchetto
+  non conteneva i pezzi: ora i pacchetti seguono i `DOCUMENT_FILE`.
+- **Test realmente eseguiti:** fmt, clippy `-D warnings`, suite completa (esito nel messaggio).
+- **Limiti:** la foschia non ha ancora un'anteprima nella viewport; gli adesivi non seguono il
+  displacement; la polvere riempie un riquadro attorno alla scena (max 6 m per lato).

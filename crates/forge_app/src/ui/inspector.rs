@@ -1513,14 +1513,10 @@ fn effects(app: &mut ForgeApp, ui: &mut egui::Ui) {
             app.selected_light = None;
             app.shading_changed();
         }
-        for (name, tip) in [
-            (tr("Foschia d'ambiente"), tr("Aria velata e raggi di luce visibili (in roadmap)")),
-            (tr("Adesivo (decal)"), tr("Immagine applicata su una superficie (in roadmap)")),
-        ] {
-            ui.add_enabled(false, egui::Button::new(name)).on_disabled_hover_text(tip);
-        }
+        crate::ui::atmosphere::add_buttons(app, ui);
     });
     ui.separator();
+    crate::ui::atmosphere::sections(app, ui);
     ui.horizontal(|ui| {
         ui.strong(tf("Nella scena ({})", &[format!("{}", app.scene.fogs.len())]));
         if app.is_baking_fog() {
@@ -1529,7 +1525,9 @@ fn effects(app: &mut ForgeApp, ui: &mut egui::Ui) {
         }
     });
     if app.scene.fogs.is_empty() {
-        ui.label(egui::RichText::new(tr("Nessun effetto: aggiungine uno dai pulsanti qui sopra.")).weak());
+        if !app.scene.haze.enabled && app.scene.decals.is_empty() {
+            ui.label(egui::RichText::new(tr("Nessun effetto: aggiungine uno dai pulsanti qui sopra.")).weak());
+        }
         return;
     }
     let mut remove = None;

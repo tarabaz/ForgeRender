@@ -5,6 +5,7 @@
 //! log), area centrale (viewport o render).
 
 pub(crate) mod ai_setup;
+pub(crate) mod atmosphere;
 pub(crate) mod blend_import;
 pub mod central;
 mod demo_info;

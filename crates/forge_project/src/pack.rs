@@ -60,6 +60,8 @@ fn companions(model: &Path) -> Vec<PathBuf> {
         return Vec::new();
     };
     match ext.as_str() {
+        // STEP "a più file": i pezzi dell'assieme, accanto.
+        "step" | "stp" => forge_import::step::external_refs(model),
         "obj" => {
             let mut out = Vec::new();
             for line in text.lines() {
@@ -138,6 +140,31 @@ pub fn save_bundle(
         let Some(copy) = copy_unique(&s.absolute_path, &mdir, &mut done, &mut report) else {
             continue;
         };
+        // Conversione STEP già fatta: nel pacchetto, così si apre senza riconvertire.
+        let mut converted = None;
+        if let Some(conv) = meta
+            .path
+            .as_ref()
+            .and_then(|p| p.parent())
+            .zip(s.converted.as_ref())
+            .map(|(d, c)| d.join(c))
+            .filter(|c| c.is_file())
+            .or_else(|| {
+                forge_import::step::fingerprint(&s.absolute_path, &s.import_options)
+                    .map(|k| forge_import::step::cached_conversion(&k))
+                    .filter(|c| c.is_file())
+            })
+        {
+            let rel = Path::new(crate::CONVERTED_DIR).join(if i == 0 {
+                format!("{stem}.frmesh")
+            } else {
+                format!("{stem}-{}.frmesh", i + 1)
+            });
+            std::fs::create_dir_all(dir.join(crate::CONVERTED_DIR))?;
+            std::fs::copy(&conv, dir.join(&rel)).with_context(|| format!("{}", conv.display()))?;
+            report.copied += 1;
+            converted = Some(rel);
+        }
         let src_dir = s.absolute_path.parent().unwrap_or(Path::new("."));
         for rel in companions(&s.absolute_path) {
             let from = src_dir.join(&rel);
@@ -152,8 +179,15 @@ pub fn save_bundle(
                 report.missing.push(from);
             }
         }
+        let converted_key = converted.as_ref().and(
+            s.converted_key
+                .clone()
+                .or_else(|| forge_import::step::fingerprint(&s.absolute_path, &s.import_options)),
+        );
         sources.push(SourceRef {
             absolute_path: copy,
+            converted,
+            converted_key,
             ..s.clone()
         });
     }
@@ -170,6 +204,13 @@ pub fn save_bundle(
         for slot in m.texture_slots_mut().into_iter().flatten() {
             if let Some(copy) = copy_unique(slot, &tex_dir, &mut done, &mut report) {
                 *slot = copy;
+            }
+        }
+    }
+    for d in &mut scene.decals {
+        if let Some(img) = &mut d.image {
+            if let Some(copy) = copy_unique(img, &tex_dir, &mut done, &mut report) {
+                *img = copy;
             }
         }
     }

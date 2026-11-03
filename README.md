@@ -143,6 +143,9 @@ Prepare a product scene with a backdrop and studio lights, then choose a light, 
 
 Spotlights can create visible beams with adjustable density and length. Volumetric fog is a participating medium with scattering and shadows: light interacts with the volume and becomes visible in space, not only on surfaces.
 
+- **Ambient haze:** a participating medium that fills the whole scene, the camera and the lights. It is not a uniform grey block: a domain-warped fractal noise gives it denser banks, curls and clear gaps, with controls for density, colour, swirl amount and size, forward scattering (how bright the rays are when looking towards the light) and an optional falloff with height for ground fog. Light is scattered several times inside it, so every light draws shafts with the shadows of the objects; it works on CPU and GPU. Presets: Light veil, Light rays, Dusty attic, Thick haze, Low fog.
+- **Floating dust:** tiny real specks (sub-millimetre geometry, up to 150,000) scattered in the air. They are almost invisible in the dark and sparkle where a beam, or bounced light, reaches them, as in a backlit attic. Amount, size and colour are adjustable.
+
 ### 8. Camera, multiple views and product presentation
 
 ![Three-quarter product view](docs/img/mcp/esempi/vista_tre_quarti.jpg)
@@ -152,6 +155,14 @@ Render cameras provide focal length, aperture, depth of field and lens shift. Au
 ### 9. Render passes and post-production
 
 ForgeRender can export separate **Albedo, Normals, Depth, Product Mask and Component ID** passes for compositing, masking and further image editing. These are technical output buffers, not additional beauty renders.
+
+### 10. Decals — labels and logos on any surface
+
+Apply an image (a logo, a label, a PNG with transparency) to the selected object where the camera is looking. The decal is cut from the object's own triangles inside a projection box, so it wraps curved surfaces such as bottles and cups, and it moves with the object. The transparent parts of the PNG let the object show through. Width (the height follows the image proportions), rotation, position on the surface, projection depth, roughness and metalness are adjustable, and the image travels with the project and inside `.frpack` packages.
+
+### 11. STEP models: converted once, then reopened instantly
+
+A STEP file is converted to meshes once. The result is kept in a conversion cache and saved next to the project (`modelli-convertiti/`) and inside `.frpack` packages, so reopening a project does not convert the STEP again. On the optical bench demo, opening went from 27 s to 0.2 s. When the STEP changes (or the parts of a multi-file assembly change, or the quality changes), it is converted again. Packages now also include the part files that a multi-file STEP assembly refers to.
 
 
 ## What it does today

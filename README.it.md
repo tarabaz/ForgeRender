@@ -154,6 +154,9 @@ Prepara una scena prodotto con fondale e luci da studio, quindi scegli sfondo ch
 
 Le luci spot possono generare fasci visibili con densità e lunghezza regolabili. La nebbia volumetrica è un mezzo partecipante simulato, con scattering e ombre: la luce interagisce con il volume e diventa visibile nello spazio, non soltanto sulle superfici.
 
+- **Foschia d'ambiente:** un mezzo partecipante che riempie tutta la scena, la camera e le luci. Non è un blocco grigio uniforme: un rumore frattale a dominio distorto le dà banchi più densi, riccioli e vuoti, con i controlli di densità, colore, quantità e grandezza dei vortici, diffusione in avanti (quanto brillano i raggi guardando verso la luce) e diradamento con l'altezza per la nebbia a terra. La luce si diffonde più volte al suo interno, quindi ogni luce disegna lame di luce con le ombre degli oggetti; funziona su CPU e GPU. Preset: Velo leggero, Raggi di luce, Soffitta polverosa, Foschia fitta, Nebbia bassa.
+- **Polvere in sospensione:** granelli veri minuscoli (geometria sotto il millimetro, fino a 150 000) sparsi nell'aria. Al buio quasi non si vedono e brillano dove li raggiunge un fascio, o la luce di rimbalzo, come in una soffitta controluce. Quantità, dimensione e colore sono regolabili.
+
 ### 8. Camera, viste multiple e presentazione prodotto
 
 ![Vista prodotto a tre quarti](docs/img/mcp/esempi/vista_tre_quarti.jpg)
@@ -163,6 +166,14 @@ Le camere di rendering offrono focale, diaframma, profondità di campo e decentr
 ### 9. Render pass e workflow di post-produzione
 
 ForgeRender può esportare pass separati **Albedo, Normals, Depth, Product Mask e Component ID**, utili per compositing, mascherature e interventi successivi sull'immagine. Sono buffer tecnici di output, non ulteriori render beauty.
+
+### 10. Adesivi (decal) — etichette e loghi su qualsiasi superficie
+
+Applica un'immagine (un logo, un'etichetta, un PNG con trasparenza) sull'oggetto selezionato, nel punto che la camera sta guardando. L'adesivo si ricava dai triangoli dell'oggetto dentro una scatola di proiezione, quindi segue le superfici curve come bottiglie e tazze, e si sposta con l'oggetto. Le parti trasparenti del PNG lasciano vedere l'oggetto. Si regolano larghezza (l'altezza segue le proporzioni dell'immagine), rotazione, posizione sulla superficie, profondità della proiezione, ruvidità e metallicità; l'immagine viaggia con il progetto e dentro i pacchetti `.frpack`.
+
+### 11. Modelli STEP: convertiti una volta, poi riaperti subito
+
+Un file STEP si converte in mesh una volta sola. Il risultato resta in una cache delle conversioni e si salva accanto al progetto (`modelli-convertiti/`) e dentro i pacchetti `.frpack`, così riaprendo il progetto lo STEP non si riconverte. Sulla demo del banco ottico l'apertura è passata da 27 s a 0,2 s. Se lo STEP cambia (o cambiano i pezzi di un assieme a più file, o la qualità), si riconverte. I pacchetti ora includono anche i file dei pezzi a cui rimanda un assieme STEP a più file.
 
 
 ## Cosa fa oggi

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 /// Mesh triangolata indicizzata. Le normali e le UV sono opzionali (vettori
 /// vuoti se assenti); se presenti hanno la stessa lunghezza di `positions`.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Mesh {
     pub name: String,
     pub positions: Vec<Vec3>,

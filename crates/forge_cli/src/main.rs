@@ -208,8 +208,16 @@ fn render(args: &Args) -> anyhow::Result<()> {
             _ => bail!("backend non valido: {b} (cpu|gpu)"),
         };
     }
+    // GPU di base; se non c'è (o non parte) si prosegue sulla CPU invece di fermarsi.
     let backend: Box<dyn RenderBackend> = match settings.backend {
-        forge_render_core::BackendKind::Gpu => Box::new(forge_render_gpu::GpuBackend::new()?),
+        forge_render_core::BackendKind::Gpu => match forge_render_gpu::GpuBackend::new() {
+            Ok(g) => Box::new(g),
+            Err(e) => {
+                eprintln!("GPU non disponibile, il rendering prosegue sulla CPU: {e:#}");
+                settings.backend = forge_render_core::BackendKind::Cpu;
+                Box::new(CpuBackend::from_settings(&settings)?)
+            }
+        },
         forge_render_core::BackendKind::Cpu => Box::new(CpuBackend::from_settings(&settings)?),
     };
     let session = RenderSession::new();

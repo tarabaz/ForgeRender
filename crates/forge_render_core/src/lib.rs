@@ -31,6 +31,7 @@ pub use render_scene::{
 };
 pub use session::{AdaptiveDiag, Frame, Progress, RenderSession, SessionState};
 pub use settings::{
-    BackendKind, CausticSettings, ColorMode, DenoiseMode, DenoiseQuality, DenoiseSettings, RenderSettings, SamplesPreset, ToneMapping,
+    BackendKind, CausticSettings, ColorMode, DenoiseMode, DenoiseQuality, DenoiseSettings, OutlineSettings, RenderSettings, RenderStyle,
+    SamplesPreset, ToneMapping,
 };
 pub use tonemap::{tonemap_pixel, tonemap_to_rgb16, tonemap_to_rgba8, tonemap_unit};

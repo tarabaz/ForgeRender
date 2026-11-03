@@ -191,3 +191,52 @@ pub const FOG_PRESETS: [FogPreset; 5] = [
         values: [6.0, 1.2, 6.0, 0.35, 25.0, 12.0, 40.0, 0.4, 0.5, 0.05, 0.5, 0.3, 160.0],
     },
 ];
+
+/// Foschia d'ambiente: aria leggermente velata in tutta la scena, che rende visibili i raggi
+/// di luce (con le ombre degli oggetti, "lame" di luce) e allontana lo sfondo. Una sola per
+/// scena; spenta di serie.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Haze {
+    pub enabled: bool,
+    /// Coefficiente di estinzione (1/m): 0,05 = velo leggero, 0,5 = foschia fitta.
+    pub density: f32,
+    /// Colore (albedo) della foschia, 0–1: bianco = aria neutra.
+    pub color: [f32; 3],
+    /// Anisotropia Henyey–Greenstein: alta = raggi luminosi soprattutto in controluce.
+    pub anisotropy: f32,
+    /// Altezza (m) in cui la foschia si dimezza salendo dal punto più basso della scena:
+    /// 0 = uniforme, piccola = foschia a terra.
+    pub falloff_height: f32,
+    /// Quanto la foschia è irregolare, 0–1: 0 = uniforme, 1 = banchi e vuoti marcati.
+    pub variation: f32,
+    /// Dimensione tipica dei vortici e dei banchi (metri).
+    pub swirl_scale: f32,
+    /// Seme della forma dei vortici.
+    pub seed: u32,
+}
+
+impl Default for Haze {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            density: 0.15,
+            color: [0.92, 0.93, 0.95],
+            anisotropy: 0.6,
+            falloff_height: 0.0,
+            variation: 0.55,
+            swirl_scale: 0.8,
+            seed: 1,
+        }
+    }
+}
+
+impl Haze {
+    /// Densità alla quota `y` sopra il punto più basso `floor`.
+    pub fn density_at(&self, y: f32, floor: f32) -> f32 {
+        if self.falloff_height <= 0.0 {
+            return self.density.max(0.0);
+        }
+        self.density.max(0.0) * (-(y - floor).max(0.0) * std::f32::consts::LN_2 / self.falloff_height).exp()
+    }
+}

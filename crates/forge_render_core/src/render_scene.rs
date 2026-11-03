@@ -79,7 +79,18 @@ impl MaterialTextures {
             metallic: load(&m.metallic_texture, false),
             height: load(&m.height_texture, false),
             ao: load(&m.ao_texture, false),
-            opacity: load(&m.opacity_texture, false),
+            // Stessa immagine del colore (es. un adesivo PNG): il ritaglio è la sua trasparenza.
+            opacity: if m.opacity_texture.is_some() && m.opacity_texture == m.base_color_texture {
+                m.opacity_texture.as_ref().and_then(|p| match crate::texture::load_alpha_cached(p) {
+                    Ok(t) => Some(t),
+                    Err(e) => {
+                        tracing::error!("materiale «{}»: {e:#}", m.name);
+                        None
+                    }
+                })
+            } else {
+                load(&m.opacity_texture, false)
+            },
             normal_directx: m.normal_directx,
             roughness_is_gloss: m.roughness_is_gloss,
             bump_m: m.bump_mm * 1e-3,
@@ -715,6 +726,7 @@ impl RenderScene {
         let has_cutout = material_textures.iter().flatten().any(|t| t.opacity.is_some());
         let mut fogs = crate::fog::bake_fogs(scene, &geometry);
         fogs.extend(crate::fog::beam_fogs(scene));
+        fogs.extend(crate::fog::haze_fog(scene));
         let id = next_scene_id();
         let mut rs = RenderScene {
             has_cutout,

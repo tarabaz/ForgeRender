@@ -13,6 +13,45 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## In sviluppo (prossima 0.33.0, branch `sviluppo`)
+
+**Foschia d'ambiente e polvere in sospensione**
+- Scheda Effetti, **Foschia d'ambiente**: aria velata in tutta la scena, con banchi, riccioli e
+  vuoti (rumore frattale a dominio distorto), illuminata come la nebbia (diffusione multipla,
+  ombre degli oggetti nei raggi), su CPU e GPU. Densità, colore, raggi in controluce, vortici,
+  grandezza dei vortici, diradamento salendo, forma. Preset: Velo leggero, Raggi di luce,
+  Soffitta polverosa, Foschia fitta, Nebbia bassa.
+- **Polvere in sospensione**: granelli veri sotto il millimetro (fino a 150 000) che brillano
+  dove li colpisce un raggio o la luce di rimbalzo. Quantità, dimensione, colore.
+
+**Adesivi (decal)**
+- Scheda Effetti, **Adesivo (decal)**: un'immagine sull'oggetto selezionato, nel punto che guarda
+  la camera; segue le superfici curve e si sposta con l'oggetto. Un PNG trasparente lascia
+  vedere l'oggetto (stessa immagine come colore e ritaglio: si usa il canale alfa). Larghezza,
+  rotazione, spostamento, profondità, ruvidità, metallicità, "Riposiziona dalla vista".
+- Salvati nel progetto e nei pacchetti `.frpack` (con l'immagine).
+
+**STEP: conversione salvata**
+- Lo STEP si converte una volta: la conversione resta in una cache dell'utente e si salva con il
+  progetto (`modelli-convertiti/`) e nei pacchetti; all'apertura si rilegge invece di
+  riconvertire. Banco ottico demo: da 27 s a 0,2 s. Si riconverte se cambia lo STEP, un pezzo
+  dell'assieme o la qualità.
+- I pacchetti includono anche i pezzi degli assiemi STEP "a più file". Corretta la demo **Lenti
+  convergenti e divergenti**: il pacchetto aveva solo l'assieme vuoto (si vedevano solo i laser);
+  ora ha lenti, supporti e laser.
+
+**Nebbia da ghiaccio secco**
+- Pulsante **✕** accanto alla barra della nebbia: annulla il calcolo in anticipo (avviso: verrà
+  rifatto all'avvio del render).
+- Cambiare la nebbia (qualità compresa) o la scena durante il calcolo lo ferma subito e lo fa
+  ripartire da capo con i valori nuovi.
+
+**Altro**
+- Il render parte di serie sulla **GPU**; senza scheda video adatta si passa alla CPU (anche da
+  riga di comando).
+- Integrazione AI: il ponte MCP si aggiorna anche se un assistente lo sta usando (il file in uso
+  viene rinominato), niente più "Accesso negato".
+
 ## 0.32.0 — 03/11/2026
 
 **Nebbia da ghiaccio secco: simulazione molto più veloce**

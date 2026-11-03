@@ -83,7 +83,18 @@ struct JobInfo {
     geometry_rev: u64,
     shading_rev: u64,
     camera_rev: u64,
-    key: (u32, u32, u32, u32, u32, u64, bool, forge_render_core::ColorMode, u64),
+    key: (
+        u32,
+        u32,
+        u32,
+        u32,
+        u32,
+        u64,
+        bool,
+        forge_render_core::ColorMode,
+        u64,
+        forge_render_core::RenderStyle,
+    ),
     threads: usize,
     target: u32,
     /// Soglia di rumore e campioni minimi inviati alla sessione.
@@ -267,6 +278,8 @@ pub struct ForgeApp {
     /// e l'ultima impronta già controllata.
     fog_watch: Option<(String, std::time::Instant)>,
     fog_checked: Option<String>,
+    /// Impronta della nebbia che si sta calcolando: se la nebbia cambia, il calcolo si annulla.
+    fog_running: Option<String>,
     job: Option<JobInfo>,
     pub session: RenderSession,
 
@@ -420,6 +433,7 @@ impl ForgeApp {
             fog_then_render: false,
             fog_watch: None,
             fog_checked: None,
+            fog_running: None,
             job: None,
             session: RenderSession::new(),
             viewport,
@@ -1282,10 +1296,19 @@ impl ForgeApp {
     /// calcolo parte da solo in sottofondo, così all'avvio del render è già pronto. Si aspetta
     /// che non cambi niente per un attimo, per non ricominciare a ogni movimento di un cursore.
     fn precompute_fog(&mut self) {
-        if self.pending_fog.is_some() || !self.scene.fogs.iter().any(|f| f.enabled) {
+        let fp = self.fog_fingerprint();
+        if self.pending_fog.is_some() {
+            // La nebbia (o la scena) è cambiata durante il calcolo: lo si ferma subito e si
+            // riparte da capo con i valori nuovi.
+            if self.fog_running.as_deref().is_some_and(|r| r != fp) {
+                forge_render_core::fog::progress::cancel();
+                self.fog_running = None;
+            }
             return;
         }
-        let fp = format!("{:?}|{}", self.scene.fogs, self.geometry_rev);
+        if !self.scene.fogs.iter().any(|f| f.enabled) {
+            return;
+        }
         match &self.fog_watch {
             Some((f, t)) if *f == fp => {
                 if t.elapsed() < std::time::Duration::from_millis(800) {
@@ -1313,8 +1336,26 @@ impl ForgeApp {
         }
     }
 
+    fn fog_fingerprint(&self) -> String {
+        format!("{:?}|{}", self.scene.fogs, self.geometry_rev)
+    }
+
+    /// Annulla il calcolo della nebbia in corso (pulsante X): non riparte da solo, si rifà
+    /// quando si avvia il render.
+    pub fn cancel_fog(&mut self) {
+        if self.pending_fog.is_none() {
+            return;
+        }
+        forge_render_core::fog::progress::cancel();
+        self.fog_then_render = false;
+        self.fog_running = None;
+        self.fog_checked = Some(self.fog_fingerprint());
+        self.toast(tr("Calcolo della nebbia annullato: verrà rifatto quando avvii il render"));
+    }
+
     /// Calcola le nebbie della scena su un thread a sé.
     fn spawn_fog_bake(&mut self, geometry: Arc<RenderGeometry>) {
+        self.fog_running = Some(self.fog_fingerprint());
         let (tx, rx) = std::sync::mpsc::channel();
         let scene = self.scene.clone();
         std::thread::Builder::new()
@@ -1337,6 +1378,7 @@ impl ForgeApp {
         match rx.try_recv() {
             Ok(()) => {
                 self.pending_fog = None;
+                self.fog_running = None;
                 // Calcolo in anticipo: il render parte solo se era stato chiesto (la scena può
                 // essere cambiata nel frattempo: start_render ricontrolla).
                 if std::mem::take(&mut self.fog_then_render) {

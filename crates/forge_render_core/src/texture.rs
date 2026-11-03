@@ -163,6 +163,32 @@ pub fn load_cached(path: &Path, srgb: bool) -> anyhow::Result<Arc<Texture>> {
     cached(path, srgb, false)
 }
 
+/// Trasparenza di un'immagine (canale alfa) come mappa di opacità: bianco = pieno. Senza canale
+/// alfa l'immagine è tutta piena. Serve per gli adesivi (un PNG usato per colore e ritaglio).
+pub fn load_alpha_cached(path: &Path) -> anyhow::Result<Arc<Texture>> {
+    static CACHE: OnceLock<TextureCache> = OnceLock::new();
+    let cache = CACHE.get_or_init(Default::default);
+    let key = (path.to_path_buf(), false, false);
+    if let Some(t) = cache.lock().unwrap().get(&key) {
+        return Ok(t.clone());
+    }
+    let img = image::open(path).with_context(|| format!("lettura texture {}", path.display()))?;
+    let (w, h) = (img.width(), img.height());
+    anyhow::ensure!(w > 0 && h > 0, "texture vuota");
+    let data = if img.color().has_alpha() {
+        img.into_rgba8().pixels().map(|p| [p.0[3]; 3]).collect()
+    } else {
+        vec![[255u8; 3]; (w * h) as usize]
+    };
+    let t = Arc::new(Texture::from_rgb8(w as usize, h as usize, data, false));
+    let mut c = cache.lock().unwrap();
+    if c.len() > 64 {
+        c.clear();
+    }
+    c.insert(key, t.clone());
+    Ok(t)
+}
+
 /// Height map per il displacement: con una sorgente a più di 8 bit tiene i 16 bit.
 pub fn load_precise_cached(path: &Path) -> anyhow::Result<Arc<Texture>> {
     cached(path, false, true)

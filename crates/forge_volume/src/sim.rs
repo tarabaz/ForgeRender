@@ -660,7 +660,7 @@ pub fn simulate(inp: &SimInput) -> SimResult {
     let (mut b_div, mut b_fwd, mut b_out) = (Vec::<f32>::new(), Vec::<S2>::new(), Vec::<[f32; 2]>::new());
     let profile = std::env::var_os("FORGE_FOG_PROFILE").is_some();
     let (mut near_cells, mut domain_cells) = (0u64, 0u64);
-    while t < inp.sim_time - 1e-5 {
+    while t < inp.sim_time - 1e-5 && !crate::progress::cancelled() {
         // Velocità massima sulle facce del dominio del passo prima (entro il margine dalla
         // nebbia: lì si muove l'aria che conta), misurata alla fine di quel passo.
         let vmax = next_vmax;

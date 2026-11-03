@@ -127,11 +127,32 @@ pub fn install_bridge(env: &Env, source: &Path) -> Result<PathBuf, String> {
     if let Some(d) = target.parent() {
         std::fs::create_dir_all(d).map_err(|e| format!("cartella {} non creata: {e}", d.display()))?;
     }
+    // Copie vecchie messe da parte le volte prima (ora non più in uso).
+    if let Some(d) = target.parent() {
+        if let Ok(rd) = std::fs::read_dir(d) {
+            for e in rd.flatten() {
+                if e.file_name().to_string_lossy().ends_with(".vecchio") {
+                    let _ = std::fs::remove_file(e.path());
+                }
+            }
+        }
+    }
     let tmp = target.with_extension("nuovo");
     std::fs::write(&tmp, &new).map_err(|e| format!("ponte non copiato: {e}"))?;
     match std::fs::rename(&tmp, &target) {
         Ok(()) => Ok(target),
         Err(e) => {
+            // Ponte in uso da un assistente collegato: Windows non lo lascia sovrascrivere ma
+            // lo lascia rinominare. Il vecchio si sposta di lato (chi lo usa continua a usarlo e
+            // si cancella al prossimo avvio) e il nuovo va al suo posto, per i nuovi collegamenti.
+            let stamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or(0);
+            let aside = target.with_extension(format!("{stamp}.vecchio"));
+            if target.is_file() && std::fs::rename(&target, &aside).is_ok() && std::fs::rename(&tmp, &target).is_ok() {
+                return Ok(target);
+            }
             let _ = std::fs::remove_file(&tmp);
             if target.is_file() {
                 Err(format!(

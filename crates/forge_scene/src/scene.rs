@@ -153,6 +153,12 @@ pub struct Scene {
     pub fogs: Vec<crate::fog::FogVolume>,
     /// Oggetti aggiunti dall'utente (pavimento, fondale, forme).
     pub added: Vec<crate::added::AddedRecord>,
+    /// Foschia d'ambiente (una per scena).
+    pub haze: crate::fog::Haze,
+    /// Polvere in sospensione nella foschia.
+    pub haze_dust: crate::effects::Dust,
+    /// Adesivi (decal) applicati sugli oggetti.
+    pub decals: Vec<crate::effects::Decal>,
 }
 
 impl Default for Scene {
@@ -172,6 +178,9 @@ impl Default for Scene {
             copies: Vec::new(),
             fogs: Vec::new(),
             added: Vec::new(),
+            haze: Default::default(),
+            haze_dust: Default::default(),
+            decals: Vec::new(),
         }
     }
 }

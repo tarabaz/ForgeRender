@@ -202,6 +202,7 @@ pub fn fogs_ready(scene: &Scene, geo: &RenderGeometry) -> bool {
 /// Nebbie attive della scena, calcolate se non sono già in cache.
 pub fn bake_fogs(scene: &Scene, geo: &RenderGeometry) -> Vec<Arc<BakedFog>> {
     use forge_volume::progress::{self, Phase};
+    progress::start_job();
     let mut out = Vec::new();
     let fogs: Vec<&FogVolume> = scene.fogs.iter().filter(|f| f.enabled).collect();
     for (n, f) in fogs.iter().enumerate() {
@@ -221,6 +222,10 @@ pub fn bake_fogs(scene: &Scene, geo: &RenderGeometry) -> Vec<Arc<BakedFog>> {
             Some(s) => s,
             None => {
                 let s = Arc::new(forge_volume::simulate_fog(f, Some(&solid), ground));
+                // Annullato (dall'utente o perché la nebbia è cambiata): niente cache, si esce.
+                if progress::cancelled() {
+                    break;
+                }
                 let mut c = sim_cache().lock().unwrap();
                 if c.len() > 8 {
                     c.clear();
@@ -230,6 +235,9 @@ pub fn bake_fogs(scene: &Scene, geo: &RenderGeometry) -> Vec<Arc<BakedFog>> {
             }
         };
         let b = Arc::new(forge_volume::bake_detail(f, &sim, Some(&solid), ground));
+        if progress::cancelled() {
+            break;
+        }
         let mut c = cache().lock().unwrap();
         if c.len() > 16 {
             c.clear();
@@ -354,11 +362,119 @@ pub fn beam_fogs(scene: &Scene) -> Vec<Arc<BakedFog>> {
     out
 }
 
+/// Densità della foschia d'ambiente nel punto `p` (1/m): base, diradata salendo da `floor`,
+/// con banchi e vortici da un rumore frattale a dominio distorto (riccioli, non macchie).
+pub fn haze_density_at(h: &forge_scene::Haze, p: Vec3, floor: f32) -> f32 {
+    use forge_volume::noise::fbm;
+    let base = h.density_at(p.y, floor);
+    let v = h.variation.clamp(0.0, 1.0);
+    if v <= 0.0 || base <= 0.0 {
+        return base;
+    }
+    let q = p / h.swirl_scale.max(0.02);
+    let s = h.seed;
+    // Distorsione del dominio: il rumore letto in un punto spostato da altro rumore fa i vortici.
+    let warp = Vec3::new(
+        fbm(q + Vec3::new(5.2, 1.3, 9.1), s ^ 0x68e3_1da4, 3),
+        fbm(q + Vec3::new(-7.7, 3.9, 2.4), s ^ 0x1b56_c4e9, 3),
+        fbm(q + Vec3::new(1.7, -9.2, 6.3), s ^ 0x2f8a_7d11, 3),
+    );
+    let n = fbm(q + warp * 1.6, s, 4);
+    // Banchi: da quasi vuoto (n basso) a circa il doppio della base; media ≈ la base.
+    let shape = ((n * 1.4 + 0.5).clamp(0.0, 1.0)).powf(1.5) * 2.2;
+    base * ((1.0 - v) + v * shape)
+}
+
+fn haze_cache() -> &'static Mutex<HashMap<String, Arc<BakedFog>>> {
+    static C: OnceLock<Mutex<HashMap<String, Arc<BakedFog>>>> = OnceLock::new();
+    C.get_or_init(Default::default)
+}
+
+/// Foschia d'ambiente: un mezzo che copre la scena, la camera e le luci, illuminato come le
+/// altre nebbie (luce diffusa più volte, ombre degli oggetti nei raggi).
+pub fn haze_fog(scene: &Scene) -> Option<Arc<BakedFog>> {
+    let h = &scene.haze;
+    if !h.enabled || h.density <= 0.0 {
+        return None;
+    }
+    let mut b = scene.bounds();
+    if b.is_empty() {
+        b.grow_point(Vec3::ZERO);
+    }
+    b.grow_point(scene.render_camera().position);
+    for l in &scene.lights {
+        if l.enabled && !matches!(l.kind, forge_scene::LightKind::Directional) {
+            b.grow_point(l.position);
+        }
+    }
+    // Pavimenti enormi: la foschia resta entro 20 m dal centro della scena.
+    let center = (b.min + b.max) * 0.5;
+    let half = ((b.max - b.min) * 0.5 * 1.05 + Vec3::splat(0.05)).min(Vec3::splat(20.0));
+    let (min, max) = (center - half, center + half);
+    let key = format!("{h:?}|{min:?}|{max:?}");
+    if let Some(f) = haze_cache().lock().unwrap().get(&key) {
+        return Some(f.clone());
+    }
+    let ext = max - min;
+    // Celle: abbastanza per i vortici (circa 6 per vortice) senza superare ~4 milioni.
+    let mut cell = if h.variation > 0.0 {
+        h.swirl_scale.max(0.02) / 6.0
+    } else {
+        ext.max_element() / 8.0
+    };
+    if h.falloff_height > 0.0 {
+        cell = cell.min(h.falloff_height / 4.0);
+    }
+    cell = cell.max(ext.max_element() / 256.0);
+    while (ext.x / cell).ceil() * (ext.y / cell).ceil() * (ext.z / cell).ceil() > 4.0e6 {
+        cell *= 1.15;
+    }
+    let longest = ((ext.max_element() / cell).ceil() as usize).clamp(4, 256);
+    let hz = h.clone();
+    let floor = min.y;
+    let albedo = Vec3::from(h.color).clamp(Vec3::ZERO, Vec3::splat(0.999));
+    let fog = BakedFog::from_fn(min, max, longest, albedo, h.anisotropy.clamp(-0.95, 0.95), move |p| {
+        haze_density_at(&hz, p, floor)
+    });
+    let f = Arc::new(fog);
+    tracing::info!("foschia d'ambiente: {:?} celle in {:.0} ms", f.spec.res, f.bake_ms);
+    let mut c = haze_cache().lock().unwrap();
+    if c.len() > 8 {
+        c.clear();
+    }
+    c.insert(key, f.clone());
+    Some(f)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use forge_math::Mat4;
     use forge_scene::{primitives, ComponentId};
+
+    /// La foschia vorticosa ha banchi e vuoti, ma in media resta vicina alla densità scelta.
+    #[test]
+    fn haze_swirls_keep_the_mean_density() {
+        let h = forge_scene::Haze {
+            enabled: true,
+            density: 0.2,
+            variation: 0.8,
+            ..Default::default()
+        };
+        let (mut sum, mut lo, mut hi, n) = (0.0, f32::MAX, 0.0f32, 4000);
+        for i in 0..n {
+            let p = Vec3::new((i % 20) as f32 * 0.13, ((i / 20) % 20) as f32 * 0.11, (i / 400) as f32 * 0.17);
+            let d = haze_density_at(&h, p, 0.0);
+            sum += d;
+            lo = lo.min(d);
+            hi = hi.max(d);
+        }
+        let mean = sum / n as f32;
+        assert!((mean / 0.2 - 1.0).abs() < 0.35, "media {mean}");
+        assert!(lo < 0.1 && hi > 0.3, "niente vortici: {lo}..{hi}");
+        let flat = forge_scene::Haze { variation: 0.0, ..h };
+        assert_eq!(haze_density_at(&flat, Vec3::ONE, 0.0), 0.2);
+    }
 
     /// Bancone a y = 0 sopra un pavimento a y = −1: la nebbia sopra il bancone si appoggia
     /// al bancone, non al pavimento (altrimenti la zona si allunga e le celle ingrossano).

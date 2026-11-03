@@ -21,8 +21,9 @@ impl ToneMapping {
 /// Dispositivo su cui calcolare il rendering.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum BackendKind {
-    #[default]
     Cpu,
+    /// Predefinito: la scheda video (con gli RT core se ci sono); senza GPU si passa alla CPU.
+    #[default]
     Gpu,
 }
 
@@ -160,6 +161,65 @@ pub struct RenderSettings {
     /// Caustiche con le mappe di fotoni (vedi [`CausticSettings`]).
     #[serde(default)]
     pub caustics: CausticSettings,
+    /// Stile del render: fotorealistico, fumetto, illustrazione tecnica.
+    #[serde(default)]
+    pub style: RenderStyle,
+    /// Contorni a inchiostro sull'immagine finale (con qualsiasi stile).
+    #[serde(default)]
+    pub outlines: OutlineSettings,
+}
+
+/// Stile del render. Fumetto e illustrazione tecnica si calcolano alla prima superficie vista
+/// (attraverso vetri e specchi, che riflettono e rifrangono come sempre); nel render spettrale
+/// questi due stili usano il percorso RGB.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub enum RenderStyle {
+    /// Path tracing fisico: la luce come nella realtà.
+    #[default]
+    Photoreal,
+    /// Fumetto (cel shading): colore pieno del materiale in 3 fasce nette (luce, mezza ombra,
+    /// ombra) dalle luci della scena, con le loro ombre, e un riflesso netto sui materiali lucidi.
+    Toon,
+    /// Illustrazione tecnica (Gooch): ombreggiatura morbida da caldo (in luce) a freddo (in
+    /// ombra) con una luce fissa in alto a sinistra della camera, senza ombre nere.
+    Technical,
+}
+
+impl RenderStyle {
+    pub const ALL: [RenderStyle; 3] = [RenderStyle::Photoreal, RenderStyle::Toon, RenderStyle::Technical];
+
+    /// Numero per lo shader (0, 1, 2).
+    pub fn code(self) -> u32 {
+        self as u32
+    }
+}
+
+/// Contorni a inchiostro: sagome, confini tra oggetti diversi, salti di profondità e (se
+/// attivi) spigoli vivi, calcolati una volta dalla geometria e disegnati sull'immagine finale.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct OutlineSettings {
+    pub enabled: bool,
+    /// Spessore della linea in pixel.
+    pub width_px: f32,
+    /// Colore lineare della linea.
+    pub color: [f32; 3],
+    /// Anche gli spigoli vivi dentro lo stesso oggetto.
+    pub creases: bool,
+    /// Angolo oltre il quale due facce vicine fanno uno spigolo (gradi).
+    pub crease_deg: f32,
+}
+
+impl Default for OutlineSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            width_px: 1.5,
+            color: [0.015; 3],
+            creases: true,
+            crease_deg: 35.0,
+        }
+    }
 }
 
 fn default_adaptive_min() -> u32 {
@@ -180,12 +240,14 @@ impl Default for RenderSettings {
             tone_mapping: ToneMapping::AcesFilmic,
             exposure_ev: 0.0,
             environment_visible: true,
-            backend: BackendKind::Cpu,
+            backend: BackendKind::Gpu,
             denoise: DenoiseSettings::default(),
             noise_threshold: 0.0,
             adaptive_min_samples: default_adaptive_min(),
             color_mode: ColorMode::Rgb,
             caustics: CausticSettings::default(),
+            style: RenderStyle::Photoreal,
+            outlines: OutlineSettings::default(),
         }
     }
 }
@@ -235,7 +297,7 @@ impl RenderSettings {
     /// Le impostazioni che, se cambiano, invalidano l'accumulo.
     /// (Tone mapping ed esposizione si applicano in visualizzazione, e anche
     /// il numero di campioni obiettivo si può cambiare senza ripartire.)
-    pub fn accumulation_key(&self) -> (u32, u32, u32, u32, u32, u64, bool, ColorMode, u64) {
+    pub fn accumulation_key(&self) -> (u32, u32, u32, u32, u32, u64, bool, ColorMode, u64, RenderStyle) {
         (
             self.width,
             self.height,
@@ -246,6 +308,7 @@ impl RenderSettings {
             self.environment_visible,
             self.color_mode,
             self.caustics.key(),
+            self.style,
         )
     }
 }
