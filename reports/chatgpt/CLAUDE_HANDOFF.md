@@ -2481,3 +2481,5 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
 - Stessa giornata: la foschia entra nel calcolo anticipato (`bake_fogs` la calcola per ultima,
   in sequenza dopo le nebbie, `Phase::Haze`, `progress::update` chiamabile dai thread di rayon);
   `fogs_ready` e `ForgeApp::fog_fingerprint` tengono conto di foschia, camera e luci.
+- 03/11/2026: Valerio ha chiesto di portare tutto su main: versione 0.33.0 (Cargo.toml,
+  forgerender.iss, changelog), main avanzato in fast-forward da `sviluppo`.

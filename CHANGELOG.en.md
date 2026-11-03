@@ -10,7 +10,7 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
-## In development (next 0.33.0, `sviluppo` branch)
+## 0.33.0 — 3 Nov 2026
 
 **Ambient haze and floating dust**
 - Effects tab, **Ambient haze**: hazy air throughout the scene, with banks, curls and gaps (domain-warped fractal noise), lit like the fog (multiple scattering, object shadows in the rays), on CPU and GPU. Density, colour, backlit rays, swirls, swirl size, thinning with height, shape. Presets: Light veil, Light rays, Dusty attic, Thick haze, Low fog.

@@ -682,7 +682,7 @@
 - UI: `ui/atmosphere.rs` (foschia con preset, polvere, adesivi) nella scheda Effetti.
 - Ancora da fare: stili di rendering (cel/toon, illustrazione tecnica, contorni) chiesti da Valerio.
 
-### In sviluppo (03/11/2026): niente foschia dentro gli oggetti
+### 0.33.0 (03/11/2026): niente foschia dentro gli oggetti
 - `Media::inside_solid` (CPU) e `media_inside_solid` (GPU): le nebbie saltano i tratti dentro vetri
   e liquidi. `forge_render_core::fog::interior_cells` (riempimento dell'interno dopo
   `voxelize`) usato da `haze_fog(scene, geo)`.

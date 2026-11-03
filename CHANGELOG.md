@@ -13,7 +13,7 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
-## In sviluppo (prossima 0.33.0, branch `sviluppo`)
+## 0.33.0 — 03/11/2026
 
 **Foschia d'ambiente e polvere in sospensione**
 - Scheda Effetti, **Foschia d'ambiente**: aria velata in tutta la scena, con banchi, riccioli e
