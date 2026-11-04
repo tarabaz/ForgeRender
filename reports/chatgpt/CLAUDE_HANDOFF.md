@@ -2507,3 +2507,46 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
 - Polvere: solo luci spot/direzionali, `Dust::brightness` → `RenderScene::dust_gain` →
   `P_DUST_GAIN` (84, `PARAM_WORDS` 88); granelli nelle guide (`guides.rs`).
 - Render di prova con `forgerender-cli render --test-scene --dark --spot --haze … --dust`.
+
+
+## Valerio → Claude Code — 04/11/2026: rifinitura stili fumetto/tecnico, sfondo e artefatti nei contorni
+
+### Feedback visivo (immagine allegata nella conversazione)
+I rendering in stile fumetto e illustrazione tecnica sono complessivamente nella direzione giusta. Restano però tre richieste UX/qualità:
+
+1. **Illustrazione tecnica esclusivamente in bianco e nero.**
+   - Lo stile tecnico attuale è Gooch, con transizione freddo/blu → caldo/giallo e tinta derivata dal materiale (crates/forge_render_cpu/src/style.rs, funzione gooch). Non è il risultato desiderato.
+   - Sostituire/affiancare il risultato tecnico con un vero stile monocromatico: solo bianco, nero e livelli di grigio, senza tinta cromatica proveniente dai materiali o dall'illuminazione.
+   - Esporre due varianti selezionabili per lo stile tecnico: **Bianco e nero** e **Scala di grigi** (la prima ad alto contrasto, la seconda con gradazioni più morbide). Entrambe devono rimanere rigorosamente prive di colore. Se la distinzione proposta non è tecnicamente/visivamente sensata, presentare prima una breve proposta alternativa.
+
+2. **Opzione monocromatica anche per lo stile fumetto.**
+   - Mantenere il fumetto a colori attuale e aggiungere una variante **Fumetto bianco e nero**, con le stesse fasce toon ma convertite in bianco/nero o grigi.
+   - Non rimuovere né cambiare il comportamento predefinito esistente.
+
+3. **Gestione dello sfondo/piano di appoggio.**
+   - Nella scena di prova il piano/fondale, quando viene contornato o reso molto scuro, può diventare una grande macchia nera che appesantisce l'immagine.
+   - Aggiungere un controllo per **rimuovere/nascondere lo sfondo** nel rendering stilizzato, senza cancellare o modificare la geometria della scena.
+   - Quando lo sfondo è presente, permettere di scegliere il suo colore; prevedere anche un'opzione neutra/chiara e una trasparente o assente, se il pipeline immagine lo consente.
+   - Valutare separatamente se il piano di appoggio debba ricevere contorni: sarebbe utile poter escludere il fondale dai contorni senza escludere gli altri oggetti.
+   - Chiarire la semantica: distinguere il colore dello sfondo (pixel di miss) dal colore/materiale del piano geometrico. Non mascherare indiscriminatamente la geometria degli oggetti.
+
+### Problema visibile: puntini neri sparsi generati dai contorni
+Nell'immagine allegata, oltre ai contorni corretti delle forme, compaiono numerosi piccoli punti neri isolati sullo sfondo e sulle superfici. Sono artefatti visivamente sgradevoli e non devono essere confusi con dettagli voluti della scena.
+
+### Ispezione preliminare di ChatGPT (fatti verificati nel codice su main @ a16ffbfcab3cbcd4425d9867300cab7c897d2019)
+- crates/forge_render_core/src/outline.rs: compute() lancia 3×3 raggi per pixel (SUB = 3), registra il primo nodo colpito, profondità e normale geometrica.
+- Un bordo viene marcato se due campioni vicini appartengono a nodi diversi, se la profondità differisce oltre il 3% della distanza, oppure (se attivo) se la normale cambia oltre la soglia di spigolo.
+- La copertura finale è la somma dei 9 campioni per pixel. Non risulta nel codice ispezionato un filtro di coerenza spaziale/area minima che elimini piccoli gruppi isolati.
+- **Ipotesi, non causa dimostrata:** piccoli frammenti di geometria, triangoli sottili/isolati o hit sporadici dei raggi possono generare bordi locali; il campionamento 3×3 li può trasformare in puntini. Un'altra possibile origine è una discontinuità di profondità/normale su geometria molto piccola. La sola immagine non permette di stabilire quale caso sia responsabile.
+
+### Richiesta a Claude: diagnosi prima della correzione
+1. Riprodurre il render della scena allegata con contorni attivi e identificare se i punti corrispondono a hit geometrici reali, triangoli degeneri/frammenti, instabilità d'intersezione o falsi positivi della regola di bordo.
+2. Aggiungere una modalità diagnostica temporanea che mostri i campioni/hit o la maschera grezza dei contorni, così da localizzare la sorgente. Verificare in particolare geometria del fondale e piccoli oggetti.
+3. Valutare una soppressione robusta dei componenti isolati (coerenza/area minima o filtro equivalente) senza cancellare dettagli legittimi e senza arrotondare eccessivamente silhouette e spigoli.
+4. Testare almeno: cubo e sfera puliti, piano grande, oggetto con dettagli sottili, più oggetti separati e scena reale dell'immagine. Confrontare immagini prima/dopo.
+5. Non ridurre semplicemente la sensibilità globale o aumentare la soglia finché spariscono i puntini: la correzione non deve compromettere i contorni validi.
+6. Implementare le opzioni di stile e sfondo mantenendo compatibilità con scene/progetti esistenti e valori predefiniti attuali. Aggiornare UI, serializzazione se necessaria, documentazione IT/EN e test.
+
+**Criterio di accettazione:** tecnico rigorosamente monocromatico con due varianti; fumetto a colori invariato più variante monocromatica; sfondo disattivabile e colore configurabile; contorni puliti senza puntini isolati nella scena di riferimento.
+
+**Nota sullo stato:** questa è una richiesta e una diagnosi preliminare, non una modifica già implementata. ChatGPT non ha eseguito build, test o render. Screenshot di riferimento fornito da Valerio nella chat; non è stato caricato come asset binario nel repository.
