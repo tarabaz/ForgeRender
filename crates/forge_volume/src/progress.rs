@@ -14,6 +14,8 @@ pub enum Phase {
     Detail,
     /// Foschia d'ambiente (interno degli oggetti, poi densità).
     Haze,
+    /// Fumo volumetrico (interno degli oggetti, poi densità).
+    Smoke,
 }
 
 /// Fase, frazione fatta (0–1) e numero della nebbia (1 = prima) su quante.

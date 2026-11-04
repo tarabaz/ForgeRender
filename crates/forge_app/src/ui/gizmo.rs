@@ -58,6 +58,8 @@ enum DragStart {
     /// Emettitore e zona simulata della nebbia.
     /// Nebbia: emettitore, dimensioni e spostamento della zona all'inizio.
     Fog(usize, Vec3, Vec3, Vec3),
+    /// Fumo volumetrico: centro e dimensioni del riquadro all'inizio.
+    Smoke(usize, Vec3, Vec3),
 }
 
 /// Su cosa agisce il gizmo.
@@ -66,6 +68,7 @@ pub enum Target {
     Nodes,
     Light(usize),
     Fog(usize),
+    Smoke(usize),
 }
 
 /// Snap a contatto preparato all'inizio del trascinamento, se uno dei componenti trascinati
@@ -267,7 +270,10 @@ pub fn target(app: &ForgeApp) -> Option<Target> {
     if let Some(i) = app.selected_light.filter(|&i| i < app.scene.lights.len()) {
         return Some(Target::Light(i));
     }
-    app.selected_fog.filter(|&i| i < app.scene.fogs.len()).map(Target::Fog)
+    if let Some(i) = app.selected_fog.filter(|&i| i < app.scene.fogs.len()) {
+        return Some(Target::Fog(i));
+    }
+    app.selected_smoke.filter(|&i| i < app.scene.smokes.len()).map(Target::Smoke)
 }
 
 /// Assi propri di una luce: (destra, su, direzione) attorno alla direzione di emissione.
@@ -301,6 +307,7 @@ fn frame_for(app: &ForgeApp, rect: egui::Rect, t: Target, sel: &[usize]) -> Opti
             };
             (c, [Vec3::X, Vec3::Y, Vec3::Z])
         }
+        Target::Smoke(i) => (app.scene.smokes[i].center, [Vec3::X, Vec3::Y, Vec3::Z]),
     };
     let cam = &app.view_camera;
     let dist = (center - cam.position).length().max(1e-4);
@@ -426,7 +433,7 @@ pub fn update(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::
             (app.gizmo.mode == GizmoMode::Rotate && matches!(k, LightKind::Point))
                 || (app.gizmo.mode == GizmoMode::Scale && !matches!(k, LightKind::Area { .. } | LightKind::Portal { .. }))
         }
-        Some(Target::Fog(_)) => app.gizmo.mode == GizmoMode::Rotate,
+        Some(Target::Fog(_) | Target::Smoke(_)) => app.gizmo.mode == GizmoMode::Rotate,
         _ => false,
     };
     if app.gizmo.mode == GizmoMode::Select || tgt.is_none() || pointless || ui.input(|i| i.modifiers.alt) {
@@ -464,6 +471,10 @@ pub fn update(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::
                     Target::Fog(i) => {
                         let f = &app.scene.fogs[i];
                         DragStart::Fog(i, f.emitter, f.size, f.zone_offset)
+                    }
+                    Target::Smoke(i) => {
+                        let s = &app.scene.smokes[i];
+                        DragStart::Smoke(i, s.center, s.size)
                     }
                 };
                 let contact = match (tgt, h) {
@@ -504,6 +515,11 @@ pub fn update(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::
                     app.scene.fogs[*i].emitter = *e;
                     app.scene.fogs[*i].size = *size;
                     app.scene.fogs[*i].zone_offset = *off;
+                    app.shading_changed();
+                }
+                DragStart::Smoke(i, c, size) => {
+                    app.scene.smokes[*i].center = *c;
+                    app.scene.smokes[*i].size = *size;
                     app.shading_changed();
                 }
             }
@@ -700,6 +716,15 @@ fn apply_drag(app: &mut ForgeApp, rect: egui::Rect, drag: &Drag, pos: egui::Pos2
                 Op::World(m) if zone => f.zone_offset = m.transform_point3(*e + *off) - *e,
                 Op::World(m) => f.emitter = m.transform_point3(*e),
                 Op::Scale(s) => f.size = (*size * s.abs()).max(Vec3::splat(0.05)),
+            }
+            app.shading_changed();
+        }
+        // Fumo: il riquadro si sposta (e il fumo con lui) o si ridimensiona attorno al centro.
+        DragStart::Smoke(i, c, size) => {
+            let s = &mut app.scene.smokes[*i];
+            match &op {
+                Op::World(m) => s.center = m.transform_point3(*c),
+                Op::Scale(k) => s.size = (*size * k.abs()).max(Vec3::splat(0.01)),
             }
             app.shading_changed();
         }

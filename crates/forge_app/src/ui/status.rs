@@ -92,6 +92,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
                             Phase::Simulation => tr("simulazione"),
                             Phase::Detail => tr("dettaglio"),
                             Phase::Haze => tr("foschia d'ambiente"),
+                            Phase::Smoke => tr("fumo volumetrico"),
                         };
                         let pct = format!("{:.0}", p.fraction * 100.0);
                         // Più effetti: uno alla volta, la barra riparte da zero per ognuno.
@@ -102,6 +103,8 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
                             )
                         } else if p.phase == Phase::Haze {
                             tf("Foschia d'ambiente: {}%", &[pct])
+                        } else if p.phase == Phase::Smoke {
+                            tf("Fumo volumetrico: {}%", &[pct])
                         } else {
                             tf("Nebbia: {} {}%", &[phase.to_string(), pct])
                         };

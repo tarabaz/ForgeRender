@@ -736,6 +736,7 @@ impl RenderScene {
         let has_dust = node_material.iter().any(|&m| materials[m as usize].dust);
         let has_cutout = has_dust || material_textures.iter().flatten().any(|t| t.opacity.is_some());
         let mut fogs = crate::fog::bake_fogs(scene, &geometry);
+        fogs.extend(crate::smoke::smoke_fogs(scene, &geometry));
         fogs.extend(crate::fog::beam_fogs(scene));
         fogs.extend(crate::fog::haze_fog(scene, &geometry));
         let id = next_scene_id();

@@ -13,6 +13,44 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.36.0 — 04/11/2026
+
+**Fumo volumetrico**
+- Nuovo effetto **Fumo volumetrico** (scheda Effetti): nubi di fumo vere in un riquadro
+  (`forge_scene::SmokeCloud`, `Scene::smokes`, salvate nel progetto). Il riquadro decide dove
+  esiste il fumo: si seleziona dal punto al centro nella viewport e si sposta o ridimensiona con
+  il gizmo (Sposta / Scala, `gizmo::Target::Smoke`), o si scrivono centro e dimensioni; il fumo
+  renderizzato lo segue esattamente.
+- Quattro forme (nube, pennacchio, filo d'incenso, banco) e sei preset che aggiungono una nube
+  nuova sopra la selezione: nube sospesa, incenso, vapore da tazza, pennacchio da tubo, fumo denso
+  industriale, banco di fumo.
+- Campo di densità (`forge_render_core::smoke::smoke_density_at`) nelle coordinate del riquadro:
+  contorno della forma attorcigliato da un rumore a dominio distorto, sbuffi a cavolfiore sul bordo
+  (frattale di |rumore|), filamenti dalle creste del rumore, variazione lenta all'interno; pennacchi
+  e incenso lisci in basso e turbolenti salendo. Altezza di partenza e massima nel riquadro, bordi
+  sfumati sulle facce del riquadro.
+- Comandi: densità (0,5–2000 1/m) con la scala "opaco oltre ~X", colore, controluce, grandezza dei
+  riccioli, forza dei vortici (0–8), dettaglio frattale (1–10), ruvidità, sbuffi, filamenti,
+  morbidezza dei bordi, variazione interna, si allarga / serpeggia / si dissolve, altezza di
+  partenza e massima, niente fumo negli oggetti, qualità 1–4 (3–24 M celle), variante.
+- Mezzo fisico (`BakedFog`, delta tracking con le ombre su CPU e GPU); l'interno degli oggetti si
+  toglie con `voxelize` + `interior_cells`. Calcolato in anticipo con gli altri effetti sulla
+  stessa barra (`Phase::Smoke`), con la cache.
+- Prima versione procedurale, ancora senza simulazione fluida (vedi `docs/studio-fumo-fuoco.md`).
+
+**Foschia**
+- **Altezza di partenza** (`Haze::bottom_height`): la foschia comincia sopra il pavimento, con
+  l'inizio sfumato e qualche sbuffo che pende sotto; con l'altezza massima fa una fascia sospesa
+  (es. 2,2–2,8 m). Strati, diradamento e fumo a terra si misurano dall'altezza di partenza; la
+  griglia comincia poco sotto (celle più fini).
+- Slider più ampi: densità 0,001–50, addensamenti fino a 2 (pochi ammassi molto concentrati),
+  grandezza dei vortici 0,01–20 m, forza fino a 8, dettaglio frattale fino a 10, ruvidità 0,2–0,85,
+  diffusione in avanti −0,5–0,95, altezze fino a 20 m, spessore e distanza degli strati ×4.
+
+**Riga di comando**
+- `render`: `--haze-bottom`, `--smoke 0..5|NOME`, `--smoke-at X,Z`, `--smoke-y`,
+  `--smoke-scale`, `--smoke-quality`, `--smoke-density`.
+
 ## 0.35.0 — 04/11/2026
 
 **Stili di rendering**

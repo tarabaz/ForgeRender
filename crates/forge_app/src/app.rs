@@ -211,6 +211,8 @@ pub struct ForgeApp {
     pub selected_light: Option<usize>,
     /// Nebbia selezionata (il gizmo sposta il suo emettitore).
     pub selected_fog: Option<usize>,
+    /// Nube di fumo volumetrico selezionata (il gizmo sposta e ridimensiona il suo riquadro).
+    pub selected_smoke: Option<usize>,
     /// Il gizmo della nebbia sposta la zona simulata invece dell'emettitore.
     pub fog_gizmo_zone: bool,
     pub selected_material: MaterialId,
@@ -384,6 +386,7 @@ impl ForgeApp {
             selection: BTreeSet::new(),
             selected_light: None,
             selected_fog: None,
+            selected_smoke: None,
             fog_gizmo_zone: false,
             selected_material: MaterialId::new("default"),
             view: View::Viewport,
@@ -1295,7 +1298,10 @@ impl ForgeApp {
             }
             return;
         }
-        if !self.scene.fogs.iter().any(|f| f.enabled) && !forge_render_core::fog::haze_on(&self.scene) {
+        if !self.scene.fogs.iter().any(|f| f.enabled)
+            && !forge_render_core::fog::haze_on(&self.scene)
+            && forge_render_core::smoke::smoke_count(&self.scene) == 0
+        {
             return;
         }
         match &self.fog_watch {
@@ -1329,8 +1335,9 @@ impl ForgeApp {
         // La foschia copre scena, camera e luci: spostarle cambia il suo riquadro.
         let lights: Vec<_> = self.scene.lights.iter().map(|l| (l.enabled, l.position)).collect();
         format!(
-            "{:?}|{}|{:?}|{:?}|{:?}",
+            "{:?}|{:?}|{}|{:?}|{:?}|{:?}",
             self.scene.fogs,
+            self.scene.smokes,
             self.geometry_rev,
             self.scene.haze,
             self.scene.render_camera().position,
@@ -1667,6 +1674,7 @@ impl ForgeApp {
         self.selection.clear();
         self.selected_light = None;
         self.selected_fog = None;
+        self.selected_smoke = None;
         self.collapsed.clear();
         self.sync_orbit_from_camera();
         self.geometry_changed();

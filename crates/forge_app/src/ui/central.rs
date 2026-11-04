@@ -159,6 +159,7 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
     }
     draw_lights(app, &painter, rect);
     draw_fogs(app, &painter, rect);
+    draw_smokes(app, &painter, rect);
     draw_cameras(app, &painter, rect);
     draw_depth_of_field(app, &painter, rect);
     if app.aim_pick {
@@ -242,31 +243,47 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
             let (origin, dir) = cam.ray(ndc_x, ndc_y, rect.width() / rect.height());
             // Luci ed emettitori di nebbia: si scelgono cliccando vicino all'icona.
             let near = |p: Vec3| project(&cam, rect, p).map(|q| q.distance(pos)).filter(|d| *d < 10.0);
-            let mut best: Option<(f32, bool, usize)> = None;
+            // 0 = luce, 1 = nebbia, 2 = fumo (il punto al centro del riquadro).
+            let mut best: Option<(f32, u8, usize)> = None;
             for (i, l) in app.scene.lights.iter().enumerate() {
                 if let Some(d) = near(l.position) {
                     if best.is_none_or(|b| d < b.0) {
-                        best = Some((d, true, i));
+                        best = Some((d, 0, i));
                     }
                 }
             }
             for (i, f) in app.scene.fogs.iter().enumerate() {
                 if let Some(d) = near(f.emitter) {
                     if best.is_none_or(|b| d < b.0) {
-                        best = Some((d, false, i));
+                        best = Some((d, 1, i));
                     }
                 }
             }
-            if let Some((_, is_light, i)) = best {
+            for (i, s) in app.scene.smokes.iter().enumerate() {
+                if let Some(d) = near(s.center) {
+                    if best.is_none_or(|b| d < b.0) {
+                        best = Some((d, 2, i));
+                    }
+                }
+            }
+            if let Some((_, kind, i)) = best {
                 app.selection.clear();
-                if is_light {
-                    app.selected_light = Some(i);
-                    app.selected_fog = None;
-                    app.tab = crate::app::InspectorTab::Lights;
-                } else {
-                    app.selected_fog = Some(i);
-                    app.selected_light = None;
-                    app.tab = crate::app::InspectorTab::Effects;
+                app.selected_light = None;
+                app.selected_fog = None;
+                app.selected_smoke = None;
+                match kind {
+                    0 => {
+                        app.selected_light = Some(i);
+                        app.tab = crate::app::InspectorTab::Lights;
+                    }
+                    1 => {
+                        app.selected_fog = Some(i);
+                        app.tab = crate::app::InspectorTab::Effects;
+                    }
+                    _ => {
+                        app.selected_smoke = Some(i);
+                        app.tab = crate::app::InspectorTab::Effects;
+                    }
                 }
                 return;
             }
@@ -274,6 +291,7 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
             let multi = ui.input(|i| i.modifiers.command);
             app.selected_light = None;
             app.selected_fog = None;
+            app.selected_smoke = None;
             match forge_render_core::pick(&geo, origin, dir) {
                 Some((node, _)) => {
                     crate::ui::tree::select(&mut app.selection, node, multi);
@@ -556,6 +574,53 @@ fn draw_fogs(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
             p + egui::vec2(8.0, -8.0),
             egui::Align2::LEFT_BOTTOM,
             &f.name,
+            egui::FontId::proportional(11.0),
+            c,
+        );
+    }
+}
+
+/// Fumo volumetrico: il riquadro in cui esiste (linea piena, più marcata se selezionato) con il
+/// punto centrale da cliccare per selezionarlo.
+fn draw_smokes(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
+    let cam = &app.view_camera;
+    for (i, s) in app.scene.smokes.iter().enumerate() {
+        let selected = app.selected_smoke == Some(i);
+        let c = if !s.enabled {
+            egui::Color32::from_gray(90)
+        } else if selected {
+            egui::Color32::from_rgb(255, 200, 120)
+        } else {
+            egui::Color32::from_rgb(200, 170, 140)
+        };
+        let (lo, hi) = s.sanitized().bounds();
+        let corner = |i: usize| Vec3::new([lo.x, hi.x][i & 1], [lo.y, hi.y][(i >> 1) & 1], [lo.z, hi.z][(i >> 2) & 1]);
+        let width = if selected { 1.6 } else { 1.0 };
+        let stroke = egui::Stroke::new(width, c.gamma_multiply(if selected { 1.0 } else { 0.7 }));
+        for (a, b) in [
+            (0, 1),
+            (2, 3),
+            (4, 5),
+            (6, 7),
+            (0, 2),
+            (1, 3),
+            (4, 6),
+            (5, 7),
+            (0, 4),
+            (1, 5),
+            (2, 6),
+            (3, 7),
+        ] {
+            if let (Some(p), Some(q)) = (project(cam, rect, corner(a)), project(cam, rect, corner(b))) {
+                painter.line_segment([p, q], stroke);
+            }
+        }
+        let Some(p) = project(cam, rect, s.center) else { continue };
+        painter.circle_filled(p, 4.0, c);
+        painter.text(
+            p + egui::vec2(8.0, -8.0),
+            egui::Align2::LEFT_BOTTOM,
+            &s.name,
             egui::FontId::proportional(11.0),
             c,
         );

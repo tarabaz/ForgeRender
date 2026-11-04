@@ -159,6 +159,8 @@ pub struct Scene {
     pub haze_dust: crate::effects::Dust,
     /// Adesivi (decal) applicati sugli oggetti.
     pub decals: Vec<crate::effects::Decal>,
+    /// Nubi di fumo volumetrico.
+    pub smokes: Vec<crate::smoke::SmokeCloud>,
 }
 
 impl Default for Scene {
@@ -181,6 +183,7 @@ impl Default for Scene {
             haze: Default::default(),
             haze_dust: Default::default(),
             decals: Vec::new(),
+            smokes: Vec::new(),
         }
     }
 }

@@ -69,4 +69,17 @@ pub const EXTERNAL: &[&str] = &[
     tk("Emettitore a 20–40 cm da terra (la bocca della macchina): tappeto basso e compatto che copre il pavimento."),
     tk("Molto alta"),
     tk("Ultra"),
+    // forge_scene::SMOKE_PRESETS
+    tk("Nube sospesa"),
+    tk("Un ammasso di fumo morbido a mezz'aria, con sbuffi e bordi sfilacciati"),
+    tk("Incenso"),
+    tk("Un filo sottile che sale liscio e poi si rompe in riccioli: il fondo del riquadro va sulla punta del bastoncino"),
+    tk("Vapore da tazza"),
+    tk("Vapore bianco e leggero che sale dalla tazza e svanisce: il fondo del riquadro va sulla superficie del caffè"),
+    tk("Pennacchio da tubo"),
+    tk("Fumo che esce da un tubo, un ugello o un camino, sale allargandosi e si apre in sbuffi: il fondo del riquadro va sulla bocca"),
+    tk("Fumo denso industriale"),
+    tk("Fumo scuro e pesante che si gonfia in grossi sbuffi: ciminiere, incendi, scene drammatiche"),
+    tk("Banco di fumo"),
+    tk("Fumo che riempie tutto il riquadro con i bordi sfilacciati: stanza piena di fumo, palco, strato sotto il soffitto"),
 ];

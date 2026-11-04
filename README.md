@@ -18,15 +18,16 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
-### What's new in 0.35.0
+### What's new in 0.36.0
 
-- **Render styles:** cartoon (cel shading) and technical illustration (Gooch), chosen at the top of the Render tab with a small example on hover, plus ink outlines that work with any style.
-- **Haze that does not veil everything:** "light rays only" mode (default) shows the rays of spots, sun and lamps without greying the scene; clumping, maximum height with rising puffs, a density scale, a finer grid and stronger swirls.
-- **Dust only in the beams:** lit only by spots and sun, kept by the denoiser, with a brightness slider.
+- **Volumetric smoke:** real smoke clouds with curls, cauliflower puffs and frayed edges, in a box you move and resize with the gizmo; six presets (suspended cloud, incense, steam from a cup, plume from a pipe, dense industrial smoke, smoke bank), physical light scattering and shadows, no smoke inside objects.
+- **Haze start height:** the haze can begin above the floor, so with the maximum height it forms a suspended band (for example 2.2–2.8 m under the ceiling); the floor smoke rises with it.
+- **Wider sliders:** larger ranges for density, clumping, swirl size and strength, fractal detail and heights, in the haze and in the new smoke.
 
 <details>
 <summary><strong>Previous versions — complete release history</strong></summary>
 
+- **0.35.0 — Render styles, haze that does not veil everything:** cartoon and technical illustration with ink outlines; haze in "light rays only" mode with clumping, maximum height and puffs; dust lit only in the beams and kept by the denoiser.
 - **0.34.0 — Haze in five kinds, dust as its own effect:** low fog, gas clouds, toxic floor smoke, floating layers and vapour curls with fractal and quality controls; dust visible only in direct light; icons instead of missing symbols.
 - **0.33.0 — Ambient haze, floating dust, decals:** haze with banks and curls lit with multiple scattering; dust specks; decals on curved surfaces; STEP conversion saved with projects and packages; fog computation can be cancelled and restarts on changes.
 - **0.32.0 — Much faster dry-ice fog:** the simulation works only where the fog is (Ultra 182 → 37 s on the cocktail demo), computed in the background with a progress bar; laser partial reflections; optical bench and lens demos; AI MCP ON/OFF switch.
@@ -132,53 +133,65 @@ This is a physically motivated fluid approximation for dry-ice-style effects, no
 A participating medium that fills the scene (or only a layer of it) and that every light crosses: spots, sun and lamps draw rays with the shadows of the objects inside it, and light is scattered several times, on CPU and GPU. It is not a texture or a uniform grey block: the density comes from a domain-warped fractal noise computed on a 3D grid, so it has banks, curls and gaps.
 
 - **Five kinds:** *Low fog* lying on the ground and thinning out going up; *Gas clouds*, almost clear air with dense clumps here and there; *Toxic smoke on the floor*, a layer a few centimetres thick that hovers over the floor gathered into filaments; *Floating layers*, horizontal veils at different heights, wavy and full of holes; *Vapour curls*, swirls inside swirls with high contrast.
-- **Fractal controls:** swirl strength (from round blobs to clearly visible spirals), fractal detail (1–8 octaves), roughness (soft or ragged edges), swirl size, amount, colour and forward scattering (how bright the rays are against the light).
+- **Fractal controls:** swirl strength (from round blobs to clearly visible spirals), fractal detail (1–10 octaves), roughness (soft or ragged edges), swirl size, amount, colour and forward scattering (how bright the rays are against the light).
 - **Light rays only (default):** the haze adds only the light of spots, sun and lamps scattered in the air, so the rays show without veiling or darkening the objects; switched off, it becomes a physical medium that also scatters the environment light and veils the scene.
-- **Shape controls:** clumping (large denser areas and thinner ones), a maximum height above the floor (the floor is found with rays) with a few random puffs rising above it, and a density scale that tells how far you can see through it.
+- **Shape controls:** clumping (large denser areas and thinner ones), a start height and a maximum height above the floor (together they make a suspended band, for example under the ceiling) (the floor is found with rays) with a few random puffs rising above it, and a density scale that tells how far you can see through it.
 - **Quality slider:** the grid follows both the swirl size and the size of the scene, from a 2-million-cell draft to 24 million cells (48 MB) for fine detail and sharp edges. The haze is computed ahead of time, one effect at a time, with the progress bar at the bottom.
 - **Never inside the objects:** rays travelling inside glass or liquid skip it (lenses and glasses stay clear) and the solid inside of the parts is cleared, while the air of a closed room stays hazy.
 
-### 6. Floating dust — specks that shine only in a beam
+### 6. Volumetric smoke — clouds, plumes and incense in a box
+
+Real volumetric smoke clouds for product shots: incense smoke next to a perfume bottle, steam rising from a cup, a plume from a pipe or chimney, dense dark industrial smoke. Each cloud lives in a box that you select in the viewport and move or resize with the gizmo: the rendered smoke follows the box exactly, with nothing left behind where it was.
+
+- **Four shapes and six presets:** *Cloud* (a rounded mass in mid-air), *Plume* (narrow at the bottom of the box, widening and fading as it rises), *Incense thread* (smooth at the bottom, then breaking into curls) and *Bank* (fills the whole box with frayed edges). Presets: suspended cloud, incense, steam from a cup, plume from a pipe, dense industrial smoke and smoke bank. Each preset adds a new cloud on top of the selection, it never replaces one.
+- **Multi-scale structure:** the outline of the shape is twisted by domain-warped noise, the edge gets cauliflower puffs (a fractal of |noise|) and thin filaments (noise ridges), and the inside has slow density variations. Plumes and incense start laminar and become turbulent as they rise.
+- **Controls:** density with an "opaque beyond ~X" scale, colour (white steam, grey smoke, dark soot), backlight, curl size, swirl strength (up to 8), fractal detail (up to 10 octaves), roughness, puffs, filaments, edge softness, inner variation; for plumes and incense also widening, meandering and fading; start height and maximum height inside the box; quality from 3 to 24 million cells; variant (seed).
+- **Physical:** the smoke scatters and absorbs light with multiple scattering, casts volumetric shadows and receives them, on CPU and GPU (the same delta tracking as the dry-ice fog). It never fills the solid inside of the objects that cross the box. The same parameters and seed always give the same cloud.
+- **Computed ahead of time** with the other effects, one at a time on the progress bar, and saved with the project.
+
+This first version is procedural (no fluid simulation yet): the physical smoke simulation with temperature and buoyancy is the next step, see the [smoke and fire study](docs/studio-fumo-fuoco.md).
+
+### 7. Floating dust — specks that shine only in a beam
 
 Real specks (a few millimetres, up to 150,000) scattered in the air, as their own effect. They are invisible except inside the beams of spots and sun: there they sparkle, like the dust in the rays coming through an attic window, while bulbs, panels, environment and bounce light do not light them. They are marked in the denoiser guides, so the denoiser keeps them instead of removing them as noise. Amount, size, brightness and colour are adjustable.
 
-### 7. Decals — labels and logos on any surface
+### 8. Decals — labels and logos on any surface
 
 ![ForgeRender logo applied as a decal on a glass sphere and a red cube](docs/img/effetti/adesivi.webp)
 
 Apply an image (a logo, a label, a PNG with transparency) to the selected object where the camera is looking. The decal is cut from the object's own triangles inside a projection box, so it wraps curved surfaces such as bottles and cups, and it moves with the object. The transparent parts of the PNG let the object show through. Width (the height follows the image proportions), rotation, position on the surface, projection depth, roughness and metalness are adjustable, and the image travels with the project and inside `.frpack` packages.
 
-### 8. PBR materials and textures for CAD models
+### 9. PBR materials and textures for CAD models
 
 ![ForgeRender material and texture examples](docs/img/mcp/esempi/materiali.jpg)
 
 Diffuse materials, GGX metals and plastics, Fresnel glass, frosted glass and emissive surfaces. PBR maps include base colour, roughness, metallic, normal, bump, true displacement, ambient occlusion and opacity. For CAD models without UVs, metric Box projection is available, with Piece, Assembly or World anchoring.
 
-### 9. Product studio and lighting
+### 10. Product studio and lighting
 
 ![ForgeRender photographic studio look](docs/img/mcp/esempi/aspetto_studio.jpg)
 
 Prepare a product scene with a backdrop and studio lights, then choose a light, dark or dramatic background. Lights remain individually adjustable, and the studio can be fitted to the product dimensions without taking control away from the user.
 
-### 10. Volumetric lighting and visible beams
+### 11. Volumetric lighting and visible beams
 
 ![ForgeRender volumetric light beam](reports/fascio-volumetrico/dopo_fascio_solo_camera.png)
 
 Spotlights can create visible beams with adjustable density and length. Volumetric fog is a participating medium with scattering and shadows: light interacts with the volume and becomes visible in space, not only on surfaces.
 
-For fog that fills the whole scene see [Ambient haze](#5-ambient-haze--five-kinds-of-procedural-fog), and for specks that sparkle in the beams see [Floating dust](#6-floating-dust--specks-that-shine-only-in-a-beam).
+For fog that fills the whole scene see [Ambient haze](#5-ambient-haze--five-kinds-of-procedural-fog), and for specks that sparkle in the beams see [Floating dust](#7-floating-dust--specks-that-shine-only-in-a-beam).
 
-### 11. Camera, multiple views and product presentation
+### 12. Camera, multiple views and product presentation
 
 ![Three-quarter product view](docs/img/mcp/esempi/vista_tre_quarti.jpg)
 
 Render cameras provide focal length, aperture, depth of field and lens shift. Automatic front, rear, side, top and three-quarter views help present a product from multiple angles; turntable videos can be exported as MP4.
 
-### 12. Render passes and post-production
+### 13. Render passes and post-production
 
 ForgeRender can export separate **Albedo, Normals, Depth, Product Mask and Component ID** passes for compositing, masking and further image editing. These are technical output buffers, not additional beauty renders.
 
-### 13. Render styles — cartoon, technical illustration and ink outlines
+### 14. Render styles — cartoon, technical illustration and ink outlines
 
 At the top of the Render tab you choose how the image is drawn; hovering over each choice shows a small example.
 
@@ -189,7 +202,7 @@ At the top of the Render tab you choose how the image is drawn; hovering over ea
 
 The styles are applied at the first surface seen by the camera, so glass and mirrors still reflect and refract; they work on CPU and GPU, also in the Spectral render.
 
-### 14. STEP models: converted once, then reopened instantly
+### 15. STEP models: converted once, then reopened instantly
 
 A STEP file is converted to meshes once. The result is kept in a conversion cache and saved next to the project (`modelli-convertiti/`) and inside `.frpack` packages, so reopening a project does not convert the STEP again. On the optical bench demo, opening went from 27 s to 0.2 s. When the STEP changes (or the parts of a multi-file assembly change, or the quality changes), it is converted again. Packages now also include the part files that a multi-file STEP assembly refers to.
 

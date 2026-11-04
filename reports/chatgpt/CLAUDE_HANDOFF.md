@@ -2614,3 +2614,17 @@ Per la creazione di un nuovo effetto di tipo **Fumo tossico a terra**, i valori 
 Applicare questi valori ai **nuovi effetti** di questo tipo soltanto. Non modificare gli effetti già salvati nei progetti e non estendere il preset agli altri tipi di foschia senza indicazioni specifiche. L'altezza massima deve partire disattivata.
 
 **Stato:** una configurazione ricevuta, raccolta ancora aperta. Attendere le altre schermate e la conferma di Valerio prima di implementare in blocco i default. Nessuna modifica al codice, build, test o render eseguiti da ChatGPT.
+
+
+## Claude Code → ChatGPT — 04/11/2026: fumo volumetrico (fase 1 procedurale) e altezza di partenza della foschia (0.36.0)
+
+Fatto (su richiesta diretta di Valerio, "implementa il volumetrico", slider più ampi, altezza di partenza):
+- **Fumo volumetrico procedurale** = la *Fase 1* della richiesta `2026-11-04_realistic-volumetric-smoke-hybrid.md`. `forge_scene::SmokeCloud` (`Scene::smokes`, salvato nel progetto con `#[serde(default)]`: i progetti vecchi si aprono senza fumo). Riquadro = zona in cui il fumo esiste, densità calcolata nelle coordinate del riquadro: spostarlo con il gizmo sposta il fumo renderizzato, senza residui (test `smoke_cloud_has_a_core_and_follows_its_box`).
+- Forme: nube, pennacchio, filo d'incenso, banco. Preset: nube sospesa, incenso, vapore da tazza, pennacchio da tubo, fumo denso industriale, banco di fumo.
+- Rendering: un `BakedFog` fisico per nube (stesso percorso CPU/GPU della nebbia: delta tracking, ratio tracking per le ombre, Henyey–Greenstein, majorant a blocchi), niente emissione. Interno degli oggetti azzerato con `voxelize` + `interior_cells`.
+- Foschia: `Haze::bottom_height`. Semantica verificata nel codice: `haze_floor` è la quota del pavimento trovata con 5×5 raggi verso il basso (superfici rivolte in alto, almeno 13 su 25), non una quota iniziale; `top_height` e `bottom_height` si misurano da lì. Strati, diradamento e fumo a terra partono da `floor + bottom_height`. Default 0 = comportamento di prima.
+- Slider più ampi nella foschia (densità, addensamenti fino a 2, vortici, ottave fino a 10, altezze) e nel fumo.
+
+Verificato: test nuovi (`smoke::tests::*`, `fog::tests::haze_band_between_start_and_top_height`), render di prova da riga di comando sulla scena di prova (pennacchio, fumo denso, nube, banco, incenso; fascia di foschia 0,5–0,9 m con una spot al buio). Non provato nell'interfaccia (gizmo, pannello) né confrontato CPU/GPU con una misura: solo a occhio.
+
+Non fatto (resta nel backlog, non considerarlo completato): fasi 2–4 del fumo (simulazione con temperatura e galleggiamento, sorgenti, ibrido, ottimizzazione), undo/redo del riquadro del fumo, strumento MCP per il fumo; camera come componente e tilt-shift; stili bianco e nero, sfondo, puntini dei contorni e sensibilità; polvere (quantità minima, dimensione ×3, fascio che non arriva a terra, box); nuovi default della foschia (raccolta aperta).

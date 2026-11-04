@@ -282,6 +282,7 @@ pub fn fogs_ready(scene: &Scene, geo: &RenderGeometry) -> bool {
         scene.fogs.iter().filter(|f| f.enabled).all(|f| c.contains_key(&key(f, geo)))
     };
     fogs_done
+        && crate::smoke::smokes_ready(scene, geo)
         && match haze_params(scene, geo) {
             Some(p) => haze_cache().lock().unwrap().contains_key(&p.key),
             None => true,
@@ -290,14 +291,16 @@ pub fn fogs_ready(scene: &Scene, geo: &RenderGeometry) -> bool {
 
 /// Nebbie attive della scena, calcolate se non sono già in cache. Gli effetti si calcolano
 /// uno alla volta (ognuno usa già tutti i core), sulla stessa barra che riparte da zero:
-/// prima le nebbie di ghiaccio secco, poi la foschia d'ambiente (che resta in cache per
-/// [`haze_fog`]). Restituisce le nebbie di ghiaccio secco.
+/// prima le nebbie di ghiaccio secco, poi il fumo volumetrico, poi la foschia d'ambiente (fumo e
+/// foschia restano in cache per [`crate::smoke::smoke_fogs`] e [`haze_fog`]). Restituisce le
+/// nebbie di ghiaccio secco.
 pub fn bake_fogs(scene: &Scene, geo: &RenderGeometry) -> Vec<Arc<BakedFog>> {
     use forge_volume::progress::{self, Phase};
     progress::start_job();
     let mut out = Vec::new();
     let fogs: Vec<&FogVolume> = scene.fogs.iter().filter(|f| f.enabled).collect();
-    let total = fogs.len() + haze_on(scene) as usize;
+    let smokes = crate::smoke::smoke_count(scene);
+    let total = fogs.len() + smokes + haze_on(scene) as usize;
     for (n, f) in fogs.iter().enumerate() {
         progress::begin(Phase::Obstacles, n + 1, total);
         let k = key(f, geo);
@@ -337,6 +340,9 @@ pub fn bake_fogs(scene: &Scene, geo: &RenderGeometry) -> Vec<Arc<BakedFog>> {
         }
         c.insert(k, b.clone());
         out.push(b);
+    }
+    if !progress::cancelled() {
+        crate::smoke::bake_smokes(scene, geo, fogs.len() + 1, total);
     }
     if haze_on(scene) && !progress::cancelled() {
         progress::begin(Phase::Haze, total, total);
@@ -463,10 +469,12 @@ pub fn beam_fogs(scene: &Scene) -> Vec<Arc<BakedFog>> {
 /// dominio distorto (riccioli, non macchie) con ottave, ruvidità e forza dei vortici scelte.
 pub fn haze_density_at(h: &forge_scene::Haze, p: Vec3, floor: f32) -> f32 {
     use forge_scene::HazeKind;
-    let top = top_factor(h, p, floor);
+    let top = top_factor(h, p, floor) * bottom_factor(h, p, floor);
     if top <= 0.0 {
         return 0.0;
     }
+    // Altezza di partenza: strati, diradamento e fumo a terra si misurano da lì.
+    let floor = floor + h.bottom_height.max(0.0);
     let d = match h.kind {
         HazeKind::Ambient => ambient_density(h, p, floor),
         HazeKind::GasClouds => gas_cloud_density(h, p, floor),
@@ -482,15 +490,42 @@ pub fn haze_density_at(h: &forge_scene::Haze, p: Vec3, floor: f32) -> f32 {
 
 /// Addensamenti: un rumore largo (3,5 volte i vortici) rende alcune zone più dense e altre più
 /// tenui; la media resta circa 1.
+/// Oltre 1 gli ammassi diventano più rari e più concentrati (fino a 2).
 fn clump_factor(h: &forge_scene::Haze, p: Vec3) -> f32 {
-    let c = h.clumping.clamp(0.0, 1.0);
+    let c = h.clumping.clamp(0.0, 2.0);
     if c <= 0.0 {
         return 1.0;
     }
-    let q = p / (h.swirl_scale.max(0.02) * 3.5) + Vec3::new(11.3, -4.1, 7.7);
+    let q = p / (h.swirl_scale.max(0.005) * 3.5) + Vec3::new(11.3, -4.1, 7.7);
     let n = forge_volume::noise::fbm(q, h.seed ^ 0x3c6e_f372, 3);
     let m = smoothstep(-0.25, 0.25, n);
-    (1.0 - c) + c * 2.5 * m.powf(1.5)
+    let k = c.min(1.0);
+    let extra = (c - 1.0).max(0.0);
+    // Esponente più alto = ammassi più rari; il guadagno compensa per tenere la media vicina.
+    let s = 1.5 + 3.0 * extra;
+    (1.0 - k) + k * 2.5 * (1.0 + 1.6 * extra) * m.powf(s)
+}
+
+/// Altezza di partenza: niente foschia sotto `bottom_height` dal pavimento, con l'inizio sfumato
+/// e (se ci sono sbuffi) qualche sbuffo che pende sotto.
+fn bottom_factor(h: &forge_scene::Haze, p: Vec3, floor: f32) -> f32 {
+    let bottom = h.bottom_height;
+    if bottom <= 0.0 {
+        return 1.0;
+    }
+    let y = p.y - floor;
+    let w = (bottom * 0.1).clamp(0.02, 0.25);
+    let edge = smoothstep(bottom, bottom + w, y);
+    let puffs = h.puffs.clamp(0.0, 1.0);
+    if y >= bottom + w || puffs <= 0.0 {
+        return edge;
+    }
+    let s = h.swirl_scale.max(0.005);
+    let q = Vec3::new(p.x / s, (bottom - y) / (s * 2.0), p.z / s) * 1.3 + Vec3::new(8.1, 0.0, -2.9);
+    let n = forge_volume::noise::fbm(q, h.seed ^ 0x85eb_ca6b, 3);
+    let blob = smoothstep(0.32 - 0.3 * puffs, 0.4, n);
+    let fade = (-(bottom - y).max(0.0) / (0.5 * s + 0.2 * bottom)).exp();
+    edge.max(blob * fade)
 }
 
 /// Altezza massima: piena fino al 90 % di `top_height`, sfuma fino all'altezza massima; sopra
@@ -506,7 +541,7 @@ fn top_factor(h: &forge_scene::Haze, p: Vec3, floor: f32) -> f32 {
     if y <= top * 0.9 || puffs <= 0.0 {
         return edge;
     }
-    let s = h.swirl_scale.max(0.02);
+    let s = h.swirl_scale.max(0.005);
     let q = Vec3::new(p.x / s, (y - top) / (s * 2.0), p.z / s) * 1.3 + Vec3::new(-3.7, 0.0, 5.3);
     let n = forge_volume::noise::fbm(q, h.seed ^ 0x9e37_79b9, 3);
     let blob = smoothstep(0.32 - 0.3 * puffs, 0.4, n);
@@ -517,7 +552,7 @@ fn top_factor(h: &forge_scene::Haze, p: Vec3, floor: f32) -> f32 {
 /// Frattale della foschia nel punto (già diviso per la grandezza dei vortici): ottave e
 /// ruvidità dalla foschia.
 fn haze_fbm(h: &forge_scene::Haze, q: Vec3, seed: u32) -> f32 {
-    forge_volume::noise::fbm_gain(q, seed, h.octaves.clamp(1, 8), h.roughness.clamp(0.2, 0.85))
+    forge_volume::noise::fbm_gain(q, seed, h.octaves.clamp(1, 10), h.roughness.clamp(0.2, 0.85))
 }
 
 /// Distorsione del dominio: spostare il punto con altro rumore fa i vortici (ampiezza ≈ 1 per
@@ -543,7 +578,7 @@ fn ambient_density(h: &forge_scene::Haze, p: Vec3, floor: f32) -> f32 {
     if v <= 0.0 || base <= 0.0 {
         return base;
     }
-    let q = p / h.swirl_scale.max(0.02);
+    let q = p / h.swirl_scale.max(0.005);
     let n = haze_fbm(h, q + haze_warp(q, h.seed) * h.warp, h.seed);
     // Banchi: da quasi vuoto (n basso) a circa il doppio della base; media ≈ la base.
     let shape = ((n * 2.2 + 0.5).clamp(0.0, 1.0)).powf(1.6) * 2.3;
@@ -557,7 +592,7 @@ fn gas_cloud_density(h: &forge_scene::Haze, p: Vec3, floor: f32) -> f32 {
     if base <= 0.0 {
         return 0.0;
     }
-    let q = p / h.swirl_scale.max(0.02);
+    let q = p / h.swirl_scale.max(0.005);
     let n = haze_fbm(h, q + haze_warp(q, h.seed) * h.warp, h.seed);
     let threshold = 0.22 - 0.3 * h.variation.clamp(0.0, 1.0);
     base * (0.03 + 0.97 * smoothstep(threshold, threshold + 0.15, n))
@@ -574,7 +609,7 @@ fn toxic_floor_density(h: &forge_scene::Haze, p: Vec3, floor: f32) -> f32 {
     if d <= 1e-6 {
         return 0.0;
     }
-    let sc = h.swirl_scale.max(0.02);
+    let sc = h.swirl_scale.max(0.005);
     let q = Vec3::new(p.x / (sc * 4.0), p.y / sc, p.z / sc);
     let n = haze_fbm(h, q + haze_warp(q, h.seed) * h.warp, h.seed);
     let ridge = (1.0 - (n * 3.0).abs()).max(0.0).powi(3);
@@ -590,7 +625,7 @@ fn layer_density(h: &forge_scene::Haze, p: Vec3, floor: f32) -> f32 {
         return 0.0;
     }
     let spacing = h.falloff_height.max(0.05);
-    let q = p / h.swirl_scale.max(0.02);
+    let q = p / h.swirl_scale.max(0.005);
     let wave = haze_fbm(h, q * 0.5 + haze_warp(q * 0.5, h.seed) * h.warp * 0.5, h.seed ^ 0x51ed_270b);
     let phase = (p.y - floor) / spacing + wave * 1.5;
     let sheet = (0.5 + 0.5 * (std::f32::consts::TAU * phase).cos()).powi(6);
@@ -607,7 +642,7 @@ fn billow_density(h: &forge_scene::Haze, p: Vec3, floor: f32) -> f32 {
     if base <= 0.0 {
         return 0.0;
     }
-    let q = p / h.swirl_scale.max(0.02);
+    let q = p / h.swirl_scale.max(0.005);
     let w1 = haze_warp(q, h.seed);
     let w2 = haze_warp(q + w1 * h.warp + Vec3::new(3.1, 7.4, 1.9), h.seed ^ 0x7f4a_7c15);
     let n = haze_fbm(h, q + w2 * h.warp, h.seed);
@@ -695,15 +730,22 @@ fn haze_params(scene: &Scene, geo: &RenderGeometry) -> Option<HazeParams> {
     let half = ((b.max - b.min) * 0.5 * 1.05 + Vec3::splat(0.05)).min(Vec3::splat(20.0));
     let (mut min, mut max) = (center - half, center + half);
     let floor = haze_floor(geo, min, max, min.y);
-    // Sotto il pavimento la foschia non serve.
-    min.y = min.y.max(floor - 0.02);
+    // Sotto il pavimento (o sotto l'altezza di partenza, salvo gli sbuffi che pendono) la foschia
+    // non serve: celle più fitte dove c'è.
+    let bottom = h.bottom_height.max(0.0);
+    let below = if bottom > 0.0 {
+        h.swirl_scale.max(0.005) * 2.0 * h.puffs.clamp(0.0, 1.0) + 0.05
+    } else {
+        0.02
+    };
+    min.y = min.y.max(floor + bottom - below);
     // Fumo a terra: il riquadro si ferma poco sopra lo strato (celle fitte dove serve).
     if h.kind == forge_scene::HazeKind::ToxicFloor {
-        max.y = max.y.min(floor + 0.05 + h.falloff_height.max(0.01) * 5.0);
+        max.y = max.y.min(floor + bottom + 0.05 + h.falloff_height.max(0.01) * 5.0);
     }
     // Altezza massima: sopra ci sono solo gli sbuffi, che si spengono in poco.
     if h.top_height > 0.0 {
-        max.y = max.y.min(floor + 0.05 + h.top_height * 2.0 + h.swirl_scale.max(0.02) * 2.0);
+        max.y = max.y.min(floor + 0.05 + h.top_height * 2.0 + h.swirl_scale.max(0.005) * 2.0);
     }
     max.y = max.y.max(min.y + 0.02);
     let key = format!("{h:?}|{min:?}|{max:?}|{}", geo.id);
@@ -723,7 +765,7 @@ pub fn haze_fog(scene: &Scene, geo: &RenderGeometry) -> Option<Arc<BakedFog>> {
     // Qualità 1–4: celle per vortice, celle minime e massime per lato, tetto di celle (con 4:
     // 24 milioni di celle, 48 MB, entro la memoria che la GPU dà a un buffer).
     let (per_swirl, min_side, max_side, max_cells) = HAZE_QUALITY[(h.quality.clamp(1, 4) - 1) as usize];
-    let mut cell = h.swirl_scale.max(0.02) / per_swirl;
+    let mut cell = h.swirl_scale.max(0.005) / per_swirl;
     if h.falloff_height > 0.0 {
         cell = cell.min(h.falloff_height / (per_swirl * 0.66));
     }
@@ -811,6 +853,38 @@ mod tests {
         assert!(lo < 0.1 && hi > 0.3, "niente vortici: {lo}..{hi}");
         let flat = forge_scene::Haze { variation: 0.0, ..h };
         assert_eq!(haze_density_at(&flat, Vec3::ONE, 0.0), 0.2);
+    }
+
+    /// Fascia sospesa: con altezza di partenza 2,2 m e massima 2,8 m (senza sbuffi) la foschia c'è
+    /// solo in mezzo; anche il fumo a terra si alza con l'altezza di partenza.
+    #[test]
+    fn haze_band_between_start_and_top_height() {
+        let h = forge_scene::Haze {
+            enabled: true,
+            density: 0.2,
+            variation: 0.0,
+            bottom_height: 2.2,
+            top_height: 2.8,
+            puffs: 0.0,
+            ..Default::default()
+        };
+        let at = |y: f32| haze_density_at(&h, Vec3::new(0.3, y, -0.2), 0.0);
+        assert_eq!(at(1.0), 0.0, "sotto la fascia");
+        assert_eq!(at(2.1), 0.0, "appena sotto");
+        assert!(at(2.5) > 0.1, "dentro la fascia: {}", at(2.5));
+        assert_eq!(at(3.0), 0.0, "sopra la fascia");
+        let toxic = forge_scene::Haze {
+            bottom_height: 1.0,
+            top_height: 0.0,
+            puffs: 0.0,
+            ..forge_scene::Haze::of_kind(forge_scene::HazeKind::ToxicFloor)
+        };
+        let t = |y: f32| haze_density_at(&toxic, Vec3::new(0.0, y, 0.0), 0.0);
+        assert_eq!(t(0.03), 0.0, "il fumo a terra non è più a terra");
+        let lifted: f32 = (0..20)
+            .map(|i| haze_density_at(&toxic, Vec3::new(i as f32 * 0.07, 1.05, 0.1), 0.0))
+            .sum();
+        assert!(lifted > 0.0, "strato spostato a 1 m");
     }
 
     /// Bancone a y = 0 sopra un pavimento a y = −1: la nebbia sopra il bancone si appoggia

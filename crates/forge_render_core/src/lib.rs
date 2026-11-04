@@ -19,6 +19,7 @@ pub mod outline;
 mod render_scene;
 mod session;
 mod settings;
+pub mod smoke;
 pub mod spectral;
 pub mod texture;
 mod tonemap;

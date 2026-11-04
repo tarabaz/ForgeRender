@@ -703,3 +703,16 @@
 
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
+
+### 0.36.0 (04/11/2026): fumo volumetrico procedurale, altezza di partenza della foschia
+- `forge_scene::smoke` (`SmokeCloud`, `SmokeShape`, `SMOKE_PRESETS`), `Scene::smokes`, salvato in
+  `ProjectFile::smokes`. Calcolo in `forge_render_core::smoke` (`smoke_density_at`, `bake_smokes`,
+  `smoke_fogs`, cache), dentro `fog::bake_fogs` tra le nebbie e la foschia (`Phase::Smoke`).
+- UI: `ui/smoke.rs` (pulsante con i preset e pannelli), riquadro e punto centrale nella viewport
+  (`central::draw_smokes`), gizmo Sposta/Scala (`gizmo::Target::Smoke`), `ForgeApp::selected_smoke`.
+- Foschia: `Haze::bottom_height` (fascia sospesa), slider più ampi.
+- Render di prova: `forgerender-cli render --smoke N --smoke-at X,Z --smoke-y Y`.
+- Ancora da fare (dalle richieste di ChatGPT del 04/11): simulazione fisica del fumo (temperatura,
+  galleggiamento, sorgenti), undo/redo del riquadro, strumento MCP per il fumo; camera come componente
+  e tilt-shift; varianti bianco e nero degli stili, sfondo e puntini nei contorni; polvere più rada e
+  più grande con il suo box; nuovi valori di partenza della foschia (raccolta aperta).

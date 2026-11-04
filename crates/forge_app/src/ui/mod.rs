@@ -22,6 +22,7 @@ mod quickbar;
 pub(crate) mod sequence;
 pub(crate) mod settings;
 mod simple;
+pub(crate) mod smoke;
 mod splash;
 mod status;
 pub mod style;

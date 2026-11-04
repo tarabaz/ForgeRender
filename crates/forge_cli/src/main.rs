@@ -79,7 +79,9 @@ fn print_help() {
              --denoise off|finale  --denoise-quality veloce|bilanciata|alta  --cuda  --denoise-strength 0..1\n    \
              --style fotorealistico|fumetto|tecnico  --outlines  --dust\n    \
              --haze nebbia-bassa|gas|fumo|strati|riccioli  --haze-density D  --haze-quality 1..4\n    \
-             --haze-clumping 0..1  --haze-top METRI\n  \
+             --haze-clumping 0..2  --haze-top METRI  --haze-bottom METRI\n    \
+             --smoke 0..5|NOME (preset del fumo volumetrico)  --smoke-y Y  --smoke-scale F\n    \
+             --smoke-quality 1..4  --smoke-density D\n  \
          bench [opzioni]            benchmark della scena di test con diversi numeri di thread\n    \
              --spp N (default 16)  --width W  --height H  --threads 1,2,4  --json F\n  \
          libreria elenco            materiali e HDRI della libreria\n  \
@@ -258,6 +260,46 @@ fn render(args: &Args) -> anyhow::Result<()> {
             target,
             ..forge_scene::Light::point("Spot di prova", target + forge_math::Vec3::new(-1.2, 2.2, 0.6), 40.0)
         });
+    }
+    if let Some(v) = args.parse("--haze-bottom")? {
+        scene.haze.bottom_height = v;
+    }
+    // Prove del fumo volumetrico: preset (numero o parte del nome) con il fondo del riquadro al
+    // centro della scena, o all'altezza `--smoke-y`; `--smoke-scale` ridimensiona il riquadro.
+    if let Some(k) = args.value("--smoke") {
+        let preset = k
+            .parse::<usize>()
+            .ok()
+            .and_then(|i| forge_scene::SMOKE_PRESETS.get(i))
+            .or_else(|| {
+                let k = k.to_lowercase();
+                forge_scene::SMOKE_PRESETS.iter().find(|p| p.name.to_lowercase().contains(&k))
+            })
+            .ok_or_else(|| anyhow::anyhow!("--smoke: preset sconosciuto «{k}»"))?;
+        let mut s = (preset.make)();
+        if let Some(f) = args.parse::<f32>("--smoke-scale")? {
+            s.size *= f;
+            s.detail_scale *= f;
+        }
+        let c = scene.bounds().center();
+        let y = args.parse::<f32>("--smoke-y")?.unwrap_or(c.y);
+        // `--smoke-at X,Z`: posizione in pianta del fondo del riquadro (di serie il centro della scena).
+        let (x, z) = match args.value("--smoke-at") {
+            Some(v) => {
+                let p: Vec<f32> = v.split(',').filter_map(|t| t.trim().parse().ok()).collect();
+                anyhow::ensure!(p.len() == 2, "--smoke-at: serve X,Z");
+                (p[0], p[1])
+            }
+            None => (c.x, c.z),
+        };
+        s.center = forge_math::Vec3::new(x, y + s.size.y * 0.5, z);
+        if let Some(v) = args.parse("--smoke-quality")? {
+            s.quality = v;
+        }
+        if let Some(v) = args.parse("--smoke-density")? {
+            s.density = v;
+        }
+        scene.smokes.push(s);
     }
     if args.flag("--dust") {
         scene.haze_dust.enabled = true;

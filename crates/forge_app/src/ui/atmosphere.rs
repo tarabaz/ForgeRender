@@ -45,6 +45,7 @@ pub fn add_buttons(app: &mut ForgeApp, ui: &mut egui::Ui) {
         ))
         .on_disabled_hover_text(tr("Già nella scena: le impostazioni sono qui sotto"));
     });
+    crate::ui::smoke::add_button(app, ui);
     if ui
         .add_enabled(!app.scene.haze_dust.enabled, egui::Button::new(tr("Polvere in sospensione")))
         .on_hover_text(tr(
@@ -128,6 +129,10 @@ pub fn sections(app: &mut ForgeApp, ui: &mut egui::Ui) {
         haze(app, ui);
         ui.separator();
     }
+    if !app.scene.smokes.is_empty() {
+        crate::ui::smoke::sections(app, ui);
+        ui.separator();
+    }
     if app.scene.haze_dust.enabled {
         dust(app, ui);
         ui.separator();
@@ -187,7 +192,7 @@ fn haze(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 ui.label(tr("Densità"));
                 ui.horizontal(|ui| {
                     changed |= ui
-                        .add(egui::Slider::new(&mut h.density, 0.005..=10.0).logarithmic(true).max_decimals(3))
+                        .add(egui::Slider::new(&mut h.density, 0.001..=50.0).logarithmic(true).max_decimals(3))
                         .on_hover_text(tr(
                             "Quanto è spessa l'aria (1/m): più alta = raggi più luminosi e, se la foschia è fisica, oggetti \
                              più velati",
@@ -209,12 +214,44 @@ fn haze(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 ui.end_row();
                 ui.label(tr("Addensamenti"));
                 changed |= ui
-                    .add(egui::Slider::new(&mut h.clumping, 0.0..=1.0))
+                    .add(egui::Slider::new(&mut h.clumping, 0.0..=2.0))
                     .on_hover_text(tr(
                         "Zone grandi più dense e altre più tenui, sparse nella scena: 0 = uguale ovunque, 1 = ammassi \
-                         marcati e vuoti",
+                         marcati e vuoti, 2 = pochi ammassi molto concentrati",
                     ))
                     .changed();
+                ui.end_row();
+                ui.label(tr("Altezza di partenza"));
+                ui.horizontal(|ui| {
+                    let mut raised = h.bottom_height > 0.0;
+                    if ui
+                        .checkbox(&mut raised, "")
+                        .on_hover_text(tr(
+                            "Fa partire la foschia da un'altezza dal pavimento invece che da terra: con l'altezza massima \
+                             si ottiene una fascia sospesa, per esempio da 2,2 a 2,8 m sotto il soffitto",
+                        ))
+                        .changed()
+                    {
+                        h.bottom_height = if raised { 1.0 } else { 0.0 };
+                        if raised && h.top_height > 0.0 && h.top_height <= h.bottom_height {
+                            h.top_height = h.bottom_height + 0.5;
+                        }
+                        changed = true;
+                    }
+                    if raised {
+                        changed |= ui
+                            .add(
+                                egui::Slider::new(&mut h.bottom_height, 0.01..=20.0)
+                                    .logarithmic(true)
+                                    .suffix(" m")
+                                    .max_decimals(2),
+                            )
+                            .on_hover_text(tr(
+                                "Da che altezza dal pavimento comincia la foschia (sotto, solo qualche sbuffo che pende)",
+                            ))
+                            .changed();
+                    }
+                });
                 ui.end_row();
                 ui.label(tr("Altezza massima"));
                 ui.horizontal(|ui| {
@@ -224,27 +261,32 @@ fn haze(app: &mut ForgeApp, ui: &mut egui::Ui) {
                         .on_hover_text(tr("Ferma la foschia a un'altezza dal pavimento, salvo qualche sbuffo che sale"))
                         .changed()
                     {
-                        h.top_height = if limited { 0.5 } else { 0.0 };
+                        h.top_height = if limited { h.bottom_height + 0.5 } else { 0.0 };
                         changed = true;
                     }
                     if limited {
+                        let lo = h.bottom_height + 0.02;
                         changed |= ui
                             .add(
-                                egui::Slider::new(&mut h.top_height, 0.02..=5.0)
+                                egui::Slider::new(&mut h.top_height, lo..=lo + 20.0)
                                     .logarithmic(true)
                                     .suffix(" m")
                                     .max_decimals(2),
                             )
                             .on_hover_text(tr("Fino a che altezza dal pavimento arriva la foschia"))
                             .changed();
+                        h.top_height = h.top_height.max(lo);
                     }
                 });
                 ui.end_row();
-                if h.top_height > 0.0 {
+                if h.top_height > 0.0 || h.bottom_height > 0.0 {
                     ui.label(tr("Sbuffi"));
                     changed |= ui
                         .add(egui::Slider::new(&mut h.puffs, 0.0..=1.0))
-                        .on_hover_text(tr("Quanti sbuffi salgono a caso sopra l'altezza massima: 0 = taglio netto"))
+                        .on_hover_text(tr(
+                            "Quanti sbuffi salgono a caso sopra l'altezza massima e pendono sotto quella di partenza: \
+                             0 = taglio netto",
+                        ))
                         .changed();
                     ui.end_row();
                 }
@@ -258,7 +300,7 @@ fn haze(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 ui.end_row();
                 ui.label(tr("Raggi in controluce"));
                 changed |= ui
-                    .add(egui::Slider::new(&mut h.anisotropy, 0.0..=0.9))
+                    .add(egui::Slider::new(&mut h.anisotropy, -0.5..=0.95))
                     .on_hover_text(tr(
                         "Quanto la foschia manda la luce in avanti: alto = raggi brillanti guardando verso la luce, \
                          basso = alone uniforme",
@@ -288,7 +330,7 @@ fn haze(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 ui.label(tr("Grandezza dei vortici"));
                 changed |= ui
                     .add(
-                        egui::Slider::new(&mut h.swirl_scale, 0.05..=5.0)
+                        egui::Slider::new(&mut h.swirl_scale, 0.01..=20.0)
                             .logarithmic(true)
                             .suffix(" m")
                             .max_decimals(2),
@@ -298,25 +340,25 @@ fn haze(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 ui.end_row();
                 ui.label(tr("Forza dei vortici"));
                 changed |= ui
-                    .add(egui::Slider::new(&mut h.warp, 0.0..=4.0).max_decimals(2))
+                    .add(egui::Slider::new(&mut h.warp, 0.0..=8.0).max_decimals(2))
                     .on_hover_text(tr(
                         "Quanto il rumore viene attorcigliato: 0 = macchie tonde, 1,5 = banchi mossi, 3–4 = riccioli \
-                         e spirali ben visibili",
+                         e spirali ben visibili, 6–8 = vortici estremi",
                     ))
                     .changed();
                 ui.end_row();
                 ui.label(tr("Dettaglio frattale"));
                 changed |= ui
-                    .add(egui::Slider::new(&mut h.octaves, 1..=8))
+                    .add(egui::Slider::new(&mut h.octaves, 1..=10))
                     .on_hover_text(tr(
-                        "Ottave del frattale: 1–2 = forme morbide e grandi, 6–8 = dettagli sempre più fini dentro le \
+                        "Ottave del frattale: 1–2 = forme morbide e grandi, 6–10 = dettagli sempre più fini dentro le \
                          forme (servono qualità alte per vederli)",
                     ))
                     .changed();
                 ui.end_row();
                 ui.label(tr("Ruvidità"));
                 changed |= ui
-                    .add(egui::Slider::new(&mut h.roughness, 0.25..=0.8).max_decimals(2))
+                    .add(egui::Slider::new(&mut h.roughness, 0.2..=0.85).max_decimals(2))
                     .on_hover_text(tr(
                         "Quanto pesano i dettagli fini: bassa = bordi morbidi, alta = bordi frastagliati e accentuati",
                     ))
@@ -325,19 +367,19 @@ fn haze(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 let (fall_label, fall_hint, range) = match h.kind {
                     HazeKind::ToxicFloor => (
                         tr("Spessore dello strato"),
-                        tr("Altezza dello strato di fumo sopra il punto più basso della scena"),
-                        0.01..=0.5,
+                        tr("Altezza dello strato di fumo sopra il pavimento (o sopra l'altezza di partenza)"),
+                        0.005..=2.0,
                     ),
                     HazeKind::Layers => (
                         tr("Distanza tra gli strati"),
                         tr("Distanza verticale tra un velo e il successivo"),
-                        0.05..=2.0,
+                        0.05..=8.0,
                     ),
                     _ => (
                         tr("Si dirada salendo"),
                         tr("Altezza in cui la foschia si dimezza salendo dal punto più basso della scena: \
                             0 = uguale ovunque, piccola = nebbia a terra"),
-                        0.0..=5.0,
+                        0.0..=20.0,
                     ),
                 };
                 ui.label(fall_label);

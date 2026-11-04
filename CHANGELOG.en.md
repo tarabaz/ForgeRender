@@ -10,6 +10,23 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.36.0 — 4 Nov 2026
+
+**Volumetric smoke**
+- New effect **Volumetric smoke** (Effects tab): real smoke clouds in a box (`forge_scene::SmokeCloud`, `Scene::smokes`, saved in the project). The box decides where the smoke exists: select its centre dot in the viewport and move or resize it with the gizmo (Move / Scale, `gizmo::Target::Smoke`), or type centre and size; the rendered smoke follows it exactly.
+- Four shapes (cloud, plume, incense thread, bank) and six presets that add a new cloud on top of the selection: suspended cloud, incense, steam from a cup, plume from a pipe, dense industrial smoke, smoke bank.
+- Density field (`forge_render_core::smoke::smoke_density_at`) in box coordinates: shape outline twisted by domain-warped noise, cauliflower puffs on the edge (fractal of |noise|), filaments from noise ridges, slow inner variation; plumes and incense laminar at the bottom and turbulent going up. Start and maximum height inside the box, soft edges on the box faces.
+- Controls: density (0.5–2000 1/m) with an "opaque beyond ~X" scale, colour, backlight, curl size, swirl strength (0–8), fractal detail (1–10), roughness, puffs, filaments, edge softness, inner variation, widening / meandering / fading, start and maximum height, no smoke inside objects, quality 1–4 (3–24 M cells), variant.
+- Physical medium (`BakedFog`, delta tracking with shadows on CPU and GPU); the inside of objects is cleared with `voxelize` + `interior_cells`. Computed ahead of time with the other effects on the same bar (`Phase::Smoke`), with a cache.
+- Procedural first version, no fluid simulation yet (see `docs/studio-fumo-fuoco.md`).
+
+**Haze**
+- **Start height** (`Haze::bottom_height`): the haze begins above the floor, with a soft start and a few puffs hanging below it; with the maximum height it makes a suspended band (e.g. 2.2–2.8 m). Layers, thinning and the floor smoke are measured from the start height; the grid starts just below it (finer cells).
+- Wider sliders: density 0.001–50, clumping up to 2 (few, very concentrated clumps), swirl size 0.01–20 m, swirl strength up to 8, fractal detail up to 10, roughness 0.2–0.85, forward scattering −0.5–0.95, heights up to 20 m, layer thickness and spacing ranges ×4.
+
+**Command line**
+- `render`: `--haze-bottom`, `--smoke 0..5|NAME`, `--smoke-at X,Z`, `--smoke-y`, `--smoke-scale`, `--smoke-quality`, `--smoke-density`.
+
 ## 0.35.0 — 4 Nov 2026
 
 **Render styles**

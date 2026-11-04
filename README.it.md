@@ -18,15 +18,16 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
-### Novità della versione 0.35.0
+### Novità della versione 0.36.0
 
-- **Stili di rendering:** fumetto (cel shading) e illustrazione tecnica (Gooch), scelti in cima alla scheda Render con un piccolo esempio al passaggio del mouse, più i contorni a inchiostro che vanno con qualsiasi stile.
-- **Foschia che non vela tutto:** la modalità "solo raggi delle luci" (di serie) mostra i raggi di spot, sole e lampade senza ingrigire la scena; addensamenti, altezza massima con sbuffi, scala della densità, griglia più fitta e vortici più marcati.
-- **Polvere solo nei fasci:** la illuminano solo spot e sole, il denoiser la tiene, con lo slider della brillantezza.
+- **Fumo volumetrico:** nubi di fumo vere con riccioli, sbuffi a cavolfiore e bordi sfilacciati, in un riquadro che sposti e ridimensioni con il gizmo; sei preset (nube sospesa, incenso, vapore da tazza, pennacchio da tubo, fumo denso industriale, banco di fumo), diffusione della luce e ombre fisiche, niente fumo dentro gli oggetti.
+- **Altezza di partenza della foschia:** la foschia può cominciare sopra il pavimento, così con l'altezza massima forma una fascia sospesa (per esempio 2,2–2,8 m sotto il soffitto); il fumo a terra si alza con lei.
+- **Slider più ampi:** intervalli più larghi per densità, addensamenti, grandezza e forza dei vortici, dettaglio frattale e altezze, nella foschia e nel nuovo fumo.
 
 <details>
 <summary><strong>Versioni precedenti — storico completo delle release</strong></summary>
 
+- **0.35.0 — Stili di rendering, foschia che non vela tutto:** fumetto e illustrazione tecnica con i contorni a inchiostro; foschia in modalità "solo raggi delle luci" con addensamenti, altezza massima e sbuffi; polvere illuminata solo nei fasci e tenuta dal denoiser.
 - **0.34.0 — Foschia in cinque tipi, polvere come effetto a sé:** nebbia bassa, nuvole di gas, fumo tossico a terra, strati sospesi e riccioli di vapore con frattale e qualità; polvere visibile solo con la luce diretta; icone al posto dei simboli mancanti.
 - **0.33.0 — Foschia d'ambiente, polvere, adesivi:** foschia con banchi e riccioli illuminata con diffusione multipla; granelli di polvere; adesivi sulle superfici curve; conversione STEP salvata con progetti e pacchetti; calcolo della nebbia annullabile e che riparte alle modifiche.
 - **0.32.0 — Nebbia da ghiaccio secco molto più veloce:** la simulazione lavora solo dove c'è la nebbia (Ultra 182 → 37 s sulla demo del cocktail), calcolata in sottofondo con la barra di avanzamento; riflessi parziali del laser; demo del banco ottico e delle lenti; interruttore AI MCP ON/OFF.
@@ -143,53 +144,65 @@ ForgeRender genera nebbia scenografica con una simulazione fluida 3D determinist
 Un mezzo partecipante che riempie la scena (o solo uno strato) e che ogni luce attraversa: spot, sole e lampade disegnano raggi con le ombre degli oggetti, e la luce si diffonde più volte, su CPU e GPU. Non è una texture né un blocco grigio uniforme: la densità viene da un rumore frattale a dominio distorto calcolato su una griglia 3D, quindi ha banchi, riccioli e vuoti.
 
 - **Cinque tipi:** *Nebbia bassa* che si stende a terra e si dirada salendo; *Nuvole di gas*, aria quasi limpida con ammassi densi qua e là; *Fumo tossico a terra*, uno strato di pochi centimetri che aleggia sul pavimento raccolto in filamenti; *Strati sospesi*, veli orizzontali a quote diverse, ondulati e bucati; *Riccioli di vapore*, vortici dentro i vortici con contrasto alto.
-- **Comandi del frattale:** forza dei vortici (da macchie tonde a spirali ben visibili), dettaglio frattale (1–8 ottave), ruvidità (bordi morbidi o frastagliati), grandezza e quantità dei vortici, colore e diffusione in avanti (quanto brillano i raggi in controluce).
+- **Comandi del frattale:** forza dei vortici (da macchie tonde a spirali ben visibili), dettaglio frattale (1–10 ottave), ruvidità (bordi morbidi o frastagliati), grandezza e quantità dei vortici, colore e diffusione in avanti (quanto brillano i raggi in controluce).
 - **Solo raggi delle luci (di serie):** la foschia aggiunge solo la luce di spot, sole e lampade diffusa nell'aria, così i raggi si vedono senza velare né scurire gli oggetti; spento, diventa un mezzo fisico che diffonde anche la luce dell'ambiente e vela la scena.
-- **Comandi della forma:** addensamenti (zone grandi più dense e altre più tenui), altezza massima dal pavimento (trovato con i raggi) con qualche sbuffo che sale a caso, e la scala della densità che dice fino a che distanza ci si vede attraverso.
+- **Comandi della forma:** addensamenti (zone grandi più dense e altre più tenui), altezza di partenza e altezza massima dal pavimento (insieme fanno una fascia sospesa, per esempio sotto il soffitto) (trovato con i raggi) con qualche sbuffo che sale a caso, e la scala della densità che dice fino a che distanza ci si vede attraverso.
 - **Slider di qualità:** la griglia segue sia la grandezza dei vortici sia quella della scena, da una bozza di 2 milioni di celle a 24 milioni (48 MB) per dettagli fini e bordi netti. La foschia si calcola in anticipo, un effetto alla volta, con la barra di avanzamento in basso.
 - **Mai dentro gli oggetti:** i raggi che viaggiano nel vetro o nel liquido la saltano (lenti e bicchieri restano limpidi) e si toglie dall'interno pieno dei pezzi, mentre l'aria di una stanza chiusa resta velata.
 
-### 6. Polvere in sospensione — granelli che brillano solo in un fascio
+### 6. Fumo volumetrico — nubi, pennacchi e incenso in un riquadro
+
+Nubi di fumo volumetrico vere per le foto di prodotto: il fumo d'incenso accanto al flacone di profumo, il vapore che sale dalla tazza, il pennacchio da un tubo o da un camino, il fumo denso e scuro industriale. Ogni nube vive in un riquadro che selezioni nella viewport e sposti o ridimensioni con il gizmo: il fumo renderizzato segue esattamente il riquadro, senza lasciare niente dove era prima.
+
+- **Quattro forme e sei preset:** *Nube* (un ammasso tondeggiante a mezz'aria), *Pennacchio* (stretto in fondo al riquadro, si allarga e si dissolve salendo), *Filo d'incenso* (liscio in basso, poi si rompe in riccioli) e *Banco* (riempie tutto il riquadro con i bordi sfilacciati). Preset: nube sospesa, incenso, vapore da tazza, pennacchio da tubo, fumo denso industriale e banco di fumo. Ogni preset aggiunge una nube nuova sopra la selezione, non ne sostituisce nessuna.
+- **Struttura a più scale:** il contorno della forma è attorcigliato da un rumore a dominio distorto, il bordo ha sbuffi a cavolfiore (frattale di |rumore|) e filamenti sottili (creste del rumore), e l'interno ha variazioni lente della densità. Pennacchi e incenso nascono lisci e diventano turbolenti salendo.
+- **Comandi:** densità con la scala "opaco oltre ~X", colore (vapore bianco, fumo grigio, fuliggine scura), controluce, grandezza dei riccioli, forza dei vortici (fino a 8), dettaglio frattale (fino a 10 ottave), ruvidità, sbuffi, filamenti, morbidezza dei bordi, variazione interna; per pennacchi e incenso anche quanto si allarga, serpeggia e si dissolve; altezza di partenza e altezza massima dentro il riquadro; qualità da 3 a 24 milioni di celle; variante (seme).
+- **Fisico:** il fumo diffonde e assorbe la luce con la diffusione multipla, fa ombre volumetriche e le riceve, su CPU e GPU (lo stesso delta tracking della nebbia da ghiaccio secco). Non riempie mai l'interno pieno degli oggetti che attraversano il riquadro. Stessi parametri e stesso seme danno sempre la stessa nube.
+- **Calcolato in anticipo** con gli altri effetti, uno alla volta sulla barra di avanzamento, e salvato con il progetto.
+
+Questa prima versione è procedurale (ancora senza simulazione fluida): la simulazione fisica del fumo con temperatura e galleggiamento è il passo successivo, vedi lo [studio su fumo e fuoco](docs/studio-fumo-fuoco.md).
+
+### 7. Polvere in sospensione — granelli che brillano solo in un fascio
 
 Granelli veri (qualche millimetro, fino a 150 000) sparsi nell'aria, come effetto a sé. Sono invisibili tranne dentro i fasci di spot e sole: lì brillano, come la polvere nei raggi che entrano dalla finestra di una soffitta, mentre lampadine, pannelli, ambiente e luce di rimbalzo non li illuminano. Sono segnati nelle guide del denoiser, così il denoiser li tiene invece di cancellarli come rumore. Quantità, dimensione, brillantezza e colore sono regolabili.
 
-### 7. Adesivi (decal) — etichette e loghi su qualsiasi superficie
+### 8. Adesivi (decal) — etichette e loghi su qualsiasi superficie
 
 ![Logo di ForgeRender applicato come adesivo su una sfera di vetro e su un cubo rosso](docs/img/effetti/adesivi.webp)
 
 Applica un'immagine (un logo, un'etichetta, un PNG con trasparenza) sull'oggetto selezionato, nel punto che la camera sta guardando. L'adesivo si ricava dai triangoli dell'oggetto dentro una scatola di proiezione, quindi segue le superfici curve come bottiglie e tazze, e si sposta con l'oggetto. Le parti trasparenti del PNG lasciano vedere l'oggetto. Si regolano larghezza (l'altezza segue le proporzioni dell'immagine), rotazione, posizione sulla superficie, profondità della proiezione, ruvidità e metallicità; l'immagine viaggia con il progetto e dentro i pacchetti `.frpack`.
 
-### 8. Materiali PBR e texture per modelli CAD
+### 9. Materiali PBR e texture per modelli CAD
 
 ![Esempi di materiali e texture di ForgeRender](docs/img/mcp/esempi/materiali.jpg)
 
 Materiali diffusi, metalli e plastiche GGX, vetro Fresnel, vetro satinato ed emissivi. Le mappe PBR includono colore base, rugosità, metallicità, normal, bump, displacement reale, occlusione ambientale e opacità. Per i modelli CAD senza UV è disponibile la proiezione Box in scala metrica, con ancoraggio a pezzo, assieme o mondo.
 
-### 9. Studio fotografico e illuminazione
+### 10. Studio fotografico e illuminazione
 
 ![Aspetto studio fotografico di ForgeRender](docs/img/mcp/esempi/aspetto_studio.jpg)
 
 Prepara una scena prodotto con fondale e luci da studio, quindi scegli sfondo chiaro, scuro o scenografico. Le luci possono essere regolate singolarmente; la scena può essere adattata alle dimensioni del prodotto senza perdere il controllo sui componenti.
 
-### 10. Illuminazione volumetrica e fasci visibili
+### 11. Illuminazione volumetrica e fasci visibili
 
 ![Confronto del fascio volumetrico](reports/fascio-volumetrico/dopo_fascio_solo_camera.png)
 
 Le luci spot possono generare fasci visibili con densità e lunghezza regolabili. La nebbia volumetrica è un mezzo partecipante simulato, con scattering e ombre: la luce interagisce con il volume e diventa visibile nello spazio, non soltanto sulle superfici.
 
-Per la nebbia che riempie la scena vedi [Foschia d'ambiente](#5-foschia-dambiente--cinque-tipi-di-nebbia-procedurale), per i granelli che brillano nei fasci vedi [Polvere in sospensione](#6-polvere-in-sospensione--granelli-che-brillano-solo-in-un-fascio).
+Per la nebbia che riempie la scena vedi [Foschia d'ambiente](#5-foschia-dambiente--cinque-tipi-di-nebbia-procedurale), per i granelli che brillano nei fasci vedi [Polvere in sospensione](#7-polvere-in-sospensione--granelli-che-brillano-solo-in-un-fascio).
 
-### 11. Camera, viste multiple e presentazione prodotto
+### 12. Camera, viste multiple e presentazione prodotto
 
 ![Vista prodotto a tre quarti](docs/img/mcp/esempi/vista_tre_quarti.jpg)
 
 Le camere di rendering offrono focale, diaframma, profondità di campo e decentramento. Le viste automatiche frontale, posteriore, laterali, superiore e a tre quarti aiutano a presentare un prodotto da più angolazioni; è possibile esportare video turntable in MP4.
 
-### 12. Render pass e workflow di post-produzione
+### 13. Render pass e workflow di post-produzione
 
 ForgeRender può esportare pass separati **Albedo, Normals, Depth, Product Mask e Component ID**, utili per compositing, mascherature e interventi successivi sull'immagine. Sono buffer tecnici di output, non ulteriori render beauty.
 
-### 13. Stili di rendering — fumetto, illustrazione tecnica e contorni a inchiostro
+### 14. Stili di rendering — fumetto, illustrazione tecnica e contorni a inchiostro
 
 In cima alla scheda Render scegli come si disegna l'immagine; passando sopra a ogni scelta compare un piccolo esempio.
 
@@ -200,7 +213,7 @@ In cima alla scheda Render scegli come si disegna l'immagine; passando sopra a o
 
 Gli stili si applicano alla prima superficie vista dalla camera, quindi vetri e specchi riflettono e rifrangono come sempre; funzionano su CPU e GPU, anche nel render spettrale.
 
-### 14. Modelli STEP: convertiti una volta, poi riaperti subito
+### 15. Modelli STEP: convertiti una volta, poi riaperti subito
 
 Un file STEP si converte in mesh una volta sola. Il risultato resta in una cache delle conversioni e si salva accanto al progetto (`modelli-convertiti/`) e dentro i pacchetti `.frpack`, così riaprendo il progetto lo STEP non si riconverte. Sulla demo del banco ottico l'apertura è passata da 27 s a 0,2 s. Se lo STEP cambia (o cambiano i pezzi di un assieme a più file, o la qualità), si riconverte. I pacchetti ora includono anche i file dei pezzi a cui rimanda un assieme STEP a più file.
 

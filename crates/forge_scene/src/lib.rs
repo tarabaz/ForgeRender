@@ -14,6 +14,7 @@ pub mod material;
 pub mod mesh;
 pub mod primitives;
 pub mod scene;
+pub mod smoke;
 pub mod units;
 
 pub use added::{AddedKind, AddedRecord};
@@ -25,4 +26,5 @@ pub use light::{LaserSource, Light, LightKind};
 pub use material::{Material, MaterialId, MaterialLibrary, Projection, TextureAnchor, TextureMapping, LIQUIDS_CATEGORY};
 pub use mesh::Mesh;
 pub use scene::{ComponentId, CopyRecord, Node, NodeIndex, Scene, UserTransform};
+pub use smoke::{SmokeCloud, SmokePreset, SmokeShape, SMOKE_PRESETS};
 pub use units::LengthUnit;

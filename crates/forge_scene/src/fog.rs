@@ -228,6 +228,10 @@ pub struct Haze {
     pub clumping: f32,
     /// Altezza massima sopra il punto più basso (m, 0 = nessun limite): sopra, solo sbuffi.
     pub top_height: f32,
+    /// Altezza di partenza sopra il punto più basso (m, 0 = dal pavimento): sotto non c'è foschia
+    /// (fascia sospesa, es. da 2,2 a 2,8 m sotto il soffitto). Strati, diradamento e fumo a terra
+    /// partono da qui.
+    pub bottom_height: f32,
     /// Quanti sbuffi salgono sopra l'altezza massima, 0–1.
     pub puffs: f32,
     /// Solo i raggi delle luci: la foschia aggiunge la luce di lampade e sole diffusa nell'aria,
@@ -338,6 +342,7 @@ impl Default for Haze {
             quality: 2,
             clumping: 0.0,
             top_height: 0.0,
+            bottom_height: 0.0,
             puffs: 0.4,
             rays_only: true,
         }

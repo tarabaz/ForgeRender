@@ -36,7 +36,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
         });
 }
 
-fn vec3_edit(ui: &mut egui::Ui, label: &str, v: &mut Vec3, speed: f64) -> bool {
+pub(crate) fn vec3_edit(ui: &mut egui::Ui, label: &str, v: &mut Vec3, speed: f64) -> bool {
     let mut changed = false;
     ui.horizontal(|ui| {
         ui.label(label);
@@ -1525,7 +1525,7 @@ fn effects(app: &mut ForgeApp, ui: &mut egui::Ui) {
         }
     });
     if app.scene.fogs.is_empty() {
-        if !app.scene.haze.enabled && !app.scene.haze_dust.enabled && app.scene.decals.is_empty() {
+        if !app.scene.haze.enabled && !app.scene.haze_dust.enabled && app.scene.decals.is_empty() && app.scene.smokes.is_empty() {
             ui.label(egui::RichText::new(tr("Nessun effetto: aggiungine uno dai pulsanti qui sopra.")).weak());
         }
         return;
@@ -1751,6 +1751,7 @@ fn effects(app: &mut ForgeApp, ui: &mut egui::Ui) {
     if let Some(i) = select {
         app.selected_fog = Some(i);
         app.selected_light = None;
+        app.selected_smoke = None;
         app.selection.clear();
     }
     if let Some(i) = remove {
