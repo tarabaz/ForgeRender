@@ -2832,3 +2832,27 @@ Acceptance criteria:
 3. Only one Materials-view menu entry remains, labelled in the active UI language; the duplicate Library entry is removed.
 4. Materials functionality remains intact.
 5. Report changed files and actual build/test results; distinguish tested behavior from untested paths.
+
+
+## New localization request from Valerio — Spanish language support — 04/11/2026
+
+Valerio wants ForgeRender to support Spanish as an additional UI language, using the existing localization architecture. Do not introduce a parallel localization system.
+
+### Required investigation and implementation
+
+1. Inspect the existing localization implementation (including `crates/forge_app/src/i18n.rs`), language-file format, language selector, language discovery/registration, persistence of the selected language, and runtime/packaged asset loading.
+2. Determine whether adding a correctly named language JSON file is sufficient for automatic discovery. Do not assume that copying a file into `lang/` will make the language appear in the selector.
+3. Add Spanish as a supported language using the existing convention, expected filename `lang/Lan_spa.json`, language code `es`, and display name `Español`. If the codebase uses a different established locale identifier or filename convention, follow the actual implementation and explain the difference.
+4. Translate the complete source string catalogue (currently the English catalogue contains approximately 1,520 entries) into clear, neutral Spanish suitable for both Spain and Latin America. Preserve every source key exactly and preserve all formatting tokens/placeholders (including `{}`, named placeholders such as `{n}` / `{e}`, escaped braces, newlines, punctuation-sensitive markup, and any other interpolation syntax).
+5. Do not translate identifiers/keys. Translate only values. Keep technical terminology consistent across rendering, materials, lighting, cameras, geometry, volumetrics, simulation, UI, errors, tooltips, and documentation.
+6. Ensure the Spanish file is included and loadable both in development and in the packaged/released application. If language discovery is static, register Spanish in the appropriate central list/selector and update packaging/resource inclusion. If discovery is dynamic, verify that it really discovers the file in the packaged layout.
+7. Add/update validation tests or scripts to check JSON validity, duplicate/missing/extra keys against the source catalogue, and exact preservation of interpolation placeholders. A missing translation should use the existing fallback behavior rather than crash.
+8. Verify Spanish appears in the language selector, can be selected, remains selected after restart if language preference is persisted, and actually translates the interface. Report which of these behaviors were tested in a running application versus covered only by automated tests.
+
+### Important scope and coordination
+
+- Reuse the existing Italian-source / English-translation architecture. Do not populate or alter the Italian source catalogue merely to add Spanish.
+- Do not change existing Italian or English translations as part of this task, except where a minimal shared localization change is strictly required.
+- Do not create an empty placeholder Spanish file and call the feature complete. The catalogue must be fully translated and validated.
+- Before implementation, report whether language files are dynamically discovered or statically registered and identify the exact code/resource-loading path.
+- Include changed files, translation/key counts, validation results, build/test commands, and any remaining manual verification in the final report.
