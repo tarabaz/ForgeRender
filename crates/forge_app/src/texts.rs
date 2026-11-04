@@ -79,7 +79,7 @@ pub const EXTERNAL: &[&str] = &[
     tk("Incenso"),
     tk("Un filo sottile che sale liscio e poi si rompe in riccioli: il fondo del riquadro va sulla punta del bastoncino"),
     tk("Vapore da tazza"),
-    tk("Vapore bianco e leggero che sale dalla tazza e svanisce: il fondo del riquadro va sulla superficie del caffè"),
+    tk("Simulazione fisica: vapore bianco e leggero che sale piano dalla tazza in filamenti che si arricciano e svaniscono: il fondo del riquadro va sulla superficie del caffè, la sorgente è larga come la tazza"),
     tk("Pennacchio da tubo"),
     tk("Fumo che esce da un tubo, un ugello o un camino, sale allargandosi e si apre in sbuffi: il fondo del riquadro va sulla bocca"),
     tk("Fumo denso industriale"),

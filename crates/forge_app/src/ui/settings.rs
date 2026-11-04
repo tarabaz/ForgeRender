@@ -88,9 +88,7 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
     if reset {
         p = Preferences::default();
     }
-    let previews_changed = p.preview_samples != app.prefs.preview_samples
-        || p.preview_resolution != app.prefs.preview_resolution
-        || p.preview_object_cm != app.prefs.preview_object_cm;
+    let previews_changed = p.preview_samples != app.prefs.preview_samples || p.preview_object_cm != app.prefs.preview_object_cm;
     // La dimensione cambia l'aspetto: le miniature salvate nella libreria vanno rifatte.
     let object_changed = p.preview_object_cm != app.prefs.preview_object_cm;
     if p != app.prefs {
@@ -200,19 +198,10 @@ fn library(ui: &mut egui::Ui, p: &mut Preferences, clear_cache: &mut bool) {
         .show(ui, |ui| {
             ui.label(tr("Qualità"));
             ui.horizontal(|ui| {
-                for (label, samples, res) in [(tr("Bassa"), 32, 128), (tr("Media"), 128, 256), (tr("Alta"), 512, 512)] {
-                    let on = p.preview_samples == samples && p.preview_resolution == res;
-                    if ui.selectable_label(on, label).clicked() {
+                for (label, samples) in [(tr("Bassa"), 32), (tr("Media"), 128), (tr("Alta"), 512)] {
+                    if ui.selectable_label(p.preview_samples == samples, label).clicked() {
                         p.preview_samples = samples;
-                        p.preview_resolution = res;
                     }
-                }
-            });
-            ui.end_row();
-            ui.label(tr("Risoluzione minima"));
-            ui.horizontal(|ui| {
-                for res in [128u32, 256, 512] {
-                    ui.selectable_value(&mut p.preview_resolution, res, format!("{res} px"));
                 }
             });
             ui.end_row();

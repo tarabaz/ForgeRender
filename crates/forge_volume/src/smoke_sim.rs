@@ -48,6 +48,14 @@ pub struct SmokeSimParams {
     /// Secondi simulati (l'istante che si congela per il render).
     pub time: f32,
     pub seed: u32,
+    /// Bordi sfumati: fascia vicino alle pareti e al soffitto (frazione del lato, 0 = nessuna)
+    /// in cui fumo e calore si dissolvono in fretta, come se uscissero dal riquadro.
+    pub edge_fade: f32,
+    /// Riquadro del fumo: centro, rotazione attorno alla verticale (radianti) e mezze dimensioni nei suoi
+    /// assi. La griglia copre il riquadro ruotato; fuori dal riquadro il fumo si perde.
+    pub box_center: Vec3,
+    pub box_yaw: f32,
+    pub box_half: Vec3,
 }
 
 /// Risultato: densità (0–1 circa) al centro delle celle di `spec`.
@@ -154,6 +162,53 @@ fn run(
     let dt = p.time / steps as f32;
     let src_r2 = p.source_radius.max(h * 0.75).powi(2);
     let coords = |i: usize| p.spec.coords(i);
+    // Bordi sfumati: in ogni cella quanto fumo resta a ogni passo (1 lontano dalle pareti; sulla
+    // parete si dissolve in circa un decimo di secondo, fuori dal riquadro subito).
+    // La profondità della fascia cambia da punto a punto con un frattale: il fumo si sfilaccia
+    // in lingue e buchi invece di svanire tutto alla stessa distanza dalla parete.
+    let fade = if p.edge_fade.is_finite() {
+        p.edge_fade.clamp(0.0, 0.5)
+    } else {
+        0.0
+    };
+    let longest = (rx.max(ry).max(rz) as f32 * h).max(1e-4);
+    // Distanza dalle pareti e dal soffitto del riquadro in frazione del lato (negativa fuori).
+    // Senza rotazione il riquadro è la griglia: si usano gli indici (bordo esatto delle celle).
+    let rotated = p.box_yaw.is_finite() && p.box_yaw.abs() > 1e-5;
+    let (ys, yc) = if rotated { p.box_yaw.sin_cos() } else { (0.0, 1.0) };
+    let mid = p.box_center;
+    let half = p.box_half.max(Vec3::splat(1e-4));
+    let wall = |x: usize, y: usize, z: usize| -> f32 {
+        let top = ((ry - 1 - y) as f32 + 0.5) / ry as f32;
+        if !rotated {
+            let side = |a: usize, m: usize| (a.min(m - 1 - a) as f32 + 0.5) / m as f32;
+            return side(x, rx).min(side(z, rz)).min(top);
+        }
+        let r = p.spec.center(x, y, z) - mid;
+        // Nel riquadro: rotazione inversa attorno alla verticale.
+        let lx = yc * r.x - ys * r.z;
+        let lz = ys * r.x + yc * r.z;
+        ((half.x - lx.abs()) / (2.0 * half.x))
+            .min((half.z - lz.abs()) / (2.0 * half.z))
+            .min(top)
+    };
+    let edge: Vec<f32> = (0..n)
+        .into_par_iter()
+        .map(|i| {
+            let (x, y, z) = coords(i);
+            let d = wall(x, y, z);
+            if d < 0.0 {
+                return 0.0;
+            }
+            if fade <= 0.0 || d >= fade * 1.6 {
+                return 1.0;
+            }
+            let c = p.spec.center(x, y, z) / (longest * fade * 0.6);
+            let depth = fade * (1.0 + 0.6 * crate::noise::fbm(c, p.seed ^ 0x0ed9_e5a1, 4)).max(0.15);
+            let t = (1.0 - d / depth).clamp(0.0, 1.0);
+            (-25.0 * t * t * dt).exp()
+        })
+        .collect();
     for step in 0..steps {
         if cancelled() {
             return None;
@@ -368,7 +423,11 @@ fn run(
                     return (0.0, 0.0);
                 }
                 let q = back(i, &u, &v, &w);
-                ((g.sample(&rho, q) * keep_r).max(0.0), (g.sample(&temp, q) * keep_t).max(0.0))
+                let e = edge[i];
+                (
+                    (g.sample(&rho, q) * keep_r * e).max(0.0),
+                    (g.sample(&temp, q) * keep_t * e).max(0.0),
+                )
             })
             .unzip();
         rho = nr;
@@ -433,7 +492,42 @@ mod tests {
             wind: Vec3::ZERO,
             time: 1.5,
             seed: 3,
+            edge_fade: 0.0,
+            box_center: Vec3::ZERO,
+            box_yaw: 0.0,
+            box_half: Vec3::ONE,
         }
+    }
+
+    /// Fumo che arriva al soffitto: senza bordi sfumati si ammassa contro il riquadro, con i
+    /// bordi sfumati sotto il soffitto ne resta molto meno, ma il fumo c'è ancora più in basso.
+    #[test]
+    fn soft_edges_keep_smoke_off_the_box() {
+        let spec = GridSpec::covering(Vec3::ZERO, Vec3::new(1.0, 1.0, 1.0), 24);
+        let none = || false;
+        let p = SmokeSimParams { time: 4.0, ..params(spec) };
+        let hard = simulate_smoke(&p, None, &|_| {}, &none).unwrap();
+        let soft = simulate_smoke(&SmokeSimParams { edge_fade: 0.2, ..p }, None, &|_| {}, &none).unwrap();
+        let top = |f: &SmokeField| -> f32 {
+            let ry = f.spec.res[1];
+            (0..f.spec.len())
+                .filter(|&i| f.spec.coords(i).1 + 1 == ry)
+                .map(|i| f.density[i])
+                .sum()
+        };
+        let mid = |f: &SmokeField| -> f32 {
+            (0..f.spec.len())
+                .filter(|&i| {
+                    let (_, y, _) = f.spec.coords(i);
+                    (6..14).contains(&y)
+                })
+                .map(|i| f.density[i])
+                .sum()
+        };
+        eprintln!("soffitto {} → {}, a metà {} → {}", top(&hard), top(&soft), mid(&hard), mid(&soft));
+        assert!(top(&hard) > 0.05, "senza bordi sfumati il fumo arriva al soffitto");
+        assert!(top(&soft) < top(&hard) * 0.1, "con i bordi sfumati sotto il soffitto quasi niente");
+        assert!(mid(&soft) > mid(&hard) * 0.3, "il fumo più in basso resta");
     }
 
     /// Fumo caldo: sale dalla sorgente (più fumo in alto che in basso dopo un po'), è

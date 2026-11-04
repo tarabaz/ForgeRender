@@ -7,7 +7,7 @@
 //! diffonde e assorbe la luce, fa ombra e la riceve (niente emissione: il fuoco è un'altra cosa).
 //! Stessi parametri e stesso seme danno sempre la stessa nube.
 
-use forge_math::Vec3;
+use forge_math::{Quat, Vec3};
 use serde::{Deserialize, Serialize};
 
 /// Forma di massima della nube.
@@ -71,6 +71,10 @@ pub struct SmokeSim {
     pub time: f32,
     /// Qualità della simulazione (1–4): celle sul lato più lungo del riquadro.
     pub quality: u32,
+    /// Bordi sfumati: fascia vicino alle pareti e al soffitto del riquadro (frazione del lato,
+    /// 0–0,4) in cui il fumo si dissolve, così non si ammassa contro il riquadro e non finisce
+    /// tagliato netto. 0 = come prima (riquadro pieno fino al bordo). Il fondo non si sfuma.
+    pub edge_fade: f32,
 }
 
 /// Celle della simulazione sul lato più lungo per qualità 1–4.
@@ -94,6 +98,7 @@ impl Default for SmokeSim {
             wind: Vec3::ZERO,
             time: 3.0,
             quality: 2,
+            edge_fade: 0.2,
         }
     }
 }
@@ -108,8 +113,11 @@ pub struct SmokeCloud {
     pub shape: SmokeShape,
     /// Centro del riquadro (m, spazio mondo).
     pub center: Vec3,
-    /// Dimensioni del riquadro (m).
+    /// Dimensioni del riquadro (m), nei suoi assi.
     pub size: Vec3,
+    /// Rotazione del riquadro attorno all'asse verticale (gradi). Solo attorno alla verticale:
+    /// il caldo sale e il gas pesante scende comunque in verticale.
+    pub rotation_deg: f32,
     /// Densità del fumo pieno (1/m): 5 = fumo leggero, 50 = denso, 300 = quasi opaco.
     pub density: f32,
     /// Colore del fumo (albedo, 0–1): bianco = vapore, grigio = fumo, scuro = fuliggine.
@@ -161,6 +169,7 @@ impl Default for SmokeCloud {
             shape: SmokeShape::Cloud,
             center: Vec3::new(0.0, 0.5, 0.0),
             size: Vec3::splat(0.6),
+            rotation_deg: 0.0,
             density: 40.0,
             color: [0.8, 0.8, 0.8],
             anisotropy: 0.35,
@@ -229,26 +238,44 @@ pub const SMOKE_PRESETS: [SmokePreset; 8] = [
     },
     SmokePreset {
         name: "Vapore da tazza",
-        hint: "Vapore bianco e leggero che sale dalla tazza e svanisce: il fondo del riquadro va sulla superficie del caffè",
+        hint: "Simulazione fisica: vapore bianco e leggero che sale piano dalla tazza in filamenti che si arricciano e svaniscono: il fondo del riquadro va sulla superficie del caffè, la sorgente è larga come la tazza",
+        // Simulato: il vapore è poco caldo e sale piano da tutta la superficie, si arriccia in
+        // filamenti sottili che si staccano e svaniscono presto (non una colonna che si allarga).
         make: || SmokeCloud {
             name: "Vapore".into(),
+            mode: SmokeMode::Simulated,
             shape: SmokeShape::Plume,
-            size: Vec3::new(0.14, 0.25, 0.14),
-            density: 110.0,
-            color: [0.95, 0.95, 0.95],
-            anisotropy: 0.5,
-            detail_scale: 0.035,
-            octaves: 5,
-            roughness: 0.5,
-            turbulence: 1.4,
-            billows: 0.3,
-            wisps: 0.7,
-            softness: 0.6,
-            variation: 0.7,
-            spread: 0.55,
-            meander: 0.6,
-            fade: 0.85,
+            size: Vec3::new(0.16, 0.26, 0.16),
+            density: 70.0,
+            color: [0.96, 0.96, 0.96],
+            anisotropy: 0.55,
+            detail_scale: 0.012,
+            octaves: 6,
+            roughness: 0.6,
+            turbulence: 1.2,
+            billows: 0.1,
+            wisps: 0.95,
+            softness: 0.55,
+            variation: 0.6,
             quality: 3,
+            sim: SmokeSim {
+                source_offset: Vec3::new(0.0, 0.008, 0.0),
+                source_radius: 0.035,
+                emission: 1.2,
+                temperature: 0.7,
+                buoyancy: 2.2,
+                weight: 0.0,
+                exit_speed: 0.04,
+                cooling: 1.0,
+                dissipation: 1.1,
+                vorticity: 7.0,
+                turbulence: 2.8,
+                turbulence_scale: 0.02,
+                time: 3.0,
+                quality: 3,
+                edge_fade: 0.25,
+                ..SmokeSim::default()
+            },
             ..Default::default()
         },
     },
@@ -379,10 +406,52 @@ pub const SMOKE_PRESETS: [SmokePreset; 8] = [
 ];
 
 impl SmokeCloud {
-    /// Riquadro (min, max) nello spazio mondo.
+    /// Riquadro allineato agli assi del mondo (min, max) che contiene il riquadro ruotato.
     pub fn bounds(&self) -> (Vec3, Vec3) {
-        let h = self.size.max(Vec3::splat(0.01)) * 0.5;
-        (self.center - h, self.center + h)
+        let h = self.half();
+        let (s, c) = self.yaw().sin_cos();
+        let w = Vec3::new(c.abs() * h.x + s.abs() * h.z, h.y, s.abs() * h.x + c.abs() * h.z);
+        (self.center - w, self.center + w)
+    }
+
+    /// Mezze dimensioni del riquadro nei suoi assi (m).
+    pub fn half(&self) -> Vec3 {
+        let s = if self.size.is_finite() { self.size } else { Vec3::ONE };
+        s.max(Vec3::splat(0.01)) * 0.5
+    }
+
+    fn yaw(&self) -> f32 {
+        if self.rotation_deg.is_finite() {
+            self.rotation_deg.to_radians()
+        } else {
+            0.0
+        }
+    }
+
+    /// Rotazione del riquadro (attorno alla verticale).
+    pub fn rotation(&self) -> Quat {
+        Quat::from_rotation_y(self.yaw())
+    }
+
+    /// Punto del mondo nelle coordinate del riquadro (origine al centro, assi del riquadro).
+    pub fn to_local(&self, p: Vec3) -> Vec3 {
+        self.rotation().inverse() * (p - self.center)
+    }
+
+    /// Punto nelle coordinate del riquadro riportato nel mondo.
+    pub fn to_world(&self, l: Vec3) -> Vec3 {
+        self.center + self.rotation() * l
+    }
+
+    /// Gli 8 spigoli del riquadro (mondo): bit 0 = x, bit 1 = y, bit 2 = z (0 = lato negativo).
+    pub fn corners(&self) -> [Vec3; 8] {
+        let h = self.half();
+        std::array::from_fn(|i| {
+            let sx = if i & 1 == 0 { -1.0 } else { 1.0 };
+            let sy = if i & 2 == 0 { -1.0 } else { 1.0 };
+            let sz = if i & 4 == 0 { -1.0 } else { 1.0 };
+            self.to_world(Vec3::new(sx * h.x, sy * h.y, sz * h.z))
+        })
     }
 
     /// Parametri riportati in intervalli validi.
@@ -390,6 +459,7 @@ impl SmokeCloud {
         let mut s = self.clone();
         let fin = |v: f32, d: f32| if v.is_finite() { v } else { d };
         s.center = if s.center.is_finite() { s.center } else { Vec3::ZERO };
+        s.rotation_deg = fin(s.rotation_deg, 0.0).rem_euclid(360.0);
         s.size = if s.size.is_finite() {
             s.size.clamp(Vec3::splat(0.01), Vec3::splat(100.0))
         } else {
@@ -436,13 +506,36 @@ impl SmokeCloud {
         };
         m.time = fin(m.time, 3.0).clamp(0.05, 60.0);
         m.quality = m.quality.clamp(1, 4);
+        m.edge_fade = fin(m.edge_fade, 0.2).clamp(0.0, 0.4);
         s
+    }
+
+    /// Quanto resta del fumo simulato nel punto `p` per i bordi sfumati (1 = tutto, 0 = sulla
+    /// parete): sale dolcemente nella fascia [`SmokeSim::edge_fade`] dalle pareti e dal soffitto.
+    pub fn edge_keep(&self, p: Vec3) -> f32 {
+        let f = self.sim.edge_fade;
+        if f.is_nan() || f <= 0.0 {
+            return 1.0;
+        }
+        let h = self.half();
+        let l = self.to_local(p);
+        // Distanza dalle pareti in frazione del lato, negli assi del riquadro (il fondo non conta).
+        let d = [
+            (h.x - l.x.abs()) / (2.0 * h.x),
+            (h.y - l.y) / (2.0 * h.y),
+            (h.z - l.z.abs()) / (2.0 * h.z),
+        ];
+        d.iter()
+            .map(|&x| {
+                let t = (x / f).clamp(0.0, 1.0);
+                t * t * (3.0 - 2.0 * t)
+            })
+            .product()
     }
 
     /// Centro della sorgente della simulazione (spazio mondo).
     pub fn sim_source(&self) -> Vec3 {
-        let (lo, _) = self.bounds();
-        Vec3::new(self.center.x, lo.y, self.center.z) + self.sim.source_offset
+        self.to_world(Vec3::new(0.0, -self.half().y, 0.0) + self.sim.source_offset)
     }
 
     /// Celle sul lato più lungo del riquadro per la simulazione. Partono da
@@ -484,6 +577,35 @@ mod tests {
     /// Riquadro piccolo: le celle della qualità. Riquadro grande con sorgente piccola (il caso
     /// del gas pesante in un riquadro di 10 × 1,5 × 5 m): celle più fini, entro il totale della
     /// qualità, e l'avviso solo se la sorgente resta più piccola di una cella.
+    /// Riquadro ruotato attorno alla verticale: la sorgente gira con lui, il riquadro del mondo
+    /// lo contiene, i bordi sfumati seguono i suoi assi.
+    #[test]
+    fn rotated_box_carries_the_source() {
+        let mut s = SmokeCloud {
+            center: Vec3::new(1.0, 0.5, 0.0),
+            size: Vec3::new(2.0, 1.0, 0.5),
+            mode: SmokeMode::Simulated,
+            ..Default::default()
+        };
+        s.sim.source_offset = Vec3::new(0.5, 0.1, 0.0);
+        s.sim.edge_fade = 0.2;
+        let before = s.sim_source();
+        assert!((before - Vec3::new(1.5, 0.1, 0.0)).length() < 1e-5);
+        s.rotation_deg = 90.0;
+        // Ruotato di 90°: l'asse x del riquadro va verso −z.
+        assert!((s.sim_source() - Vec3::new(1.0, 0.1, -0.5)).length() < 1e-5, "{:?}", s.sim_source());
+        let (lo, hi) = s.bounds();
+        assert!((hi - lo - Vec3::new(0.5, 1.0, 2.0)).length() < 1e-4, "{:?}", hi - lo);
+        let p = Vec3::new(0.3, 0.2, 0.7);
+        assert!((s.to_world(s.to_local(p)) - p).length() < 1e-5);
+        // Al centro tutto il fumo, vicino alla parete lunga (ora lungo z) quasi niente.
+        assert!((s.edge_keep(Vec3::new(1.0, 0.2, 0.0)) - 1.0).abs() < 1e-5);
+        assert!(s.edge_keep(Vec3::new(1.0, 0.2, -0.98)) < 0.05);
+        for c in s.corners() {
+            assert!(c.cmpge(lo - Vec3::splat(1e-4)).all() && c.cmple(hi + Vec3::splat(1e-4)).all());
+        }
+    }
+
     #[test]
     fn sim_cells_follow_the_source() {
         let mut s = SmokeCloud {

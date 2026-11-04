@@ -58,8 +58,8 @@ enum DragStart {
     /// Emettitore e zona simulata della nebbia.
     /// Nebbia: emettitore, dimensioni e spostamento della zona all'inizio.
     Fog(usize, Vec3, Vec3, Vec3),
-    /// Fumo volumetrico: centro e dimensioni del riquadro all'inizio.
-    Smoke(usize, Vec3, Vec3),
+    /// Fumo volumetrico all'inizio (riquadro, rotazione e sorgente: si muovono insieme).
+    Smoke(usize, Box<forge_scene::SmokeCloud>),
     /// Sorgente della simulazione del fumo: posizione (mondo) e raggio all'inizio.
     SmokeSource(usize, Vec3, f32),
     /// Polvere: riquadro all'inizio.
@@ -330,12 +330,13 @@ fn frame_for(app: &ForgeApp, rect: egui::Rect, t: Target, sel: &[usize]) -> Opti
         }
         Target::Smoke(i) => {
             let s = &app.scene.smokes[i];
-            let c = if app.smoke_source_handle {
-                s.sanitized().sim_source()
+            if app.smoke_source_handle {
+                (s.sanitized().sim_source(), [Vec3::X, Vec3::Y, Vec3::Z])
             } else {
-                s.center
-            };
-            (c, [Vec3::X, Vec3::Y, Vec3::Z])
+                // Il gizmo segue il riquadro: i suoi assi (ruotati attorno alla verticale).
+                let r = s.rotation();
+                (s.center, [r * Vec3::X, Vec3::Y, r * Vec3::Z])
+            }
         }
         Target::Dust => (dust_region(app).0, [Vec3::X, Vec3::Y, Vec3::Z]),
         Target::Camera(i) => {
@@ -473,7 +474,9 @@ pub fn update(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::
             (app.gizmo.mode == GizmoMode::Rotate && matches!(k, LightKind::Point))
                 || (app.gizmo.mode == GizmoMode::Scale && !matches!(k, LightKind::Area { .. } | LightKind::Portal { .. }))
         }
-        Some(Target::Fog(_) | Target::Smoke(_) | Target::Dust) => app.gizmo.mode == GizmoMode::Rotate,
+        // Il riquadro del fumo gira attorno alla verticale; la sorgente (una sfera) no.
+        Some(Target::Smoke(_)) => app.gizmo.mode == GizmoMode::Rotate && app.smoke_source_handle,
+        Some(Target::Fog(_) | Target::Dust) => app.gizmo.mode == GizmoMode::Rotate,
         // Camera: si sposta e gira attorno al bersaglio; il bersaglio si sposta soltanto.
         Some(Target::Camera(_)) => app.gizmo.mode == GizmoMode::Scale || (app.camera_target_handle && app.gizmo.mode == GizmoMode::Rotate),
         _ => false,
@@ -518,10 +521,7 @@ pub fn update(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::
                         let s = app.scene.smokes[i].sanitized();
                         DragStart::SmokeSource(i, s.sim_source(), s.sim.source_radius)
                     }
-                    Target::Smoke(i) => {
-                        let s = &app.scene.smokes[i];
-                        DragStart::Smoke(i, s.center, s.size)
-                    }
+                    Target::Smoke(i) => DragStart::Smoke(i, Box::new(app.scene.smokes[i].clone())),
                     Target::Dust => {
                         let (c, s) = dust_region(app);
                         DragStart::Dust(c, s)
@@ -568,9 +568,8 @@ pub fn update(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::
                     app.scene.fogs[*i].zone_offset = *off;
                     app.shading_changed();
                 }
-                DragStart::Smoke(i, c, size) => {
-                    app.scene.smokes[*i].center = *c;
-                    app.scene.smokes[*i].size = *size;
+                DragStart::Smoke(i, st) => {
+                    app.scene.smokes[*i] = (**st).clone();
                     app.shading_changed();
                 }
                 DragStart::SmokeSource(i, p, r) => {
@@ -834,12 +833,27 @@ fn apply_drag(app: &mut ForgeApp, rect: egui::Rect, drag: &Drag, pos: egui::Pos2
             }
             app.shading_changed();
         }
-        // Fumo: il riquadro si sposta (e il fumo con lui) o si ridimensiona attorno al centro.
-        DragStart::Smoke(i, c, size) => {
+        // Fumo: riquadro e sorgente insieme. Si sposta, gira attorno alla verticale o si scala
+        // tenendo fermo il fondo (cresce solo verso l'alto, non va sotto il piano); con la scala
+        // si allargano anche la posizione e il raggio della sorgente.
+        DragStart::Smoke(i, st) => {
             let s = &mut app.scene.smokes[*i];
             match &op {
-                Op::World(m) => s.center = m.transform_point3(*c),
-                Op::Scale(k) => s.size = (*size * k.abs()).max(Vec3::splat(0.01)),
+                Op::World(m) => {
+                    s.center = m.transform_point3(st.center);
+                    let ax = m.transform_vector3(st.rotation() * Vec3::X);
+                    if ax.x * ax.x + ax.z * ax.z > 1e-8 {
+                        s.rotation_deg = (-ax.z).atan2(ax.x).to_degrees().rem_euclid(360.0);
+                    }
+                }
+                Op::Scale(k) => {
+                    let k = k.abs().max(Vec3::splat(1e-3));
+                    let bottom = st.center.y - st.half().y;
+                    s.size = (st.size * k).max(Vec3::splat(0.01));
+                    s.center = Vec3::new(st.center.x, bottom + s.size.y * 0.5, st.center.z);
+                    s.sim.source_offset = st.sim.source_offset * k;
+                    s.sim.source_radius = (st.sim.source_radius * (k.x * k.y * k.z).cbrt()).clamp(0.001, 50.0);
+                }
             }
             app.shading_changed();
         }

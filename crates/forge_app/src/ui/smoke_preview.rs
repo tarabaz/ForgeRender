@@ -65,8 +65,8 @@ impl SmokePreviewState {
 fn key(s: &SmokeCloud, geometry_rev: u64) -> String {
     let s = s.sanitized();
     format!(
-        "{:?}|{:?}|{:?}|{}|{}|{}",
-        s.sim, s.center, s.size, s.seed, s.collisions, geometry_rev
+        "{:?}|{:?}|{:?}|{}|{}|{}|{}",
+        s.sim, s.center, s.size, s.rotation_deg, s.seed, s.collisions, geometry_rev
     )
 }
 
@@ -87,10 +87,11 @@ pub fn update(app: &mut ForgeApp) {
         .and_then(|i| app.scene.smokes.get(i).map(|s| (i, s)))
         .filter(|(_, s)| s.enabled && s.mode == SmokeMode::Simulated);
     let Some((i, s)) = target else {
-        if !app.smoke_preview.key.is_empty() {
+        // Deselezionato (per esempio con un clic nella viewport): l'anteprima pronta resta, così
+        // riselezionando lo stesso fumo non si rifà; si ferma solo un calcolo in corso.
+        if app.smoke_preview.busy {
             app.smoke_preview.cancel.store(true, Ordering::SeqCst);
             app.smoke_preview.key.clear();
-            app.smoke_preview.data = None;
             app.smoke_preview.busy = false;
             app.smoke_preview.rx = None;
         }
@@ -145,6 +146,15 @@ pub fn draw(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect, i: usize)
             painter.circle_filled(pos, 1.4 + d * 0.8, col.gamma_multiply(0.12 + 0.45 * d));
         }
     }
+    // Istante mostrato: si vede che il giro ricomincia da 0 (non è un nuovo calcolo).
+    let time = s.sanitized().sim.time;
+    painter.text(
+        rect.left_bottom() + egui::vec2(10.0, -10.0),
+        egui::Align2::LEFT_BOTTOM,
+        crate::i18n::tf("Anteprima del fumo: {} / {} s", &[format!("{t:.1}"), format!("{time:.1}")]),
+        egui::FontId::proportional(12.0),
+        egui::Color32::from_rgb(225, 235, 245),
+    );
     if app.smoke_preview.playing {
         painter.ctx().request_repaint();
     }

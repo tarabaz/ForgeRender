@@ -105,12 +105,25 @@ pub fn render_pixel_with(
     sample: u32,
     caustics: Option<&photons::PhotonMap>,
 ) -> [f32; 3] {
-    if settings.color_mode == forge_render_core::ColorMode::Spectral {
-        return spectral::render_pixel_spectral(scene, settings, x, y, sample, caustics);
+    let c = if settings.color_mode == forge_render_core::ColorMode::Spectral {
+        spectral::render_pixel_spectral(scene, settings, x, y, sample, caustics)
+    } else {
+        let mut rng = Pcg32::for_pixel(settings.seed, x, y, sample);
+        let (o, dir) = camera_ray(&scene.camera, settings.width, settings.height, x, y, &mut rng);
+        integrator::radiance_with(scene, settings, o, dir, &mut rng, caustics).to_array()
+    };
+    style_gray(settings, c)
+}
+
+/// Stili in bianco e nero: tutto il campione in grigi (luminanza), anche quello che si vede
+/// attraverso vetri e liquidi colorati o riflesso negli specchi, non solo le superfici disegnate.
+#[inline]
+pub fn style_gray(settings: &RenderSettings, c: [f32; 3]) -> [f32; 3] {
+    if settings.style_mono && settings.style != forge_render_core::RenderStyle::Photoreal {
+        [forge_math::luminance(Vec3::from_array(c)); 3]
+    } else {
+        c
     }
-    let mut rng = Pcg32::for_pixel(settings.seed, x, y, sample);
-    let (o, dir) = camera_ray(&scene.camera, settings.width, settings.height, x, y, &mut rng);
-    integrator::radiance_with(scene, settings, o, dir, &mut rng, caustics).to_array()
 }
 
 /// Mappa di fotoni delle caustiche per la passata `sample_index`, se attive e se la scena ha vetri

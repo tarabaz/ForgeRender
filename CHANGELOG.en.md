@@ -10,6 +10,21 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.40.0 — 5 Nov 2026
+
+**Simulated smoke that does not end at the box**
+- **Soft edges** (`SmokeSim::edge_fade`, 0–0.4 of the side, default 0.2): in a band near the walls and the ceiling of the box (not the bottom) smoke and heat dissolve in the simulation, as if they left the box, instead of piling up against it and being cut off sharply by the render (`smoke_sim`, test `soft_edges_keep_smoke_off_the_box`). The depth of the band changes from point to point with a fractal noise, and in the band the render makes swirls, puffs and wisps stronger (`SmokeCloud::edge_keep`), so the smoke frays into tongues and holes rather than fading evenly. 0 = full up to the edge, as before.
+- **Box rotation** (`SmokeCloud::rotation_deg`, around the vertical only, since heat still rises straight up): `to_local`, `to_world`, `corners`, `bounds` (world box containing the rotated one), source turned with the box; the simulation grid covers the rotated box and the smoke outside it is lost (`SmokeSimParams::box_center`, `box_yaw`, `box_half`). Test `rotated_box_carries_the_source`.
+- **Gizmo of the smoke:** it follows the axes of the box; Rotate turns box and source together (also the "Rotation" field); Scale enlarges box, source position and source radius together. With the gizmo and with the "Size" field the bottom stays fixed: the box grows upwards only and no longer goes below the floor.
+- **"Steam from a cup" preset:** now simulated (wide source like the cup, little heat, strong swirls and fine turbulence, quick fade, fine detail with many wisps), instead of the procedural plume that looked like a chimney (test `cup_steam_rises_in_thin_wisps`).
+- **Viewport preview:** it is no longer thrown away when the smoke is deselected (for example by a click in the viewport while turning the camera), so selecting it again does not recompute it; a label at the bottom left shows the time being played (the loop starting again from 0 is not a new computation).
+
+**Material previews at 512 px**
+- Every preview is rendered once at 512 px (`store::THUMBNAIL_RENDER`, file `anteprima-v6-512.png`, the existing 512 px previews stay valid) and reduced with a Lanczos filter for smaller cards and the inspector. The "Minimum resolution" preference is removed (Low / Medium / High change the samples only).
+
+**Fixes**
+- **Black and white styles:** with "Black and white" on, the whole sample of each pixel becomes grey (`forge_render_cpu::style_gray`, the same in WGSL), including what is seen through coloured glass and liquids or in mirrors: before, only the drawn surfaces were grey and the orange glass ball of Valerio's render stayed orange (test `style_mono.rs`, cartoon and technical, RGB and spectral).
+
 ## 0.39.0 — 4 Nov 2026
 
 **Simulated smoke you can place**

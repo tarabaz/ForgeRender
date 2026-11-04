@@ -16,11 +16,14 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 pub const MATERIAL_FILE: &str = "materiale.json";
-/// Anteprima renderizzata (v4: con gli EXR a un canale di Poly Haven letti; nella v3 rugosità,
-/// AO e height in EXR "Y" mancavano. Le vecchie si rifanno).
-pub const THUMBNAIL_FILE: &str = "anteprima-v6.png";
+/// Anteprima renderizzata, sempre a [`THUMBNAIL_RENDER`] pixel: le miniature più piccole si
+/// ricavano rimpicciolendo questa (v4: con gli EXR a un canale di Poly Haven letti; nella v3
+/// rugosità, AO e height in EXR "Y" mancavano. Le vecchie si rifanno).
+pub const THUMBNAIL_FILE: &str = "anteprima-v6-512.png";
+/// Lato (pixel) dell'unica anteprima renderizzata.
+pub const THUMBNAIL_RENDER: u32 = 512;
 /// Anteprime delle versioni precedenti: si eliminano quando si salva quella nuova.
-const LEGACY_THUMBNAIL_FILES: [&str; 11] = [
+const LEGACY_THUMBNAIL_FILES: [&str; 13] = [
     "anteprima.png",
     "anteprima-v2.png",
     "anteprima-v3.png",
@@ -32,6 +35,8 @@ const LEGACY_THUMBNAIL_FILES: [&str; 11] = [
     "anteprima-v5.png",
     "anteprima-v5-256.png",
     "anteprima-v5-512.png",
+    "anteprima-v6.png",
+    "anteprima-v6-256.png",
 ];
 /// Versione di `materiale.json`. Nella 1 il displacement veniva acceso in automatico
 /// all'import (3 % del lato della texture): al caricamento si riporta a 0.
@@ -357,24 +362,13 @@ pub fn set_catalog_info(dir: &Path, categories: &[String], tags: &[String]) -> a
     load(dir)
 }
 
-/// Lati (pixel) delle miniature: 128 è quella standard, le altre si renderizzano solo
-/// quando la libreria mostra anteprime più grandi.
+/// Lati (pixel) delle miniature mostrate: si ricavano tutte dall'anteprima a
+/// [`THUMBNAIL_RENDER`] pixel, rimpicciolita per la dimensione delle schede.
 pub const THUMBNAIL_SIZES: [u32; 3] = [128, 256, 512];
 
-/// Nome del file della miniatura di lato `size` (128 → [`THUMBNAIL_FILE`]).
-pub fn thumbnail_file(size: u32) -> String {
-    if size <= THUMBNAIL_SIZES[0] {
-        THUMBNAIL_FILE.to_string()
-    } else {
-        format!("anteprima-v6-{size}.png")
-    }
-}
-
-/// Elimina tutte le miniature del materiale (si rifanno alla prossima visualizzazione).
+/// Elimina l'anteprima del materiale (si rifà alla prossima visualizzazione).
 pub fn remove_thumbnails(dir: &Path) {
-    for s in THUMBNAIL_SIZES {
-        let _ = std::fs::remove_file(dir.join(thumbnail_file(s)));
-    }
+    let _ = std::fs::remove_file(dir.join(THUMBNAIL_FILE));
 }
 
 /// Cartella della cache delle miniature dei materiali predefiniti (nella libreria).
@@ -393,9 +387,7 @@ pub fn clear_thumbnail_cache() -> usize {
         }
     };
     for m in list() {
-        for s in THUMBNAIL_SIZES {
-            remove(m.dir.join(thumbnail_file(s)));
-        }
+        remove(m.dir.join(THUMBNAIL_FILE));
         for old in LEGACY_THUMBNAIL_FILES {
             remove(m.dir.join(old));
         }
@@ -408,12 +400,12 @@ pub fn clear_thumbnail_cache() -> usize {
     n
 }
 
-/// Salva la miniatura (RGBA8) del materiale; il file dipende dal lato (`width`).
+/// Salva l'anteprima (RGBA8) del materiale in [`THUMBNAIL_FILE`].
 pub fn save_thumbnail(dir: &Path, width: u32, height: u32, rgba: &[u8]) -> anyhow::Result<PathBuf> {
     for old in LEGACY_THUMBNAIL_FILES {
         let _ = std::fs::remove_file(dir.join(old));
     }
-    let p = dir.join(thumbnail_file(width));
+    let p = dir.join(THUMBNAIL_FILE);
     image::save_buffer(&p, rgba, width, height, image::ColorType::Rgba8)?;
     Ok(p)
 }

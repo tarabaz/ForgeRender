@@ -2071,7 +2071,10 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             origin = cam_pos + r * a.x + u * a.y;
             dir = normalize(focus - origin);
         }
-        let c = radiance(origin, dir);
+        var c = radiance(origin, dir);
+        // Stili in bianco e nero: tutto il campione in grigi, anche quello visto attraverso vetri
+        // e liquidi colorati (come forge_render_cpu::style_gray).
+        if (style_id() != 0u && style_mono()) { c = vec3<f32>(luminance(c)); }
         // Campioni non finiti scartati (come nell'accumulatore CPU).
         if (c.x < INF && c.y < INF && c.z < INF && c.x == c.x && c.y == c.y && c.z == c.z) { sum = sum + c; }
     }

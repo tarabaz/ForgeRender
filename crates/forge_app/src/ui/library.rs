@@ -68,8 +68,6 @@ pub struct LibraryUi {
     category: CategoryFilter,
     /// Lato delle anteprime della scheda "La mia libreria" (dalle impostazioni).
     card: f32,
-    /// Risoluzione minima delle miniature (Impostazioni → Anteprime dei materiali).
-    min_tier: u32,
     resolution: usize,
     items: Option<Vec<LibraryMaterial>>,
     /// Materiali predefiniti (libreria ufficiale), letti alla prima apertura.
@@ -108,7 +106,6 @@ impl Default for LibraryUi {
             my_query: String::new(),
             category: CategoryFilter::Official(None),
             card: CARD,
-            min_tier: 128,
             resolution: 1,
             items: None,
             presets: None,
@@ -203,6 +200,22 @@ fn to_color_image(img: image::RgbaImage) -> egui::ColorImage {
     egui::ColorImage::from_rgba_unmultiplied([img.width() as usize, img.height() as usize], img.as_raw())
 }
 
+/// Anteprima del materiale renderizzata con il path tracer a [`store::THUMBNAIL_RENDER`] pixel.
+fn rendered_thumb(m: &forge_scene::Material) -> image::RgbaImage {
+    let rgba = crate::ui::central::render_preview(m, store::THUMBNAIL_RENDER);
+    let side = ((rgba.len() / 4) as f64).sqrt() as u32;
+    image::RgbaImage::from_raw(side, side, rgba).unwrap_or_else(|| image::RgbaImage::new(1, 1))
+}
+
+/// Rimpicciolisce l'anteprima al lato `size` (Lanczos: resta nitida, senza seghettature);
+/// se è già di quel lato o più piccola resta com'è.
+fn scaled_thumb(img: image::RgbaImage, size: u32) -> image::RgbaImage {
+    if img.width() <= size && img.height() <= size {
+        return img;
+    }
+    image::imageops::resize(&img, size, size, image::imageops::FilterType::Lanczos3)
+}
+
 impl LibraryUi {
     /// Apre la finestra sulla ricerca di HDRI online (Poly Haven).
     pub fn open_hdri_tab(&mut self) {
@@ -221,7 +234,6 @@ impl LibraryUi {
     pub fn apply_prefs(&mut self, p: &crate::prefs::Preferences, library_changed: bool) {
         self.resolution = p.download_resolution.min(online::RESOLUTIONS.len() - 1);
         self.card = p.library_card_size as f32;
-        self.min_tier = p.preview_resolution;
         self.provider = if p.download_provider == "polyhaven" {
             Provider::PolyHaven
         } else {
@@ -302,23 +314,23 @@ impl LibraryUi {
         })
     }
 
-    /// Miniatura del materiale di lato `size` (uno di [`store::THUMBNAIL_SIZES`]). Finché non è
+    /// Miniatura del materiale di lato `size` (uno di [`store::THUMBNAIL_SIZES`]): l'anteprima si
+    /// renderizza sempre a [`store::THUMBNAIL_RENDER`] pixel e si rimpicciolisce. Finché non è
     /// pronta si mostra un'altra già caricata dello stesso materiale.
     fn material_thumb(&mut self, ctx: &egui::Context, m: &LibraryMaterial, size: u32) -> Option<egui::TextureHandle> {
         let dir = m.dir.clone();
         let mat = m.material.clone();
         let key = format!("mat:{}:{size}", m.dir.display());
         let tex = self.thumb(ctx, &key, move || {
-            let path = dir.join(store::thumbnail_file(size));
+            let path = dir.join(store::THUMBNAIL_FILE);
             if let Ok(img) = image::open(&path) {
-                return Ok(to_color_image(img.to_rgba8()));
+                return Ok(to_color_image(scaled_thumb(img.to_rgba8(), size)));
             }
             // Prima volta: anteprima renderizzata con il path tracer e salvata nella cartella.
             let _slot = render_slot();
-            let rgba = crate::ui::central::render_preview(&mat, size);
-            let side = ((rgba.len() / 4) as f64).sqrt() as u32;
-            let _ = store::save_thumbnail(&dir, side, side, &rgba);
-            Ok(egui::ColorImage::from_rgba_unmultiplied([side as usize, side as usize], &rgba))
+            let img = rendered_thumb(&mat);
+            let _ = store::save_thumbnail(&dir, img.width(), img.height(), img.as_raw());
+            Ok(to_color_image(scaled_thumb(img, size)))
         });
         tex.or_else(|| {
             store::THUMBNAIL_SIZES
@@ -344,20 +356,20 @@ impl LibraryUi {
         crate::ui::central::preview_object_cm().hash(&mut h);
         let hash = h.finish();
         let key = |s: u32| format!("preset:{}:{s}:{hash:016x}", m.id.0);
-        let file = store::preset_thumbnail_dir().join(format!("{}-{size}-{hash:016x}.png", m.id.0));
+        let render = store::THUMBNAIL_RENDER;
+        let file = store::preset_thumbnail_dir().join(format!("{}-{render}-{hash:016x}.png", m.id.0));
         let mat = m.clone();
         let tex = self.thumb(ctx, &key(size), move || {
             if let Ok(img) = image::open(&file) {
-                return Ok(to_color_image(img.to_rgba8()));
+                return Ok(to_color_image(scaled_thumb(img.to_rgba8(), size)));
             }
             let _slot = render_slot();
-            let rgba = crate::ui::central::render_preview(&mat, size);
-            let side = ((rgba.len() / 4) as f64).sqrt() as u32;
-            if let (Some(dir), Some(img)) = (file.parent(), image::RgbaImage::from_raw(side, side, rgba.clone())) {
+            let img = rendered_thumb(&mat);
+            if let Some(dir) = file.parent() {
                 let _ = std::fs::create_dir_all(dir);
                 let _ = img.save(&file);
             }
-            Ok(egui::ColorImage::from_rgba_unmultiplied([side as usize, side as usize], &rgba))
+            Ok(to_color_image(scaled_thumb(img, size)))
         });
         tex.or_else(|| store::THUMBNAIL_SIZES.iter().rev().find_map(|&s| self.ready_thumb(&key(s))))
     }
@@ -801,8 +813,7 @@ fn mine(app: &mut ForgeApp, ui: &mut egui::Ui) {
         .iter()
         .copied()
         .find(|s| *s as f32 >= need_px * 0.9)
-        .unwrap_or(store::THUMBNAIL_SIZES[store::THUMBNAIL_SIZES.len() - 1])
-        .max(app.library.min_tier);
+        .unwrap_or(store::THUMBNAIL_SIZES[store::THUMBNAIL_SIZES.len() - 1]);
     ui.horizontal_top(|ui| {
         ui.vertical(|ui| {
             ui.set_width(170.0);

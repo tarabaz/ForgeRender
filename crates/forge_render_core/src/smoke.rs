@@ -74,8 +74,9 @@ pub fn smoke_density_at(s: &SmokeCloud, p: Vec3) -> f32 {
 pub fn smoke_density_with(s: &SmokeCloud, p: Vec3, field: Option<&SmokeField>) -> f32 {
     let field = field.filter(|_| s.mode == SmokeMode::Simulated);
     let (lo, hi) = s.bounds();
-    let half = (hi - lo) * 0.5;
-    let rel = p - s.center;
+    // Coordinate del riquadro (anche ruotato attorno alla verticale).
+    let half = s.half();
+    let rel = s.to_local(p);
     let u = rel / half.max(Vec3::splat(1e-4));
     // Fuori dal riquadro (anche con i vortici) niente fumo.
     let box_edge = 1.0 - u.abs().max_element();
@@ -108,16 +109,21 @@ pub fn smoke_density_with(s: &SmokeCloud, p: Vec3, field: Option<&SmokeField>) -
         _ => 1.0,
     };
     let turb = s.turbulence * laminar;
+    // Bordi sfumati del fumo simulato (1 lontano dalle pareti, 0 sulla parete): nella fascia
+    // vortici, sbuffi e filamenti si fanno più forti, così il fumo si sfilaccia in modo frattale
+    // invece di svanire in una sfumatura uniforme.
+    let ek = if field.is_some() { s.edge_keep(p) } else { 1.0 };
+    let erode = 1.0 + 2.5 * (1.0 - ek);
     // Uscita veloce dove la forma di massima è lontana (oltre il massimo spostamento dei vortici).
     let w = warp(q, seed);
-    let disp = w * (turb * 0.45 * l);
+    let disp = w * (turb * 0.45 * l * (1.0 + 1.5 * (1.0 - ek)));
     let up = (rel + disp) / half.max(Vec3::splat(1e-4));
     let tp = ((up.y + 1.0) * 0.5).clamp(0.0, 1.0);
     // Forma e larghezza del pezzo (frazione del riquadro: il filo d'incenso è sottile).
     // Con la simulazione: la sua densità rispetto al punto più denso (4 % = bordo, 40 % o più =
     // pieno), letta nel punto mosso dai vortici fini.
     // Curva schiacciata (radice): il fumo diluito che sale resta visibile, come nel fumo vero.
-    let sim = field.map(|f| (f.sample(p + disp * 0.5) / f.max.max(1e-6)).max(0.0).powf(0.55));
+    let sim = field.map(|f| (f.sample(p + s.rotation() * disp * 0.5) / f.max.max(1e-6) * ek).max(0.0).powf(0.55));
     let (base, width) = match (sim, s.shape) {
         (Some(v), _) => ((v * 2.5 - 0.25).min(1.2), 0.3),
         (None, SmokeShape::Cloud) => (1.0 - up.length(), 1.0),
@@ -141,12 +147,12 @@ pub fn smoke_density_with(s: &SmokeCloud, p: Vec3, field: Option<&SmokeField>) -
     // Bordo: sbuffi a cavolfiore e rumore frattale.
     let puffs = billow_fbm(qd * 0.8, seed ^ 0x3c6e_f372, oct, gain);
     let grain = fbm_gain(qd, seed, oct, gain);
-    let bump = (s.billows * 0.9 * puffs + (1.0 - s.billows) * 0.5 * grain) * rel_l * 1.4;
+    let bump = (s.billows * 0.9 * puffs + (1.0 - s.billows) * 0.5 * grain) * rel_l * 1.4 * erode;
     // Filamenti: creste sottili del rumore, che portano il fumo anche poco fuori dal bordo.
     let ridge = (1.0 - fbm_gain(qd * 2.3 + Vec3::splat(4.7), seed ^ 0x9e37_79b9, oct.min(6), gain).abs() * 2.2)
         .max(0.0)
         .powi(4);
-    let edge = base + bump + s.wisps * ridge * rel_l * 0.5;
+    let edge = base + bump + s.wisps.max(0.5 * (1.0 - ek)) * ridge * rel_l * 0.5 * erode;
     let soft = 0.02 + 0.45 * s.softness * rel_l.max(0.15);
     let mut cov = smoothstep(0.0, soft, edge);
     if cov <= 0.0 {
@@ -204,7 +210,15 @@ fn sim_cache() -> &'static SimCache {
 /// Simulazione della nube (dalla cache o calcolata qui, avanzamento da `p0` a `p1` sulla barra).
 fn simulated_field(s: &SmokeCloud, geo: &RenderGeometry, p0: f32, p1: f32) -> Option<Arc<SmokeField>> {
     let (lo, hi) = s.bounds();
-    let k = format!("{:?}|{:?}|{:?}|{}|{}", s.sim, lo, hi, s.seed, if s.collisions { geo.id } else { 0 });
+    let k = format!(
+        "{:?}|{:?}|{:?}|{}|{}|{}",
+        s.sim,
+        lo,
+        hi,
+        s.rotation_deg,
+        s.seed,
+        if s.collisions { geo.id } else { 0 }
+    );
     if let Some(f) = sim_cache().lock().unwrap().get(&k) {
         return Some(f.clone());
     }
@@ -233,6 +247,10 @@ fn simulated_field(s: &SmokeCloud, geo: &RenderGeometry, p0: f32, p1: f32) -> Op
         wind: m.wind,
         time: m.time,
         seed: s.seed,
+        edge_fade: m.edge_fade,
+        box_center: s.center,
+        box_yaw: s.rotation_deg.to_radians(),
+        box_half: s.half(),
     };
     let f = simulate_smoke(
         &params,
@@ -334,6 +352,10 @@ pub fn smoke_preview(s: &SmokeCloud, geo: &RenderGeometry, cancelled: &dyn Fn() 
         wind: m.wind,
         time: m.time,
         seed: s.seed,
+        edge_fade: m.edge_fade,
+        box_center: s.center,
+        box_yaw: s.rotation_deg.to_radians(),
+        box_half: s.half(),
     };
     let mut raw: Vec<(f32, Vec<f32>)> = Vec::new();
     simulate_smoke_frames(
@@ -375,6 +397,10 @@ pub fn smoke_preview(s: &SmokeCloud, geo: &RenderGeometry, cancelled: &dyn Fn() 
                 }
                 let (x, y, z) = spec.coords(i);
                 let c = spec.center(x, y, z);
+                let d = d * s.edge_keep(c);
+                if d < 0.04 {
+                    continue;
+                }
                 // Uno o più punti per cella, sparsi dentro la cella (sempre negli stessi posti).
                 let n = (d * 3.0).ceil() as u32;
                 for k in 0..n {
@@ -500,6 +526,42 @@ mod tests {
         // Fotogramma per istante: il primo all'inizio, l'ultimo alla fine.
         assert!(std::ptr::eq(p.at(0.0).unwrap(), p.frames[0].1.as_slice()));
         assert!(std::ptr::eq(p.at(1e9).unwrap(), late.as_slice()));
+    }
+
+    /// Vapore da tazza: sale sopra la metà del riquadro in filamenti (riempie poco del riquadro)
+    /// e non si ammassa sotto il soffitto (bordi sfumati).
+    #[test]
+    fn cup_steam_rises_in_thin_wisps() {
+        let preset = forge_scene::SMOKE_PRESETS.iter().find(|p| p.name == "Vapore da tazza").unwrap();
+        let mut s = (preset.make)();
+        s.center = Vec3::new(0.0, s.size.y * 0.5, 0.0);
+        s.sim.quality = 1;
+        let geo = RenderGeometry::build(&Scene::default());
+        let f = simulated_field(&s, &geo, 0.0, 1.0).expect("simulazione");
+        let ref_d = f.max.max(1e-6);
+        let ry = f.spec.res[1];
+        let (mut full, mut high, mut ceiling) = (0usize, 0.0f32, 0.0f32);
+        for i in 0..f.spec.len() {
+            let (_, y, _) = f.spec.coords(i);
+            let d = f.density[i] / ref_d;
+            if d > 0.1 {
+                full += 1;
+            }
+            if y > ry / 2 {
+                high += d;
+            }
+            if y + 1 == ry {
+                ceiling += d;
+            }
+        }
+        let frac = full as f32 / f.spec.len() as f32;
+        eprintln!(
+            "celle con vapore {:.1} %, sopra la metà {high:.1}, sotto il soffitto {ceiling:.3}",
+            frac * 100.0
+        );
+        assert!(high > 1.0, "il vapore sale sopra la metà");
+        assert!(frac < 0.35, "filamenti, non un blocco: {frac}");
+        assert!(ceiling < high * 0.02, "niente ammasso sotto il soffitto");
     }
 
     /// Nube sospesa: piena al centro, vuota fuori dal riquadro e sugli angoli, con il bordo

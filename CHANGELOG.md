@@ -13,6 +13,21 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.40.0 — 05/11/2026
+
+**Fumo simulato che non finisce sul riquadro**
+- **Bordi sfumati** (`SmokeSim::edge_fade`, 0–0,4 del lato, di serie 0,2): in una fascia vicino alle pareti e al soffitto del riquadro (non al fondo) fumo e calore si dissolvono nella simulazione, come se uscissero dal riquadro, invece di ammassarsi contro e di essere tagliati netti dal render (`smoke_sim`, test `soft_edges_keep_smoke_off_the_box`). La profondità della fascia cambia da punto a punto con un rumore frattale e nella fascia il render rinforza vortici, sbuffi e filamenti (`SmokeCloud::edge_keep`): il fumo si sfilaccia in lingue e buchi invece di svanire in modo uniforme. 0 = pieno fino al bordo, come prima.
+- **Rotazione del riquadro** (`SmokeCloud::rotation_deg`, solo attorno alla verticale, perché il caldo sale comunque dritto): `to_local`, `to_world`, `corners`, `bounds` (riquadro del mondo che contiene quello ruotato), sorgente che gira con il riquadro; la griglia della simulazione copre il riquadro ruotato e il fumo che ne esce si perde (`SmokeSimParams::box_center`, `box_yaw`, `box_half`). Test `rotated_box_carries_the_source`.
+- **Gizmo del fumo:** segue gli assi del riquadro; Ruota gira riquadro e sorgente insieme (anche il campo "Rotazione"); Scala ingrandisce insieme riquadro, posizione e raggio della sorgente. Con il gizmo e con il campo "Dimensioni" il fondo resta fermo: il riquadro cresce solo verso l'alto e non va più sotto il piano.
+- **Preset "Vapore da tazza":** ora simulato (sorgente larga come la tazza, poco calore, vortici forti e turbolenza fine, dissolvenza veloce, dettaglio fine con molti filamenti), al posto del pennacchio procedurale che sembrava una ciminiera (test `cup_steam_rises_in_thin_wisps`).
+- **Anteprima nella viewport:** non si butta più quando il fumo viene deselezionato (per esempio con un clic nella viewport mentre si gira la camera), così riselezionandolo non si ricalcola; un'etichetta in basso a sinistra mostra l'istante riprodotto (il giro che riparte da 0 non è un nuovo calcolo).
+
+**Anteprime dei materiali a 512 px**
+- Ogni anteprima si renderizza una volta a 512 px (`store::THUMBNAIL_RENDER`, file `anteprima-v6-512.png`: quelle a 512 già fatte restano valide) e si rimpicciolisce con un filtro Lanczos per le schede più piccole e l'inspector. Tolta l'impostazione "Risoluzione minima" (Bassa / Media / Alta cambiano solo i campioni).
+
+**Correzioni**
+- **Stili in bianco e nero:** con "Bianco e nero" acceso va in grigi l'intero campione di ogni pixel (`forge_render_cpu::style_gray`, lo stesso in WGSL), anche quello visto attraverso vetri e liquidi colorati o negli specchi: prima erano grigie solo le superfici disegnate e la palla di vetro arancione del render di Valerio restava arancione (test `style_mono.rs`, fumetto e tecnico, RGB e spettrale).
+
 ## 0.39.0 — 04/11/2026
 
 **Fumo simulato da posizionare**

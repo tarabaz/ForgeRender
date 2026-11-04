@@ -751,3 +751,14 @@ Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
   dalla barra; rotazione dell'anteprima del materiale invertita.
 - Non provato nell'interfaccia: pannello colore, gizmo della sorgente, anteprima del fumo (solo test
   e render da riga di comando).
+
+### 0.40.0 (05/11/2026): fumo con bordi sfumati e riquadro ruotabile, anteprime a 512 px
+- Fumo: `SmokeSim::edge_fade` (fascia frattale che dissolve fumo e calore vicino a pareti e soffitto,
+  `SmokeCloud::edge_keep` nel render con erosione più forte); `SmokeCloud::rotation_deg` (solo verticale,
+  `to_local`/`to_world`/`corners`, `SmokeSimParams::box_center`/`box_yaw`/`box_half`); gizmo con assi
+  del riquadro, Ruota e Scala di riquadro e sorgente insieme, fondo fermo; preset "Vapore da tazza"
+  simulato; anteprima conservata alla deselezione, etichetta del tempo.
+- Anteprime dei materiali solo a 512 px (`store::THUMBNAIL_RENDER`), rimpicciolite con Lanczos; tolta la
+  preferenza `preview_resolution`.
+- `forge_render_cpu::style_gray` (e WGSL): bianco e nero su tutto il campione.
+- Non provato nell'interfaccia: gizmo Ruota/Scala del fumo, resa del vapore da tazza (solo test).

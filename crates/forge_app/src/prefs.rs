@@ -44,8 +44,6 @@ pub struct Preferences {
     pub library_card_size: u32,
     /// Campioni per pixel delle anteprime dei materiali (4–4096).
     pub preview_samples: u32,
-    /// Risoluzione minima delle anteprime dei materiali: 128 (bassa), 256 (media), 512 (alta).
-    pub preview_resolution: u32,
     /// Dimensione apparente dell'oggetto delle anteprime (cm, 0 = reale, circa 9 cm).
     pub preview_object_cm: u32,
     // --- Percorsi ---
@@ -90,7 +88,6 @@ impl Default for Preferences {
             import_displacement: ImportDisplacement::Off,
             library_card_size: 112,
             preview_samples: 64,
-            preview_resolution: 128,
             preview_object_cm: 30,
             library_dir: None,
             new_backend: BackendKind::Gpu,
@@ -116,11 +113,6 @@ impl Preferences {
         self.library_card_size = self.library_card_size.clamp(64, 512);
         self.preview_samples = self.preview_samples.clamp(4, 4096);
         self.preview_object_cm = self.preview_object_cm.min(1000);
-        self.preview_resolution = match self.preview_resolution {
-            0..=191 => 128,
-            192..=383 => 256,
-            _ => 512,
-        };
         self.new_samples = self.new_samples.min(1 << 20);
         self.new_threads = self.new_threads.min(1024);
         if self.library_dir.as_ref().is_some_and(|p| p.as_os_str().is_empty()) {
@@ -233,7 +225,6 @@ mod tests {
             import_displacement: ImportDisplacement::FromMaterialX,
             library_card_size: 256,
             preview_samples: 512,
-            preview_resolution: 512,
             preview_object_cm: 100,
             library_dir: Some(PathBuf::from("/x/Libreria")),
             new_backend: BackendKind::Gpu,
@@ -267,7 +258,7 @@ mod tests {
         let (d, err) = Preferences::load_from(&p);
         assert!(err.is_none());
         assert_eq!(d.library_card_size, 512);
-        assert_eq!((d.preview_samples, d.preview_resolution), (4, 256));
+        assert_eq!(d.preview_samples, 4);
         // Preferenze di versioni precedenti alla 0.15.0: dimensione delle anteprime predefinita.
         assert_eq!(d.preview_object_cm, 30);
         assert_eq!(d.download_resolution, forge_library::online::RESOLUTIONS.len() - 1);

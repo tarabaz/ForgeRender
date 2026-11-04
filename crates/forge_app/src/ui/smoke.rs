@@ -179,6 +179,13 @@ fn sim_controls(ui: &mut egui::Ui, s: &mut SmokeCloud) -> bool {
         );
         changed |= slider(ui, tr("Raffreddamento"), tr("Quanto presto il fumo si raffredda e smette di salire"), &mut m.cooling, 0.0..=10.0);
         changed |= slider(ui, tr("Dissolvenza"), tr("Quanto presto il fumo svanisce nell'aria"), &mut m.dissipation, 0.0..=5.0);
+        changed |= slider(
+            ui,
+            tr("Bordi sfumati"),
+            tr("Fascia vicino alle pareti e al soffitto del riquadro (frazione del lato) in cui il fumo si dissolve: non si ammassa contro il riquadro e non finisce tagliato netto. 0 = pieno fino al bordo"),
+            &mut m.edge_fade,
+            0.0..=0.4,
+        );
         changed |= slider(ui, tr("Vortici"), tr("Riccioli che nascono nel moto (confinamento della vorticità)"), &mut m.vorticity, 0.0..=20.0);
         changed |= slider(ui, tr("Turbolenza"), tr("Agitazione dell'aria: rompe la colonna in sbuffi"), &mut m.turbulence, 0.0..=20.0);
         ui.label(tr("Grandezza della turbolenza"));
@@ -234,14 +241,32 @@ fn body(
         .small()
         .weak(),
     );
-    let before = (s.center, s.size);
-    if crate::ui::inspector::vec3_edit(ui, tr("Centro (m)"), &mut s.center, 0.01)
-        | crate::ui::inspector::vec3_edit(ui, tr("Dimensioni (m)"), &mut s.size, 0.01)
-    {
+    let before = (s.center, s.size, s.rotation_deg);
+    let moved = crate::ui::inspector::vec3_edit(ui, tr("Centro (m)"), &mut s.center, 0.01);
+    let bottom = s.center.y - s.size.y * 0.5;
+    if crate::ui::inspector::vec3_edit(ui, tr("Dimensioni (m)"), &mut s.size, 0.01) {
+        // Il fondo resta dov'è: l'altezza cresce verso l'alto (non va sotto il piano).
         s.size = s.size.max(Vec3::splat(0.01));
+        s.center.y = bottom + s.size.y * 0.5;
         *select = Some(i);
         changed = true;
     }
+    if moved {
+        *select = Some(i);
+        changed = true;
+    }
+    ui.horizontal(|ui| {
+        ui.label(tr("Rotazione"));
+        changed |= ui
+            .add(
+                egui::DragValue::new(&mut s.rotation_deg)
+                    .speed(1.0)
+                    .suffix("°")
+                    .range(-360.0..=360.0),
+            )
+            .on_hover_text(tr("Rotazione del riquadro attorno alla verticale (anche con il gizmo Ruota)"))
+            .changed();
+    });
     ui.horizontal(|ui| {
         let label = if has_selection {
             tr("Appoggia sulla selezione")
@@ -259,7 +284,7 @@ fn body(
             changed = true;
         }
     });
-    if before != (s.center, s.size) {
+    if before != (s.center, s.size, s.rotation_deg) {
         changed = true;
     }
     ui.horizontal(|ui| {

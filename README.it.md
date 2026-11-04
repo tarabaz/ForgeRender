@@ -18,14 +18,17 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
-### Novità della versione 0.39.0
+### Novità della versione 0.40.0
 
-- **Fumo da posizionare:** la sorgente del fumo simulato è una sfera nella viewport, spostata con il gizmo; un'anteprima veloce a particelle mostra dove va il fumo e come si muove nel tempo, senza fare il render; le celle della simulazione seguono la sorgente, così nei riquadri grandi il fumo non si perde più.
-- **Selettore colore:** un solo pannello per ogni colore dei materiali con RGB, CMYK e palette (RAL Classic con valori indicativi compresa, o il file ufficiale RAL), Applica e Annulla, e il codice RAL accanto al campione.
-- **Correzioni:** con contorni a inchiostro e tilt-shift accesi il render parte subito (le linee arrivano un attimo dopo); sfocatura del tilt-shift continua, senza copie ripetute dei punti luminosi; riflessi del fumetto solo dove una luce si riflette davvero; niente più simboli mancanti (quadratini) nell'interfaccia; il manuale segue la lingua dell'interfaccia; l'anteprima del materiale gira nel verso in cui la trascini.
+- **Fumo che non finisce sul riquadro:** con "Bordi sfumati" il fumo simulato si sfilaccia e si dissolve vicino alle pareti e al soffitto del suo riquadro, in modo frattale e naturale, invece di riempirlo e restare tagliato; il riquadro gira con il gizmo e si scala insieme alla sua sorgente, crescendo solo verso l'alto.
+- **Vapore da tazza:** un nuovo preset simulato con filamenti sottili che si arricciano e svaniscono.
+- **Anteprime dei materiali nitide:** renderizzate una volta a 512 px e rimpicciolite per ogni grandezza delle schede.
+- **Correzioni:** gli stili in bianco e nero sono grigi anche attraverso i vetri colorati; l'anteprima del fumo non si ricalcola più quando clicchi nella viewport.
 
 <details>
 <summary><strong>Versioni precedenti — cronologia completa</strong></summary>
+
+- **0.39.0 — Fumo da posizionare, selettore colore:** la sorgente del fumo simulato è una sfera nella viewport, spostata con il gizmo; un'anteprima veloce a particelle mostra dove va il fumo e come si muove nel tempo, senza fare il render; le celle della simulazione seguono la sorgente, così nei riquadri grandi il fumo non si perde più; un selettore colore per ogni colore dei materiali con RGB, CMYK e palette (RAL Classic con valori indicativi compresa); il render parte subito con contorni a inchiostro e tilt-shift; sfocatura del tilt-shift continua; riflessi del fumetto solo dove una luce si riflette davvero; il manuale segue la lingua dell'interfaccia.
 
 - **0.38.0 — Nuova libreria dei materiali di serie:** 125 materiali in 13 categorie con nomi italiani, la dispersione giusta sui trasparenti e cinque materiali con texture per categoria; materiali BlenderKit sostituiti da materiali CC0; un pacchetto aggiuntivo di 109 materiali con texture.
 - **0.37.0 — Simulazione del fumo, camere come componenti, tilt-shift:** fumo simulato (calore, galleggiamento, vortici, vento, oggetti che lo deviano); camere di rendering con bersaglio, spostate e fatte orbitare con il gizmo; fascia di tilt-shift separata dalla profondità di campo; stili in bianco e nero, sfondo a tinta unita, contorni senza puntini; polvere nel suo riquadro, granelli più grandi che fanno ombra.
@@ -163,8 +166,10 @@ Nubi di fumo volumetrico vere per le foto di prodotto: il fumo d'incenso accanto
 - **Fisico:** il fumo diffonde e assorbe la luce con la diffusione multipla, fa ombre volumetriche e le riceve, su CPU e GPU (lo stesso delta tracking della nebbia da ghiaccio secco). Non riempie mai l'interno pieno degli oggetti che attraversano il riquadro. Stessi parametri e stesso seme danno sempre la stessa nube.
 - **Calcolato in anticipo** con gli altri effetti, uno alla volta sulla barra di avanzamento, e salvato con il progetto.
 
-- **Modo simulato:** invece di una forma scelta, il fumo può nascere da una simulazione fisica dentro il riquadro (un fluido euleriano con temperatura e galleggiamento, come in Fedkiw, Stam e Jensen 2001): una sorgente emette fumo e calore, il fumo caldo sale, il gas pesante scende e si stende, il confinamento della vorticità tiene i riccioli, la turbolenza (curl noise) rompe la colonna in sbuffi, il vento la spinge e gli oggetti nel riquadro la deviano. La simulazione si congela all'istante scelto e sul bordo si aggiunge il dettaglio procedurale (sbuffi, filamenti). Comandi: posizione e raggio della sorgente, quantità, calore, spinta, peso, velocità di uscita, raffreddamento, dissolvenza, vortici, turbolenza e la sua grandezza, vento, istante e qualità della simulazione (da 48 a 136 celle per lato). Preset: fumo caldo simulato e gas pesante simulato.
+- **Modo simulato:** invece di una forma scelta, il fumo può nascere da una simulazione fisica dentro il riquadro (un fluido euleriano con temperatura e galleggiamento, come in Fedkiw, Stam e Jensen 2001): una sorgente emette fumo e calore, il fumo caldo sale, il gas pesante scende e si stende, il confinamento della vorticità tiene i riccioli, la turbolenza (curl noise) rompe la colonna in sbuffi, il vento la spinge e gli oggetti nel riquadro la deviano. La simulazione si congela all'istante scelto e sul bordo si aggiunge il dettaglio procedurale (sbuffi, filamenti). Comandi: posizione e raggio della sorgente, quantità, calore, spinta, peso, velocità di uscita, raffreddamento, dissolvenza, vortici, turbolenza e la sua grandezza, vento, istante e qualità della simulazione (da 48 a 136 celle per lato). Preset: fumo caldo simulato, gas pesante simulato e vapore da tazza (filamenti sottili che si arricciano e svaniscono, da una sorgente larga come la tazza).
 - **Posizionare il fumo simulato:** la sorgente è una sfera azzurra nella viewport, grande come la sorgente vera: con un clic (o "Seleziona la sorgente") il gizmo la sposta, e Scala ne cambia il raggio. L'**anteprima in viewport** fa la stessa simulazione su una griglia grossolana in circa un secondo e la mostra come una nuvola di punti che si muove da 0 all'istante scelto, in loop o ferma su un istante qualsiasi: trovi posto, sorgente e comportamento senza fare il render, poi rifinisci con il render. Le celle della simulazione seguono la sorgente: in un riquadro grande diventano più fini (entro il limite di calcolo della qualità), così il fumo non nasce più in pochi grumi né sparisce nel pavimento, e il pannello avvisa se la sorgente resta più piccola di una cella.
+- **Bordi sfumati:** il fumo simulato non riempie il riquadro per poi finire tagliato: in una fascia vicino alle pareti e al soffitto (non al fondo) si dissolve come se uscisse dal riquadro, e il bordo si sfilaccia in modo frattale, con lingue, buchi e filamenti, come il fumo vero che si dirada nell'aria. La larghezza della fascia si regola (0 = pieno fino al bordo).
+- **Riquadro con la sua sorgente:** il gizmo segue il riquadro: Sposta muove riquadro e sorgente, Ruota li gira attorno alla verticale (anche con il campo "Rotazione"), Scala ingrandisce insieme riquadro, posizione e raggio della sorgente. Altezza e scala crescono solo verso l'alto, dal fondo del riquadro, così il fumo non va mai sotto il piano. L'anteprima in viewport mostra l'istante riprodotto e resta pronta quando clicchi altrove, quindi non si ricalcola mentre giri la camera.
 
 Il fuoco (combustione, emissione, fiamme che illuminano la scena) è un passo a parte, successivo: vedi lo [studio su fumo e fuoco](docs/studio-fumo-fuoco.md).
 
@@ -187,6 +192,7 @@ Materiali diffusi, metalli e plastiche GGX, vetro Fresnel, vetro satinato ed emi
 - **Libreria di serie:** 125 materiali pronti in 13 categorie: metalli, alluminio anodizzato, vernici, plastiche, gomme, vetri, liquidi, ceramiche e pietre, legni, tessuti e pelle, asfalto, coperture ed emissivi. Ci sono tutti i materiali senza texture (metalli, vernici, plastiche, vetri, liquidi, LED) e cinque materiali con texture per categoria, scelti diversi tra loro: acciaio spazzolato, alluminio tornito, lamiera mandorlata, lamiera forata e metallo arrugginito; rovere, noce, parquet a spina di pesce, compensato e corteccia; denim, pelle, lana bouclé, juta e raso. I trasparenti hanno la dispersione giusta (numero di Abbe: vetro 58, cristallo al piombo 32, vetro ottico 64, diamante 55, policarbonato 30, acqua 56…), che si vede nel render spettrale, e acqua e bevande si comportano da liquidi dentro il loro bicchiere. Le mappe sono da 1024 px perché il programma resti leggero.
 - **Pacchetto aggiuntivo:** altri 109 materiali con mappe a 2K (legni e cortecce, pietre e intonaci, tessuti, metalli arrugginiti e consumati, asfalti, tetti), circa 1,6 GB, da scaricare a parte e copiare come `materiali-aggiuntivi` accanto a `forgerender.exe`: al riavvio compaiono nella stessa libreria.
 - **Liberi da ridistribuire:** i materiali con texture vengono da Poly Haven e ambientCG (CC0); la fonte di ogni materiale è in `assets/materiali/LEGGIMI.md`.
+- **Anteprime nitide:** ogni anteprima dei materiali si renderizza una volta con il path tracer a 512 px e si rimpicciolisce per ogni grandezza delle schede, così resta nitida sia grande sia piccola.
 - **Selettore colore:** cliccando il campione di un colore del materiale (colore base, colore in volume, emissione) si apre un solo pannello con tre schede: **RGB** (ruota dei colori, R, G, B e codice esadecimale), **CMYK** (ciano, magenta, giallo e nero in percentuale, con una conversione matematica semplice, non un profilo di stampa) e **Palette** (colori con codice e nome). Il colore cambia subito; **Applica** lo tiene, **Annulla** (o Esc) rimette quello di prima. La scheda palette comprende i codici RAL Classic con nome italiano e inglese e valori RGB **indicativi** (media di fonti pubbliche, non i valori ufficiali RAL, che RAL vende come libreria digitale); in più puoi importare la libreria ufficiale RAL CLASSIC `.ase` o una tua palette `.json`/`.csv` nella cartella Colori della libreria. Un colore preso da una palette mostra il suo codice (per esempio **RAL 7016**) accanto al campione, salvato con il progetto; cambiando il colore a mano torna un normale colore RGB.
 
 ### 10. Studio fotografico e illuminazione
@@ -223,7 +229,7 @@ In cima alla scheda Render scegli come si disegna l'immagine; passando sopra a o
 - **Fotorealistico:** il path tracing fisico di sempre.
 - **Fumetto (cel shading):** colori pieni del materiale in tre fasce nette (luce, mezz'ombra, ombra) dalle luci della scena, con le loro ombre nette e un riflesso secco sui materiali lucidi, solo dove una luce si riflette davvero (la forma della softbox per le luci ad area) e forte quanto riflette il materiale (tenue sulle plastiche scure, pieno sui metalli).
 - **Illustrazione tecnica (Gooch):** ombreggiatura morbida da caldo in luce a freddo in ombra, senza ombre nere, così forme e volumi si leggono bene.
-- **Bianco e nero:** il fumetto con le stesse fasce in grigi, l'illustrazione tecnica come un disegno a matita; spento, restano a colori.
+- **Bianco e nero:** il fumetto con le stesse fasce in grigi, l'illustrazione tecnica come un disegno a matita; tutta l'immagine è in grigi, anche quello che si vede attraverso vetri e liquidi colorati o negli specchi. Spento, restano a colori.
 - **Sfondo a tinta unita:** dove la camera non vede niente, un colore (bianco, grigio chiaro, nero o un altro) al posto dell'ambiente, che continua a illuminare la scena.
 - **Contorni a inchiostro:** linee scure su sagome, confini tra oggetti, salti di profondità e (a scelta) spigoli vivi, tracciati con 3×3 raggi per pixel e disegnati sopra l'immagine finale, anche dopo il denoiser. Vanno con qualsiasi stile; si regolano spessore, colore, angolo degli spigoli e sensibilità ai salti di profondità. I raggi che passano nella fessura tra due triangoli non lasciano più puntini sparsi, lo slider Pulizia toglie i pezzi di linea troppo corti e il bordo del pavimento contro lo sfondo può restare senza linea.
 
@@ -263,7 +269,13 @@ Un file STEP si converte in mesh una volta sola. Il risultato resta in una cache
   proiezione box in metri per i modelli CAD senza UV, con dimensione della ripetizione, rotazione
   e spostamento.
 - **Libreria**: 125 materiali di serie in 13 categorie (un pacchetto aggiuntivo ne aggiunge 109 con texture), più materiali e HDRI scaricati da ambientCG e
-  Poly Haven o importati da cartelle/ZIP, conservati nella cartella locale `Libreria` con anteprime.
+  Poly Haven o importati da cartelle/ZIP, conservati nella cartella locale `Libreria` con anteprime a 512 px.
+- **Selettore colore**: RGB, CMYK e palette (RAL Classic con valori indicativi, o palette
+  `.ase`/`.json`/`.csv` importate) per ogni colore dei materiali, con il codice della palette
+  accanto al campione.
+- **Render spettrale, caustiche e laser**: trasporto della luce RGB o spettrale con dispersione,
+  caustiche con il photon mapping con tutte le luci, laser da laboratorio rosso, verde, blu, viola
+  e bianco con fasci visibili, prismi e lenti.
 - **Luci e ambiente**: luci ad area, puntiformi, spot e direzionali, preset da studio; ambiente
   uniforme, a gradiente o HDRI (.hdr/.exr) con importance sampling. Puntiformi e spot hanno un
   **raggio d'azione** con sfumatura del bordo, indipendente dall'intensità, disegnato come una
@@ -272,10 +284,25 @@ Un file STEP si converte in mesh una volta sola. Il risultato resta in una cache
   esce da un emettitore puntiforme, cade, si deposita, si allarga e scorre attorno agli oggetti;
   resa come vero mezzo partecipante (delta tracking, fase Henyey–Greenstein, ombre nella nebbia)
   su CPU e GPU.
+- **Foschia e polvere**: cinque tipi di foschia procedurale (nebbia bassa, nuvole di gas, fumo
+  tossico a terra, strati sospesi, riccioli di vapore) da un'altezza di partenza a una massima;
+  granelli di polvere nel loro riquadro che brillano solo nei fasci di spot e sole.
+- **Fumo volumetrico**: nubi, pennacchi, fili d'incenso e banchi procedurali, oppure una
+  simulazione fisica (calore, galleggiamento, vortici, vento, oggetti che lo deviano) con la
+  sorgente spostabile, l'anteprima a particelle nella viewport, i bordi sfumati frattali e un
+  riquadro che si sposta, gira e si scala insieme alla sua sorgente.
+- **Stili di rendering**: fotorealistico, fumetto (cel shading) e illustrazione tecnica, a colori
+  o in bianco e nero, sfondo a tinta unita, contorni a inchiostro su sagome e spigoli.
+- **Adesivi**: immagini e loghi (PNG con trasparenza) proiettati sulle superfici curve, che si
+  muovono con l'oggetto.
 - **Camere**: camera orbitale della viewport più camere di rendering con obiettivo professionale:
   focale in mm, diaframma f/, profondità di campo (piano di fuoco e limiti vicino/lontano
   disegnati nella viewport), lamelle, decentramento. **Vista ortografica e isometrica** nella
-  viewport (icone accanto al navigatore, tasto 5 del tastierino) e nella camera di render.
+  viewport (icone accanto al navigatore, tasto 5 del tastierino) e nella camera di render. Le
+  camere di rendering sono componenti con un bersaglio, spostate e fatte orbitare con il gizmo.
+  **Tilt-shift**: una fascia nitida (posizione, larghezza, angolo) con la sfocatura che tiene
+  conto della profondità ai due lati, separata dalla profondità di campo, visibile subito senza
+  rifare il render.
 - **Import**: glTF/GLB (esportazione consigliata da SolidWorks), OBJ (con .mtl), STL, Blender
   `.blend` (tramite Blender installato); STEP con Open CASCADE e SolidWorks SLDPRT/SLDASM sono
   sperimentali. Il convertitore STEP (`forgerender-step.exe`) lo compila `Build-ForgeRender.ps1`;

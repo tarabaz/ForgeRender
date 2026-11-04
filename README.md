@@ -18,14 +18,17 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
-### What's new in 0.39.0
+### What's new in 0.40.0
 
-- **Smoke you can place:** the source of the simulated smoke is a sphere in the viewport, moved with the gizmo; a quick particle preview shows where the smoke goes and how it moves over time, without rendering; the simulation cells follow the source, so large boxes no longer lose the smoke.
-- **Colour picker:** one panel for every material colour with RGB, CMYK and palettes (RAL Classic with indicative values included, or the official RAL file), Apply and Cancel, and the RAL code shown next to the swatch.
-- **Fixes:** the render starts at once with ink outlines and tilt-shift on (lines arrive a moment later); smooth tilt-shift blur without repeated copies of bright spots; cartoon highlights only where a light is really reflected; no more missing symbols (squares) in the interface; the manual follows the interface language; the material preview turns the way you drag it.
+- **Smoke that does not end at the box:** with "Soft edges" the simulated smoke frays and dissolves near the walls and the ceiling of its box, in a fractal, natural way, instead of filling it and being cut off; the box turns with the gizmo and scales together with its source, growing upwards only.
+- **Steam from a cup:** a new simulated preset with thin, curling wisps that fade away.
+- **Sharp material previews:** rendered once at 512 px and scaled down for every card size.
+- **Fixes:** black and white styles are grey also through coloured glass; the smoke preview is no longer recomputed when you click in the viewport.
 
 <details>
 <summary><strong>Previous versions — complete release history</strong></summary>
+
+- **0.39.0 — Smoke you can place, colour picker:** the source of the simulated smoke is a sphere in the viewport, moved with the gizmo; a quick particle preview shows where the smoke goes and how it moves over time, without rendering; the simulation cells follow the source, so large boxes no longer lose the smoke; a colour picker for every material colour with RGB, CMYK and palettes (RAL Classic with indicative values included); the render starts at once with ink outlines and tilt-shift; smooth tilt-shift blur; cartoon highlights only where a light is really reflected; the manual follows the interface language.
 
 - **0.38.0 — New built-in material library:** 125 materials in 13 categories with Italian names, the right dispersion on transparent materials and five textured materials per category; BlenderKit materials replaced by CC0 ones; an additional pack of 109 textured materials.
 - **0.37.0 — Smoke simulation, cameras as components, tilt-shift:** simulated smoke (heat, buoyancy, swirls, wind, objects that deflect it); render cameras with a target, moved and orbited with the gizmo; tilt-shift band separate from the depth of field; black and white styles, solid background, outlines without stray dots; dust in its own box, larger specks with shadows.
@@ -152,8 +155,10 @@ Real volumetric smoke clouds for product shots: incense smoke next to a perfume 
 - **Physical:** the smoke scatters and absorbs light with multiple scattering, casts volumetric shadows and receives them, on CPU and GPU (the same delta tracking as the dry-ice fog). It never fills the solid inside of the objects that cross the box. The same parameters and seed always give the same cloud.
 - **Computed ahead of time** with the other effects, one at a time on the progress bar, and saved with the project.
 
-- **Simulated mode:** instead of a chosen shape, the smoke can come from a physical simulation inside the box (a Eulerian fluid with temperature and buoyancy, as in Fedkiw, Stam and Jensen 2001): a source emits smoke and heat, hot smoke rises, heavy gas sinks and spreads, vorticity confinement keeps the curls, curl-noise turbulence breaks the column into puffs, wind pushes it and the objects in the box deflect it. The simulation is frozen at the chosen instant and the procedural detail (puffs, filaments) is added on its edge. Controls: source position and radius, amount, heat, buoyancy, weight, exit speed, cooling, fading, swirls, turbulence and its size, wind, instant and simulation quality (48 to 136 cells per side). Presets: simulated hot smoke and simulated heavy gas.
+- **Simulated mode:** instead of a chosen shape, the smoke can come from a physical simulation inside the box (a Eulerian fluid with temperature and buoyancy, as in Fedkiw, Stam and Jensen 2001): a source emits smoke and heat, hot smoke rises, heavy gas sinks and spreads, vorticity confinement keeps the curls, curl-noise turbulence breaks the column into puffs, wind pushes it and the objects in the box deflect it. The simulation is frozen at the chosen instant and the procedural detail (puffs, filaments) is added on its edge. Controls: source position and radius, amount, heat, buoyancy, weight, exit speed, cooling, fading, swirls, turbulence and its size, wind, instant and simulation quality (48 to 136 cells per side). Presets: simulated hot smoke, simulated heavy gas and steam from a cup (thin wisps that curl and fade away, from a source as wide as the cup).
 - **Placing the simulated smoke:** the source is a light blue sphere in the viewport, as large as the real source: click it (or "Select the source") and the gizmo moves it, while Scale changes its radius. The **viewport preview** runs the same simulation on a coarse grid in about a second and shows it as a cloud of points that moves from 0 to the chosen instant, in a loop or paused at any time: you find the place, the source and the behaviour without rendering, then refine with the render. The simulation cells follow the source: in a large box they get finer (within the computing limit of the quality), so the smoke no longer comes out in a few lumps or vanishes into the floor, and the panel warns when the source is still smaller than a cell.
+- **Soft edges:** the simulated smoke does not fill the box and end with a cut: in a band near the walls and the ceiling (not the bottom) it dissolves as if it left the box, and the edge frays in a fractal way, with tongues, holes and wisps, like real smoke thinning out in the air. The width of the band is adjustable (0 = full up to the edge).
+- **Box with its source:** the gizmo follows the box: Move moves box and source, Rotate turns them around the vertical (also with the "Rotation" field), Scale enlarges box, source position and source radius together. Height and scale grow upwards only, from the bottom of the box, so the smoke never goes below the floor. The viewport preview shows the time being played and is kept when you click elsewhere, so it is not recomputed while you turn the camera.
 
 Fire (combustion, emission, flames lighting the scene) is a separate, later step: see the [smoke and fire study](docs/studio-fumo-fuoco.md).
 
@@ -176,6 +181,7 @@ Diffuse materials, GGX metals and plastics, Fresnel glass, frosted glass and emi
 - **Built-in library:** 125 ready materials in 13 categories: metals, anodised aluminium, paints, plastics, rubbers, glass, liquids, ceramics and stone, woods, fabrics and leather, asphalt, roofing and emissive. Every plain material (metals, paints, plastics, glass, liquids, LEDs) is included, plus five textured materials per category, chosen to be different from each other: brushed steel, turned aluminium, diamond plate, perforated sheet and rusty metal; oak, walnut, herringbone parquet, plywood and bark; denim, leather, bouclé wool, jute and satin. Transparent materials carry the right dispersion (Abbe number: crown glass 58, lead crystal 32, optical glass 64, diamond 55, polycarbonate 30, water 56…), visible in the spectral render, and water and drinks behave as liquids inside their glass. Maps are 1024 px to keep the program light.
 - **Additional pack:** 109 more textured materials with 2K maps (woods and barks, stones and plasters, fabrics, rusty and worn metals, asphalt, roofs), about 1.6 GB, downloaded separately and copied as `materiali-aggiuntivi` next to `forgerender.exe`: at the next start they appear in the same library.
 - **Free to redistribute:** the textured materials come from Poly Haven and ambientCG (CC0); each material's source is listed in `assets/materiali/LEGGIMI.md`.
+- **Sharp previews:** every material preview is rendered once with the path tracer at 512 px and scaled down for each card size, so it stays sharp both large and small.
 - **Colour picker:** clicking the swatch of a material colour (base colour, volume colour, emission) opens one panel with three tabs: **RGB** (colour wheel, R, G, B and hex code), **CMYK** (cyan, magenta, yellow and black in percent, with a simple mathematical conversion, not a print profile) and **Palette** (colours with code and name). The colour changes live; **Apply** keeps it, **Cancel** (or Esc) restores the previous one. The palette tab includes the RAL Classic codes with Italian and English names and **indicative** RGB values (an average of public sources, not the official RAL values, which RAL sells as a digital library); you can also import the official RAL CLASSIC `.ase` library or your own `.json`/`.csv` palette into the Colours folder of the library. A colour picked from a palette shows its code (for example **RAL 7016**) next to the swatch, saved with the project; changing the colour by hand turns it back into a plain RGB colour.
 
 ### 10. Product studio and lighting
@@ -212,7 +218,7 @@ At the top of the Render tab you choose how the image is drawn; hovering over ea
 - **Photorealistic:** physically based path tracing, as always.
 - **Cartoon (cel shading):** flat material colours in three sharp bands (light, half shadow, shadow) from the scene lights, with their hard shadows and a crisp highlight on shiny materials, only where a light is really reflected (the shape of a softbox for area lights) and as strong as the material reflects (faint on dark plastics, full on metals).
 - **Technical illustration (Gooch):** soft shading from warm in the light to cool in the shadow, with no black shadows, so shapes and volumes read clearly.
-- **Black and white:** the cartoon with the same bands in greys, the technical illustration like a pencil drawing; off, they stay in colour.
+- **Black and white:** the cartoon with the same bands in greys, the technical illustration like a pencil drawing; the whole image is grey, also what is seen through coloured glass and liquids or in mirrors. Off, they stay in colour.
 - **Solid background:** where the camera sees nothing, a colour (white, light grey, black or any) instead of the environment, which still lights the scene.
 - **Ink outlines:** dark lines on silhouettes, borders between objects, depth jumps and (optionally) sharp edges, traced with 3×3 rays per pixel and drawn over the final image, also after the denoiser. They work with any style; thickness, colour, edge angle and depth-jump sensitivity are adjustable. Rays that slip through the seam between two triangles no longer leave stray dots, a cleanup slider removes line pieces that are too short, and the floor edge against the background can be left without a line.
 
@@ -251,7 +257,13 @@ A STEP file is converted to meshes once. The result is kept in a conversion cach
   **true displacement**, ambient occlusion, opacity cutout; UV mapping or world-space box
   projection in metres for CAD models without UVs, with repeat size, rotation and offset.
 - **Library**: 125 built-in materials in 13 categories (an additional pack adds 109 textured ones), plus materials and HDRIs downloaded from ambientCG and
-  Poly Haven or imported from folders/ZIP files, kept in a local `Library` folder with previews.
+  Poly Haven or imported from folders/ZIP files, kept in a local `Library` folder with 512 px previews.
+- **Colour picker**: RGB, CMYK and palettes (RAL Classic with indicative values, or imported
+  `.ase`/`.json`/`.csv` palettes) for every material colour, with the palette code next to
+  the swatch.
+- **Spectral render, caustics and lasers**: RGB or spectral light transport with dispersion,
+  photon-mapped caustics with every light, red, green, blue, violet and white lab lasers with
+  visible beams, prisms and lenses.
 - **Lights and environment**: area, point, spot and directional lights, studio presets;
   uniform, gradient or HDRI environment (.hdr/.exr) with importance sampling. Point and spot
   lights have a **range** with edge falloff, independent of the intensity, drawn as a bubble in
@@ -259,10 +271,24 @@ A STEP file is converted to meshes once. The result is kept in a conversion cach
 - **Volumetric fog**: procedural dry-ice fog (seeded, deterministic) that falls from a point
   emitter, settles, spreads sideways and flows around objects; rendered as a real participating
   medium (delta tracking, Henyey–Greenstein phase, shadows through fog) on CPU and GPU.
+- **Ambient haze and dust**: five kinds of procedural haze (low fog, gas clouds, toxic floor
+  smoke, floating layers, vapour curls) from a start to a maximum height; dust specks in their
+  own box that sparkle only in the beams of spots and sun.
+- **Volumetric smoke**: procedural clouds, plumes, incense threads and smoke banks, or a physical
+  simulation (heat, buoyancy, swirls, wind, objects that deflect it) with a movable source, a
+  particle preview in the viewport, soft fractal edges and a box that moves, turns and scales
+  with its source.
+- **Render styles**: photorealistic, cartoon (cel shading) and technical illustration, in colour
+  or black and white, solid background, ink outlines on silhouettes and edges.
+- **Decals**: images and logos (PNG with transparency) projected on curved surfaces, moving
+  with the object.
 - **Cameras**: orbit viewport camera plus render cameras with a professional lens: focal length
   in mm, f-stop, depth of field (focus plane and near/far limits drawn in the viewport),
   aperture blades, lens shift. **Orthographic and isometric view** in the viewport (icons next
-  to the navigator, numpad 5) and in the render camera.
+  to the navigator, numpad 5) and in the render camera. Render cameras are components with a
+  target, moved and orbited with the gizmo. **Tilt-shift**: a sharp band (position, width,
+  angle) with a depth-aware blur on both sides, separate from the depth of field, shown at once
+  without re-rendering.
 - **Import**: glTF/GLB (recommended export from SolidWorks), OBJ (with .mtl), STL, Blender
   `.blend` (through an installed Blender); STEP via Open CASCADE and SolidWorks SLDPRT/SLDASM
   are experimental. The STEP converter (`forgerender-step.exe`) is built by `Build-ForgeRender.ps1`;

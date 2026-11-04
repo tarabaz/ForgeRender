@@ -729,8 +729,8 @@ fn draw_smokes(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
         } else {
             egui::Color32::from_rgb(200, 170, 140)
         };
-        let (lo, hi) = s.sanitized().bounds();
-        let corner = |i: usize| Vec3::new([lo.x, hi.x][i & 1], [lo.y, hi.y][(i >> 1) & 1], [lo.z, hi.z][(i >> 2) & 1]);
+        let corners = s.sanitized().corners();
+        let corner = |i: usize| corners[i];
         let width = if selected { 1.6 } else { 1.0 };
         let stroke = egui::Stroke::new(width, c.gamma_multiply(if selected { 1.0 } else { 0.7 }));
         for (a, b) in [
