@@ -2641,3 +2641,21 @@ Fatto su richiesta di Valerio ("implementa" tutto il backlog del 04/11, tranne i
 - **Polvere:** diagnosi del fascio "interrotto": sulla scena di prova il fascio arriva al pavimento con o senza polvere (CPU e GPU); il riquadro automatico dei granelli era centrato tra scena e camera e tagliato a 6 m, quindi i granelli potevano finire a mezz'aria. Ora c'è un riquadro vero con gizmo; quantità da 1/m³, dimensione fino a 18 mm (3×), ombre dei granelli opzionali.
 
 Verificato: test nuovi (`smoke_sim`, `tiltshift`, `no_isolated_dots_on_a_smooth_sphere`), render di confronto da riga di comando (contorni prima/dopo, bianco e nero CPU = GPU, tilt orizzontale e verticale, polvere con e senza riquadro e ombre, fumo simulato). Non provato nell'interfaccia (pannelli, gizmo della camera, selezione del rombo). Non fatto: annulla/ripeti di camera e riquadri, strumenti MCP per fumo e opzioni nuove, sfondo trasparente, fuoco, nuovi default della foschia.
+
+
+## Valerio → Claude Code — 04/11/2026: glifo mancante nel controllo colore (U8 / RGB)
+
+Screenshot di riferimento: carattere non renderizzato nella riga del selettore colore, immediatamente dopo l'etichetta **U8** e prima dei valori **R 203, G 208, B 204**. Al suo posto compare un quadratino/tofu (glifo mancante).
+
+### Richiesta
+- Identificare quale simbolo o icona dovrebbe comparire in quella posizione e perché il font/UI renderer lo mostra come quadratino.
+- Controllare il font effettivamente usato da quel widget, la disponibilità del glifo, eventuali fallback e la codifica/carattere sorgente.
+- Correggere il problema usando, se possibile, un'icona già disponibile nel set di icone del progetto oppure un glifo sicuramente supportato. Evitare di sostituirlo con un altro carattere Unicode non garantito.
+- Eseguire una ricerca più ampia nell'interfaccia per individuare altri simboli non supportati o caratteri visualizzati come quadratini, soprattutto nei controlli colore, inspector, toolbar, menu e pannelli.
+- Verificare anche che non siano stati introdotti simboli problematici in stringhe, tooltip o label.
+- Aggiungere o aggiornare un controllo automatico/test, se ragionevole, che intercetti caratteri o simboli non supportati nel codice dell'interfaccia. Non limitarsi a correggere il singolo punto se esiste una causa comune.
+
+### Criterio di accettazione
+Il simbolo accanto a U8 deve essere visualizzato correttamente e non devono rimanere glifi mancanti nelle aree dell'interfaccia controllate. Nel report indicare il simbolo previsto, la causa individuata, i file modificati, i controlli effettuati e i test realmente eseguiti.
+
+**Nota:** lo screenshot mostra il problema visivo, ma non permette da solo di identificare con certezza il carattere previsto o la causa tecnica. Non presumere quale icona sia senza verificare il codice.
