@@ -2514,10 +2514,11 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
 ### Feedback visivo (immagine allegata nella conversazione)
 I rendering in stile fumetto e illustrazione tecnica sono complessivamente nella direzione giusta. Restano però tre richieste UX/qualità:
 
-1. **Illustrazione tecnica esclusivamente in bianco e nero.**
-   - Lo stile tecnico attuale è Gooch, con transizione freddo/blu → caldo/giallo e tinta derivata dal materiale (crates/forge_render_cpu/src/style.rs, funzione gooch). Non è il risultato desiderato.
-   - Sostituire/affiancare il risultato tecnico con un vero stile monocromatico: solo bianco, nero e livelli di grigio, senza tinta cromatica proveniente dai materiali o dall'illuminazione.
-   - Esporre due varianti selezionabili per lo stile tecnico: **Bianco e nero** e **Scala di grigi** (la prima ad alto contrasto, la seconda con gradazioni più morbide). Entrambe devono rimanere rigorosamente prive di colore. Se la distinzione proposta non è tecnicamente/visivamente sensata, presentare prima una breve proposta alternativa.
+1. **Illustrazione tecnica: mantenere Gooch a colori e aggiungere il bianco e nero.**
+   - **Non rimuovere né modificare lo stile tecnico attuale**: deve restare disponibile con la sua caratteristica transizione freddo/blu → caldo/giallo (Gooch), come implementata in crates/forge_render_cpu/src/style.rs, funzione gooch.
+   - Aggiungere una nuova variante selezionabile **Tecnico bianco e nero**, rigorosamente monocromatica (nero, bianco e grigi), senza tinte blu/gialle e senza colori derivati dai materiali.
+   - La scelta deve quindi offrire almeno: **Tecnico colori freddi/caldi (attuale)** e **Tecnico bianco e nero (nuovo)**. Non introdurre una seconda variante monocromatica separata "scala di grigi" a meno che Claude non abbia una motivazione concreta e la proponga prima.
+   - Il comportamento predefinito deve rimanere quello attuale a colori, così i progetti esistenti non cambiano aspetto.
 
 2. **Opzione monocromatica anche per lo stile fumetto.**
    - Mantenere il fumetto a colori attuale e aggiungere una variante **Fumetto bianco e nero**, con le stesse fasce toon ma convertite in bianco/nero o grigi.
@@ -2547,6 +2548,10 @@ Nell'immagine allegata, oltre ai contorni corretti delle forme, compaiono numero
 5. Non ridurre semplicemente la sensibilità globale o aumentare la soglia finché spariscono i puntini: la correzione non deve compromettere i contorni validi.
 6. Implementare le opzioni di stile e sfondo mantenendo compatibilità con scene/progetti esistenti e valori predefiniti attuali. Aggiornare UI, serializzazione se necessaria, documentazione IT/EN e test.
 
-**Criterio di accettazione:** tecnico rigorosamente monocromatico con due varianti; fumetto a colori invariato più variante monocromatica; sfondo disattivabile e colore configurabile; contorni puliti senza puntini isolati nella scena di riferimento.
+**Criterio di accettazione:** stile tecnico attuale Gooch freddo/caldo mantenuto invariato + nuova variante tecnico bianco e nero; fumetto a colori invariato più variante monocromatica; sfondo disattivabile e colore configurabile; contorni puliti senza puntini isolati nella scena di riferimento.
 
 **Nota sullo stato:** questa è una richiesta e una diagnosi preliminare, non una modifica già implementata. ChatGPT non ha eseguito build, test o render. Screenshot di riferimento fornito da Valerio nella chat; non è stato caricato come asset binario nel repository.
+
+
+### Chiarimento di Valerio — 04/11/2026
+Conferma esplicita: nella modalità **Illustrazione tecnica** va mantenuto anche il rendering attuale a colori freddi/caldi (Gooch). La richiesta è soltanto di **aggiungere** l'opzione bianco e nero, non di sostituire la modalità esistente. Default e compatibilità devono restare sull'aspetto attuale. Le sole due scelte richieste per Tecnico sono quindi: "Colori freddi/caldi (attuale)" e "Bianco e nero (nuovo)".
