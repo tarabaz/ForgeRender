@@ -2730,3 +2730,8 @@ Quando il colore di una proprietà materiale è stato selezionato dalla palette 
 
 ### Criterio di accettazione
 Dopo aver scelto, per esempio, RAL 7016, nella riga della proprietà materiale si vede lo swatch con accanto **RAL 7016** (o almeno **RAL** se lo spazio è insufficiente). Scegliendo un colore non RAL o modificando il colore in modo da invalidare l'associazione, l'indicatore viene aggiornato correttamente. Salvare e riaprire il progetto non deve perdere o inventare l'associazione RAL, se questa viene persistita.
+
+
+### Chiarimento di Valerio — comportamento dopo la modifica manuale di un colore RAL
+
+Se l'utente modifica manualmente un colore precedentemente scelto dalla palette RAL (ad esempio intervenendo sui valori RGB o CMYK), il colore deve **tornare a essere un normale colore RGB**: rimuovere l'associazione al codice RAL e nascondere l'etichetta RAL accanto allo swatch. Non tentare di mantenere automaticamente il codice RAL anche se il nuovo colore è simile o uguale; l'utente ha modificato il colore e da quel momento è un colore personalizzato RGB. L'etichetta RAL ricompare soltanto se l'utente seleziona nuovamente un colore dalla palette RAL.
