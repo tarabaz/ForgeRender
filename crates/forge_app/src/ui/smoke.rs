@@ -7,7 +7,7 @@ use crate::i18n::{tf, tr};
 use crate::ui::icons;
 use eframe::egui;
 use forge_math::Vec3;
-use forge_scene::{SmokeCloud, SmokeShape, SMOKE_PRESETS};
+use forge_scene::{SmokeCloud, SmokeMode, SmokeShape, SMOKE_PRESETS};
 
 pub fn shape_name(s: SmokeShape) -> &'static str {
     match s {
@@ -123,6 +123,7 @@ pub fn sections(app: &mut ForgeApp, ui: &mut egui::Ui) {
         });
     }
     if let Some(i) = select {
+        app.selected_dust = false;
         app.selected_smoke = Some(i);
         app.selected_fog = None;
         app.selected_light = None;
@@ -136,6 +137,67 @@ pub fn sections(app: &mut ForgeApp, ui: &mut egui::Ui) {
     if changed {
         app.shading_changed();
     }
+}
+
+/// Parametri della simulazione fisica del fumo.
+fn sim_controls(ui: &mut egui::Ui, s: &mut SmokeCloud) -> bool {
+    let mut changed = false;
+    let m = &mut s.sim;
+    changed |= crate::ui::inspector::vec3_edit(ui, tr("Sorgente (m dal fondo)"), &mut m.source_offset, 0.005);
+    egui::Grid::new("fumo-sim").num_columns(2).show(ui, |ui| {
+        ui.label(tr("Raggio della sorgente"));
+        changed |= ui
+            .add(egui::Slider::new(&mut m.source_radius, 0.002..=2.0).logarithmic(true).suffix(" m").max_decimals(3))
+            .on_hover_text(tr("Grandezza della bocca da cui esce il fumo (sfera attorno al punto della sorgente)"))
+            .changed();
+        ui.end_row();
+        changed |= slider(ui, tr("Quantità di fumo"), tr("Quanto fumo esce al secondo"), &mut m.emission, 0.0..=30.0);
+        changed |= slider(
+            ui,
+            tr("Calore"),
+            tr("0 = fumo freddo (non sale), 1 = caldo tipico, 3 o più = molto caldo, sale veloce"),
+            &mut m.temperature,
+            0.0..=10.0,
+        );
+        changed |= slider(ui, tr("Spinta del caldo"), tr("Quanto il caldo spinge verso l'alto"), &mut m.buoyancy, 0.0..=30.0);
+        changed |= slider(
+            ui,
+            tr("Peso del fumo"),
+            tr("Alto = gas pesante che scende e si stende sul piano (come il ghiaccio secco)"),
+            &mut m.weight,
+            0.0..=20.0,
+        );
+        changed |= slider(
+            ui,
+            tr("Velocità di uscita"),
+            tr("Velocità con cui il fumo esce dalla sorgente (m/s): negativa = verso il basso"),
+            &mut m.exit_speed,
+            -3.0..=5.0,
+        );
+        changed |= slider(ui, tr("Raffreddamento"), tr("Quanto presto il fumo si raffredda e smette di salire"), &mut m.cooling, 0.0..=10.0);
+        changed |= slider(ui, tr("Dissolvenza"), tr("Quanto presto il fumo svanisce nell'aria"), &mut m.dissipation, 0.0..=5.0);
+        changed |= slider(ui, tr("Vortici"), tr("Riccioli che nascono nel moto (confinamento della vorticità)"), &mut m.vorticity, 0.0..=20.0);
+        changed |= slider(ui, tr("Turbolenza"), tr("Agitazione dell'aria: rompe la colonna in sbuffi"), &mut m.turbulence, 0.0..=20.0);
+        ui.label(tr("Grandezza della turbolenza"));
+        changed |= ui
+            .add(egui::Slider::new(&mut m.turbulence_scale, 0.005..=5.0).logarithmic(true).suffix(" m").max_decimals(3))
+            .changed();
+        ui.end_row();
+        ui.label(tr("Istante"));
+        changed |= ui
+            .add(egui::Slider::new(&mut m.time, 0.1..=20.0).logarithmic(true).suffix(" s").max_decimals(2))
+            .on_hover_text(tr("Secondi di simulazione: l'istante che si congela per il render"))
+            .changed();
+        ui.end_row();
+        ui.label(tr("Qualità della simulazione"));
+        changed |= ui
+            .add(egui::Slider::new(&mut m.quality, 1..=4))
+            .on_hover_text(tr("Celle della simulazione sul lato più lungo: 1 = 48, 2 = 72, 3 = 100, 4 = 136. Più alta = moto più fine, calcolo molto più lungo"))
+            .changed();
+        ui.end_row();
+    });
+    changed |= crate::ui::inspector::vec3_edit(ui, tr("Vento (m/s)"), &mut m.wind, 0.01);
+    changed
 }
 
 fn slider(ui: &mut egui::Ui, label: &str, hint: &str, v: &mut f32, range: std::ops::RangeInclusive<f32>) -> bool {
@@ -187,19 +249,43 @@ fn body(ui: &mut egui::Ui, s: &mut SmokeCloud, base: Vec3, has_selection: bool, 
     if before != (s.center, s.size) {
         changed = true;
     }
+    ui.horizontal(|ui| {
+        ui.label(tr("Come nasce"));
+        changed |= ui
+            .selectable_value(&mut s.mode, SmokeMode::Procedural, tr("Procedurale"))
+            .on_hover_text(tr("Forma scelta e rumore frattale: immediato, pieno controllo della forma"))
+            .changed();
+        changed |= ui
+            .selectable_value(&mut s.mode, SmokeMode::Simulated, tr("Simulato"))
+            .on_hover_text(tr(
+                "Simulazione fisica: il fumo esce da una sorgente, il caldo sale, il gas pesante scende, i vortici \
+                 nascono da soli e gli oggetti lo deviano. Si congela all'istante scelto (qualche secondo di calcolo)",
+            ))
+            .changed();
+    });
+    if s.mode == SmokeMode::Simulated {
+        changed |= sim_controls(ui, s);
+        ui.label(
+            egui::RichText::new(tr("Dettaglio fine sul bordo (sopra la simulazione):"))
+                .small()
+                .weak(),
+        );
+    }
     egui::Grid::new("fumo-grid").num_columns(2).show(ui, |ui| {
-        ui.label(tr("Forma"));
-        egui::ComboBox::from_id_salt("forma-fumo")
-            .selected_text(shape_name(s.shape))
-            .show_ui(ui, |ui| {
-                for k in SmokeShape::ALL {
-                    changed |= ui
-                        .selectable_value(&mut s.shape, k, shape_name(k))
-                        .on_hover_text(shape_hint(k))
-                        .changed();
-                }
-            });
-        ui.end_row();
+        if s.mode == SmokeMode::Procedural {
+            ui.label(tr("Forma"));
+            egui::ComboBox::from_id_salt("forma-fumo")
+                .selected_text(shape_name(s.shape))
+                .show_ui(ui, |ui| {
+                    for k in SmokeShape::ALL {
+                        changed |= ui
+                            .selectable_value(&mut s.shape, k, shape_name(k))
+                            .on_hover_text(shape_hint(k))
+                            .changed();
+                    }
+                });
+            ui.end_row();
+        }
         ui.label(tr("Densità"));
         ui.horizontal(|ui| {
             changed |= ui
@@ -295,7 +381,7 @@ fn body(ui: &mut egui::Ui, s: &mut SmokeCloud, base: Vec3, has_selection: bool, 
             &mut s.variation,
             0.0..=1.0,
         );
-        if matches!(s.shape, SmokeShape::Plume | SmokeShape::Wisp) {
+        if s.mode == SmokeMode::Procedural && matches!(s.shape, SmokeShape::Plume | SmokeShape::Wisp) {
             changed |= slider(
                 ui,
                 tr("Si allarga"),

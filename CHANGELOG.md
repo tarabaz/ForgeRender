@@ -13,6 +13,62 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.37.0 — 04/11/2026
+
+**Simulazione del fumo**
+- Il fumo volumetrico ha il modo **Simulato** (`SmokeCloud::mode`, `SmokeSim`): fluido euleriano su
+  griglia con temperatura e galleggiamento (`forge_volume::smoke_sim`: sorgente sferica con fumo,
+  calore e velocità di uscita; forza (β·T − α·ρ)·ŷ; confinamento della vorticità; turbolenza curl
+  noise; vento; trasporto semi-lagrangiano; pressione Gauss–Seidel rosso/nero; dissolvenza e
+  raffreddamento; oggetti come celle solide; riquadro aperto). Deterministico. Congelato all'istante
+  scelto; il campo (normalizzato sul 90° percentile, curva schiacciata) sostituisce la forma
+  procedurale e sul suo bordo si aggiungono sbuffi e filamenti procedurali. Cache a parte rispetto al
+  dettaglio. Qualità della simulazione 48–136 celle per lato. Preset: fumo caldo simulato, gas
+  pesante simulato. La sorgente si vede nella viewport.
+
+**Camera come componente**
+- Pannello di sinistra: elenco **Camere** sopra **Luci** (selezione, camera attiva, aggiunta dalla
+  vista). La camera di rendering selezionata mostra nella viewport una linea tratteggiata fino al
+  bersaglio (un rombo); si seleziona cliccando l'icona della camera o il rombo. Gizmo: Sposta =
+  camera e bersaglio insieme, Ruota = orbita attorno al bersaglio, il rombo = solo il bersaglio
+  (`gizmo::Target::Camera`, `ForgeApp::selected_camera`, `camera_target_handle`).
+  `RenderCamera::aim`: il bersaglio può seguire un oggetto (`follow_camera_aims`). Se la vista
+  guarda attraverso la camera, la segue.
+
+**Tilt-shift**
+- `forge_render_core::tiltshift`: fascia nitida sull'immagine finale (posizione, larghezza, angolo,
+  due transizioni indipendenti, sfocatura massima), sfocatura a disco che rispetta la profondità da
+  un buffer per pixel calcolato all'avvio del render, applicata in `Frame::display` (CPU e GPU, dopo
+  il denoiser e i contorni). Separata dalla profondità di campo fisica; con tutte e due accese si
+  sommano. Accenderlo riavvia il render (buffer di profondità); gli altri valori si applicano subito
+  (`Frame::with_tilt`), anche all'esportazione.
+
+**Stili e contorni**
+- **Bianco e nero** (`RenderSettings::style_mono`) per fumetto (fasce in grigi) e illustrazione
+  tecnica (rampa di grigi, senza i colori dei materiali), CPU e GPU.
+- **Sfondo a tinta unita** (`RenderSettings::background`): colore per i raggi della camera che non
+  colpiscono niente, l'ambiente continua a illuminare (CPU, GPU, spettrale, guide del denoiser).
+- Contorni: i puntini sparsi venivano da singoli raggi di controllo che passavano nella fessura tra
+  due triangoli dello stesso oggetto e ne colpivano il retro; un campione isolato in disaccordo con i
+  suoi quattro vicini concordi ora prende il loro valore (test `no_isolated_dots_on_a_smooth_sphere`).
+  Nuovi: sensibilità ai salti di profondità (di serie 3 % come prima), pulizia dei pezzi di linea più
+  corti di N pixel (di serie 2), niente linea sul bordo di pavimento e fondali contro lo sfondo.
+
+**Polvere**
+- Un suo riquadro (`Dust::region`, gizmo `Target::Dust`, riquadro tratteggiato nella viewport,
+  "Adatta alla scena"): il riquadro automatico di prima era centrato tra la scena e la camera e
+  tagliato a 6 m, così i granelli potevano finire a mezz'aria e il fascio sembrava interrotto. La
+  polvere nuova riceve un riquadro attorno agli oggetti fino alle spot.
+- Quantità da 1 per m³, dimensione fino a 18 mm; **Fanno ombra** (`Dust::shadows`): i granelli
+  fermano i raggi d'ombra su CPU e GPU.
+
+**Riga di comando**
+- `render`: `--mono`, `--background R,G,B`, `--outline-clean PX`, `--tilt C,L,T`, `--tilt-angle`,
+  `--tilt-blur`, `--dust-shadows`, `--dust-box`; i preset del fumo 6–7 sono simulati.
+
+Non ancora fatto: annulla/ripeti per camera e riquadri di fumo e polvere; strumenti MCP per il fumo
+e le opzioni nuove; sfondo trasparente.
+
 ## 0.36.0 — 04/11/2026
 
 **Fumo volumetrico**

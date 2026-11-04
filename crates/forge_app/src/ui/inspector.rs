@@ -1871,6 +1871,7 @@ pub(crate) fn set_hdri(app: &mut ForgeApp, path: std::path::PathBuf) {
 fn camera(app: &mut ForgeApp, ui: &mut egui::Ui) {
     render_cameras(app, ui);
     ui.separator();
+    selected_camera(app, ui);
     ui.horizontal(|ui| {
         if ui
             .selectable_label(app.aim_pick, tr("Punta su oggetto"))
@@ -1926,6 +1927,8 @@ fn camera(app: &mut ForgeApp, ui: &mut egui::Ui) {
         }
         app.render_camera_changed();
     }
+    ui.separator();
+    tilt_shift(app, ui);
     ui.separator();
     ui.horizontal_wrapped(|ui| {
         let views = [
@@ -2363,6 +2366,173 @@ fn denoiser(app: &mut ForgeApp, ui: &mut egui::Ui) -> bool {
 }
 
 /// Elenco delle camere di rendering salvate nel progetto.
+/// Tilt-shift: fascia nitida sull'immagine finale, separata dalla profondità di campo (non cambia
+/// diaframma, focale né messa a fuoco). Accenderlo riavvia il render (serve la profondità per
+/// pixel); gli altri valori si vedono subito sull'immagine.
+fn tilt_shift(app: &mut ForgeApp, ui: &mut egui::Ui) {
+    let t = &mut app.settings.tilt_shift;
+    let was_on = t.enabled;
+    ui.checkbox(&mut t.enabled, tr("Tilt-shift")).on_hover_text(tr(
+        "Effetto plastico: una fascia nitida e il resto sfocato, sull'immagine finale. È separato dalla \
+             profondità di campo: diaframma, focale e messa a fuoco non cambiano; se è accesa anche la \
+             profondità di campo, la fascia si aggiunge alla sfocatura della lente",
+    ));
+    let mut live = false;
+    if t.enabled {
+        egui::Grid::new("tilt-grid").num_columns(2).spacing([10.0, 6.0]).show(ui, |ui| {
+            ui.label(tr("Posizione"));
+            live |= ui
+                .add(egui::Slider::new(&mut t.center, -0.5..=1.5).max_decimals(2))
+                .on_hover_text(tr("Dove passa la fascia nitida: 0 = bordo in alto, 0,5 = centro, 1 = bordo in basso (o sinistra / destra se la fascia è verticale)"))
+                .changed();
+            ui.end_row();
+            ui.label(tr("Angolo"));
+            ui.horizontal(|ui| {
+                live |= ui
+                    .add(egui::Slider::new(&mut t.angle_deg, -90.0..=90.0).suffix("°").max_decimals(1))
+                    .on_hover_text(tr("0° = fascia orizzontale, 90° = verticale, in mezzo = inclinata"))
+                    .changed();
+                for (label, a) in [(tr("Orizzontale"), 0.0), (tr("Verticale"), 90.0)] {
+                    if ui.small_button(label).clicked() {
+                        t.angle_deg = a;
+                        live = true;
+                    }
+                }
+            });
+            ui.end_row();
+            ui.label(tr("Larghezza nitida"));
+            live |= ui
+                .add(egui::Slider::new(&mut t.width, 0.0..=1.0).max_decimals(3))
+                .on_hover_text(tr("Quanto è larga la fascia del tutto nitida (frazione dell'altezza dell'immagine): 0 = solo una linea"))
+                .changed();
+            ui.end_row();
+            ui.label(tr("Transizione sopra"));
+            live |= ui
+                .add(egui::Slider::new(&mut t.transition_a, 0.0..=1.0).max_decimals(3))
+                .on_hover_text(tr("Quanto spazio serve, sopra (o a sinistra) della fascia, per passare da nitido a sfocato del tutto: 0 = passaggio netto"))
+                .changed();
+            ui.end_row();
+            ui.label(tr("Transizione sotto"));
+            live |= ui
+                .add(egui::Slider::new(&mut t.transition_b, 0.0..=1.0).max_decimals(3))
+                .on_hover_text(tr("Lo stesso sotto (o a destra) della fascia: le due transizioni sono indipendenti dalla larghezza nitida"))
+                .changed();
+            ui.end_row();
+            ui.label("");
+            if ui.small_button(tr("Transizioni uguali")).on_hover_text(tr("Copia la transizione di sopra anche sotto")).clicked() {
+                t.transition_b = t.transition_a;
+                live = true;
+            }
+            ui.end_row();
+            ui.label(tr("Sfocatura"));
+            let mut pct = t.blur * 100.0;
+            if ui
+                .add(egui::Slider::new(&mut pct, 0.0..=5.0).suffix(" %").max_decimals(2))
+                .on_hover_text(tr("Sfocatura massima ai bordi: raggio in percentuale della larghezza dell'immagine"))
+                .changed()
+            {
+                t.blur = pct / 100.0;
+                live = true;
+            }
+            ui.end_row();
+            ui.label(tr("Rispetta la profondità"));
+            live |= ui
+                .checkbox(&mut t.depth_aware, "")
+                .on_hover_text(tr("Un oggetto vicino e nitido non sbava sullo sfondo sfocato (niente aloni ai bordi degli oggetti)"))
+                .changed();
+            ui.end_row();
+        });
+    }
+    if t.enabled != was_on {
+        // Serve (o non serve più) la profondità per pixel: il render riparte.
+        app.unsaved = true;
+    } else if live {
+        app.unsaved = true;
+    }
+}
+
+/// Camera di rendering selezionata come componente (dall'albero o dalla viewport): cosa sposta
+/// il gizmo, bersaglio libero o agganciato a un oggetto, posizione e bersaglio.
+fn selected_camera(app: &mut ForgeApp, ui: &mut egui::Ui) {
+    let Some(k) = app.selected_camera.filter(|&k| k < app.scene.render_cameras.len()) else {
+        return;
+    };
+    ui.strong(tf("Camera selezionata: {}", &[app.scene.render_cameras[k].name.to_string()]));
+    ui.horizontal(|ui| {
+        ui.label(tr("Il gizmo sposta"));
+        for (target, name, tip) in [
+            (
+                false,
+                tr("Camera"),
+                tr("Sposta: camera e bersaglio insieme (stessa direzione). Ruota: la camera gira attorno al bersaglio"),
+            ),
+            (
+                true,
+                tr("Bersaglio"),
+                tr("Sposta solo il punto inquadrato: la camera resta ferma e cambia direzione"),
+            ),
+        ] {
+            if ui
+                .selectable_label(app.camera_target_handle == target, name)
+                .on_hover_text(tip)
+                .clicked()
+            {
+                app.camera_target_handle = target;
+            }
+        }
+    });
+    ui.horizontal(|ui| {
+        let aimed = app.scene.render_cameras[k]
+            .aim
+            .as_ref()
+            .and_then(|id| app.scene.find(id))
+            .map(|i| app.scene.nodes[i].name.clone());
+        match aimed {
+            Some(name) => {
+                ui.label(egui::RichText::new(tf("bersaglio su «{name}»", std::slice::from_ref(&name))).color(style::ACCENT));
+                if ui
+                    .small_button(tr("Sgancia"))
+                    .on_hover_text(tr("Il bersaglio torna un punto libero"))
+                    .clicked()
+                {
+                    app.scene.render_cameras[k].aim = None;
+                    app.render_camera_changed();
+                }
+            }
+            None => {
+                if ui
+                    .add_enabled(
+                        !app.selection.is_empty(),
+                        egui::Button::new(tr("Bersaglio sull'oggetto selezionato")),
+                    )
+                    .on_hover_text(tr(
+                        "Il bersaglio segue il centro dell'oggetto: la camera lo tiene al centro anche se lo sposti",
+                    ))
+                    .on_disabled_hover_text(tr("Seleziona prima un oggetto"))
+                    .clicked()
+                {
+                    let before = app.scene.render_cameras[k].camera.clone();
+                    app.aim_camera_at_selection(k);
+                    app.render_camera_moved(k, &before);
+                }
+            }
+        }
+    });
+    let r = app.scene.bounds().radius().max(0.01) as f64;
+    let before = app.scene.render_cameras[k].camera.clone();
+    let mut cam = before.clone();
+    let mut changed = vec3_edit(ui, tr("Posizione"), &mut cam.position, r * 0.005);
+    changed |= vec3_edit(ui, tr("Bersaglio"), &mut cam.target, r * 0.005);
+    if changed {
+        if cam.target != before.target {
+            app.scene.render_cameras[k].aim = None;
+        }
+        app.scene.render_cameras[k].camera = cam;
+        app.render_camera_moved(k, &before);
+    }
+    ui.separator();
+}
+
 fn render_cameras(app: &mut ForgeApp, ui: &mut egui::Ui) {
     ui.strong(tr("Camere di rendering"));
     ui.label(
@@ -2428,6 +2598,7 @@ fn render_cameras(app: &mut ForgeApp, ui: &mut egui::Ui) {
         }
         Some((i, "elimina")) => {
             app.scene.render_cameras.remove(i);
+            app.selected_camera = None;
             let new_active = match app.scene.active_camera {
                 Some(a) if a == i => None,
                 Some(a) if a > i => Some(a - 1),

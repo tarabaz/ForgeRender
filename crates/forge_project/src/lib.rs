@@ -603,6 +603,7 @@ mod tests {
         });
         scene.camera.vfov_deg = 27.0;
         scene.render_cameras.push(forge_scene::RenderCamera {
+            aim: None,
             name: "Frontale".into(),
             camera: forge_scene::Camera {
                 position: Vec3::new(0.0, 0.5, 2.0),

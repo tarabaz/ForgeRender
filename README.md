@@ -18,15 +18,17 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
-### What's new in 0.36.0
+### What's new in 0.37.0
 
-- **Volumetric smoke:** real smoke clouds with curls, cauliflower puffs and frayed edges, in a box you move and resize with the gizmo; six presets (suspended cloud, incense, steam from a cup, plume from a pipe, dense industrial smoke, smoke bank), physical light scattering and shadows, no smoke inside objects.
-- **Haze start height:** the haze can begin above the floor, so with the maximum height it forms a suspended band (for example 2.2–2.8 m under the ceiling); the floor smoke rises with it.
-- **Wider sliders:** larger ranges for density, clumping, swirl size and strength, fractal detail and heights, in the haze and in the new smoke.
+- **Smoke simulation:** volumetric smoke can now be *simulated* (hot smoke that rises, heavy gas that sinks and spreads, swirls, turbulence, wind, objects that deflect it), frozen at the chosen instant, with the procedural detail on top.
+- **Camera as a component:** render cameras listed above the lights, with a target point or object, moved, orbited and re-aimed with the gizmo in the viewport; **tilt-shift** with a sharp band, angle and independent transitions, separate from the depth of field.
+- **Styles and outlines:** black and white cartoon and technical illustration, solid background colour, ink outlines without stray dots, with depth sensitivity, cleanup and no line on the floor edge.
+- **Dust:** its own box moved with the gizmo (so the specks fill the whole beam down to the table), specks up to 18 mm, much lower amounts, and specks that cast shadows.
 
 <details>
 <summary><strong>Previous versions — complete release history</strong></summary>
 
+- **0.36.0 — Volumetric smoke, haze start height:** procedural smoke clouds in a box moved with the gizmo, six presets; haze from a start height to a maximum height; wider sliders.
 - **0.35.0 — Render styles, haze that does not veil everything:** cartoon and technical illustration with ink outlines; haze in "light rays only" mode with clumping, maximum height and puffs; dust lit only in the beams and kept by the denoiser.
 - **0.34.0 — Haze in five kinds, dust as its own effect:** low fog, gas clouds, toxic floor smoke, floating layers and vapour curls with fractal and quality controls; dust visible only in direct light; icons instead of missing symbols.
 - **0.33.0 — Ambient haze, floating dust, decals:** haze with banks and curls lit with multiple scattering; dust specks; decals on curved surfaces; STEP conversion saved with projects and packages; fog computation can be cancelled and restarts on changes.
@@ -149,11 +151,13 @@ Real volumetric smoke clouds for product shots: incense smoke next to a perfume 
 - **Physical:** the smoke scatters and absorbs light with multiple scattering, casts volumetric shadows and receives them, on CPU and GPU (the same delta tracking as the dry-ice fog). It never fills the solid inside of the objects that cross the box. The same parameters and seed always give the same cloud.
 - **Computed ahead of time** with the other effects, one at a time on the progress bar, and saved with the project.
 
-This first version is procedural (no fluid simulation yet): the physical smoke simulation with temperature and buoyancy is the next step, see the [smoke and fire study](docs/studio-fumo-fuoco.md).
+- **Simulated mode:** instead of a chosen shape, the smoke can come from a physical simulation inside the box (a Eulerian fluid with temperature and buoyancy, as in Fedkiw, Stam and Jensen 2001): a source emits smoke and heat, hot smoke rises, heavy gas sinks and spreads, vorticity confinement keeps the curls, curl-noise turbulence breaks the column into puffs, wind pushes it and the objects in the box deflect it. The simulation is frozen at the chosen instant and the procedural detail (puffs, filaments) is added on its edge. Controls: source position and radius, amount, heat, buoyancy, weight, exit speed, cooling, fading, swirls, turbulence and its size, wind, instant and simulation quality (48 to 136 cells per side). Presets: simulated hot smoke and simulated heavy gas.
+
+Fire (combustion, emission, flames lighting the scene) is a separate, later step: see the [smoke and fire study](docs/studio-fumo-fuoco.md).
 
 ### 7. Floating dust — specks that shine only in a beam
 
-Real specks (a few millimetres, up to 150,000) scattered in the air, as their own effect. They are invisible except inside the beams of spots and sun: there they sparkle, like the dust in the rays coming through an attic window, while bulbs, panels, environment and bounce light do not light them. They are marked in the denoiser guides, so the denoiser keeps them instead of removing them as noise. Amount, size, brightness and colour are adjustable.
+Real specks (a few millimetres, up to 150,000) scattered in the air, as their own effect. They are invisible except inside the beams of spots and sun: there they sparkle, like the dust in the rays coming through an attic window, while bulbs, panels, environment and bounce light do not light them. They are marked in the denoiser guides, so the denoiser keeps them instead of removing them as noise. The specks live in a box that you select in the viewport and move or resize with the gizmo; by default it covers the objects up to the spots, so the specks fill the whole beam down to the lit surface. Amount (down to a few isolated specks), size (up to 18 mm), brightness and colour are adjustable, and the specks can cast shadows: small dark shapes in the beams and on the lit surface.
 
 ### 8. Decals — labels and logos on any surface
 
@@ -187,6 +191,9 @@ For fog that fills the whole scene see [Ambient haze](#5-ambient-haze--five-kind
 
 Render cameras provide focal length, aperture, depth of field and lens shift. Automatic front, rear, side, top and three-quarter views help present a product from multiple angles; turntable videos can be exported as MP4.
 
+- **Cameras as components:** the render cameras are listed in the left panel, just above the lights. Selecting one shows a line to its target (a diamond) in the viewport: the gizmo moves the camera and its target together, orbits the camera around the target (Rotate), or, after clicking the diamond, moves only the target. The target can follow an object, like a spot light, so the object stays centred even when you move it.
+- **Tilt-shift:** a sharp band on the final image (position, width and angle, horizontal, vertical or tilted) with the blur growing on both sides, each side with its own transition, from a hard edge to a very wide fade. It is separate from the depth of field: aperture, focal length and focus do not change, and with both on the band adds to the lens blur. The blur is depth-aware (a near sharp object does not bleed into the blurred background), it works the same on CPU and GPU, and moving the band shows immediately without re-rendering.
+
 ### 13. Render passes and post-production
 
 ForgeRender can export separate **Albedo, Normals, Depth, Product Mask and Component ID** passes for compositing, masking and further image editing. These are technical output buffers, not additional beauty renders.
@@ -198,7 +205,9 @@ At the top of the Render tab you choose how the image is drawn; hovering over ea
 - **Photorealistic:** physically based path tracing, as always.
 - **Cartoon (cel shading):** flat material colours in three sharp bands (light, half shadow, shadow) from the scene lights, with their hard shadows and a crisp highlight on shiny materials.
 - **Technical illustration (Gooch):** soft shading from warm in the light to cool in the shadow, with no black shadows, so shapes and volumes read clearly.
-- **Ink outlines:** dark lines on silhouettes, borders between objects, depth jumps and (optionally) sharp edges, traced with 3×3 rays per pixel and drawn over the final image, also after the denoiser. They work with any style; thickness, colour and edge angle are adjustable.
+- **Black and white:** the cartoon with the same bands in greys, the technical illustration like a pencil drawing; off, they stay in colour.
+- **Solid background:** where the camera sees nothing, a colour (white, light grey, black or any) instead of the environment, which still lights the scene.
+- **Ink outlines:** dark lines on silhouettes, borders between objects, depth jumps and (optionally) sharp edges, traced with 3×3 rays per pixel and drawn over the final image, also after the denoiser. They work with any style; thickness, colour, edge angle and depth-jump sensitivity are adjustable. Rays that slip through the seam between two triangles no longer leave stray dots, a cleanup slider removes line pieces that are too short, and the floor edge against the background can be left without a line.
 
 The styles are applied at the first surface seen by the camera, so glass and mirrors still reflect and refract; they work on CPU and GPU, also in the Spectral render.
 

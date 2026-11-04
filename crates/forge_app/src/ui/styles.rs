@@ -83,6 +83,38 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) -> bool {
             }
         }
     });
+    if app.settings.style != RenderStyle::Photoreal {
+        changed |= ui
+            .checkbox(&mut app.settings.style_mono, tr("Bianco e nero"))
+            .on_hover_text(tr(
+                "Lo stesso stile in grigi, senza i colori dei materiali: fumetto con le stesse fasce in bianco e nero, \
+                 illustrazione tecnica come un disegno a matita (spento = a colori, come prima)",
+            ))
+            .changed();
+    }
+    ui.horizontal(|ui| {
+        let mut own = app.settings.background.is_some();
+        if ui
+            .checkbox(&mut own, tr("Sfondo a tinta unita"))
+            .on_hover_text(tr(
+                "Dove la camera non vede niente (lo sfondo, non il pavimento) mette questo colore al posto \
+                 dell'ambiente; la scena resta illuminata dall'ambiente come prima",
+            ))
+            .changed()
+        {
+            app.settings.background = own.then_some([1.0; 3]);
+            changed = true;
+        }
+        if let Some(c) = &mut app.settings.background {
+            changed |= ui.color_edit_button_rgb(c).changed();
+            for (label, v) in [(tr("Bianco"), 1.0), (tr("Grigio chiaro"), 0.8), (tr("Nero"), 0.0)] {
+                if ui.small_button(label).clicked() {
+                    *c = [v; 3];
+                    changed = true;
+                }
+            }
+        }
+    });
     let o = &mut app.settings.outlines;
     changed |= ui
         .checkbox(&mut o.enabled, tr("Contorni a inchiostro"))
@@ -121,6 +153,41 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) -> bool {
                     .on_hover_text(tr("Più basso = più linee (anche su angoli poco marcati)"))
                     .changed();
             }
+            let mut pct = o.depth_threshold * 100.0;
+            if ui
+                .add(
+                    egui::Slider::new(&mut pct, 0.5..=20.0)
+                        .logarithmic(true)
+                        .suffix(" %")
+                        .text(tr("Salto di profondità")),
+                )
+                .on_hover_text(tr(
+                    "Sensibilità ai salti di profondità dentro lo stesso oggetto: più basso = linee anche dove una \
+                     parte passa poco davanti a un'altra; più alto = solo i distacchi netti (3 % = come prima)",
+                ))
+                .changed()
+            {
+                o.depth_threshold = pct / 100.0;
+                changed = true;
+            }
+            changed |= ui
+                .add(
+                    egui::Slider::new(&mut o.min_length_px, 0.0..=30.0)
+                        .suffix(" px")
+                        .text(tr("Pulizia")),
+                )
+                .on_hover_text(tr(
+                    "Toglie i pezzi di linea più corti di così (puntini e trattini isolati); le sagome e gli spigoli \
+                     veri sono lunghi e restano. 0 = nessuna pulizia",
+                ))
+                .changed();
+            changed |= ui
+                .checkbox(&mut o.skip_backdrop, tr("Niente linea sul bordo del pavimento"))
+                .on_hover_text(tr(
+                    "Pavimento, fondali e pareti non hanno la linea dove finiscono contro lo sfondo; le sagome \
+                     degli oggetti appoggiati restano",
+                ))
+                .changed();
         });
     }
     changed

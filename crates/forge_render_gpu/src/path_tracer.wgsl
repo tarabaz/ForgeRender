@@ -111,6 +111,10 @@ const P_N_LASERS: u32 = 81u;
 const P_HAS_DUST: u32 = 82u;
 const P_STYLE: u32 = 83u;
 const P_DUST_GAIN: u32 = 84u;
+const P_BACKGROUND: u32 = 85u;
+fn style_id() -> u32 { return pu(P_STYLE) & 15u; }
+fn style_mono() -> bool { return (pu(P_STYLE) & 16u) != 0u; }
+fn has_background() -> bool { return (pu(P_STYLE) & 32u) != 0u; }
 const ADAPTIVE_TILE: u32 = 16u;
 const PORTAL_WORDS: u32 = 16u;
 
@@ -607,6 +611,8 @@ fn apply_textures(m: ptr<function, Mat>, prim: u32, bu: f32, bv: f32, p: vec3<f3
 
 // Vero mentre si cercano solo i granelli di polvere (`dust_glints`).
 var<private> dust_only: bool = false;
+// Vero durante un raggio d'ombra: i granelli fermano la luce se fanno ombra (bit 2 di P_HAS_DUST).
+var<private> shadow_ray: bool = false;
 
 // Ritaglio: vero se il punto del triangolo è opaco (come forge_render_cpu::textures::opaque_at).
 // La polvere non lo è mai (i raggi la attraversano); cercando la polvere lo è solo lei.
@@ -615,7 +621,7 @@ fn opaque_at(prim: u32, t: f32, bu: f32, bv: f32, o: vec3<f32>, d: vec3<f32>) ->
     let mb = pu(P_OFF_MATS) + S[pb + 3u] * MAT_WORDS;
     let is_dust = (S[mb + 27u] & 4u) != 0u;
     if (dust_only) { return is_dust; }
-    if (is_dust) { return false; }
+    if (is_dust) { return shadow_ray && (pu(P_HAS_DUST) & 4u) != 0u; }
     let top = bitcast<i32>(S[mb + 26u]);
     if (top < 0) { return true; }
     let m = load_mat(S[pb + 3u]);
@@ -1356,7 +1362,10 @@ fn light_visibility(so: vec3<f32>, ls: LSample) -> f32 {
     if (!ls.shadows) { return 1.0; }
     var tmax = INF;
     if (ls.dist < INF) { tmax = ls.dist * (1.0 - 1e-4); }
-    if (trace(so, ls.wi, 0.0, tmax, true).found) { return 0.0; }
+    shadow_ray = true;
+    let blocked = trace(so, ls.wi, 0.0, tmax, true).found;
+    shadow_ray = false;
+    if (blocked) { return 0.0; }
     if (pu(P_N_FOGS) == 0u) { return 1.0; }
     return fog_transmittance(so, ls.wi, tmax);
 }
@@ -1425,8 +1434,22 @@ fn style_gooch(m: Mat, n: vec3<f32>, wo: vec3<f32>) -> vec3<f32> {
     return c;
 }
 
+// Illustrazione tecnica in bianco e nero (come forge_render_cpu::style::gooch_mono).
+fn style_gooch_mono(m: Mat, n: vec3<f32>, wo: vec3<f32>) -> vec3<f32> {
+    let l = style_key_light();
+    let k = 0.5 * (1.0 + dot(n, l));
+    let h = normalize(l + wo);
+    let g = 0.18 + 0.74 * k + 0.3 * max(1.0 - m.roughness, 0.0) * pow(max(dot(n, h), 0.0), 60.0);
+    return vec3<f32>(g);
+}
+
 fn style_shade(m: Mat, n: vec3<f32>, wo: vec3<f32>, p: vec3<f32>) -> vec3<f32> {
-    if (pu(P_STYLE) == 1u) { return style_toon(m, n, wo, p); }
+    if (style_id() == 1u) {
+        let c = style_toon(m, n, wo, p);
+        if (style_mono()) { return vec3<f32>(luminance(c)); }
+        return c;
+    }
+    if (style_mono()) { return style_gooch_mono(m, n, wo); }
     return style_gooch(m, n, wo);
 }
 
@@ -1843,7 +1866,8 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
         if (!hit.found) {
             var c = vec3<f32>(0.0);
             if (depth == 0u) {
-                if ((pu(P_FLAGS) & 1u) != 0u) { c = beta * env_radiance(d, true); }
+                if (has_background()) { c = beta * pv3(P_BACKGROUND); }
+                else if ((pu(P_FLAGS) & 1u) != 0u) { c = beta * env_radiance(d, true); }
             } else if (has_env) {
                 var w = 1.0;
                 if (!specular) { w = power_heuristic(prev_pdf, env_light_pdf(o, d) * sel_pdf); }
@@ -1894,7 +1918,7 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
         bs.entering = entering;
 
         // Stili non fotorealistici: alla prima superficie non speculare vista dalla camera.
-        if (camera_path && pu(P_STYLE) != 0u && has_non_delta(bs)) {
+        if (camera_path && style_id() != 0u && has_non_delta(bs)) {
             l = l + beta * style_shade(m, ns, wo, p);
             break;
         }

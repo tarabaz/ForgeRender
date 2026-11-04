@@ -22,6 +22,7 @@ mod settings;
 pub mod smoke;
 pub mod spectral;
 pub mod texture;
+pub mod tiltshift;
 mod tonemap;
 
 pub use accum::{Accumulator, BFraction};

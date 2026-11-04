@@ -13,6 +13,12 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
         .min_size(80.0)
         .max_size((avail * 0.8).max(90.0))
         .show(ui, |ui| lights(app, ui));
+    egui::Panel::bottom("tree-cameras")
+        .resizable(true)
+        .default_size(96.0)
+        .min_size(54.0)
+        .max_size((avail * 0.4).max(60.0))
+        .show(ui, |ui| cameras(app, ui));
     egui::CentralPanel::default().show(ui, |ui| scene_tree(app, ui));
 }
 
@@ -205,6 +211,71 @@ fn scene_tree(app: &mut ForgeApp, ui: &mut egui::Ui) {
     if let Some(i) = frame_node {
         app.selection = BTreeSet::from([i]);
         app.frame_selection();
+    }
+}
+
+/// Camere di rendering come componenti: selezionandone una il gizmo la sposta e la fa orbitare
+/// attorno al bersaglio; il pallino dice quale usa il render.
+fn cameras(app: &mut ForgeApp, ui: &mut egui::Ui) {
+    ui.add_space(4.0);
+    ui.horizontal(|ui| {
+        ui.strong(tr("Camere"));
+        if ui
+            .small_button("+")
+            .on_hover_text(tr("Aggiungi una camera di rendering dalla vista attuale"))
+            .clicked()
+        {
+            app.add_render_camera(None);
+            app.selected_camera = Some(app.scene.render_cameras.len() - 1);
+            app.tab = InspectorTab::Camera;
+        }
+    });
+    let mut click = None;
+    let mut activate = None;
+    egui::ScrollArea::vertical()
+        .id_salt("tree-cameras-list")
+        .auto_shrink([false, false])
+        .show(ui, |ui| {
+            if app.scene.render_cameras.is_empty() {
+                ui.label(egui::RichText::new(tr("Nessuna: il render usa la vista")).weak().small());
+            }
+            for (i, c) in app.scene.render_cameras.iter().enumerate() {
+                ui.horizontal(|ui| {
+                    if ui
+                        .radio(app.scene.active_camera == Some(i), "")
+                        .on_hover_text(tr("Usa questa camera per il render"))
+                        .clicked()
+                    {
+                        activate = Some(i);
+                    }
+                    let label = if c.aim.is_some() {
+                        format!("{} ⊙", c.name)
+                    } else {
+                        c.name.clone()
+                    };
+                    if ui
+                        .selectable_label(app.selected_camera == Some(i), label)
+                        .on_hover_text(tr("Seleziona: il gizmo sposta la camera, la fa girare attorno al bersaglio \
+                             (Ruota) o sposta il bersaglio (clic sul rombo nella viewport)"))
+                        .clicked()
+                    {
+                        click = Some(i);
+                    }
+                });
+            }
+        });
+    if let Some(i) = activate {
+        app.set_active_camera(Some(i));
+    }
+    if let Some(i) = click {
+        app.selection.clear();
+        app.selected_light = None;
+        app.selected_fog = None;
+        app.selected_smoke = None;
+        app.selected_dust = false;
+        app.selected_camera = Some(i);
+        app.camera_target_handle = false;
+        app.tab = InspectorTab::Camera;
     }
 }
 

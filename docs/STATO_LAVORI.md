@@ -716,3 +716,12 @@ Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
   galleggiamento, sorgenti), undo/redo del riquadro, strumento MCP per il fumo; camera come componente
   e tilt-shift; varianti bianco e nero degli stili, sfondo e puntini nei contorni; polvere più rada e
   più grande con il suo box; nuovi valori di partenza della foschia (raccolta aperta).
+
+### 0.37.0 (04/11/2026): simulazione del fumo, camera come componente, tilt-shift, stili b/n, polvere con riquadro
+- `forge_volume::smoke_sim` (fluido con temperatura e galleggiamento) usato dal modo Simulato del fumo
+  (`forge_render_core::smoke::simulated_field`, cache a parte).
+- Camere nell'albero sopra Luci, gizmo `Target::Camera` (sposta, orbita, bersaglio), `RenderCamera::aim`.
+- `forge_render_core::tiltshift` (post-produzione con profondità, `Frame::with_tilt`).
+- `style_mono`, `background`, contorni: riparazione dei campioni isolati, pulizia, sensibilità, bordo del pavimento.
+- Polvere: `Dust::region` con gizmo, `Dust::shadows`, dimensione fino a 18 mm.
+- Da fare: annulla/ripeti dei riquadri e della camera, strumenti MCP, sfondo trasparente, fuoco.

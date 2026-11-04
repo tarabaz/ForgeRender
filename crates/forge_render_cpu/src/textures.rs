@@ -227,12 +227,15 @@ pub fn dust_hits(scene: &RenderScene, o: Vec3, d: Vec3, t_max: f32) -> ([(f32, u
     (out, n)
 }
 
-/// Raggio d'ombra: le parti ritagliate lasciano passare la luce.
+/// Raggio d'ombra: le parti ritagliate lasciano passare la luce; i granelli di polvere la
+/// fermano solo se fanno ombra.
 #[inline]
 pub fn occluded(scene: &RenderScene, o: Vec3, d: Vec3, t_min: f32, t_max: f32) -> bool {
     let accel = &scene.geometry.accel;
     if scene.has_cutout {
-        accel.occluded_filtered(o, d, t_min, t_max, |prim, t, u, v| opaque_at(scene, prim, t, u, v, o, d))
+        accel.occluded_filtered(o, d, t_min, t_max, |prim, t, u, v| {
+            (scene.dust_shadows && scene.materials[scene.material_index(prim as usize)].dust) || opaque_at(scene, prim, t, u, v, o, d)
+        })
     } else {
         accel.occluded(o, d, t_min, t_max)
     }

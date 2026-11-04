@@ -598,6 +598,10 @@ pub struct RenderScene {
     pub has_dust: bool,
     /// Brillantezza dei granelli di polvere (`Dust::brightness`).
     pub dust_gain: f32,
+    /// I granelli di polvere fermano i raggi d'ombra (fanno ombra).
+    pub dust_shadows: bool,
+    /// Nodi di pavimenti, fondali e pareti (per i contorni che li possono saltare).
+    pub backdrop_nodes: Vec<u32>,
     /// Riferimento della proiezione Box di ogni nodo (indice = nodo), secondo l'ancoraggio del
     /// suo materiale: lo legge lo shading di CPU e GPU.
     pub node_frames: Vec<crate::displace::BoxFrame>,
@@ -605,6 +609,27 @@ pub struct RenderScene {
     pub fogs: Vec<Arc<forge_volume::BakedFog>>,
     /// Laser con il percorso del fascio già calcolato (vedi [`crate::laser`]).
     pub lasers: Arc<Vec<crate::laser::RenderLaser>>,
+}
+
+/// Nodi di pavimenti, fondali e pareti: gli oggetti aggiunti di quel tipo e il pavimento della
+/// scena di prova.
+fn backdrop_nodes(scene: &Scene) -> Vec<u32> {
+    use forge_scene::AddedKind;
+    let mut out = Vec::new();
+    for r in &scene.added {
+        if matches!(
+            r.kind,
+            AddedKind::Floor { .. } | AddedKind::Backdrop { .. } | AddedKind::StudioSweep { .. } | AddedKind::Wall { .. }
+        ) {
+            if let Some(i) = scene.find(&r.id) {
+                out.push(i as u32);
+            }
+        }
+    }
+    if let Some(i) = scene.find(&forge_scene::ComponentId("pavimento".into())) {
+        out.push(i as u32);
+    }
+    out
 }
 
 impl RenderScene {
@@ -744,6 +769,8 @@ impl RenderScene {
             has_cutout,
             has_dust,
             dust_gain: scene.haze_dust.brightness.max(0.0),
+            dust_shadows: has_dust && scene.haze_dust.shadows,
+            backdrop_nodes: backdrop_nodes(scene),
             node_frames: box_frames(scene),
             fogs,
             id,
@@ -786,6 +813,8 @@ impl RenderScene {
             has_cutout: self.has_cutout,
             has_dust: self.has_dust,
             dust_gain: self.dust_gain,
+            dust_shadows: self.dust_shadows,
+            backdrop_nodes: self.backdrop_nodes.clone(),
             node_frames: self.node_frames.clone(),
             fogs: self.fogs.clone(),
             lasers: self.lasers.clone(),

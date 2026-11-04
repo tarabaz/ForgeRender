@@ -1020,6 +1020,7 @@ fn renders_dir(app: &ForgeApp) -> PathBuf {
 
 fn save_frame(app: &ForgeApp, path: &Path) -> Result<u32, String> {
     let frame = app.session.latest_frame().ok_or("nessuna immagine: avvia prima un render")?;
+    let frame = frame.with_tilt(app.settings.tilt_shift);
     if let Some(d) = path.parent() {
         std::fs::create_dir_all(d).map_err(|e| format!("cartella {} non creata: {e}", d.display()))?;
     }

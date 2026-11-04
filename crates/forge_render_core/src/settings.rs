@@ -167,6 +167,16 @@ pub struct RenderSettings {
     /// Contorni a inchiostro sull'immagine finale (con qualsiasi stile).
     #[serde(default)]
     pub outlines: OutlineSettings,
+    /// Fumetto e illustrazione tecnica in bianco e nero (grigi, senza i colori dei materiali).
+    #[serde(default)]
+    pub style_mono: bool,
+    /// Colore dello sfondo visto dalla camera (dove non c'è niente), al posto dell'ambiente; la
+    /// scena resta illuminata dall'ambiente. `None` = l'ambiente come sempre.
+    #[serde(default)]
+    pub background: Option<[f32; 3]>,
+    /// Tilt-shift sull'immagine finale (fascia nitida), separato dalla profondità di campo.
+    #[serde(default)]
+    pub tilt_shift: crate::tiltshift::TiltShift,
 }
 
 /// Stile del render. Fumetto e illustrazione tecnica si calcolano alla prima superficie vista
@@ -208,6 +218,13 @@ pub struct OutlineSettings {
     pub creases: bool,
     /// Angolo oltre il quale due facce vicine fanno uno spigolo (gradi).
     pub crease_deg: f32,
+    /// Sensibilità ai salti di profondità: differenza relativa oltre la quale due punti vicini
+    /// dello stesso oggetto sono separati da una linea (0,03 = 3 %). Più bassa = più linee.
+    pub depth_threshold: f32,
+    /// Pulizia: i pezzi di linea più corti di così (pixel) si tolgono (puntini isolati).
+    pub min_length_px: f32,
+    /// Niente linea sul bordo di pavimento e fondale contro lo sfondo.
+    pub skip_backdrop: bool,
 }
 
 impl OutlineSettings {
@@ -223,6 +240,9 @@ impl OutlineSettings {
             self.color.map(f32::to_bits),
             self.creases,
             self.crease_deg.to_bits(),
+            self.depth_threshold.to_bits(),
+            self.min_length_px.to_bits(),
+            self.skip_backdrop,
         )
             .hash(&mut h);
         h.finish().max(1)
@@ -237,6 +257,9 @@ impl Default for OutlineSettings {
             color: [0.015; 3],
             creases: true,
             crease_deg: 35.0,
+            depth_threshold: 0.03,
+            min_length_px: 2.0,
+            skip_backdrop: false,
         }
     }
 }
@@ -267,6 +290,9 @@ impl Default for RenderSettings {
             caustics: CausticSettings::default(),
             style: RenderStyle::Photoreal,
             outlines: OutlineSettings::default(),
+            style_mono: false,
+            background: None,
+            tilt_shift: Default::default(),
         }
     }
 }
@@ -327,13 +353,29 @@ impl RenderSettings {
             self.environment_visible,
             self.color_mode,
             self.caustics.key(),
-            (self.style, self.outlines.key()),
+            (self.style, self.style_key()),
         )
+    }
+
+    /// Impronta di contorni, bianco e nero e sfondo (parte della chiave dell'accumulo).
+    pub fn style_key(&self) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        (
+            self.outlines.key(),
+            self.style_mono,
+            self.background.map(|c| c.map(f32::to_bits)),
+            // Accendere il tilt-shift calcola la profondità; gli altri suoi valori si applicano
+            // all'immagine senza rifare il render.
+            self.tilt_shift.enabled,
+        )
+            .hash(&mut h);
+        h.finish()
     }
 }
 
 /// Impostazioni che invalidano l'accumulo: risoluzione, rimbalzi, roulette russa, clamp,
-/// seme, ambiente visibile, colore, caustiche, stile e contorni (vedi
+/// seme, ambiente visibile, colore, caustiche, stile, contorni, bianco e nero e sfondo (vedi
 /// [`RenderSettings::accumulation_key`]).
 pub type AccumulationKey = (u32, u32, u32, u32, u32, u64, bool, ColorMode, u64, (RenderStyle, u64));
 

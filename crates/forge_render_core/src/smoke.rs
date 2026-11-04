@@ -15,8 +15,9 @@
 use crate::fog::{interior_cells, voxelize};
 use crate::RenderGeometry;
 use forge_math::Vec3;
-use forge_scene::{Scene, SmokeCloud, SmokeShape};
+use forge_scene::{Scene, SmokeCloud, SmokeMode, SmokeShape};
 use forge_volume::noise::{fbm, fbm_gain, gradient};
+use forge_volume::smoke_sim::{simulate_smoke, SmokeField, SmokeSimParams};
 use forge_volume::{progress, BakedFog, GridSpec};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -63,8 +64,15 @@ fn column(s: &SmokeCloud, u: Vec3, t: f32, thin: bool) -> (f32, f32) {
     ((1.0 - d).min(t * 10.0).min((1.0 - t) * 6.0), width)
 }
 
-/// Densità del fumo nel punto `p` (1/m).
+/// Densità del fumo procedurale nel punto `p` (1/m).
 pub fn smoke_density_at(s: &SmokeCloud, p: Vec3) -> f32 {
+    smoke_density_with(s, p, None)
+}
+
+/// Densità del fumo nel punto `p` (1/m); con la simulazione (`field`) la forma di massima è
+/// quella simulata e il rumore aggiunge solo il dettaglio fine sul bordo.
+pub fn smoke_density_with(s: &SmokeCloud, p: Vec3, field: Option<&SmokeField>) -> f32 {
+    let field = field.filter(|_| s.mode == SmokeMode::Simulated);
     let (lo, hi) = s.bounds();
     let half = (hi - lo) * 0.5;
     let rel = p - s.center;
@@ -93,9 +101,10 @@ pub fn smoke_density_at(s: &SmokeCloud, p: Vec3) -> f32 {
     let q = rel / l + Vec3::new(17.0, -3.0, 9.0) * (seed % 97) as f32;
     let t = (u.y + 1.0) * 0.5;
     // Turbolenza: il pennacchio e soprattutto l'incenso nascono lisci e si rompono salendo.
-    let laminar = match s.shape {
-        SmokeShape::Plume => 0.25 + 0.75 * t.powf(0.8),
-        SmokeShape::Wisp => 0.08 + 0.92 * t.powf(1.6),
+    let laminar = match (field, s.shape) {
+        (Some(_), _) => 0.5,
+        (None, SmokeShape::Plume) => 0.25 + 0.75 * t.powf(0.8),
+        (None, SmokeShape::Wisp) => 0.08 + 0.92 * t.powf(1.6),
         _ => 1.0,
     };
     let turb = s.turbulence * laminar;
@@ -105,14 +114,19 @@ pub fn smoke_density_at(s: &SmokeCloud, p: Vec3) -> f32 {
     let up = (rel + disp) / half.max(Vec3::splat(1e-4));
     let tp = ((up.y + 1.0) * 0.5).clamp(0.0, 1.0);
     // Forma e larghezza del pezzo (frazione del riquadro: il filo d'incenso è sottile).
-    let (base, width) = match s.shape {
-        SmokeShape::Cloud => (1.0 - up.length(), 1.0),
-        SmokeShape::Bank => {
+    // Con la simulazione: la sua densità rispetto al punto più denso (4 % = bordo, 40 % o più =
+    // pieno), letta nel punto mosso dai vortici fini.
+    // Curva schiacciata (radice): il fumo diluito che sale resta visibile, come nel fumo vero.
+    let sim = field.map(|f| (f.sample(p + disp * 0.5) / f.max.max(1e-6)).max(0.0).powf(0.55));
+    let (base, width) = match (sim, s.shape) {
+        (Some(v), _) => ((v * 2.5 - 0.25).min(1.2), 0.3),
+        (None, SmokeShape::Cloud) => (1.0 - up.length(), 1.0),
+        (None, SmokeShape::Bank) => {
             let a = up.abs();
             (1.0 - (a.x.powi(6) + a.y.powi(6) + a.z.powi(6)).powf(1.0 / 6.0), 1.0)
         }
-        SmokeShape::Plume => column(s, up, tp, false),
-        SmokeShape::Wisp => column(s, up, tp, true),
+        (None, SmokeShape::Plume) => column(s, up, tp, false),
+        (None, SmokeShape::Wisp) => column(s, up, tp, true),
     };
     // Spessore del bordo in unità della forma: dettagli più grandi = bordo più frastagliato; mai
     // tanto da spezzare un pezzo sottile.
@@ -145,8 +159,10 @@ pub fn smoke_density_at(s: &SmokeCloud, p: Vec3) -> f32 {
     let v = fbm(qd * 0.45 + Vec3::splat(-6.1), seed ^ 0x2545_f491, 3);
     let inner = (1.0 - s.variation) + s.variation * 2.0 * smoothstep(-0.55, 0.65, v);
     // Pennacchio e incenso si diradano salendo.
-    let fade = match s.shape {
-        SmokeShape::Plume | SmokeShape::Wisp => (1.0 - s.fade * t.powf(0.8)).max(0.0).powf(1.5),
+    // (Con la simulazione la dissolvenza è già nel moto; la densità segue quella simulata.)
+    let fade = match (sim, s.shape) {
+        (Some(v), _) => (v * 2.0).min(1.0),
+        (None, SmokeShape::Plume | SmokeShape::Wisp) => (1.0 - s.fade * t.powf(0.8)).max(0.0).powf(1.5),
         _ => 1.0,
     };
     // Mai un taglio netto sulle facce del riquadro.
@@ -176,6 +192,72 @@ fn key(s: &SmokeCloud, geo: &RenderGeometry) -> String {
     };
     // Con le collisioni contano gli oggetti (qualsiasi cambio di geometria: semplice e sicuro).
     format!("{k:?}|{}", if s.collisions { geo.id } else { 0 })
+}
+
+type SimCache = Mutex<HashMap<String, Arc<SmokeField>>>;
+
+fn sim_cache() -> &'static SimCache {
+    static C: OnceLock<SimCache> = OnceLock::new();
+    C.get_or_init(Default::default)
+}
+
+/// Simulazione della nube (dalla cache o calcolata qui, avanzamento da `p0` a `p1` sulla barra).
+fn simulated_field(s: &SmokeCloud, geo: &RenderGeometry, p0: f32, p1: f32) -> Option<Arc<SmokeField>> {
+    let (lo, hi) = s.bounds();
+    let k = format!("{:?}|{:?}|{:?}|{}|{}", s.sim, lo, hi, s.seed, if s.collisions { geo.id } else { 0 });
+    if let Some(f) = sim_cache().lock().unwrap().get(&k) {
+        return Some(f.clone());
+    }
+    let cells = forge_scene::SMOKE_SIM_CELLS[(s.sim.quality.clamp(1, 4) - 1) as usize];
+    let spec = GridSpec::covering(lo, hi, cells);
+    let solid = (s.collisions && !geo.accel.is_empty()).then(|| {
+        let shell = voxelize(geo, &spec);
+        let inside = interior_cells(geo, &spec, &shell);
+        shell.iter().zip(&inside).map(|(a, b)| *a || *b).collect::<Vec<bool>>()
+    });
+    let m = &s.sim;
+    let params = SmokeSimParams {
+        spec,
+        source: s.sim_source(),
+        source_radius: m.source_radius,
+        emission: m.emission,
+        temperature: m.temperature,
+        buoyancy: m.buoyancy,
+        weight: m.weight,
+        exit_speed: m.exit_speed,
+        cooling: m.cooling,
+        dissipation: m.dissipation,
+        vorticity: m.vorticity,
+        turbulence: m.turbulence,
+        turbulence_scale: m.turbulence_scale,
+        wind: m.wind,
+        time: m.time,
+        seed: s.seed,
+    };
+    let f = simulate_smoke(
+        &params,
+        solid.as_deref(),
+        &|x| progress::update(p0 + (p1 - p0) * x),
+        &progress::cancelled,
+    )?;
+    let max = f.density.iter().copied().fold(0.0f32, f32::max);
+    let full = f.density.iter().filter(|&&v| v > 0.05).count();
+    tracing::info!(
+        "fumo simulato «{}»: {:?} celle, {} passi in {:.0} ms (massimo {:.2}, {} celle con fumo)",
+        s.name,
+        f.spec.res,
+        f.steps,
+        f.ms,
+        max,
+        full
+    );
+    let f = Arc::new(f);
+    let mut c = sim_cache().lock().unwrap();
+    if c.len() > 8 {
+        c.clear();
+    }
+    c.insert(k, f.clone());
+    Some(f)
 }
 
 /// Numero di nubi di fumo accese.
@@ -209,14 +291,23 @@ fn bake_one(s: &SmokeCloud, geo: &RenderGeometry) -> Option<Arc<BakedFog>> {
     }
     let spec = GridSpec::covering(lo, hi, longest);
     progress::update(0.0);
+    // Simulazione (se richiesta): la prima parte della barra.
+    let simulated = s.mode == SmokeMode::Simulated;
+    let field = if simulated {
+        Some(simulated_field(s, geo, 0.0, 0.6)?)
+    } else {
+        None
+    };
+    let p0 = if simulated { 0.6 } else { 0.0 };
     let inside = if s.collisions && !geo.accel.is_empty() {
         let shell = voxelize(geo, &spec);
-        progress::update(0.1);
+        progress::update(p0 + 0.1 * (1.0 - p0));
         interior_cells(geo, &spec, &shell)
     } else {
         Vec::new()
     };
-    progress::update(0.15);
+    let p0 = p0 + 0.15 * (1.0 - p0);
+    progress::update(p0);
     let done = std::sync::atomic::AtomicUsize::new(0);
     let n = spec.len().max(1);
     let sc = s.clone();
@@ -224,7 +315,7 @@ fn bake_one(s: &SmokeCloud, geo: &RenderGeometry) -> Option<Arc<BakedFog>> {
     let fog = BakedFog::from_fn(lo, hi, longest, albedo, s.anisotropy, |p| {
         let i = done.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         if i.is_multiple_of(32_768) {
-            progress::update(0.15 + 0.85 * i as f32 / n as f32);
+            progress::update(p0 + (1.0 - p0) * i as f32 / n as f32);
         }
         if !inside.is_empty() {
             if let Some((x, y, z)) = spec.cell_of(p) {
@@ -233,7 +324,7 @@ fn bake_one(s: &SmokeCloud, geo: &RenderGeometry) -> Option<Arc<BakedFog>> {
                 }
             }
         }
-        smoke_density_at(&sc, p)
+        smoke_density_with(&sc, p, field.as_deref())
     });
     if progress::cancelled() {
         return None;

@@ -18,15 +18,17 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
-### Novità della versione 0.36.0
+### Novità della versione 0.37.0
 
-- **Fumo volumetrico:** nubi di fumo vere con riccioli, sbuffi a cavolfiore e bordi sfilacciati, in un riquadro che sposti e ridimensioni con il gizmo; sei preset (nube sospesa, incenso, vapore da tazza, pennacchio da tubo, fumo denso industriale, banco di fumo), diffusione della luce e ombre fisiche, niente fumo dentro gli oggetti.
-- **Altezza di partenza della foschia:** la foschia può cominciare sopra il pavimento, così con l'altezza massima forma una fascia sospesa (per esempio 2,2–2,8 m sotto il soffitto); il fumo a terra si alza con lei.
-- **Slider più ampi:** intervalli più larghi per densità, addensamenti, grandezza e forza dei vortici, dettaglio frattale e altezze, nella foschia e nel nuovo fumo.
+- **Simulazione del fumo:** il fumo volumetrico ora si può *simulare* (fumo caldo che sale, gas pesante che scende e si stende, vortici, turbolenza, vento, oggetti che lo deviano), congelato all'istante scelto, con il dettaglio procedurale sopra.
+- **Camera come componente:** le camere di rendering nell'elenco sopra le luci, con un bersaglio (punto o oggetto), spostate, fatte orbitare e rimirate con il gizmo nella viewport; **tilt-shift** con fascia nitida, angolo e transizioni indipendenti, separato dalla profondità di campo.
+- **Stili e contorni:** fumetto e illustrazione tecnica in bianco e nero, sfondo a tinta unita, contorni a inchiostro senza puntini sparsi, con sensibilità alla profondità, pulizia e niente linea sul bordo del pavimento.
+- **Polvere:** un suo riquadro spostabile con il gizmo (così i granelli riempiono tutto il fascio fino al tavolo), granelli fino a 18 mm, quantità molto più basse e granelli che fanno ombra.
 
 <details>
 <summary><strong>Versioni precedenti — storico completo delle release</strong></summary>
 
+- **0.36.0 — Fumo volumetrico, altezza di partenza della foschia:** nubi di fumo procedurali in un riquadro spostabile con il gizmo, sei preset; foschia da un'altezza di partenza a una massima; slider più ampi.
 - **0.35.0 — Stili di rendering, foschia che non vela tutto:** fumetto e illustrazione tecnica con i contorni a inchiostro; foschia in modalità "solo raggi delle luci" con addensamenti, altezza massima e sbuffi; polvere illuminata solo nei fasci e tenuta dal denoiser.
 - **0.34.0 — Foschia in cinque tipi, polvere come effetto a sé:** nebbia bassa, nuvole di gas, fumo tossico a terra, strati sospesi e riccioli di vapore con frattale e qualità; polvere visibile solo con la luce diretta; icone al posto dei simboli mancanti.
 - **0.33.0 — Foschia d'ambiente, polvere, adesivi:** foschia con banchi e riccioli illuminata con diffusione multipla; granelli di polvere; adesivi sulle superfici curve; conversione STEP salvata con progetti e pacchetti; calcolo della nebbia annullabile e che riparte alle modifiche.
@@ -160,11 +162,13 @@ Nubi di fumo volumetrico vere per le foto di prodotto: il fumo d'incenso accanto
 - **Fisico:** il fumo diffonde e assorbe la luce con la diffusione multipla, fa ombre volumetriche e le riceve, su CPU e GPU (lo stesso delta tracking della nebbia da ghiaccio secco). Non riempie mai l'interno pieno degli oggetti che attraversano il riquadro. Stessi parametri e stesso seme danno sempre la stessa nube.
 - **Calcolato in anticipo** con gli altri effetti, uno alla volta sulla barra di avanzamento, e salvato con il progetto.
 
-Questa prima versione è procedurale (ancora senza simulazione fluida): la simulazione fisica del fumo con temperatura e galleggiamento è il passo successivo, vedi lo [studio su fumo e fuoco](docs/studio-fumo-fuoco.md).
+- **Modo simulato:** invece di una forma scelta, il fumo può nascere da una simulazione fisica dentro il riquadro (un fluido euleriano con temperatura e galleggiamento, come in Fedkiw, Stam e Jensen 2001): una sorgente emette fumo e calore, il fumo caldo sale, il gas pesante scende e si stende, il confinamento della vorticità tiene i riccioli, la turbolenza (curl noise) rompe la colonna in sbuffi, il vento la spinge e gli oggetti nel riquadro la deviano. La simulazione si congela all'istante scelto e sul bordo si aggiunge il dettaglio procedurale (sbuffi, filamenti). Comandi: posizione e raggio della sorgente, quantità, calore, spinta, peso, velocità di uscita, raffreddamento, dissolvenza, vortici, turbolenza e la sua grandezza, vento, istante e qualità della simulazione (da 48 a 136 celle per lato). Preset: fumo caldo simulato e gas pesante simulato.
+
+Il fuoco (combustione, emissione, fiamme che illuminano la scena) è un passo a parte, successivo: vedi lo [studio su fumo e fuoco](docs/studio-fumo-fuoco.md).
 
 ### 7. Polvere in sospensione — granelli che brillano solo in un fascio
 
-Granelli veri (qualche millimetro, fino a 150 000) sparsi nell'aria, come effetto a sé. Sono invisibili tranne dentro i fasci di spot e sole: lì brillano, come la polvere nei raggi che entrano dalla finestra di una soffitta, mentre lampadine, pannelli, ambiente e luce di rimbalzo non li illuminano. Sono segnati nelle guide del denoiser, così il denoiser li tiene invece di cancellarli come rumore. Quantità, dimensione, brillantezza e colore sono regolabili.
+Granelli veri (qualche millimetro, fino a 150 000) sparsi nell'aria, come effetto a sé. Sono invisibili tranne dentro i fasci di spot e sole: lì brillano, come la polvere nei raggi che entrano dalla finestra di una soffitta, mentre lampadine, pannelli, ambiente e luce di rimbalzo non li illuminano. Sono segnati nelle guide del denoiser, così il denoiser li tiene invece di cancellarli come rumore. I granelli stanno in un riquadro che selezioni nella viewport e sposti o ridimensioni con il gizmo; di partenza copre gli oggetti fino alle spot, così i granelli riempiono tutto il fascio fino al piano illuminato. Si regolano quantità (fino a pochi granelli isolati), dimensione (fino a 18 mm), brillantezza e colore, e i granelli possono fare ombra: piccole sagome scure nei fasci e sul piano illuminato.
 
 ### 8. Adesivi (decal) — etichette e loghi su qualsiasi superficie
 
@@ -198,6 +202,9 @@ Per la nebbia che riempie la scena vedi [Foschia d'ambiente](#5-foschia-dambient
 
 Le camere di rendering offrono focale, diaframma, profondità di campo e decentramento. Le viste automatiche frontale, posteriore, laterali, superiore e a tre quarti aiutano a presentare un prodotto da più angolazioni; è possibile esportare video turntable in MP4.
 
+- **Camere come componenti:** le camere di rendering sono elencate nel pannello di sinistra, subito sopra le luci. Selezionandone una compare nella viewport una linea fino al suo bersaglio (un rombo): il gizmo sposta insieme camera e bersaglio, fa girare la camera attorno al bersaglio (Ruota) oppure, dopo un clic sul rombo, sposta solo il bersaglio. Il bersaglio può seguire un oggetto, come per le spot, così l'oggetto resta al centro anche quando lo sposti.
+- **Tilt-shift:** una fascia nitida sull'immagine finale (posizione, larghezza e angolo: orizzontale, verticale o inclinata) con la sfocatura che cresce ai lati, ogni lato con la sua transizione, da un passaggio netto a una sfumatura molto ampia. È separato dalla profondità di campo: diaframma, focale e messa a fuoco non cambiano, e con tutte e due accese la fascia si aggiunge alla sfocatura della lente. La sfocatura rispetta la profondità (un oggetto vicino e nitido non sbava sullo sfondo sfocato), è uguale su CPU e GPU, e spostare la fascia si vede subito, senza rifare il render.
+
 ### 13. Render pass e workflow di post-produzione
 
 ForgeRender può esportare pass separati **Albedo, Normals, Depth, Product Mask e Component ID**, utili per compositing, mascherature e interventi successivi sull'immagine. Sono buffer tecnici di output, non ulteriori render beauty.
@@ -209,7 +216,9 @@ In cima alla scheda Render scegli come si disegna l'immagine; passando sopra a o
 - **Fotorealistico:** il path tracing fisico di sempre.
 - **Fumetto (cel shading):** colori pieni del materiale in tre fasce nette (luce, mezz'ombra, ombra) dalle luci della scena, con le loro ombre nette e un riflesso secco sui materiali lucidi.
 - **Illustrazione tecnica (Gooch):** ombreggiatura morbida da caldo in luce a freddo in ombra, senza ombre nere, così forme e volumi si leggono bene.
-- **Contorni a inchiostro:** linee scure su sagome, confini tra oggetti, salti di profondità e (a scelta) spigoli vivi, tracciati con 3×3 raggi per pixel e disegnati sopra l'immagine finale, anche dopo il denoiser. Vanno con qualsiasi stile; spessore, colore e angolo degli spigoli sono regolabili.
+- **Bianco e nero:** il fumetto con le stesse fasce in grigi, l'illustrazione tecnica come un disegno a matita; spento, restano a colori.
+- **Sfondo a tinta unita:** dove la camera non vede niente, un colore (bianco, grigio chiaro, nero o un altro) al posto dell'ambiente, che continua a illuminare la scena.
+- **Contorni a inchiostro:** linee scure su sagome, confini tra oggetti, salti di profondità e (a scelta) spigoli vivi, tracciati con 3×3 raggi per pixel e disegnati sopra l'immagine finale, anche dopo il denoiser. Vanno con qualsiasi stile; si regolano spessore, colore, angolo degli spigoli e sensibilità ai salti di profondità. I raggi che passano nella fessura tra due triangoli non lasciano più puntini sparsi, lo slider Pulizia toglie i pezzi di linea troppo corti e il bordo del pavimento contro lo sfondo può restare senza linea.
 
 Gli stili si applicano alla prima superficie vista dalla camera, quindi vetri e specchi riflettono e rifrangono come sempre; funzionano su CPU e GPU, anche nel render spettrale.
 

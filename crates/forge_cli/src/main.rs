@@ -77,7 +77,9 @@ fn print_help() {
              --adaptive-map F.png (mappa dei campioni per pixel, PNG a 16 bit con i conteggi esatti)\n    \
              --hdri F.hdr|F.exr  --hdri-strength S  --hdri-rotation GRADI\n    \
              --denoise off|finale  --denoise-quality veloce|bilanciata|alta  --cuda  --denoise-strength 0..1\n    \
-             --style fotorealistico|fumetto|tecnico  --outlines  --dust\n    \
+             --style fotorealistico|fumetto|tecnico  --mono  --outlines  --outline-clean PX  --background R,G,B\n    \
+             --tilt CENTRO,LARGHEZZA,TRANSIZIONE  --tilt-angle GRADI  --tilt-blur PERCENTUALE\n    \
+             --dust  --dust-shadows  --dust-box\n    \
              --haze nebbia-bassa|gas|fumo|strati|riccioli  --haze-density D  --haze-quality 1..4\n    \
              --haze-clumping 0..2  --haze-top METRI  --haze-bottom METRI\n    \
              --smoke 0..5|NOME (preset del fumo volumetrico)  --smoke-y Y  --smoke-scale F\n    \
@@ -213,6 +215,32 @@ fn render(args: &Args) -> anyhow::Result<()> {
     if args.flag("--outlines") {
         settings.outlines.enabled = true;
     }
+    settings.style_mono = args.flag("--mono");
+    // Tilt-shift: --tilt CENTRO,LARGHEZZA,TRANSIZIONE (frazioni dell'altezza), --tilt-angle GRADI,
+    // --tilt-blur PERCENTUALE.
+    if let Some(v) = args.value("--tilt") {
+        let p: Vec<f32> = v.split(',').filter_map(|t| t.trim().parse().ok()).collect();
+        anyhow::ensure!(p.len() == 3, "--tilt: serve CENTRO,LARGHEZZA,TRANSIZIONE");
+        settings.tilt_shift.enabled = true;
+        settings.tilt_shift.center = p[0];
+        settings.tilt_shift.width = p[1];
+        settings.tilt_shift.transition_a = p[2];
+        settings.tilt_shift.transition_b = p[2];
+    }
+    if let Some(v) = args.parse("--tilt-angle")? {
+        settings.tilt_shift.angle_deg = v;
+    }
+    if let Some(v) = args.parse::<f32>("--tilt-blur")? {
+        settings.tilt_shift.blur = v / 100.0;
+    }
+    if let Some(v) = args.parse("--outline-clean")? {
+        settings.outlines.min_length_px = v;
+    }
+    if let Some(v) = args.value("--background") {
+        let c: Vec<f32> = v.split(',').filter_map(|t| t.trim().parse().ok()).collect();
+        anyhow::ensure!(c.len() == 3, "--background: serve R,G,B (0–1)");
+        settings.background = Some([c[0], c[1], c[2]]);
+    }
     if let Some(k) = args.value("--haze") {
         use forge_scene::HazeKind;
         let kind = match k {
@@ -308,6 +336,10 @@ fn render(args: &Args) -> anyhow::Result<()> {
         }
         if let Some(v) = args.parse("--dust-amount")? {
             scene.haze_dust.per_m3 = v;
+        }
+        scene.haze_dust.shadows = args.flag("--dust-shadows");
+        if args.flag("--dust-box") {
+            scene.haze_dust.region = Some(scene.default_dust_region());
         }
         scene.sync_effects();
     }

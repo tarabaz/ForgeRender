@@ -56,6 +56,8 @@ pub fn add_buttons(app: &mut ForgeApp, ui: &mut egui::Ui) {
         .clicked()
     {
         app.scene.haze_dust.enabled = true;
+        app.scene.haze_dust.region = Some(app.scene.default_dust_region());
+        app.selected_dust = true;
         dust_changed(app);
     }
     if ui
@@ -423,7 +425,7 @@ fn haze(app: &mut ForgeApp, ui: &mut egui::Ui) {
 }
 
 /// Polvere aggiunta, tolta o cambiata: si rifà il suo nodo.
-fn dust_changed(app: &mut ForgeApp) {
+pub(crate) fn dust_changed(app: &mut ForgeApp) {
     if !app.scene.haze_dust.enabled {
         // Il nodo della polvere sparisce: gli indici dei nodi dopo di lui cambiano.
         app.selection.clear();
@@ -436,6 +438,7 @@ fn dust_changed(app: &mut ForgeApp) {
 fn dust(app: &mut ForgeApp, ui: &mut egui::Ui) {
     let mut changed = false;
     let mut remove = false;
+    let mut select = false;
     let id = ui.make_persistent_id("polvere-sospesa");
     egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, true)
         .show_header(ui, |ui| {
@@ -455,12 +458,41 @@ fn dust(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 .small()
                 .weak(),
             );
+            let auto_region = app.scene.default_dust_region();
+            let selected = app.selected_dust;
             let dust = &mut app.scene.haze_dust;
+            ui.horizontal(|ui| {
+                if ui
+                    .selectable_label(selected, tr("Riquadro della polvere"))
+                    .on_hover_text(tr(
+                        "Seleziona il riquadro: il gizmo lo sposta e lo ridimensiona (Sposta / Scala). I granelli ci sono \
+                         solo lì dentro: deve contenere tutto il fascio, fino al piano illuminato",
+                    ))
+                    .clicked()
+                {
+                    select = true;
+                }
+                if ui
+                    .small_button(tr("Adatta alla scena"))
+                    .on_hover_text(tr("Riquadro attorno agli oggetti fino alle spot (al massimo 6 m per lato)"))
+                    .clicked()
+                {
+                    dust.region = Some(auto_region);
+                    changed = true;
+                }
+            });
+            let (mut c, mut s) = dust.region.unwrap_or(auto_region);
+            if crate::ui::inspector::vec3_edit(ui, tr("Centro (m)"), &mut c, 0.01)
+                | crate::ui::inspector::vec3_edit(ui, tr("Dimensioni (m)"), &mut s, 0.01)
+            {
+                dust.region = Some((c, s.max(forge_math::Vec3::splat(0.01))));
+                changed = true;
+            }
             egui::Grid::new("polvere").num_columns(2).show(ui, |ui| {
                 ui.label(tr("Quantità"));
                 changed |= ui
                     .add(
-                        egui::Slider::new(&mut dust.per_m3, 100.0..=30000.0)
+                        egui::Slider::new(&mut dust.per_m3, 1.0..=30000.0)
                             .logarithmic(true)
                             .suffix(tr(" /m³"))
                             .max_decimals(0),
@@ -470,7 +502,12 @@ fn dust(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 ui.end_row();
                 ui.label(tr("Dimensione"));
                 changed |= ui
-                    .add(egui::Slider::new(&mut dust.size_mm, 0.3..=6.0).suffix(" mm").max_decimals(2))
+                    .add(
+                        egui::Slider::new(&mut dust.size_mm, 0.3..=18.0)
+                            .logarithmic(true)
+                            .suffix(" mm")
+                            .max_decimals(2),
+                    )
                     .on_hover_text(tr(
                         "Diametro medio dei granelli: più grandi = puntini più visibili (sotto la grandezza di un pixel il \
                          denoiser li scambia per rumore)",
@@ -490,10 +527,27 @@ fn dust(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 ui.label(tr("Colore"));
                 changed |= ui.color_edit_button_rgb(&mut dust.color).changed();
                 ui.end_row();
+                ui.label(tr("Fanno ombra"));
+                changed |= ui
+                    .checkbox(&mut dust.shadows, "")
+                    .on_hover_text(tr(
+                        "I granelli fermano la luce: piccole sagome scure dentro i fasci (con la foschia) e sul piano \
+                         illuminato. Con pochi granelli grandi si vedono meglio",
+                    ))
+                    .changed();
+                ui.end_row();
             });
         });
+    if select {
+        app.selected_dust = true;
+        app.selected_fog = None;
+        app.selected_smoke = None;
+        app.selected_light = None;
+        app.selection.clear();
+    }
     if remove {
         app.scene.haze_dust.enabled = false;
+        app.selected_dust = false;
         changed = true;
     }
     if changed {

@@ -269,6 +269,11 @@ pub struct Dust {
     /// Brillantezza dei granelli nel fascio (moltiplica la luce che diffondono): i granelli
     /// veri sono più piccoli di un pixel e nelle foto si vedono come puntini luminosi sfocati.
     pub brightness: f32,
+    /// I granelli fanno ombra (piccole sagome scure dentro i fasci e sul piano illuminato).
+    pub shadows: bool,
+    /// Riquadro in cui stanno i granelli (centro e dimensioni, m). `None` = automatico attorno
+    /// alla scena (i progetti di prima); si sposta e si ridimensiona con il gizmo.
+    pub region: Option<(Vec3, Vec3)>,
 }
 
 impl Default for Dust {
@@ -280,6 +285,8 @@ impl Default for Dust {
             color: [0.85, 0.8, 0.72],
             seed: 1,
             brightness: 12.0,
+            shadows: false,
+            region: None,
         }
     }
 }
@@ -406,23 +413,26 @@ impl Scene {
             }
             return false;
         }
-        // Riquadro: la scena senza la polvere, la camera compresa.
-        if let Some(i) = existing {
-            self.nodes[i].visible = false;
-        }
-        let mut b = self.bounds();
-        if let Some(i) = existing {
-            self.nodes[i].visible = true;
-        }
-        if b.is_empty() {
-            return false;
-        }
-        let cam = self.render_camera().position;
-        b.grow_point(cam);
-        // Niente polvere in un riquadro enorme (pavimenti infiniti): al massimo 6 m per lato
-        // attorno al centro dell'inquadratura.
-        let center = (b.min + b.max) * 0.5;
-        let half = ((b.max - b.min) * 0.5).min(Vec3::splat(3.0));
+        let (center, size) = match self.haze_dust.region {
+            Some(r) => r,
+            None => {
+                // Riquadro automatico (progetti di prima): la scena senza la polvere, la camera
+                // compresa, al massimo 6 m per lato.
+                if let Some(i) = existing {
+                    self.nodes[i].visible = false;
+                }
+                let mut b = self.bounds();
+                if let Some(i) = existing {
+                    self.nodes[i].visible = true;
+                }
+                if b.is_empty() {
+                    return false;
+                }
+                b.grow_point(self.render_camera().position);
+                ((b.min + b.max) * 0.5, (b.max - b.min).min(Vec3::splat(6.0)))
+            }
+        };
+        let half = size.max(Vec3::splat(0.01)) * 0.5;
         let mesh = self.haze_dust.build_mesh(center - half, center + half);
         self.materials.upsert(self.haze_dust.material());
         self.assignments.insert(id.clone(), MaterialId::new(DUST_ID));
@@ -517,6 +527,31 @@ impl Scene {
             depth: width.max(height) * 0.5,
             ..Default::default()
         })
+    }
+
+    /// Riquadro di partenza della polvere: gli oggetti della scena (senza pavimenti enormi) fino
+    /// alle luci a fascio (spot), così i granelli ci sono in tutto il fascio, fino al piano
+    /// illuminato; al massimo 6 m per lato.
+    pub fn default_dust_region(&self) -> (Vec3, Vec3) {
+        let existing = self.find(&ComponentId(DUST_ID.into()));
+        let mut b = forge_math::Aabb::EMPTY;
+        for i in 0..self.nodes.len() {
+            if Some(i) == existing || self.is_effect_node(i) || self.nodes[i].mesh.is_none() || !self.is_visible(i) {
+                continue;
+            }
+            b.grow(&self.bounds_of(i));
+        }
+        if b.is_empty() {
+            b.grow_point(Vec3::ZERO);
+            b.grow_point(Vec3::splat(1.0));
+        }
+        for l in &self.lights {
+            if l.enabled && matches!(l.kind, crate::LightKind::Spot { .. }) {
+                b.grow_point(l.position);
+            }
+        }
+        let c = (b.min + b.max) * 0.5;
+        (c, (b.max - b.min).max(Vec3::splat(0.2)).min(Vec3::splat(6.0)))
     }
 
     /// È un nodo creato da un effetto (adesivo, polvere): non si salva come oggetto.

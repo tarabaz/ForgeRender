@@ -169,6 +169,7 @@ fn main() -> anyhow::Result<()> {
     s.render_cameras.push(forge_scene::RenderCamera {
         name: "Demo".into(),
         camera: cam,
+        aim: None,
     });
     s.active_camera = Some(0);
     s.refresh_pivots();

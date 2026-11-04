@@ -110,6 +110,10 @@ impl Camera {
 pub struct RenderCamera {
     pub name: String,
     pub camera: Camera,
+    /// Oggetto da tenere al centro dell'inquadratura (il bersaglio segue il suo centro, come per
+    /// le luci); `None` = bersaglio libero.
+    #[serde(default)]
+    pub aim: Option<crate::ComponentId>,
 }
 
 impl Camera {

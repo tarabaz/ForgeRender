@@ -542,7 +542,8 @@ fn radiance_spectral(o_in: vec3<f32>, d_in: vec3<f32>) -> vec4<f32> {
         if (!hit.found) {
             var c = vec4<f32>(0.0);
             if (depth == 0u) {
-                if ((pu(P_FLAGS) & 1u) != 0u) { c = beta * illum4(env_radiance(d, true)); }
+                if (has_background()) { c = beta * illum4(pv3(P_BACKGROUND)); }
+                else if ((pu(P_FLAGS) & 1u) != 0u) { c = beta * illum4(env_radiance(d, true)); }
             } else if (has_env) {
                 var w = 1.0;
                 if (!specular) { w = power_heuristic(prev_pdf, env_light_pdf(o, d) * sel_pdf); }
@@ -602,7 +603,7 @@ fn radiance_spectral(o_in: vec3<f32>, d_in: vec3<f32>) -> vec4<f32> {
         bs.entering = entering;
         let col = albedo4(m.base);
 
-        if (camera_path && pu(P_STYLE) != 0u && has_non_delta(bs)) {
+        if (camera_path && style_id() != 0u && has_non_delta(bs)) {
             l = l + beta * illum4(style_shade(m, ns, wo, p));
             break;
         }

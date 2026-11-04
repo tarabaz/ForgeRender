@@ -103,7 +103,9 @@ fn guide_sample(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
             return (tint * clamp01(le), Vec3::ZERO);
         }
         let Some(hit) = hit else {
-            let bg = if depth == 0 && !settings.environment_visible {
+            let bg = if let (0, Some(c)) = (depth, settings.background) {
+                Vec3::from(c)
+            } else if depth == 0 && !settings.environment_visible {
                 Vec3::ZERO
             } else {
                 scene.env_radiance(d, depth == 0)

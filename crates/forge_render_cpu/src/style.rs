@@ -17,13 +17,38 @@ pub fn key_light(scene: &RenderScene) -> Vec3 {
     (-r * 0.6 + u * 0.8 - f * 0.35).normalize()
 }
 
-/// Colore dello stile nel punto `p` (normale di shading `n`, verso la camera `wo`).
-pub fn shade(scene: &RenderScene, style: RenderStyle, mat: &RenderMaterial, n: Vec3, wo: Vec3, p: Vec3, rng: &mut Pcg32) -> Vec3 {
-    match style {
-        RenderStyle::Photoreal => Vec3::ZERO,
-        RenderStyle::Toon => toon(scene, mat, n, wo, p, rng),
-        RenderStyle::Technical => gooch(scene, mat, n, wo),
+/// Colore dello stile nel punto `p` (normale di shading `n`, verso la camera `wo`); `mono` =
+/// bianco e nero.
+#[allow(clippy::too_many_arguments)]
+pub fn shade(
+    scene: &RenderScene,
+    style: RenderStyle,
+    mono: bool,
+    mat: &RenderMaterial,
+    n: Vec3,
+    wo: Vec3,
+    p: Vec3,
+    rng: &mut Pcg32,
+) -> Vec3 {
+    match (style, mono) {
+        (RenderStyle::Photoreal, _) => Vec3::ZERO,
+        // Le stesse fasce, in grigi (luminanza del colore).
+        (RenderStyle::Toon, true) => Vec3::splat(luminance(toon(scene, mat, n, wo, p, rng))),
+        (RenderStyle::Toon, false) => toon(scene, mat, n, wo, p, rng),
+        (RenderStyle::Technical, true) => gooch_mono(scene, mat, n, wo),
+        (RenderStyle::Technical, false) => gooch(scene, mat, n, wo),
     }
+}
+
+/// Illustrazione tecnica in bianco e nero: grigio scuro in ombra, quasi bianco in luce, senza
+/// i colori dei materiali (come un disegno a matita).
+fn gooch_mono(scene: &RenderScene, mat: &RenderMaterial, n: Vec3, wo: Vec3) -> Vec3 {
+    let l = key_light(scene);
+    let k = 0.5 * (1.0 + n.dot(l));
+    let mut g = 0.18 + 0.74 * k;
+    let h = (l + wo).normalize_or(n);
+    g += 0.3 * (1.0 - mat.roughness).max(0.0) * n.dot(h).max(0.0).powf(60.0);
+    Vec3::splat(g)
 }
 
 /// Fumetto: colore pieno del materiale in tre fasce (luce, mezz'ombra, ombra) dalla luce delle

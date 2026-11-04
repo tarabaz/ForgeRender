@@ -213,6 +213,12 @@ pub struct ForgeApp {
     pub selected_fog: Option<usize>,
     /// Nube di fumo volumetrico selezionata (il gizmo sposta e ridimensiona il suo riquadro).
     pub selected_smoke: Option<usize>,
+    /// Riquadro della polvere in sospensione selezionato (il gizmo lo sposta e lo ridimensiona).
+    pub selected_dust: bool,
+    /// Camera di rendering selezionata come componente (il gizmo la sposta e la fa orbitare).
+    pub selected_camera: Option<usize>,
+    /// Il gizmo della camera selezionata sposta il bersaglio invece della camera.
+    pub camera_target_handle: bool,
     /// Il gizmo della nebbia sposta la zona simulata invece dell'emettitore.
     pub fog_gizmo_zone: bool,
     pub selected_material: MaterialId,
@@ -279,7 +285,7 @@ pub struct ForgeApp {
     /// Viewport in vista Mesh: wireframe dei triangoli sopra l'ombreggiatura.
     pub viewport_mesh: bool,
     pub render_texture: Option<egui::TextureHandle>,
-    render_texture_key: Option<(u64, ToneMapping, u32, u32, RenderView)>,
+    render_texture_key: Option<(u64, ToneMapping, u32, u32, RenderView, String)>,
     /// Cosa mostrare del render: finale, grezzo o i buffer guida del denoiser.
     pub render_view: RenderView,
     /// Open Image Denoise caricato (versione) o motivo dell'assenza.
@@ -387,6 +393,9 @@ impl ForgeApp {
             selected_light: None,
             selected_fog: None,
             selected_smoke: None,
+            selected_dust: false,
+            selected_camera: None,
+            camera_target_handle: false,
             fog_gizmo_zone: false,
             selected_material: MaterialId::new("default"),
             view: View::Viewport,
@@ -1081,6 +1090,7 @@ impl ForgeApp {
         self.scene.render_cameras.push(forge_scene::RenderCamera {
             name: name.unwrap_or_else(|| tf("Camera {n}", &[format!("{}", n)])),
             camera: self.scene.camera.clone(),
+            aim: None,
         });
         self.set_active_camera(Some(self.scene.render_cameras.len() - 1));
     }
@@ -1148,6 +1158,59 @@ impl ForgeApp {
         if changed {
             self.shading_changed();
         }
+    }
+
+    /// Camere di rendering agganciate a un oggetto: il bersaglio segue il suo centro.
+    pub fn follow_camera_aims(&mut self) {
+        let mut changed = false;
+        for k in 0..self.scene.render_cameras.len() {
+            let Some(id) = self.scene.render_cameras[k].aim.clone() else {
+                continue;
+            };
+            let Some(i) = self.scene.find(&id) else {
+                self.scene.render_cameras[k].aim = None;
+                continue;
+            };
+            let b = self.scene.bounds_of(i);
+            if b.is_empty() {
+                continue;
+            }
+            let c = b.center();
+            let cam = &mut self.scene.render_cameras[k].camera;
+            if (cam.target - c).length() > 1e-6 * (1.0 + c.length()) {
+                cam.target = c;
+                changed = true;
+            }
+        }
+        if changed {
+            self.render_camera_changed();
+        }
+    }
+
+    /// Camera di rendering `k` modificata come componente (gizmo, valori): se la vista guarda
+    /// attraverso di lei, la vista la segue.
+    pub fn render_camera_moved(&mut self, k: usize, before: &forge_scene::Camera) {
+        if self.scene.camera == *before {
+            self.scene.camera = self.scene.render_cameras[k].camera.clone();
+            self.sync_orbit_from_camera();
+        }
+        self.render_camera_changed();
+    }
+
+    /// Aggancia la camera di rendering `k` all'oggetto selezionato.
+    pub fn aim_camera_at_selection(&mut self, k: usize) {
+        let Some(&first) = self.selection.iter().next() else { return };
+        let mut idx = first;
+        if let Some(p) = self.scene.nodes[idx].parent {
+            if self.scene.nodes[idx].name.ends_with("(mesh)") {
+                idx = p;
+            }
+        }
+        if let Some(c) = self.scene.render_cameras.get_mut(k) {
+            c.aim = Some(self.scene.nodes[idx].id.clone());
+        }
+        self.follow_camera_aims();
+        self.render_camera_changed();
     }
 
     /// Aggancia la luce `k` all'oggetto selezionato (il pezzo, non la sua mesh interna).
@@ -1593,8 +1656,9 @@ impl ForgeApp {
             self.settings.exposure_ev.to_bits(),
             strength.to_bits(),
             self.render_view,
+            format!("{:?}", self.settings.tilt_shift),
         );
-        if self.render_texture_key != Some(key) {
+        if self.render_texture_key.as_ref() != Some(&key) {
             if let Some(frame) = self.session.latest_frame() {
                 let rgba = match (self.render_view, &frame.guides) {
                     (RenderView::Raw, _) => {
@@ -1606,9 +1670,11 @@ impl ForgeApp {
                         let n: Vec<[f32; 3]> = g.normal.iter().map(|v| v.map(|c| c * 0.5 + 0.5)).collect();
                         forge_render_core::tonemap_to_rgba8(&n, ToneMapping::Standard, 0.0)
                     }
-                    _ => {
-                        forge_render_core::tonemap_to_rgba8(&frame.display(strength), self.settings.tone_mapping, self.settings.exposure_ev)
-                    }
+                    _ => forge_render_core::tonemap_to_rgba8(
+                        &frame.with_tilt(self.settings.tilt_shift).display(strength),
+                        self.settings.tone_mapping,
+                        self.settings.exposure_ev,
+                    ),
                 };
                 let img = egui::ColorImage::from_rgba_unmultiplied([frame.width as usize, frame.height as usize], &rgba);
                 match &mut self.render_texture {
@@ -1640,6 +1706,7 @@ impl ForgeApp {
             Some(f) => (path, f),
             None => (with_extension(path, "png"), ExportFormat::Png),
         };
+        let frame = frame.with_tilt(self.settings.tilt_shift);
         match forge_image_io::save_frame(
             &path,
             format,
@@ -1675,6 +1742,8 @@ impl ForgeApp {
         self.selected_light = None;
         self.selected_fog = None;
         self.selected_smoke = None;
+        self.selected_dust = false;
+        self.selected_camera = None;
         self.collapsed.clear();
         self.sync_orbit_from_camera();
         self.geometry_changed();

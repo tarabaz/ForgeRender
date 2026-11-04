@@ -10,6 +10,31 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.37.0 — 4 Nov 2026
+
+**Smoke simulation**
+- Volumetric smoke gets a **Simulated** mode (`SmokeCloud::mode`, `SmokeSim`): a Eulerian fluid on a cell-centred grid with temperature and buoyancy (`forge_volume::smoke_sim`: sphere source with smoke, heat and exit speed; force (β·T − α·ρ)·ŷ; vorticity confinement; curl-noise turbulence; wind; semi-Lagrangian advection; red-black Gauss–Seidel pressure; fading and cooling; objects as solid cells; open box). Deterministic. Frozen at the chosen instant; the field (normalised to its 90th percentile, softened curve) replaces the procedural shape and the procedural puffs and filaments are added on its edge. Cached separately from the detail. Simulation quality 48–136 cells per side. Presets: simulated hot smoke, simulated heavy gas. The source is drawn in the viewport.
+
+**Camera as a component**
+- Left panel: **Cameras** list above **Lights** (select, make active, add from the view). A selected render camera shows a dashed line to its target (a diamond) in the viewport; click the camera icon or the diamond to select it. Gizmo: Move = camera and target together, Rotate = orbit around the target, the diamond = target only (`gizmo::Target::Camera`, `ForgeApp::selected_camera`, `camera_target_handle`). `RenderCamera::aim`: the target can follow an object (`follow_camera_aims`). If the view is looking through the camera, it follows it.
+
+**Tilt-shift**
+- `forge_render_core::tiltshift`: a sharp band on the final image (position, width, angle, two independent transitions, maximum blur), depth-aware gather blur from a per-pixel depth buffer computed at render start, applied in `Frame::display` (CPU and GPU, after the denoiser and the outlines). Separate from the physical depth of field; with both on they add up. Turning it on restarts the render (depth buffer); the other values apply live (`Frame::with_tilt`), also on export.
+
+**Styles and outlines**
+- **Black and white** (`RenderSettings::style_mono`) for cartoon (bands in greys) and technical illustration (grey ramp, no material colours), CPU and GPU.
+- **Solid background** (`RenderSettings::background`): colour for camera rays that hit nothing, the environment still lights the scene (CPU, GPU, spectral, denoiser guides).
+- Outlines: the stray dots came from single sub-sample rays slipping through the seam between two triangles of the same object and hitting its back; an isolated sample that disagrees with its four agreeing neighbours now takes their value (test `no_isolated_dots_on_a_smooth_sphere`). New: depth-jump sensitivity (default 3% as before), cleanup of line pieces shorter than N pixels (default 2), no line on the floor/backdrop edge against the background.
+
+**Dust**
+- Its own box (`Dust::region`, gizmo `Target::Dust`, dashed box in the viewport, "Fit to the scene"): the old automatic box was centred between the scene and the camera and cut at 6 m, so the specks could stop in mid-air and the beam looked cut. New dust gets a box around the objects up to the spots.
+- Amount from 1 per m³, size up to 18 mm; **Cast shadows** (`Dust::shadows`): specks block shadow rays on CPU and GPU.
+
+**Command line**
+- `render`: `--mono`, `--background R,G,B`, `--outline-clean PX`, `--tilt C,W,T`, `--tilt-angle`, `--tilt-blur`, `--dust-shadows`, `--dust-box`; smoke presets 6–7 are simulated.
+
+Not done yet: undo/redo for camera, smoke and dust boxes; MCP tools for smoke and the new options; transparent background.
+
 ## 0.36.0 — 4 Nov 2026
 
 **Volumetric smoke**

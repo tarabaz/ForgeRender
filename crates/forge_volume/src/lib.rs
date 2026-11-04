@@ -17,6 +17,7 @@ pub mod grid;
 pub mod noise;
 pub mod progress;
 pub mod sim;
+pub mod smoke_sim;
 
 use forge_math::Vec3;
 use forge_scene::FogVolume;

@@ -160,6 +160,7 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
     draw_lights(app, &painter, rect);
     draw_fogs(app, &painter, rect);
     draw_smokes(app, &painter, rect);
+    draw_dust_box(app, &painter, rect);
     draw_cameras(app, &painter, rect);
     draw_depth_of_field(app, &painter, rect);
     if app.aim_pick {
@@ -193,6 +194,7 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
 
     app.follow_aim();
     app.follow_light_aims();
+    app.follow_camera_aims();
     // Punta su oggetto: il clic sceglie l'oggetto a cui agganciare la camera.
     if app.aim_pick {
         if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
@@ -266,11 +268,39 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
                     }
                 }
             }
+            if app.scene.haze_dust.enabled {
+                if let Some(d) = near(dust_region(app).0) {
+                    if best.is_none_or(|b| d < b.0) {
+                        best = Some((d, 3, 0));
+                    }
+                }
+            }
+            // Camere di rendering (4) e il bersaglio di quella selezionata (5).
+            for (i, rc) in app.scene.render_cameras.iter().enumerate() {
+                if app.viewing_through_active() && app.scene.active_camera == Some(i) {
+                    continue;
+                }
+                if let Some(d) = near(rc.camera.position) {
+                    if best.is_none_or(|b| d < b.0) {
+                        best = Some((d, 4, i));
+                    }
+                }
+                if app.selected_camera == Some(i) {
+                    if let Some(d) = near(rc.camera.target) {
+                        if best.is_none_or(|b| d < b.0) {
+                            best = Some((d, 5, i));
+                        }
+                    }
+                }
+            }
             if let Some((_, kind, i)) = best {
                 app.selection.clear();
                 app.selected_light = None;
                 app.selected_fog = None;
                 app.selected_smoke = None;
+                app.selected_dust = false;
+                app.selected_camera = None;
+                app.camera_target_handle = false;
                 match kind {
                     0 => {
                         app.selected_light = Some(i);
@@ -280,9 +310,18 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
                         app.selected_fog = Some(i);
                         app.tab = crate::app::InspectorTab::Effects;
                     }
-                    _ => {
+                    2 => {
                         app.selected_smoke = Some(i);
                         app.tab = crate::app::InspectorTab::Effects;
+                    }
+                    3 => {
+                        app.selected_dust = true;
+                        app.tab = crate::app::InspectorTab::Effects;
+                    }
+                    k => {
+                        app.selected_camera = Some(i);
+                        app.camera_target_handle = k == 5;
+                        app.tab = crate::app::InspectorTab::Camera;
                     }
                 }
                 return;
@@ -292,6 +331,8 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
             app.selected_light = None;
             app.selected_fog = None;
             app.selected_smoke = None;
+            app.selected_dust = false;
+            app.selected_camera = None;
             match forge_render_core::pick(&geo, origin, dir) {
                 Some((node, _)) => {
                     crate::ui::tree::select(&mut app.selection, node, multi);
@@ -376,6 +417,42 @@ fn draw_cameras(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
         }
     }
     let size = (app.scene.bounds().radius() * 0.12).max(0.05);
+    // Camera selezionata: linea fino al bersaglio e il bersaglio (rombo) da trascinare.
+    if let Some(rc) = app.selected_camera.and_then(|i| app.scene.render_cameras.get(i)) {
+        if let (Some(p), Some(t)) = (project(cam, rect, rc.camera.position), project(cam, rect, rc.camera.target)) {
+            let col = style::ACCENT;
+            painter.add(egui::Shape::dashed_line(
+                &[p, t],
+                egui::Stroke::new(1.0, col.gamma_multiply(0.7)),
+                5.0,
+                4.0,
+            ));
+            let r = if app.camera_target_handle { 7.0 } else { 5.0 };
+            let pts = vec![
+                t + egui::vec2(0.0, -r),
+                t + egui::vec2(r, 0.0),
+                t + egui::vec2(0.0, r),
+                t + egui::vec2(-r, 0.0),
+            ];
+            painter.add(egui::Shape::convex_polygon(
+                pts,
+                col.gamma_multiply(0.35),
+                egui::Stroke::new(1.5, col),
+            ));
+            let label = if rc.aim.is_some() {
+                tr("bersaglio (agganciato)")
+            } else {
+                tr("bersaglio")
+            };
+            painter.text(
+                t + egui::vec2(9.0, 4.0),
+                egui::Align2::LEFT_TOP,
+                label,
+                egui::FontId::proportional(11.0),
+                col,
+            );
+        }
+    }
     for (i, rc) in app.scene.render_cameras.iter().enumerate() {
         if app.viewing_through_active() && app.scene.active_camera == Some(i) {
             continue;
@@ -580,6 +657,55 @@ fn draw_fogs(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
     }
 }
 
+fn dust_region(app: &ForgeApp) -> (Vec3, Vec3) {
+    app.scene.haze_dust.region.unwrap_or_else(|| app.scene.default_dust_region())
+}
+
+/// Polvere in sospensione: il riquadro in cui stanno i granelli (tratteggiato), con il punto
+/// centrale da cliccare per selezionarlo.
+fn draw_dust_box(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
+    if !app.scene.haze_dust.enabled {
+        return;
+    }
+    let cam = &app.view_camera;
+    let (c, s) = dust_region(app);
+    let (lo, hi) = (c - s * 0.5, c + s * 0.5);
+    let col = if app.selected_dust {
+        egui::Color32::from_rgb(255, 235, 150)
+    } else {
+        egui::Color32::from_rgb(200, 190, 150).gamma_multiply(0.7)
+    };
+    let corner = |i: usize| Vec3::new([lo.x, hi.x][i & 1], [lo.y, hi.y][(i >> 1) & 1], [lo.z, hi.z][(i >> 2) & 1]);
+    for (a, b) in [
+        (0, 1),
+        (2, 3),
+        (4, 5),
+        (6, 7),
+        (0, 2),
+        (1, 3),
+        (4, 6),
+        (5, 7),
+        (0, 4),
+        (1, 5),
+        (2, 6),
+        (3, 7),
+    ] {
+        if let (Some(p), Some(q)) = (project(cam, rect, corner(a)), project(cam, rect, corner(b))) {
+            painter.add(egui::Shape::dashed_line(&[p, q], egui::Stroke::new(1.0, col), 3.0, 3.0));
+        }
+    }
+    if let Some(p) = project(cam, rect, c) {
+        painter.circle_filled(p, 4.0, col);
+        painter.text(
+            p + egui::vec2(8.0, -8.0),
+            egui::Align2::LEFT_BOTTOM,
+            tr("Polvere in sospensione"),
+            egui::FontId::proportional(11.0),
+            col,
+        );
+    }
+}
+
 /// Fumo volumetrico: il riquadro in cui esiste (linea piena, più marcata se selezionato) con il
 /// punto centrale da cliccare per selezionarlo.
 fn draw_smokes(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
@@ -613,6 +739,12 @@ fn draw_smokes(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
         ] {
             if let (Some(p), Some(q)) = (project(cam, rect, corner(a)), project(cam, rect, corner(b))) {
                 painter.line_segment([p, q], stroke);
+            }
+        }
+        // Sorgente della simulazione: un cerchietto vuoto.
+        if s.mode == forge_scene::SmokeMode::Simulated {
+            if let Some(q) = project(cam, rect, s.sanitized().sim_source()) {
+                painter.circle_stroke(q, 5.0, egui::Stroke::new(1.5, c));
             }
         }
         let Some(p) = project(cam, rect, s.center) else { continue };

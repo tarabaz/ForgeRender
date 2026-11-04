@@ -60,6 +60,10 @@ enum DragStart {
     Fog(usize, Vec3, Vec3, Vec3),
     /// Fumo volumetrico: centro e dimensioni del riquadro all'inizio.
     Smoke(usize, Vec3, Vec3),
+    /// Polvere: riquadro all'inizio.
+    Dust(Vec3, Vec3),
+    /// Camera di rendering all'inizio.
+    Camera(usize, forge_scene::Camera),
 }
 
 /// Su cosa agisce il gizmo.
@@ -69,6 +73,8 @@ pub enum Target {
     Light(usize),
     Fog(usize),
     Smoke(usize),
+    Dust,
+    Camera(usize),
 }
 
 /// Snap a contatto preparato all'inizio del trascinamento, se uno dei componenti trascinati
@@ -273,7 +279,20 @@ pub fn target(app: &ForgeApp) -> Option<Target> {
     if let Some(i) = app.selected_fog.filter(|&i| i < app.scene.fogs.len()) {
         return Some(Target::Fog(i));
     }
-    app.selected_smoke.filter(|&i| i < app.scene.smokes.len()).map(Target::Smoke)
+    if let Some(i) = app.selected_smoke.filter(|&i| i < app.scene.smokes.len()) {
+        return Some(Target::Smoke(i));
+    }
+    if app.selected_dust && app.scene.haze_dust.enabled {
+        return Some(Target::Dust);
+    }
+    app.selected_camera
+        .filter(|&i| i < app.scene.render_cameras.len())
+        .map(Target::Camera)
+}
+
+/// Riquadro della polvere (quello salvato o quello automatico di partenza).
+fn dust_region(app: &ForgeApp) -> (Vec3, Vec3) {
+    app.scene.haze_dust.region.unwrap_or_else(|| app.scene.default_dust_region())
 }
 
 /// Assi propri di una luce: (destra, su, direzione) attorno alla direzione di emissione.
@@ -308,6 +327,17 @@ fn frame_for(app: &ForgeApp, rect: egui::Rect, t: Target, sel: &[usize]) -> Opti
             (c, [Vec3::X, Vec3::Y, Vec3::Z])
         }
         Target::Smoke(i) => (app.scene.smokes[i].center, [Vec3::X, Vec3::Y, Vec3::Z]),
+        Target::Dust => (dust_region(app).0, [Vec3::X, Vec3::Y, Vec3::Z]),
+        Target::Camera(i) => {
+            let c = &app.scene.render_cameras[i].camera;
+            // Rotazione: si gira attorno al bersaglio (orbita), quindi il gizmo sta lì.
+            let at = if app.camera_target_handle || app.gizmo.mode == GizmoMode::Rotate {
+                c.target
+            } else {
+                c.position
+            };
+            (at, [Vec3::X, Vec3::Y, Vec3::Z])
+        }
     };
     let cam = &app.view_camera;
     let dist = (center - cam.position).length().max(1e-4);
@@ -433,7 +463,9 @@ pub fn update(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::
             (app.gizmo.mode == GizmoMode::Rotate && matches!(k, LightKind::Point))
                 || (app.gizmo.mode == GizmoMode::Scale && !matches!(k, LightKind::Area { .. } | LightKind::Portal { .. }))
         }
-        Some(Target::Fog(_) | Target::Smoke(_)) => app.gizmo.mode == GizmoMode::Rotate,
+        Some(Target::Fog(_) | Target::Smoke(_) | Target::Dust) => app.gizmo.mode == GizmoMode::Rotate,
+        // Camera: si sposta e gira attorno al bersaglio; il bersaglio si sposta soltanto.
+        Some(Target::Camera(_)) => app.gizmo.mode == GizmoMode::Scale || (app.camera_target_handle && app.gizmo.mode == GizmoMode::Rotate),
         _ => false,
     };
     if app.gizmo.mode == GizmoMode::Select || tgt.is_none() || pointless || ui.input(|i| i.modifiers.alt) {
@@ -476,6 +508,11 @@ pub fn update(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::
                         let s = &app.scene.smokes[i];
                         DragStart::Smoke(i, s.center, s.size)
                     }
+                    Target::Dust => {
+                        let (c, s) = dust_region(app);
+                        DragStart::Dust(c, s)
+                    }
+                    Target::Camera(i) => DragStart::Camera(i, app.scene.render_cameras[i].camera.clone()),
                 };
                 let contact = match (tgt, h) {
                     (Target::Nodes, Handle::Axis(_) | Handle::Plane(_) | Handle::Screen) => contact_for_drag(&app.scene, &sel),
@@ -521,6 +558,15 @@ pub fn update(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::
                     app.scene.smokes[*i].center = *c;
                     app.scene.smokes[*i].size = *size;
                     app.shading_changed();
+                }
+                DragStart::Dust(c, size) => {
+                    app.scene.haze_dust.region = Some((*c, *size));
+                    crate::ui::atmosphere::dust_changed(app);
+                }
+                DragStart::Camera(i, cam) => {
+                    let now = app.scene.render_cameras[*i].camera.clone();
+                    app.scene.render_cameras[*i].camera = cam.clone();
+                    app.render_camera_moved(*i, &now);
                 }
             }
             app.gizmo.readout = None;
@@ -718,6 +764,43 @@ fn apply_drag(app: &mut ForgeApp, rect: egui::Rect, drag: &Drag, pos: egui::Pos2
                 Op::Scale(s) => f.size = (*size * s.abs()).max(Vec3::splat(0.05)),
             }
             app.shading_changed();
+        }
+        // Camera: spostamento = camera e bersaglio insieme (stessa direzione); rotazione = orbita
+        // attorno al bersaglio; con la maniglia del bersaglio si sposta solo lui (la camera resta
+        // ferma e cambia la direzione). Un bersaglio agganciato a un oggetto si sgancia.
+        DragStart::Camera(i, st) => {
+            let before = app.scene.render_cameras[*i].camera.clone();
+            let target_only = app.camera_target_handle;
+            let rc = &mut app.scene.render_cameras[*i];
+            let c = &mut rc.camera;
+            match &op {
+                Op::World(m) if target_only => {
+                    c.target = m.transform_point3(st.target);
+                    rc.aim = None;
+                }
+                Op::World(m) if app.gizmo.mode == GizmoMode::Rotate => {
+                    let r = Mat4::from_mat3(forge_math::Mat3::from_mat4(*m));
+                    c.position = st.target + r.transform_vector3(st.position - st.target);
+                    c.target = st.target;
+                }
+                Op::World(m) => {
+                    c.position = m.transform_point3(st.position);
+                    if rc.aim.is_none() {
+                        c.target = m.transform_point3(st.target);
+                    }
+                }
+                Op::Scale(_) => {}
+            }
+            app.render_camera_moved(*i, &before);
+        }
+        // Polvere: i granelli si rifanno nel riquadro nuovo (niente granelli nel posto di prima).
+        DragStart::Dust(c, size) => {
+            let r = match &op {
+                Op::World(m) => (m.transform_point3(*c), *size),
+                Op::Scale(k) => (*c, (*size * k.abs()).max(Vec3::splat(0.01))),
+            };
+            app.scene.haze_dust.region = Some(r);
+            crate::ui::atmosphere::dust_changed(app);
         }
         // Fumo: il riquadro si sposta (e il fumo con lui) o si ridimensiona attorno al centro.
         DragStart::Smoke(i, c, size) => {

@@ -89,10 +89,13 @@ pub const P_N_LASERS: usize = 81;
 /// Bit 0: c'è la polvere in sospensione (bit 2 dei flag del materiale); bit 1: c'è una nebbia
 /// "solo raggi" (`BakedFog::additive`).
 pub const P_HAS_DUST: usize = 82;
-/// Stile del render (`RenderStyle::code`: 0 fotorealistico, 1 fumetto, 2 tecnico).
+/// Stile del render (`RenderStyle::code`: 0 fotorealistico, 1 fumetto, 2 tecnico); bit 4 = bianco
+/// e nero; bit 5 = colore dello sfondo in [`P_BACKGROUND`].
 pub const P_STYLE: usize = 83;
 /// Brillantezza dei granelli di polvere (`RenderScene::dust_gain`).
 pub const P_DUST_GAIN: usize = 84;
+/// Colore dello sfondo visto dalla camera (3 parole), se il bit 5 di [`P_STYLE`] è acceso.
+pub const P_BACKGROUND: usize = 85;
 /// Laser: potenza(3), raggio, densità del fascio, 0, 0, 0; poi 1 + [`forge_render_core::laser::N_LAMBDA`]
 /// percorsi (RGB, poi le lunghezze d'onda) di [`LASER_PATH_WORDS`] parole.
 pub const LASER_HEADER_WORDS: usize = 8;
@@ -565,7 +568,7 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
 
     p[P_N_SELECT] = scene.lights.len() as u32 + scene.samples_environment() as u32 + scene.emissive.is_some() as u32;
     p[P_HAS_CUTOUT] = scene.has_cutout as u32;
-    p[P_HAS_DUST] = scene.has_dust as u32 | (scene.fogs.iter().any(|f| f.additive) as u32) << 1;
+    p[P_HAS_DUST] = scene.has_dust as u32 | (scene.fogs.iter().any(|f| f.additive) as u32) << 1 | (scene.dust_shadows as u32) << 2;
     set_f(&mut p, P_DUST_GAIN, scene.dust_gain);
     if w.w.is_empty() {
         w.u(0);

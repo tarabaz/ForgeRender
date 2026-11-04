@@ -70,6 +70,10 @@ pub const EXTERNAL: &[&str] = &[
     tk("Molto alta"),
     tk("Ultra"),
     // forge_scene::SMOKE_PRESETS
+    tk("Fumo caldo simulato"),
+    tk("Simulazione fisica: fumo caldo che esce dal fondo del riquadro, sale, si allarga e si arriccia da solo"),
+    tk("Gas pesante simulato"),
+    tk("Simulazione fisica di un gas freddo e pesante che esce, scende e si stende sul piano, scorrendo attorno agli oggetti"),
     tk("Nube sospesa"),
     tk("Un ammasso di fumo morbido a mezz'aria, con sbuffi e bordi sfilacciati"),
     tk("Incenso"),

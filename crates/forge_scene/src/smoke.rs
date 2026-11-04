@@ -28,6 +28,76 @@ impl SmokeShape {
     pub const ALL: [SmokeShape; 4] = [SmokeShape::Cloud, SmokeShape::Plume, SmokeShape::Wisp, SmokeShape::Bank];
 }
 
+/// Come nasce la nube.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SmokeMode {
+    /// Forma scelta e rumore frattale: immediato.
+    #[default]
+    Procedural,
+    /// Simulazione fisica (fumo caldo che sale, gas pesante che scende) fino all'istante scelto,
+    /// poi lo stesso dettaglio procedurale sul bordo.
+    Simulated,
+}
+
+/// Parametri della simulazione del fumo (modo [`SmokeMode::Simulated`]).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SmokeSim {
+    /// Sorgente: posizione rispetto al centro del fondo del riquadro (m) e raggio (m).
+    pub source_offset: Vec3,
+    pub source_radius: f32,
+    /// Quanto fumo esce (1 = la sorgente si riempie in un secondo).
+    pub emission: f32,
+    /// Calore della sorgente (0 = fumo freddo, 1 = caldo tipico, 3 = molto caldo).
+    pub temperature: f32,
+    /// Spinta del caldo verso l'alto.
+    pub buoyancy: f32,
+    /// Peso del fumo: alto = gas pesante che scende e si stende.
+    pub weight: f32,
+    /// Velocità di uscita dalla sorgente (m/s; negativa = verso il basso).
+    pub exit_speed: f32,
+    /// Raffreddamento (1/s): alto = il fumo smette presto di salire.
+    pub cooling: f32,
+    /// Dissolvenza del fumo (1/s).
+    pub dissipation: f32,
+    /// Vortici (confinamento della vorticità).
+    pub vorticity: f32,
+    /// Turbolenza (agitazione) e la sua grandezza (m).
+    pub turbulence: f32,
+    pub turbulence_scale: f32,
+    /// Vento (m/s).
+    pub wind: Vec3,
+    /// Secondi simulati: l'istante che si congela per il render.
+    pub time: f32,
+    /// Qualità della simulazione (1–4): celle sul lato più lungo del riquadro.
+    pub quality: u32,
+}
+
+/// Celle della simulazione sul lato più lungo per qualità 1–4.
+pub const SMOKE_SIM_CELLS: [usize; 4] = [48, 72, 100, 136];
+
+impl Default for SmokeSim {
+    fn default() -> Self {
+        Self {
+            source_offset: Vec3::new(0.0, 0.06, 0.0),
+            source_radius: 0.05,
+            emission: 3.0,
+            temperature: 1.0,
+            buoyancy: 4.0,
+            weight: 0.3,
+            exit_speed: 0.3,
+            cooling: 0.6,
+            dissipation: 0.05,
+            vorticity: 4.0,
+            turbulence: 3.0,
+            turbulence_scale: 0.15,
+            wind: Vec3::ZERO,
+            time: 3.0,
+            quality: 2,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SmokeCloud {
@@ -77,6 +147,9 @@ pub struct SmokeCloud {
     /// Qualità della griglia (1–4).
     pub quality: u32,
     pub seed: u32,
+    /// Procedurale (di serie, i progetti di prima) o simulato.
+    pub mode: SmokeMode,
+    pub sim: SmokeSim,
 }
 
 impl Default for SmokeCloud {
@@ -107,6 +180,8 @@ impl Default for SmokeCloud {
             collisions: true,
             quality: 2,
             seed: 1,
+            mode: SmokeMode::Procedural,
+            sim: SmokeSim::default(),
         }
     }
 }
@@ -118,7 +193,7 @@ pub struct SmokePreset {
     pub make: fn() -> SmokeCloud,
 }
 
-pub const SMOKE_PRESETS: [SmokePreset; 6] = [
+pub const SMOKE_PRESETS: [SmokePreset; 8] = [
     SmokePreset {
         name: "Nube sospesa",
         hint: "Un ammasso di fumo morbido a mezz'aria, con sbuffi e bordi sfilacciati",
@@ -247,6 +322,60 @@ pub const SMOKE_PRESETS: [SmokePreset; 6] = [
             ..Default::default()
         },
     },
+    SmokePreset {
+        name: "Fumo caldo simulato",
+        hint: "Simulazione fisica: fumo caldo che esce dal fondo del riquadro, sale, si allarga e si arriccia da solo",
+        make: || SmokeCloud {
+            name: "Fumo simulato".into(),
+            mode: SmokeMode::Simulated,
+            size: Vec3::new(0.8, 1.4, 0.8),
+            density: 60.0,
+            color: [0.72, 0.72, 0.72],
+            detail_scale: 0.06,
+            turbulence: 0.6,
+            billows: 0.5,
+            wisps: 0.5,
+            softness: 0.35,
+            variation: 0.3,
+            sim: SmokeSim {
+                source_radius: 0.08,
+                ..SmokeSim::default()
+            },
+            ..Default::default()
+        },
+    },
+    SmokePreset {
+        name: "Gas pesante simulato",
+        hint: "Simulazione fisica di un gas freddo e pesante che esce, scende e si stende sul piano, scorrendo attorno agli oggetti",
+        make: || SmokeCloud {
+            name: "Gas pesante".into(),
+            mode: SmokeMode::Simulated,
+            size: Vec3::new(1.6, 0.5, 1.6),
+            density: 90.0,
+            color: [0.82, 0.84, 0.88],
+            detail_scale: 0.08,
+            turbulence: 0.5,
+            billows: 0.6,
+            wisps: 0.4,
+            softness: 0.4,
+            variation: 0.3,
+            sim: SmokeSim {
+                source_offset: Vec3::new(0.0, 0.3, 0.0),
+                source_radius: 0.07,
+                emission: 6.0,
+                temperature: 0.0,
+                weight: 3.0,
+                exit_speed: -0.1,
+                dissipation: 0.1,
+                vorticity: 1.5,
+                turbulence: 0.6,
+                turbulence_scale: 0.15,
+                time: 4.0,
+                ..SmokeSim::default()
+            },
+            ..Default::default()
+        },
+    },
 ];
 
 impl SmokeCloud {
@@ -287,6 +416,32 @@ impl SmokeCloud {
         s.bottom_height = fin(s.bottom_height, 0.0).max(0.0);
         s.top_height = fin(s.top_height, 0.0).max(0.0);
         s.quality = s.quality.clamp(1, 4);
+        let m = &mut s.sim;
+        m.source_offset = if m.source_offset.is_finite() { m.source_offset } else { Vec3::ZERO };
+        m.source_radius = fin(m.source_radius, 0.04).clamp(0.001, 50.0);
+        m.emission = fin(m.emission, 3.0).clamp(0.0, 100.0);
+        m.temperature = fin(m.temperature, 1.0).clamp(0.0, 10.0);
+        m.buoyancy = fin(m.buoyancy, 4.0).clamp(0.0, 50.0);
+        m.weight = fin(m.weight, 0.3).clamp(0.0, 50.0);
+        m.exit_speed = fin(m.exit_speed, 0.3).clamp(-10.0, 10.0);
+        m.cooling = fin(m.cooling, 0.6).clamp(0.0, 20.0);
+        m.dissipation = fin(m.dissipation, 0.15).clamp(0.0, 20.0);
+        m.vorticity = fin(m.vorticity, 2.5).clamp(0.0, 20.0);
+        m.turbulence = fin(m.turbulence, 1.0).clamp(0.0, 20.0);
+        m.turbulence_scale = fin(m.turbulence_scale, 0.12).clamp(0.002, 20.0);
+        m.wind = if m.wind.is_finite() {
+            m.wind.clamp(Vec3::splat(-20.0), Vec3::splat(20.0))
+        } else {
+            Vec3::ZERO
+        };
+        m.time = fin(m.time, 3.0).clamp(0.05, 60.0);
+        m.quality = m.quality.clamp(1, 4);
         s
+    }
+
+    /// Centro della sorgente della simulazione (spazio mondo).
+    pub fn sim_source(&self) -> Vec3 {
+        let (lo, _) = self.bounds();
+        Vec3::new(self.center.x, lo.y, self.center.z) + self.sim.source_offset
     }
 }

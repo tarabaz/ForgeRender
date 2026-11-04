@@ -312,7 +312,9 @@ pub fn radiance_spectral_with(
 
         let Some(hit) = hit else {
             if depth == 0 {
-                if settings.environment_visible {
+                if let Some(bg) = settings.background {
+                    add(&mut l, beta * illuminant(Vec3::from(bg), w), depth);
+                } else if settings.environment_visible {
                     add(&mut l, beta * illuminant(scene.env_radiance(d, true), w), depth);
                 }
             } else {
@@ -384,7 +386,7 @@ pub fn radiance_spectral_with(
 
         // Stili non fotorealistici (come nel render RGB).
         if camera_path && settings.style != forge_render_core::RenderStyle::Photoreal && bsdf.has_non_delta() {
-            let c = crate::style::shade(scene, settings.style, mat, ns, wo, p, rng);
+            let c = crate::style::shade(scene, settings.style, settings.style_mono, mat, ns, wo, p, rng);
             add(&mut l, beta * illuminant(c, w), depth);
             break;
         }

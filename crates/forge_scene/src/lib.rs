@@ -26,5 +26,5 @@ pub use light::{LaserSource, Light, LightKind};
 pub use material::{Material, MaterialId, MaterialLibrary, Projection, TextureAnchor, TextureMapping, LIQUIDS_CATEGORY};
 pub use mesh::Mesh;
 pub use scene::{ComponentId, CopyRecord, Node, NodeIndex, Scene, UserTransform};
-pub use smoke::{SmokeCloud, SmokePreset, SmokeShape, SMOKE_PRESETS};
+pub use smoke::{SmokeCloud, SmokeMode, SmokePreset, SmokeShape, SmokeSim, SMOKE_PRESETS, SMOKE_SIM_CELLS};
 pub use units::LengthUnit;

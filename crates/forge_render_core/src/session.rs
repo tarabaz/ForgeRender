@@ -115,6 +115,11 @@ pub struct Frame {
     pub adaptive: Option<Arc<AdaptiveDiag>>,
     /// Contorni a inchiostro da disegnare sopra l'immagine (se accesi).
     pub outline: Option<Arc<crate::outline::Outline>>,
+    /// Profondità per pixel (per il tilt-shift, se acceso all'avvio).
+    pub depth: Option<Arc<crate::tiltshift::DepthBuffer>>,
+    /// Tilt-shift da applicare (quello del render; l'interfaccia lo sostituisce con
+    /// [`Frame::with_tilt`] per vedere subito le modifiche).
+    pub tilt: crate::tiltshift::TiltShift,
 }
 
 /// Diagnostica del campionamento adattivo: dove sono finiti i campioni e quanta parte è
@@ -135,10 +140,20 @@ impl Frame {
             Some(d) if strength > 0.0 => std::borrow::Cow::Owned(crate::mix_denoised(&self.linear, d, strength)),
             _ => std::borrow::Cow::Borrowed(self.linear.as_slice()),
         };
-        match &self.outline {
+        let img = match &self.outline {
             Some(o) if o.coverage.len() == img.len() => std::borrow::Cow::Owned(o.apply(&img)),
             _ => img,
+        };
+        if self.tilt.enabled {
+            let depth = self.depth.as_deref();
+            return std::borrow::Cow::Owned(crate::tiltshift::apply(&img, self.width, self.height, &self.tilt, depth));
         }
+        img
+    }
+
+    /// Lo stesso fotogramma con un altro tilt-shift (cambia solo la post-produzione).
+    pub fn with_tilt(&self, tilt: crate::tiltshift::TiltShift) -> Frame {
+        Frame { tilt, ..self.clone() }
     }
 }
 
@@ -337,6 +352,8 @@ struct Active {
     mask_logged: bool,
     /// Contorni a inchiostro (calcolati all'avvio, se accesi).
     outline: Option<Arc<crate::outline::Outline>>,
+    /// Profondità per il tilt-shift (calcolata all'avvio, se acceso).
+    depth: Option<Arc<crate::tiltshift::DepthBuffer>>,
 }
 
 type DenoiseKey = (crate::DenoiseQuality, bool, bool);
@@ -451,6 +468,8 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
             denoised_samples: if on { a.denoised_at.map(|d| d.0).unwrap_or(0) } else { 0 },
             guides: if on { dn.guides.as_ref().map(|g| g.1.clone()) } else { None },
             outline: a.outline.clone(),
+            depth: a.depth.clone(),
+            tilt: a.job.settings.tilt_shift,
             adaptive: a.mask.as_ref().map(|_| {
                 Arc::new(AdaptiveDiag {
                     counts: a.accum.counts().to_vec(),
@@ -517,8 +536,10 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
                         _ => Accumulator::new(w, h),
                     };
                     let outline = crate::outline::compute(&job.scene, &job.settings).map(Arc::new);
+                    let depth = crate::tiltshift::depth_buffer(&job.scene, &job.settings).map(Arc::new);
                     let a = Active {
                         outline,
+                        depth,
                         pass: vec![[0.0; 3]; accum.pixel_count()],
                         accum,
                         job: Job { resume: None, ..job },

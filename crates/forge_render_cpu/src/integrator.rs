@@ -213,7 +213,9 @@ pub fn radiance_with(
 
         let Some(hit) = hit else {
             if depth == 0 {
-                if settings.environment_visible {
+                if let Some(bg) = settings.background {
+                    add(&mut l, beta * Vec3::from(bg), depth);
+                } else if settings.environment_visible {
                     add(&mut l, beta * scene.env_radiance(d, true), depth);
                 }
             } else {
@@ -285,7 +287,7 @@ pub fn radiance_with(
         if camera_path && settings.style != forge_render_core::RenderStyle::Photoreal && bsdf.has_non_delta() {
             add(
                 &mut l,
-                beta * crate::style::shade(scene, settings.style, mat, ns, wo, p, rng),
+                beta * crate::style::shade(scene, settings.style, settings.style_mono, mat, ns, wo, p, rng),
                 depth,
             );
             break;
