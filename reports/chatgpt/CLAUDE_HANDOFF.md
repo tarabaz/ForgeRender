@@ -2569,3 +2569,23 @@ Claude deve prima valutare se questa sia una funzione tecnicamente corretta e ut
 - Prima di implementare, comunicare la valutazione tecnica e la soluzione consigliata. Se la soluzione è valida, implementarla e testarla sulla scena di riferimento e sulle geometrie di test già elencate, confrontando i risultati per assicurarsi che i contorni utili non scompaiano.
 
 **Stato:** richiesta di valutazione e proposta, non decisione tecnica già presa e non implementata.
+
+
+### Richiesta di Valerio — 04/11/2026: quota iniziale della foschia regolabile
+Valerio chiede di verificare e, se tecnicamente corretto, implementare un controllo per impostare non soltanto l'altezza massima della foschia, ma anche **la quota da cui inizia**.
+
+Caso d'uso fondamentale: poter collocare una fascia di nebbia/foschia nella parte alta di una stanza, vicino al soffitto, senza essere obbligati a farla partire dal pavimento. La foschia deve poter essere spostata verticalmente nel volume della scena.
+
+Richiesta funzionale:
+- Esporre un parametro/slider **Altezza iniziale** (quota inferiore) e mantenere **Altezza massima** (quota superiore), oppure un controllo equivalente per posizione verticale + spessore/altezza.
+- Permettere ad esempio di definire una fascia da 2,2 m a 2,8 m per simulare nebbia accumulata sotto il soffitto; un altro esempio è da 0 m a 1,5 m per nebbia bassa sul pavimento.
+- Definire chiaramente il riferimento della quota: preferibilmente un piano/riferimento verticale configurabile o il sistema di coordinate della scena, evitando di assumere sempre che il pavimento sia a Y=0.
+- Valutare se il controllo debba essere espresso come quota assoluta nel mondo, offset rispetto al piano di riferimento o entrambe le modalità. Per un primo rilascio è sufficiente una soluzione semplice, prevedibile e documentata.
+- Assicurare che densità e rumore procedurale siano confinati/mascherati nell'intervallo verticale scelto, con transizioni morbide ai bordi per evitare tagli netti innaturali.
+- Verificare compatibilità CPU/GPU e serializzazione dei progetti; preservare i valori predefiniti attuali in modo che le scene esistenti non cambino.
+- Prima di implementare, controllare come `haze_floor` e `Haze::top_height` sono effettivamente usati e spiegare se rappresentano già quota iniziale/finale oppure se `haze_floor` ha un altro significato. Non basarsi soltanto sui nomi dei campi.
+- Eseguire test con fascia bassa, fascia a metà stanza e fascia alta vicino al soffitto, oltre a un caso con coordinate/piano di riferimento non standard.
+
+**Criterio di accettazione:** l'utente può spostare la foschia verticalmente e impostarne l'estensione, inclusa una fascia sospesa in alto nella stanza; il comportamento predefinito delle scene esistenti resta invariato.
+
+**Stato:** richiesta di valutazione e implementazione, non ancora implementata né testata.
