@@ -2555,3 +2555,17 @@ Nell'immagine allegata, oltre ai contorni corretti delle forme, compaiono numero
 
 ### Chiarimento di Valerio — 04/11/2026
 Conferma esplicita: nella modalità **Illustrazione tecnica** va mantenuto anche il rendering attuale a colori freddi/caldi (Gooch). La richiesta è soltanto di **aggiungere** l'opzione bianco e nero, non di sostituire la modalità esistente. Default e compatibilità devono restare sull'aspetto attuale. Le sole due scelte richieste per Tecnico sono quindi: "Colori freddi/caldi (attuale)" e "Bianco e nero (nuovo)".
+
+
+### Ulteriore richiesta di Valerio — 04/11/2026: valutare uno slider di sensibilità dei contorni
+Valerio propone di aggiungere uno **slider per regolare la sensibilità dei contorni**, in modo da poter ridurre o eliminare i puntini/segni molto deboli o appena percettibili.
+
+Claude deve prima valutare se questa sia una funzione tecnicamente corretta e utile per l'attuale algoritmo, e riferire se/come sia implementabile:
+- Analizzare quali parametri controllano davvero la generazione dei bordi: soglia di discontinuità della profondità, soglia angolare delle normali/spigoli, confronto tra ID dei nodi, campionamento e copertura.
+- Stabilire se un singolo slider "Sensibilità contorni" possa agire in modo coerente su questi criteri oppure se rischi di mescolare fenomeni diversi. Se un solo slider è sensato, definire chiaramente cosa cambia andando da sensibilità bassa ad alta.
+- Verificare in particolare se riducendo la sensibilità si possono sopprimere i puntini isolati senza perdere silhouette, bordi tra oggetti e dettagli geometrici legittimi. Non presumere che tutti i puntini siano falsi positivi: alcuni potrebbero corrispondere a geometria reale.
+- Se un controllo unico non è appropriato, proporre alternative più corrette, ad esempio una sensibilità generale più un filtro separato per i piccoli componenti isolati, oppure controlli distinti per spigoli e discontinuità di profondità.
+- Valutare range, valore predefinito e comportamento retrocompatibile: il valore iniziale deve mantenere l'aspetto attuale; lo slider non deve modificare inaspettatamente i progetti esistenti.
+- Prima di implementare, comunicare la valutazione tecnica e la soluzione consigliata. Se la soluzione è valida, implementarla e testarla sulla scena di riferimento e sulle geometrie di test già elencate, confrontando i risultati per assicurarsi che i contorni utili non scompaiano.
+
+**Stato:** richiesta di valutazione e proposta, non decisione tecnica già presa e non implementata.
