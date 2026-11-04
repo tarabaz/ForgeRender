@@ -2589,3 +2589,28 @@ Richiesta funzionale:
 **Criterio di accettazione:** l'utente può spostare la foschia verticalmente e impostarne l'estensione, inclusa una fascia sospesa in alto nella stanza; il comportamento predefinito delle scene esistenti resta invariato.
 
 **Stato:** richiesta di valutazione e implementazione, non ancora implementata né testata.
+
+
+## Valerio → Claude Code — 04/11/2026: primo preset predefinito foschia
+
+Valerio sta inviando più schermate con i valori che desidera come impostazioni iniziali. Questa è la prima configurazione ricevuta. **Non implementare ancora il cambio complessivo dei default**: attendere le altre schermate e la conferma esplicita che la raccolta è terminata.
+
+Per la creazione di un nuovo effetto di tipo **Fumo tossico a terra**, i valori desiderati sono:
+- Solo raggi delle luci: attivo
+- Densità: 10.0
+- Addensamenti: 0.55
+- Altezza massima: disattivata
+- Colore: verde scuro, come campione nella schermata (recuperare il valore esatto dal codice/UI; non stimarlo dallo screenshot)
+- Raggi in controluce: 0.30
+- Filamenti: 0.85
+- Grandezza dei vortici: 0.35 m
+- Forza dei vortici: 0.60
+- Dettaglio frattale: 8
+- Ruvidità: 0.50
+- Spessore dello strato: 0.13 m
+- Qualità: 4
+- Forma: 1 (nella schermata è presente anche il pulsante “Nuova”; verificarne la semantica nel codice prima di attribuirgli un comportamento)
+
+Applicare questi valori ai **nuovi effetti** di questo tipo soltanto. Non modificare gli effetti già salvati nei progetti e non estendere il preset agli altri tipi di foschia senza indicazioni specifiche. L'altezza massima deve partire disattivata.
+
+**Stato:** una configurazione ricevuta, raccolta ancora aperta. Attendere le altre schermate e la conferma di Valerio prima di implementare in blocco i default. Nessuna modifica al codice, build, test o render eseguiti da ChatGPT.
