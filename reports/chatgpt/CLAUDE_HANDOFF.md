@@ -2814,3 +2814,21 @@ The black specks must be eliminated. The outline result must look clean and deli
 5. Report the root cause, chosen filtering/line-continuity strategy, files changed, and actual build/test results. Visually inspect the reproduced scene before declaring the issue fixed.
 
 Treat this as part of the existing Cell Shading/outline quality investigation above, but track it as a separate artifact with its own reproduction and acceptance checks. The earlier white-patch issue and these black speckles may have different causes; do not assume one fix will solve both.
+
+
+## UI requests from Valerio — 04/11/2026
+
+### Open the manual in the active application language
+
+The user manual must follow the language currently selected in ForgeRender's UI. When the UI is Italian, open the Italian manual; when the UI is English, open the English manual. Use the application's active locale setting as the source of truth, not the operating-system language when the user has selected another UI language. If a localized manual is unavailable, fall back gracefully to the default/English manual and still open help. Apply this consistently to the menu and any other help entry points. Inspect the existing localization and manual-opening code, implement the smallest consistent change, and verify both language paths plus fallback where practical.
+
+### Remove the redundant Library menu item
+
+Valerio reports that the menu currently has both **Library** and **Materials**, but both entries open the same Materials view. Remove the redundant **Library** menu entry and retain **Materials** as the single menu entry for that view. This is a menu cleanup only: do not delete the underlying library/material functionality, panel, or data. Check all menu layouts, translations, shortcuts/actions, and tests so the duplicate is gone in every supported UI language and Materials remains accessible.
+
+Acceptance criteria:
+1. Italian UI opens the Italian manual; English UI opens the English manual.
+2. Missing localized documentation falls back gracefully.
+3. Only one Materials-view menu entry remains, labelled in the active UI language; the duplicate Library entry is removed.
+4. Materials functionality remains intact.
+5. Report changed files and actual build/test results; distinguish tested behavior from untested paths.
