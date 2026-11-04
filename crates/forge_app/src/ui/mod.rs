@@ -8,6 +8,7 @@ pub(crate) mod ai_setup;
 pub(crate) mod atmosphere;
 pub(crate) mod blend_import;
 pub mod central;
+pub(crate) mod color_picker;
 mod demo_info;
 pub mod gizmo;
 pub mod icons;
@@ -23,6 +24,7 @@ pub(crate) mod sequence;
 pub(crate) mod settings;
 mod simple;
 pub(crate) mod smoke;
+pub(crate) mod smoke_preview;
 mod splash;
 mod status;
 pub mod style;
@@ -376,12 +378,12 @@ pub fn detachable(
 pub fn dock_button(ui: &mut egui::Ui, docked: &mut bool) -> bool {
     let (text, hint) = if *docked {
         (
-            tr("⧉ Stacca dal programma"),
+            format!("{} {}", crate::ui::icons::EXPORT, tr("Stacca dal programma")),
             tr("Apre questa finestra a parte: la sposti dove vuoi, anche fuori dal programma o su un altro schermo"),
         )
     } else {
         (
-            tr("⧉ Riporta nel programma"),
+            format!("{} {}", crate::ui::icons::BACK, tr("Riporta nel programma")),
             tr("Rimette questa finestra dentro il programma, sopra la scena"),
         )
     };

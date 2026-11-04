@@ -219,6 +219,11 @@ pub struct ForgeApp {
     pub selected_camera: Option<usize>,
     /// Il gizmo della camera selezionata sposta il bersaglio invece della camera.
     pub camera_target_handle: bool,
+    /// Il gizmo del fumo selezionato sposta la sorgente della simulazione invece del riquadro
+    /// (Scala cambia il raggio della sorgente).
+    pub smoke_source_handle: bool,
+    /// Anteprima a punti del fumo simulato nella viewport.
+    pub smoke_preview: crate::ui::smoke_preview::SmokePreviewState,
     /// Il gizmo della nebbia sposta la zona simulata invece dell'emettitore.
     pub fog_gizmo_zone: bool,
     pub selected_material: MaterialId,
@@ -396,6 +401,8 @@ impl ForgeApp {
             selected_dust: false,
             selected_camera: None,
             camera_target_handle: false,
+            smoke_source_handle: false,
+            smoke_preview: Default::default(),
             fog_gizmo_zone: false,
             selected_material: MaterialId::new("default"),
             view: View::Viewport,
@@ -1305,6 +1312,11 @@ impl ForgeApp {
     }
 
     /// Geometria compilata sincrona (per il picking); costruisce la BVH se serve.
+    /// Geometria compilata per la scena attuale, se è pronta (senza aspettarla).
+    pub fn current_geometry_shared(&self) -> Option<Arc<RenderGeometry>> {
+        self.current_geometry()
+    }
+
     pub fn geometry_now(&mut self) -> Arc<RenderGeometry> {
         if let Some(g) = self.current_geometry() {
             return g;
@@ -2533,6 +2545,7 @@ impl ForgeApp {
         self.frames += 1;
         self.poll_geometry();
         self.poll_fog();
+        crate::ui::smoke_preview::update(self);
         self.precompute_fog();
         self.poll_pending();
         self.apply_startup_select();

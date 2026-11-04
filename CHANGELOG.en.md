@@ -10,6 +10,28 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.39.0 — 4 Nov 2026
+
+**Simulated smoke you can place**
+- The source of the simulation is drawn as a sphere of its real size, selectable with a click or "Select the source" (`ForgeApp::smoke_source_handle`); the gizmo moves it (`gizmo::DragStart::SmokeSource`, offset from the bottom of the box) and Scale changes its radius.
+- **Viewport preview** (`ui::smoke_preview`, `forge_render_core::smoke::smoke_preview`): the same simulation on a coarse grid (about 36,000 cells, under a second) in a background thread whenever the settings of the selected smoke change, with 48 frames (`forge_volume::smoke_sim::simulate_smoke_frames`) shown as point clouds (up to 5,000 points), in a loop or paused at a chosen time. Not saved with the project.
+- **Cells follow the source** (`SmokeCloud::sim_cells`, `sim_cell`): the quality's cells per side, made finer when a cell is larger than the source (about three cells across it), within the quality's total cell count; `sim_warning` and a message in the panel when the source is still smaller than a cell. Cause of the invisible smoke reported by Valerio: a 10 × 1.5 × 5 m box at quality 2 gave 14 cm cells for a 7 cm source, and the heavy gas lay in a layer thinner than a cell, cleared by the floor.
+
+**Colour picker (RGB / CMYK / Palette)**
+- `ui::color_picker`: one panel opened from the swatch of the material colours (base, volume, emission) with RGB (egui wheel, R G B, hex), CMYK (simple mathematical conversion, documented as not colorimetric) and Palette; live preview, Apply, Cancel/Esc restoring colour and code.
+- **RAL:** the official RAL CLASSIC digital values are sold by RAL gGmbH as libraries to import into design software. With Valerio's go-ahead the palette tab includes `assets/colori/RAL_Classic.json` (225 codes, Italian and English names, **indicative** sRGB values: the average of the English and German Wikipedia tables, the German one where they differ by more than 20/255; prepared by `tools/colori/ral_classic.js`), labelled as not official. In addition it reads files imported by the user into `<Library>/Colori`: Adobe Swatch Exchange `.ase` (RGB, Lab D50 → sRGB with Bradford adaptation, CMYK, grey), `.json`, `.csv`.
+- `Material::color_codes` (field → palette code, not written when empty): the code is shown next to the swatch with the full name as a tooltip; editing the colour in RGB or CMYK removes it.
+
+**Fixes**
+- **Ink outlines and tilt-shift no longer delay the render:** they were computed on the render thread before the first sample (0.3–0.5 s at 1080p on 0.1–1.6 million triangles, for every restart, and queued restarts added up while dragging). Now `Overlays` are computed in a separate thread and published when ready, reused while geometry, camera, resolution and outline settings stay the same, and a run of queued starts keeps only the last one (test `overlays.rs`).
+- **Tilt-shift without repeated copies:** with 48 gather taps on a radius of 20+ pixels, bright reflections showed as separate copies (on the torus in Valerio's render). The blur is now gathered from a pyramid of reduced images, about 3 pixels of radius on the chosen level, blending two levels (test `large_blur_has_no_ghost_copies`).
+- **Cartoon highlights (white patches):** the cel highlight was a fixed +0.6 white on any non-rough material, placed where the half vector of the strongest light passed 0.985 (about 10°), using the centre of area lights. Now it appears only where the mirror direction really sees the light (the softbox shape for area lights, a small circle for the others), with the strength of the material's reflectance (about 0.15 on dark plastic, full on metals), on CPU and GPU (test `toon_highlight_follows_the_reflectance`). Matches the photoreal reflections of the test scene.
+- **Black dots in the outlines:** not reproduced with 0.37 and later (test scene, 640×360 and 1600×900, with and without cleanup): the fix of 0.37 (isolated sub-samples in triangle seams) covers it.
+- **Missing glyphs:** the square after "U8" in egui's colour picker was its copy button 📋 (U+1F4CB): since egui 0.37 the symbol fonts are optional (`monochrome_emoji_fonts`), now enabled. A new test checks that every non-ASCII character of the interface strings and of `Lan_eng.json` has a glyph; it found and replaced ⊙ (camera aimed at an object), ● (unsaved changes), ✓ (in library) and ⧉ (detach window).
+- **Manual in the interface language:** it follows the active interface language (also after a language change, forgetting the choice made in the manual window); a language without a manual falls back to English, then Italian.
+- **Duplicate toolbar button:** "Library" and "Material" opened the same view; "Library" is removed (the Library menu with download, Blender import and folder stays).
+- **Material preview:** dragging to the right turns the object to the right.
+
 ## 0.38.0 — 4 Nov 2026
 
 **New built-in material library**

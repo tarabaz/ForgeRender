@@ -17,7 +17,7 @@ use crate::RenderGeometry;
 use forge_math::Vec3;
 use forge_scene::{Scene, SmokeCloud, SmokeMode, SmokeShape};
 use forge_volume::noise::{fbm, fbm_gain, gradient};
-use forge_volume::smoke_sim::{simulate_smoke, SmokeField, SmokeSimParams};
+use forge_volume::smoke_sim::{simulate_smoke, simulate_smoke_frames, SmokeField, SmokeSimParams};
 use forge_volume::{progress, BakedFog, GridSpec};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -208,7 +208,7 @@ fn simulated_field(s: &SmokeCloud, geo: &RenderGeometry, p0: f32, p1: f32) -> Op
     if let Some(f) = sim_cache().lock().unwrap().get(&k) {
         return Some(f.clone());
     }
-    let cells = forge_scene::SMOKE_SIM_CELLS[(s.sim.quality.clamp(1, 4) - 1) as usize];
+    let cells = s.sim_cells();
     let spec = GridSpec::covering(lo, hi, cells);
     let solid = (s.collisions && !geo.accel.is_empty()).then(|| {
         let shell = voxelize(geo, &spec);
@@ -273,6 +273,125 @@ pub fn smokes_ready(scene: &Scene, geo: &RenderGeometry) -> bool {
 
 /// Una nube calcolata (dalla cache o calcolata qui, con l'avanzamento sulla barra); None se il
 /// calcolo è stato annullato.
+/// Anteprima della simulazione per la viewport: lo stesso fumo simulato su una griglia grossolana
+/// (veloce, circa mezzo secondo), con un fotogramma ogni [`PREVIEW_FRAMES`]-esimo del tempo
+/// simulato. Ogni fotogramma è una nuvola di punti dove c'è fumo (più punti dove è denso): mostra
+/// dove va il fumo e come si muove senza fare il render. Non è il fumo del render (manca il
+/// dettaglio fine e la griglia è più rada), solo il suo andamento.
+#[derive(Clone, Debug, Default)]
+pub struct SmokePreview {
+    /// (istante in secondi, punti: posizione e densità relativa 0–1).
+    pub frames: Vec<(f32, Vec<(Vec3, f32)>)>,
+    /// Lato della cella dell'anteprima (m).
+    pub cell: f32,
+}
+
+impl SmokePreview {
+    /// Il fotogramma più vicino all'istante `t`.
+    pub fn at(&self, t: f32) -> Option<&[(Vec3, f32)]> {
+        let i = self.frames.partition_point(|f| f.0 < t).min(self.frames.len().checked_sub(1)?);
+        Some(&self.frames[i].1)
+    }
+}
+
+/// Fotogrammi dell'anteprima nel tempo simulato.
+pub const PREVIEW_FRAMES: usize = 48;
+/// Celle al massimo nella griglia dell'anteprima.
+const PREVIEW_CELLS: f32 = 36_000.0;
+/// Punti al massimo per fotogramma.
+const PREVIEW_POINTS: usize = 5000;
+
+/// Calcola l'anteprima (None se annullata o se il fumo non è simulato).
+pub fn smoke_preview(s: &SmokeCloud, geo: &RenderGeometry, cancelled: &dyn Fn() -> bool) -> Option<SmokePreview> {
+    let s = s.sanitized();
+    if s.mode != SmokeMode::Simulated {
+        return None;
+    }
+    let (lo, hi) = s.bounds();
+    let ext = (hi - lo).max(Vec3::splat(1e-3));
+    let cell = (ext.x * ext.y * ext.z / PREVIEW_CELLS).cbrt().max(ext.max_element() / 96.0);
+    let spec = GridSpec::covering(lo, hi, ((ext.max_element() / cell).ceil() as usize).max(8));
+    let solid = (s.collisions && !geo.accel.is_empty()).then(|| {
+        let shell = voxelize(geo, &spec);
+        let inside = interior_cells(geo, &spec, &shell);
+        shell.iter().zip(&inside).map(|(a, b)| *a || *b).collect::<Vec<bool>>()
+    });
+    let m = &s.sim;
+    let params = SmokeSimParams {
+        spec,
+        source: s.sim_source(),
+        source_radius: m.source_radius,
+        emission: m.emission,
+        temperature: m.temperature,
+        buoyancy: m.buoyancy,
+        weight: m.weight,
+        exit_speed: m.exit_speed,
+        cooling: m.cooling,
+        dissipation: m.dissipation,
+        vorticity: m.vorticity,
+        turbulence: m.turbulence,
+        turbulence_scale: m.turbulence_scale,
+        wind: m.wind,
+        time: m.time,
+        seed: s.seed,
+    };
+    let mut raw: Vec<(f32, Vec<f32>)> = Vec::new();
+    simulate_smoke_frames(
+        &params,
+        solid.as_deref(),
+        m.time / PREVIEW_FRAMES as f32,
+        &mut |t, rho| raw.push((t, rho.to_vec())),
+        cancelled,
+    )?;
+    // Riferimento comune a tutti i fotogrammi: il 90° percentile dell'ultimo (come il render).
+    let reference = raw
+        .last()
+        .map(|(_, r)| {
+            let mut v: Vec<f32> = r.iter().copied().filter(|&x| x > 1e-4).collect();
+            if v.is_empty() {
+                return 1.0;
+            }
+            let k = ((v.len() as f32 * 0.9) as usize).min(v.len() - 1);
+            *v.select_nth_unstable_by(k, |a, b| a.total_cmp(b)).1
+        })
+        .unwrap_or(1.0)
+        .max(1e-4);
+    let h = spec.cell;
+    let hash = |i: usize, k: u32| {
+        let mut x = (i as u32).wrapping_mul(0x9E37_79B9) ^ k.wrapping_mul(0x85EB_CA6B) ^ s.seed;
+        x ^= x >> 16;
+        x = x.wrapping_mul(0x7FEB_352D);
+        x ^= x >> 15;
+        (x & 0xFFFF) as f32 / 65535.0
+    };
+    let frames = raw
+        .into_iter()
+        .map(|(t, rho)| {
+            let mut pts = Vec::new();
+            for (i, &r) in rho.iter().enumerate() {
+                let d = (r / reference).min(1.5);
+                if d < 0.04 {
+                    continue;
+                }
+                let (x, y, z) = spec.coords(i);
+                let c = spec.center(x, y, z);
+                // Uno o più punti per cella, sparsi dentro la cella (sempre negli stessi posti).
+                let n = (d * 3.0).ceil() as u32;
+                for k in 0..n {
+                    let j = Vec3::new(hash(i, k * 3), hash(i, k * 3 + 1), hash(i, k * 3 + 2)) - Vec3::splat(0.5);
+                    pts.push((c + j * h, d.min(1.0)));
+                }
+            }
+            if pts.len() > PREVIEW_POINTS {
+                let step = pts.len() as f32 / PREVIEW_POINTS as f32;
+                pts = (0..PREVIEW_POINTS).map(|k| pts[(k as f32 * step) as usize]).collect();
+            }
+            (t, pts)
+        })
+        .collect();
+    Some(SmokePreview { frames, cell: h })
+}
+
 fn bake_one(s: &SmokeCloud, geo: &RenderGeometry) -> Option<Arc<BakedFog>> {
     let k = key(s, geo);
     if let Some(b) = cache().lock().unwrap().get(&k) {
@@ -359,6 +478,29 @@ pub fn smoke_fogs(scene: &Scene, geo: &RenderGeometry) -> Vec<Arc<BakedFog>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Anteprima del fumo caldo simulato: fotogrammi nel tempo, con punti che salgono dalla
+    /// sorgente (più in alto alla fine che all'inizio), calcolata in fretta.
+    #[test]
+    fn preview_shows_hot_smoke_rising_over_time() {
+        let preset = forge_scene::SMOKE_PRESETS.iter().find(|p| p.name == "Fumo caldo simulato").unwrap();
+        let mut s = (preset.make)();
+        s.center = Vec3::new(0.0, s.size.y * 0.5, 0.0);
+        let geo = RenderGeometry::build(&Scene::default());
+        let t0 = std::time::Instant::now();
+        let p = smoke_preview(&s, &geo, &|| false).expect("anteprima");
+        let ms = t0.elapsed().as_millis();
+        assert!(p.frames.len() >= PREVIEW_FRAMES / 2, "{} fotogrammi", p.frames.len());
+        let top = |pts: &[(Vec3, f32)]| pts.iter().map(|q| q.0.y).fold(f32::MIN, f32::max);
+        let early = &p.frames[p.frames.len() / 6].1;
+        let late = &p.frames.last().unwrap().1;
+        assert!(!late.is_empty() && late.len() <= PREVIEW_POINTS);
+        assert!(top(late) > top(early) + 0.05, "il fumo non sale: {} → {}", top(early), top(late));
+        assert!(ms < 5000, "anteprima lenta: {ms} ms");
+        // Fotogramma per istante: il primo all'inizio, l'ultimo alla fine.
+        assert!(std::ptr::eq(p.at(0.0).unwrap(), p.frames[0].1.as_slice()));
+        assert!(std::ptr::eq(p.at(1e9).unwrap(), late.as_slice()));
+    }
 
     /// Nube sospesa: piena al centro, vuota fuori dal riquadro e sugli angoli, con il bordo
     /// irregolare (sbuffi), e spostando il riquadro la nube si sposta identica.

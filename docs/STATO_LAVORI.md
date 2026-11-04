@@ -738,3 +738,16 @@ Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
   (`assets/materiali-aggiuntivi`, ignorata da git) e come zip in `dist/MCP/MATERIALI AGGIUNTIVI`.
 - Da decidere: dove pubblicare il pacchetto aggiuntivo (release GitHub o Drive) e se aggiungere un
   pulsante per scaricarlo dal programma; traduzioni inglesi dei nomi dei materiali.
+
+### 0.39.0 (04/11/2026): fumo da posizionare, selettore colore, correzioni da ChatGPT
+- Fumo: sorgente con gizmo (`smoke_source_handle`, `DragStart::SmokeSource`), anteprima a punti
+  (`ui::smoke_preview`, `smoke::smoke_preview`, `simulate_smoke_frames`), celle adattate
+  (`SmokeCloud::sim_cells`, `sim_warning`).
+- `ui::color_picker` (RGB, CMYK, palette), `Material::color_codes`; RAL Classic con valori indicativi in
+  `assets/colori/RAL_Classic.json` (via libera di Valerio), più le palette importate.
+- Sessione: `Overlays` (contorni e profondità) in un thread a parte con cache; avvii in coda scartati.
+- Tilt-shift a piramide; riflessi del fumetto legati al riflesso vero (CPU e WGSL); font dei simboli
+  di egui e test di copertura dei caratteri; manuale nella lingua attiva; pulsante Libreria tolto
+  dalla barra; rotazione dell'anteprima del materiale invertita.
+- Non provato nell'interfaccia: pannello colore, gizmo della sorgente, anteprima del fumo (solo test
+  e render da riga di comando).

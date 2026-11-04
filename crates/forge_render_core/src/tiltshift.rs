@@ -138,10 +138,83 @@ pub fn depth_buffer(scene: &RenderScene, s: &RenderSettings) -> Option<DepthBuff
 
 /// Campioni del disco di sfocatura (spirale aurea).
 const TAPS: usize = 48;
+/// Raggio del disco (in pixel del livello) sul livello della piramide da cui si raccoglie: con 48
+/// campioni su un disco di questo raggio i campioni distano meno di un pixel e si fondono.
+const LEVEL_RADIUS: f32 = 3.0;
+
+/// Un livello della piramide: l'immagine ridotta di 2^n con raggio di sfocatura e profondità.
+struct Level {
+    w: usize,
+    h: usize,
+    color: Vec<[f32; 3]>,
+    radius: Vec<f32>,
+    depth: Vec<f32>,
+}
+
+impl Level {
+    /// Livello successivo: media di 2×2 pixel (profondità: media di quelle finite).
+    fn half(&self) -> Level {
+        let (w, h) = (self.w.div_ceil(2), self.h.div_ceil(2));
+        let mut out = Level {
+            w,
+            h,
+            color: vec![[0.0; 3]; w * h],
+            radius: vec![0.0; w * h],
+            depth: vec![f32::INFINITY; w * h],
+        };
+        out.color
+            .par_iter_mut()
+            .zip(out.radius.par_iter_mut())
+            .zip(out.depth.par_iter_mut())
+            .enumerate()
+            .for_each(|(i, ((c, r), d))| {
+                let (x, y) = (i % w, i / w);
+                let (mut sc, mut sr, mut sd, mut nd) = ([0.0f32; 3], 0.0, 0.0, 0);
+                for (dx, dy) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
+                    let (xx, yy) = ((2 * x + dx).min(self.w - 1), (2 * y + dy).min(self.h - 1));
+                    let j = yy * self.w + xx;
+                    for (k, v) in sc.iter_mut().enumerate() {
+                        *v += self.color[j][k] * 0.25;
+                    }
+                    sr += self.radius[j] * 0.25;
+                    if self.depth[j].is_finite() {
+                        sd += self.depth[j];
+                        nd += 1;
+                    }
+                }
+                *c = sc;
+                *r = sr;
+                if nd > 0 {
+                    *d = sd / nd as f32;
+                }
+            });
+        out
+    }
+
+    /// Colore bilineare in coordinate del livello (centri dei pixel a i + 0,5).
+    fn color_at(&self, x: f32, y: f32) -> [f32; 3] {
+        let fx = (x - 0.5).clamp(0.0, (self.w - 1) as f32);
+        let fy = (y - 0.5).clamp(0.0, (self.h - 1) as f32);
+        let (x0, y0) = (fx.floor() as usize, fy.floor() as usize);
+        let (x1, y1) = ((x0 + 1).min(self.w - 1), (y0 + 1).min(self.h - 1));
+        let (tx, ty) = (fx - x0 as f32, fy - y0 as f32);
+        let at = |x: usize, y: usize| self.color[y * self.w + x];
+        let (a, b, c, d) = (at(x0, y0), at(x1, y0), at(x0, y1), at(x1, y1));
+        std::array::from_fn(|k| {
+            let top = a[k] + (b[k] - a[k]) * tx;
+            let bot = c[k] + (d[k] - c[k]) * tx;
+            top + (bot - top) * ty
+        })
+    }
+}
 
 /// Immagine con il tilt-shift. Sfocatura a disco "raccolta": un campione vicino conta solo se la
 /// sua sfocatura arriva fin qui (un pixel nitido non si spalma sui vicini sfocati) e, con la
 /// profondità, se non è un oggetto molto più vicino e più nitido del pixel.
+///
+/// I raggi grandi si raccolgono da una piramide di immagini già ridotte (2×, 4×, 8×…): sul
+/// livello giusto il disco ha un raggio di circa [`LEVEL_RADIUS`] pixel, i campioni si toccano e
+/// i riflessi forti diventano una sfumatura continua invece di tante copie separate.
 pub fn apply(img: &[[f32; 3]], w: u32, h: u32, t: &TiltShift, depth: Option<&DepthBuffer>) -> Vec<[f32; 3]> {
     let t = t.sanitized();
     let (w, h) = (w as usize, h as usize);
@@ -158,7 +231,22 @@ pub fn apply(img: &[[f32; 3]], w: u32, h: u32, t: &TiltShift, depth: Option<&Dep
         })
         .collect();
     let depth = depth.filter(|d| d.depth.len() == w * h && t.depth_aware);
+    let mut levels = vec![Level {
+        w,
+        h,
+        color: img.to_vec(),
+        radius: radius.clone(),
+        depth: depth.map(|d| d.depth.clone()).unwrap_or_else(|| vec![0.0; w * h]),
+    }];
+    while levels.len() < 8
+        && max_r / (1usize << (levels.len() - 1)) as f32 > LEVEL_RADIUS
+        && levels.last().is_some_and(|l| l.w > 4 && l.h > 4)
+    {
+        let next = levels.last().unwrap().half();
+        levels.push(next);
+    }
     let golden = std::f32::consts::PI * (3.0 - 5f32.sqrt());
+    let aware = depth.is_some();
     (0..w * h)
         .into_par_iter()
         .map(|i| {
@@ -166,37 +254,49 @@ pub fn apply(img: &[[f32; 3]], w: u32, h: u32, t: &TiltShift, depth: Option<&Dep
             if r < 0.5 {
                 return img[i];
             }
-            let (x, y) = ((i % w) as f32, (i / w) as f32);
-            let d0 = depth.map(|d| d.depth[i]).unwrap_or(0.0);
-            let mut acc = [img[i][0], img[i][1], img[i][2]];
-            let mut wsum = 1.0f32;
-            for k in 0..TAPS {
-                let rr = r * ((k as f32 + 0.5) / TAPS as f32).sqrt();
-                let a = k as f32 * golden;
-                let sx = (x + rr * a.cos()).round();
-                let sy = (y + rr * a.sin()).round();
-                if sx < 0.0 || sy < 0.0 || sx >= w as f32 || sy >= h as f32 {
-                    continue;
-                }
-                let j = sy as usize * w + sx as usize;
-                // La sfocatura del campione deve arrivare fin qui.
-                let mut wt = ((radius[j] - rr) / 1.5 + 1.0).clamp(0.0, 1.0);
-                if let Some(d) = depth {
+            // Livello (anche frazionario): si raccoglie dai due livelli vicini e si mescola, così
+            // il passaggio da un livello all'altro lungo la sfumatura non si vede.
+            let lf = (r / LEVEL_RADIUS).log2().max(0.0).min((levels.len() - 1) as f32);
+            let l0 = lf.floor() as usize;
+            let frac = lf - l0 as f32;
+            let (x, y) = ((i % w) as f32 + 0.5, (i / w) as f32 + 0.5);
+            let d0 = levels[0].depth[i];
+            let gather = |lvl: usize| -> [f32; 3] {
+                let l = &levels[lvl];
+                let scale = (1usize << lvl) as f32;
+                let mut acc = img[i];
+                let mut wsum = 1.0f32;
+                for k in 0..TAPS {
+                    let rr = r * ((k as f32 + 0.5) / TAPS as f32).sqrt();
+                    let a = k as f32 * golden;
+                    let (sx, sy) = (x + rr * a.cos(), y + rr * a.sin());
+                    if sx < 0.0 || sy < 0.0 || sx >= w as f32 || sy >= h as f32 {
+                        continue;
+                    }
+                    let (lx, ly) = (sx / scale, sy / scale);
+                    let j = (ly as usize).min(l.h - 1) * l.w + (lx as usize).min(l.w - 1);
+                    // La sfocatura del campione deve arrivare fin qui.
+                    let mut wt = ((l.radius[j] - rr) / 1.5 + 1.0).clamp(0.0, 1.0);
                     // Un oggetto molto più vicino del pixel e più nitido non entra nello sfondo.
-                    let dj = d.depth[j];
-                    if dj < d0 * 0.85 && radius[j] < r * 0.6 {
-                        wt *= 0.0;
+                    if aware && l.depth[j] < d0 * 0.85 && l.radius[j] < r * 0.6 {
+                        wt = 0.0;
+                    }
+                    if wt > 0.0 {
+                        let c = l.color_at(lx, ly);
+                        acc[0] += c[0] * wt;
+                        acc[1] += c[1] * wt;
+                        acc[2] += c[2] * wt;
+                        wsum += wt;
                     }
                 }
-                if wt > 0.0 {
-                    let c = img[j];
-                    acc[0] += c[0] * wt;
-                    acc[1] += c[1] * wt;
-                    acc[2] += c[2] * wt;
-                    wsum += wt;
-                }
+                acc.map(|v| v / wsum)
+            };
+            let c0 = gather(l0);
+            if frac < 0.01 || l0 + 1 >= levels.len() {
+                return c0;
             }
-            [acc[0] / wsum, acc[1] / wsum, acc[2] / wsum]
+            let c1 = gather(l0 + 1);
+            std::array::from_fn(|k| c0[k] + (c1[k] - c0[k]) * frac)
         })
         .collect()
 }
@@ -228,6 +328,47 @@ mod tests {
         let v = TiltShift { angle_deg: 90.0, ..t };
         assert_eq!(v.amount(cx, 0.05, a), 0.0, "verticale: nitida su tutta la colonna centrale");
         assert_eq!(v.amount(0.05, 0.5, a), 1.0, "verticale: sfocata ai lati");
+    }
+
+    /// Un punto luminoso su fondo scuro, sfocato con un raggio grande: diventa una macchia
+    /// continua, senza le copie separate dei singoli campioni (anelli o puntini).
+    #[test]
+    fn large_blur_has_no_ghost_copies() {
+        let (w, h) = (400u32, 200u32);
+        let mut img = vec![[0.0f32; 3]; (w * h) as usize];
+        for y in 98..102 {
+            for x in 198..202 {
+                img[(y * w + x) as usize] = [50.0; 3];
+            }
+        }
+        // Fascia nitida in alto: tutta la parte centrale ha la sfocatura massima (20 px).
+        let t = TiltShift {
+            enabled: true,
+            center: 0.0,
+            width: 0.0,
+            transition_a: 0.0,
+            transition_b: 0.0,
+            blur: 0.05,
+            ..Default::default()
+        };
+        let out = apply(&img, w, h, &t, None);
+        // Lungo la riga del punto la luce cala in modo regolare, senza buchi tra copie.
+        let row: Vec<f32> = (186..215).map(|x| out[(100 * w + x) as usize][0]).collect();
+        let peak = row.iter().copied().fold(0.0f32, f32::max);
+        assert!(peak > 0.0);
+        let mut rising = true;
+        for k in 1..row.len() {
+            // Salita fino al centro, poi discesa: niente risalite (anelli) di oltre il 10 %.
+            if k > row.len() / 2 {
+                rising = false;
+            }
+            let (a, b) = (row[k - 1], row[k]);
+            if rising {
+                assert!(b >= a * 0.9 - 1e-4, "risalita a {k}: {row:?}");
+            } else {
+                assert!(b <= a * 1.1 + 1e-4, "anello a {k}: {row:?}");
+            }
+        }
     }
 
     /// Un'immagine a righe si sfoca fuori dalla fascia e resta identica dentro.

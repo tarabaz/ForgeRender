@@ -113,7 +113,7 @@ fn library_save_controls(app: &mut ForgeApp, ui: &mut egui::Ui) {
             }
         }
         if dirty {
-            ui.colored_label(crate::ui::style::WARN, tr("● modifiche non salvate nella libreria"));
+            ui.colored_label(crate::ui::style::WARN, tr("Modifiche non salvate nella libreria"));
         }
     });
 
@@ -417,7 +417,7 @@ pub(crate) fn material_form(ui: &mut egui::Ui, m: &mut Material, obj_size: Optio
     egui::Grid::new("mat-grid").num_columns(2).spacing([10.0, 6.0]).show(ui, |ui| {
         ui.label(tr("Colore base"));
         ui.horizontal(|ui| {
-            changed |= ui.color_edit_button_rgb(&mut m.base_color).changed();
+            changed |= crate::ui::color_picker::material_color(ui, m, "base_color");
             from_map(ui, &m.base_color_texture);
         });
         ui.end_row();
@@ -494,13 +494,11 @@ pub(crate) fn material_form(ui: &mut egui::Ui, m: &mut Material, obj_size: Optio
                     .changed();
             });
             ui.end_row();
-            ui.label(tr("Colore in volume"));
-            changed |= ui
-                .color_edit_button_rgb(&mut m.volume_color)
+            ui.label(tr("Colore in volume"))
                 .on_hover_text(tr("Colore della luce dopo «Profondità colore» di percorso dentro l'oggetto. \
                      Per i liquidi usa questo e lascia bianco il colore base: più scuro dove è \
-                     profondo, più chiaro sui bordi, come nella realtà."))
-                .changed();
+                     profondo, più chiaro sui bordi, come nella realtà."));
+            changed |= crate::ui::color_picker::material_color(ui, m, "volume_color");
             ui.end_row();
             ui.label(tr("Profondità colore"));
             changed |= ui
@@ -522,7 +520,7 @@ pub(crate) fn material_form(ui: &mut egui::Ui, m: &mut Material, obj_size: Optio
             ui.end_row();
         }
         ui.label(tr("Emissione"));
-        changed |= ui.color_edit_button_rgb(&mut m.emission).changed();
+        changed |= crate::ui::color_picker::material_color(ui, m, "emission");
         ui.end_row();
         ui.label(tr("Intensità emissione"));
         changed |= ui

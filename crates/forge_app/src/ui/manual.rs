@@ -27,12 +27,26 @@ pub fn root() -> Option<PathBuf> {
     dev.join("indice.json").is_file().then_some(dev)
 }
 
+/// Lingua del manuale da caricare: quella chiesta se c'è, altrimenti l'inglese (il manuale
+/// di riferimento per le lingue senza traduzione), poi l'italiano, poi la prima disponibile.
+fn pick_language(available: &[String], want: &str) -> String {
+    for l in [want, "en", "it"] {
+        if available.iter().any(|a| a == l) {
+            return l.to_string();
+        }
+    }
+    available.first().cloned().unwrap_or_default()
+}
+
 #[derive(Default)]
 pub struct ManualUi {
     pub open: bool,
     manual: Option<Manual>,
     /// Lingua scelta nella finestra (None = quella dell'interfaccia).
     lang: Option<String>,
+    /// Lingua dell'interfaccia all'ultima apertura: se cambia, la scelta fatta nella finestra si
+    /// dimentica e il manuale torna a seguire l'interfaccia.
+    ui_lang_seen: String,
     history: Vec<String>,
     pos: usize,
     query: String,
@@ -67,6 +81,10 @@ impl ManualUi {
     }
 
     fn ensure_loaded(&mut self, ui_lang: &str) {
+        if self.ui_lang_seen != ui_lang {
+            self.ui_lang_seen = ui_lang.to_string();
+            self.lang = None;
+        }
         let want = self.lang.clone().unwrap_or_else(|| ui_lang.to_string());
         if self.manual.as_ref().is_some_and(|m| m.lang == want) {
             return;
@@ -77,14 +95,7 @@ impl ManualUi {
             return;
         };
         let langs = forge_manual::languages(&root);
-        // Lingua non disponibile: italiano, poi la prima che c'è.
-        let lang = if langs.contains(&want) {
-            want
-        } else if langs.iter().any(|l| l == "it") {
-            "it".into()
-        } else {
-            langs.first().cloned().unwrap_or_default()
-        };
+        let lang = pick_language(&langs, &want);
         match Manual::load(&root, &lang) {
             Ok(m) => {
                 self.manual = Some(m);
@@ -155,7 +166,8 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
     if !app.manual.open {
         return;
     }
-    let ui_lang = app.prefs.language.clone();
+    // La lingua attiva dell'interfaccia (non quella del sistema operativo).
+    let ui_lang = crate::i18n::current_code();
     let mui = &mut app.manual;
     mui.ensure_loaded(&ui_lang);
     // Destinazione richiesta (F1, "?", Guida): pagina con quell'id o che descrive quel controllo.
@@ -508,5 +520,35 @@ mod tests {
             let missing: Vec<_> = ids.iter().filter(|id| m.page_for_ui(id).is_none()).collect();
             assert!(missing.is_empty(), "[{lang}] controlli senza pagina nel manuale: {missing:?}");
         }
+    }
+}
+
+#[cfg(test)]
+mod language_tests {
+    use super::*;
+
+    /// Italiano → manuale italiano, inglese → inglese; una lingua senza manuale (spagnolo) →
+    /// inglese, e senza inglese l'italiano.
+    #[test]
+    fn manual_follows_the_interface_language() {
+        let both = vec!["en".to_string(), "it".to_string()];
+        assert_eq!(pick_language(&both, "it"), "it");
+        assert_eq!(pick_language(&both, "en"), "en");
+        assert_eq!(pick_language(&both, "es"), "en");
+        assert_eq!(pick_language(&["it".to_string()], "es"), "it");
+        assert_eq!(pick_language(&[], "es"), "");
+        // Il manuale vero ha entrambe le lingue.
+        let root = root().expect("cartella manuale");
+        let langs = forge_manual::languages(&root);
+        assert!(langs.contains(&"it".to_string()) && langs.contains(&"en".to_string()), "{langs:?}");
+        // Cambiando lingua all'interfaccia, la scelta fatta nella finestra si dimentica.
+        let mut m = ManualUi::default();
+        m.ensure_loaded("it");
+        m.lang = Some("en".into());
+        m.ensure_loaded("it");
+        assert_eq!(m.manual.as_ref().map(|x| x.lang.as_str()), Some("en"));
+        m.ensure_loaded("en");
+        m.ensure_loaded("it");
+        assert_eq!(m.manual.as_ref().map(|x| x.lang.as_str()), Some("it"));
     }
 }

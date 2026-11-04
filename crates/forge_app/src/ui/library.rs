@@ -1207,7 +1207,7 @@ fn online_tab(app: &mut ForgeApp, ui: &mut egui::Ui) {
                             None => a.category.clone(),
                         };
                         if have {
-                            sub = tf("✓ in libreria · {sub}", &[sub.to_string()]);
+                            sub = tf("{} in libreria · {}", &[crate::ui::icons::LIBRARY.to_string(), sub.to_string()]);
                         }
                         let r = thumb_card(ui, tex, size, &a.name, &sub, have)
                             .on_hover_text(tf("{}\nClic: scarica a {res}", &[a.tags.join(", ").to_string(), res.to_string()]));

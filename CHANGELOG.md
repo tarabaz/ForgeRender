@@ -13,6 +13,28 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.39.0 — 04/11/2026
+
+**Fumo simulato da posizionare**
+- La sorgente della simulazione si disegna come una sfera grande quanto la sorgente vera, selezionabile con un clic o con "Seleziona la sorgente" (`ForgeApp::smoke_source_handle`); il gizmo la sposta (`gizmo::DragStart::SmokeSource`, scostamento dal fondo del riquadro) e Scala ne cambia il raggio.
+- **Anteprima in viewport** (`ui::smoke_preview`, `forge_render_core::smoke::smoke_preview`): la stessa simulazione su una griglia grossolana (circa 36.000 celle, meno di un secondo) in un thread a parte ogni volta che cambiano le impostazioni del fumo selezionato, con 48 fotogrammi (`forge_volume::smoke_sim::simulate_smoke_frames`) mostrati come nuvole di punti (fino a 5000), in loop o fermi su un istante scelto. Non si salva con il progetto.
+- **Le celle seguono la sorgente** (`SmokeCloud::sim_cells`, `sim_cell`): le celle per lato della qualità, più fini quando una cella è più grande della sorgente (circa tre celle di diametro), entro il totale di celle della qualità; `sim_warning` e un avviso nel pannello se la sorgente resta più piccola di una cella. Causa del fumo invisibile segnalato da Valerio: un riquadro di 10 × 1,5 × 5 m a qualità 2 dava celle di 14 cm per una sorgente di 7 cm, e il gas pesante restava in uno strato più sottile di una cella, cancellato dal pavimento.
+
+**Selettore colore (RGB / CMYK / Palette)**
+- `ui::color_picker`: un solo pannello aperto dal campione dei colori del materiale (base, volume, emissione) con RGB (ruota di egui, R G B, esadecimale), CMYK (conversione matematica semplice, documentata come non colorimetrica) e Palette; anteprima immediata, Applica, Annulla/Esc che rimettono colore e codice.
+- **RAL:** i valori digitali ufficiali RAL CLASSIC li vende RAL gGmbH come librerie da importare nei programmi di grafica. Con il via libera di Valerio la scheda palette comprende `assets/colori/RAL_Classic.json` (225 codici, nomi italiani e inglesi, valori sRGB **indicativi**: media delle tabelle di Wikipedia in inglese e in tedesco, quella tedesca dove differiscono di oltre 20/255; preparato da `tools/colori/ral_classic.js`), segnalati come non ufficiali. In più legge i file importati dall'utente in `<Libreria>/Colori`: Adobe Swatch Exchange `.ase` (RGB, Lab D50 → sRGB con adattamento di Bradford, CMYK, grigio), `.json`, `.csv`.
+- `Material::color_codes` (campo → codice della palette, non scritto se vuoto): il codice si vede accanto al campione con il nome completo nel suggerimento; modificando il colore in RGB o CMYK si toglie.
+
+**Correzioni**
+- **Contorni a inchiostro e tilt-shift non ritardano più il render:** si calcolavano nel thread del render prima del primo campione (0,3–0,5 s a 1080p con 0,1–1,6 milioni di triangoli, a ogni ripartenza, e le ripartenze in coda si sommavano trascinando). Ora gli `Overlays` si calcolano in un thread a parte e si pubblicano appena pronti, si riusano finché geometria, camera, risoluzione e impostazioni delle linee restano uguali, e una serie di avvii in coda tiene solo l'ultimo (test `overlays.rs`).
+- **Tilt-shift senza copie ripetute:** con 48 campioni su un raggio di oltre 20 pixel i riflessi luminosi si vedevano come copie separate (sul toro del render di Valerio). Ora la sfocatura si raccoglie da una piramide di immagini ridotte, con circa 3 pixel di raggio sul livello scelto, mescolando due livelli (test `large_blur_has_no_ghost_copies`).
+- **Riflessi del fumetto (macchie bianche):** il riflesso era un bianco fisso +0,6 su ogni materiale non ruvido, messo dove il mezzo vettore della luce più forte superava 0,985 (circa 10°), con il centro delle luci ad area. Ora c'è solo dove la direzione speculare vede davvero la lampada (la forma della softbox per le luci ad area, un cerchietto per le altre), con la forza della riflettanza del materiale (circa 0,15 su una plastica scura, pieno sui metalli), su CPU e GPU (test `toon_highlight_follows_the_reflectance`). Corrisponde ai riflessi del render fotorealistico della scena di prova.
+- **Puntini neri nei contorni:** non riprodotti dalla 0.37 in poi (scena di prova, 640×360 e 1600×900, con e senza pulizia): la correzione della 0.37 (campioni isolati nelle fessure tra triangoli) li copre.
+- **Simboli mancanti:** il quadratino dopo "U8" nel selettore colore di egui era il suo pulsante di copia 📋 (U+1F4CB): dalla 0.37 di egui i caratteri dei simboli sono facoltativi (`monochrome_emoji_fonts`), ora attivati. Un test nuovo controlla che ogni carattere non ASCII dei testi dell'interfaccia e di `Lan_eng.json` abbia un glifo; ha trovato e sostituito ⊙ (camera agganciata a un oggetto), ● (modifiche non salvate), ✓ (in libreria) e ⧉ (stacca la finestra).
+- **Manuale nella lingua dell'interfaccia:** segue la lingua attiva dell'interfaccia (anche dopo un cambio di lingua, dimenticando la scelta fatta nella finestra del manuale); una lingua senza manuale ripiega sull'inglese, poi sull'italiano.
+- **Pulsante doppio nella barra:** "Libreria" e "Materiale" aprivano la stessa vista; "Libreria" è tolto (resta il menu Libreria con scarica, importa da Blender e cartella).
+- **Anteprima del materiale:** trascinando a destra l'oggetto gira verso destra.
+
 ## 0.38.0 — 04/11/2026
 
 **Nuova libreria dei materiali di serie**

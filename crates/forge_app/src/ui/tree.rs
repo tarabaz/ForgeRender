@@ -249,7 +249,7 @@ fn cameras(app: &mut ForgeApp, ui: &mut egui::Ui) {
                         activate = Some(i);
                     }
                     let label = if c.aim.is_some() {
-                        format!("{} ⊙", c.name)
+                        format!("{} {}", c.name, crate::ui::icons::FRAME)
                     } else {
                         c.name.clone()
                     };

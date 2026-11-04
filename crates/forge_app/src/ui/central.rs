@@ -267,6 +267,14 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
                         best = Some((d, 2, i));
                     }
                 }
+                // Sorgente della simulazione (6): il gizmo la sposta.
+                if s.mode == forge_scene::SmokeMode::Simulated {
+                    if let Some(d) = near(s.sanitized().sim_source()) {
+                        if best.is_none_or(|b| d < b.0) {
+                            best = Some((d, 6, i));
+                        }
+                    }
+                }
             }
             if app.scene.haze_dust.enabled {
                 if let Some(d) = near(dust_region(app).0) {
@@ -301,6 +309,7 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
                 app.selected_dust = false;
                 app.selected_camera = None;
                 app.camera_target_handle = false;
+                app.smoke_source_handle = false;
                 match kind {
                     0 => {
                         app.selected_light = Some(i);
@@ -310,8 +319,9 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
                         app.selected_fog = Some(i);
                         app.tab = crate::app::InspectorTab::Effects;
                     }
-                    2 => {
+                    2 | 6 => {
                         app.selected_smoke = Some(i);
+                        app.smoke_source_handle = kind == 6;
                         app.tab = crate::app::InspectorTab::Effects;
                     }
                     3 => {
@@ -741,10 +751,38 @@ fn draw_smokes(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
                 painter.line_segment([p, q], stroke);
             }
         }
-        // Sorgente della simulazione: un cerchietto vuoto.
+        // Sorgente della simulazione: una sfera (la sua grandezza vera) con un punto al centro;
+        // si seleziona con un clic e il gizmo la sposta.
         if s.mode == forge_scene::SmokeMode::Simulated {
-            if let Some(q) = project(cam, rect, s.sanitized().sim_source()) {
-                painter.circle_stroke(q, 5.0, egui::Stroke::new(1.5, c));
+            if selected {
+                crate::ui::smoke_preview::draw(app, painter, rect, i);
+            }
+            let sv = s.sanitized();
+            let src = sv.sim_source();
+            if let Some(q) = project(cam, rect, src) {
+                let on = selected && app.smoke_source_handle;
+                let sc = if on {
+                    style::ACCENT
+                } else {
+                    egui::Color32::from_rgb(120, 200, 255)
+                };
+                // Raggio apparente: un punto sul bordo della sfera, di lato rispetto alla vista.
+                let side = cam.forward().cross(Vec3::Y).normalize_or(Vec3::X);
+                let r_px = project(cam, rect, src + side * sv.sim.source_radius)
+                    .map(|e| e.distance(q))
+                    .unwrap_or(5.0)
+                    .clamp(4.0, 400.0);
+                painter.circle_stroke(q, r_px, egui::Stroke::new(if on { 2.0 } else { 1.3 }, sc));
+                painter.circle_filled(q, if on { 4.0 } else { 3.0 }, sc);
+                if selected {
+                    painter.text(
+                        q + egui::vec2(r_px + 4.0, 0.0),
+                        egui::Align2::LEFT_CENTER,
+                        tr("sorgente"),
+                        egui::FontId::proportional(11.0),
+                        sc,
+                    );
+                }
             }
         }
         let Some(p) = project(cam, rect, s.center) else { continue };
