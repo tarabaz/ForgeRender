@@ -2735,3 +2735,52 @@ Dopo aver scelto, per esempio, RAL 7016, nella riga della proprietà materiale s
 ### Chiarimento di Valerio — comportamento dopo la modifica manuale di un colore RAL
 
 Se l'utente modifica manualmente un colore precedentemente scelto dalla palette RAL (ad esempio intervenendo sui valori RGB o CMYK), il colore deve **tornare a essere un normale colore RGB**: rimuovere l'associazione al codice RAL e nascondere l'etichetta RAL accanto allo swatch. Non tentare di mantenere automaticamente il codice RAL anche se il nuovo colore è simile o uguale; l'utente ha modificato il colore e da quel momento è un colore personalizzato RGB. L'etichetta RAL ricompare soltanto se l'utente seleziona nuovamente un colore dalla palette RAL.
+
+
+## New issue reported by Valerio — 04/11/2026: unexpected white patches with Cell Shading
+
+Valerio supplied a pair of comparison renders of the same dark sphere:
+
+- With **Cell Shading enabled**, the sphere shows two conspicuous flat, light grey/white patches with hard boundaries. They look like highlights, but Valerio confirms that there should be no corresponding visible reflection in those locations.
+- With **Cell Shading disabled**, the sphere has the expected smooth, dark appearance with subtle, continuous shading and no such hard-edged patches.
+
+### Requested investigation
+
+Please investigate the Cell Shading implementation and determine why these artificial-looking bright patches appear.
+
+Do not assume the cause before tracing the actual rendering path. In particular, inspect:
+
+1. How diffuse/direct lighting is quantized into toon bands.
+2. Whether specular highlights, reflected radiance, indirect illumination, emission, or other lighting contributions are being quantized or classified incorrectly.
+3. Whether the toon thresholds, normal/light dot products, view-dependent terms, or coordinate-space conversions can produce bright regions in locations that do not correspond to a real highlight.
+4. Whether the CPU and GPU rendering paths implement Cell Shading differently, and whether the issue occurs in both.
+5. Whether the patches are caused by the Cell Shading pass itself or by an earlier/later stage in the shading and compositing pipeline.
+
+### Expected behavior
+
+- Cell Shading should create intentional, coherent tonal bands without introducing bright patches that are not supported by the underlying lighting/material response.
+- Preserve physically meaningful material behavior where appropriate; do not simply remove all specular response or globally darken the material as a workaround.
+- Keep the normal (non-Cell-Shading) rendering path unchanged.
+- If the feature intentionally stylizes specular highlights, expose or respect a clear control for that behavior rather than producing unexplained white regions.
+
+### Reproduction and diagnostic tests
+
+Use a simple dark sphere scene similar to Valerio's screenshots, with a neutral environment and controlled lighting. Compare Cell Shading on/off and isolate contributions systematically:
+
+- Diffuse-only material / specular disabled.
+- Specular enabled with controlled roughness and metallic values.
+- Direct lighting only versus indirect/reflected contributions, where the renderer supports these controls.
+- Several toon-band/threshold settings.
+- CPU and GPU paths, if both support the feature.
+
+Capture intermediate or diagnostic outputs as needed (diffuse, specular, normals, lighting bands) to identify exactly which contribution creates the patches.
+
+### Reporting requirements
+
+Before changing code, report the actual code path and the most likely root cause supported by inspection or reproduction. Then implement the smallest robust fix, add a regression test or reproducible test scene where practical, and run the relevant build/tests. Clearly distinguish verified findings from hypotheses and report the commands and actual test results. Do not claim the issue is fixed unless the visual reproduction has been checked.
+
+### Clarification about render stopping at 9 samples
+
+Valerio clarified that the render stopping after 9 samples is **not being reported as a bug**. The scene is very flat/simple, and the render completes in about one second because the adaptive noise-threshold stopping criterion is reached quickly. Do not treat this as a rendering hang or a sample-count regression.
+
+If reviewing the Cell Shading issue requires inspecting adaptive sampling, keep the two topics separate. Only investigate sample-count behavior if there is independent evidence that the adaptive stopping logic is incorrect; the current report is simply an explanation of the observed early convergence on a flat image.
