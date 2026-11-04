@@ -2711,3 +2711,22 @@ Valerio chiede di migliorare il selettore colore esistente di ForgeRender. Quand
 Prima di modificare il codice, riportare una breve analisi dell'architettura attuale e il punto d'integrazione scelto. Se emergono vincoli tecnici o di licenza per RAL, comunicarli prima di implementare quella parte. Non dichiarare completata la palette RAL finché la provenienza e i diritti di redistribuzione dei dati non sono stati verificati.
 
 **Criterio di accettazione:** cliccando un campione colore si apre un unico pannello integrato con RGB, CMYK e RAL; tutte le modalità aggiornano coerentemente lo stesso colore materiale; Applica/Annulla funzionano; la palette RAL è inclusa soltanto con dati utilizzabili legalmente; la resa e le funzioni preesistenti restano integre.
+
+
+## Ulteriore richiesta di Valerio — 04/11/2026: indicatore RAL accanto al campione colore del materiale
+
+Screenshot di riferimento: riga **Colore base** nelle proprietà del materiale (esempio materiale “Verniciatura a polvere”).
+
+Quando il colore di una proprietà materiale è stato selezionato dalla palette RAL del nuovo selettore, mostrare un piccolo indicatore testuale **RAL** accanto al campione colore nella riga della proprietà.
+
+### Comportamento richiesto
+- Se il colore è stato scelto dalla modalità RAL, visualizzare l'etichetta **RAL** accanto allo swatch, in modo compatto e coerente con lo stile dell'inspector.
+- Preferibilmente mostrare anche il codice selezionato, ad esempio **RAL 7016**, se lo spazio disponibile lo consente. Il codice è più utile della sola scritta “RAL” per riconoscere immediatamente il colore.
+- Il nome RAL completo può essere mostrato come tooltip o informazione secondaria, evitando di appesantire la riga.
+- Se il colore non proviene dalla palette RAL (RGB o CMYK), non mostrare l'indicatore.
+- Definire il comportamento quando un colore RAL viene successivamente modificato manualmente in RGB/CMYK: l'indicatore deve essere rimosso se il colore non rappresenta più la selezione RAL originale, oppure mantenuto soltanto se l'associazione al codice RAL resta effettivamente valida. Non mostrare un codice RAL fuorviante.
+- L'indicatore è informativo: non deve cambiare il colore, il valore RGB sottostante o il rendering.
+- Applicare il comportamento a tutte le proprietà materiale che supportano la selezione RAL, non soltanto a “Colore base”.
+
+### Criterio di accettazione
+Dopo aver scelto, per esempio, RAL 7016, nella riga della proprietà materiale si vede lo swatch con accanto **RAL 7016** (o almeno **RAL** se lo spazio è insufficiente). Scegliendo un colore non RAL o modificando il colore in modo da invalidare l'associazione, l'indicatore viene aggiornato correttamente. Salvare e riaprire il progetto non deve perdere o inventare l'associazione RAL, se questa viene persistita.
