@@ -1,0 +1,54 @@
+{
+  "abbe": 0.0,
+  "ao_strength": 0.5,
+  "ao_texture": "worn_asphalt_ao_2k.jpg",
+  "base_color": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "base_color_texture": "worn_asphalt_diff_2k.jpg",
+  "bump_mm": 1.5,
+  "category": "Asfalto",
+  "displacement_mid": 0.5,
+  "displacement_mm": 0.0,
+  "emission": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "emission_strength": 0.0,
+  "height_texture": "worn_asphalt_disp_2k.png",
+  "id": "asfalto-consumato",
+  "ior": 1.5,
+  "mapping": {
+    "anchor": "Component",
+    "fit_object": false,
+    "offset": [
+      0.0,
+      0.0
+    ],
+    "projection": "Box",
+    "rotation_deg": 0.0,
+    "scale": 2.0
+  },
+  "metallic": 0.0,
+  "metallic_texture": null,
+  "name": "Asfalto consumato",
+  "normal_directx": false,
+  "normal_strength": 1.7,
+  "normal_texture": "worn_asphalt_nor_gl_2k.jpg",
+  "opacity_texture": null,
+  "priority": 0,
+  "roughness": 1.0,
+  "roughness_is_gloss": true,
+  "roughness_texture": "worn_asphalt_rough_2k.jpg",
+  "specular": 0.5,
+  "transmission": 0.0,
+  "volume_color": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "volume_depth_cm": 10.0
+}

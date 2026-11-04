@@ -725,3 +725,16 @@ Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
 - `style_mono`, `background`, contorni: riparazione dei campioni isolati, pulizia, sensibilità, bordo del pavimento.
 - Polvere: `Dust::region` con gizmo, `Dust::shadows`, dimensione fino a 18 mm.
 - Da fare: annulla/ripeti dei riquadri e della camera, strumenti MCP, sfondo trasparente, fuoco.
+
+### 0.38.0 (04/11/2026): nuova libreria dei materiali di serie, pacchetto aggiuntivo
+- `forge_scene::material::presets()` legge `assets/materiali/<NN Categoria>/<id>/` (`library_presets`,
+  in cache) e il pacchetto aggiuntivo (`extra_materials_dir`); `fallback_presets` se manca la cartella;
+  `builtin_map_dirs` per ritrovare le mappe nei progetti. Tolti l'elenco nel codice, `MAPPED`,
+  `DATA_PRESET_DIRS` e l'esempio `materiali_predefiniti`.
+- `tools/libreria-serie/`: `tabella.json` (id, nome, categoria, dispersione, compreso/aggiuntivo),
+  `sostituti.txt` (CC0 al posto dei BlenderKit), `leggimi.js`. Esempi `forge_render_core`
+  `libreria_serie` e `forge_library` `sostituti_cc0`.
+- 125 compresi (108 MB, mappe 1K), 109 aggiuntivi (1,6 GB, 2K) solo sul PC di Valerio
+  (`assets/materiali-aggiuntivi`, ignorata da git) e come zip in `dist/MCP/MATERIALI AGGIUNTIVI`.
+- Da decidere: dove pubblicare il pacchetto aggiuntivo (release GitHub o Drive) e se aggiungere un
+  pulsante per scaricarlo dal programma; traduzioni inglesi dei nomi dei materiali.

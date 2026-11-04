@@ -13,6 +13,17 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.38.0 — 04/11/2026
+
+**Nuova libreria dei materiali di serie**
+- I materiali di serie sono dati, non codice: `assets/materiali/<NN Categoria>/<id>/materiale.json` più le mappe (il formato di "Esporta zip…"), letti una volta da `forge_scene::material::presets()` (`library_presets`, in cache). 125 materiali in 13 categorie (Metalli, Anodizzati, Vernici, Plastiche, Gomme, Vetri, Liquidi, Ceramiche e pietre, Legni, Tessuti e pelle, Asfalto, Coperture, Emissivi): tutti i materiali senza mappe e al massimo cinque con mappe per categoria, ridotte a 1024 px (108 MB in tutto). Senza la cartella restano pochi materiali di base (gli id della scena di prova).
+- Ricavata dagli zip dei materiali preparati da Valerio seguendo `tools/libreria-serie/tabella.json` (id, nome italiano, categoria, dispersione, compreso o aggiuntivo) con l'esempio `libreria_serie` di `forge_render_core`. Corretti strada facendo: id doppi (anodizzati, plastiche lucide, opache e soft-touch, guarnizioni), categorie sbagliate (l'acqua era nei Vetri e non veniva trattata da liquido; intonaci nei Legni; i materiali Poly Haven tutti in "Libreria"; la categoria "Classici" con un solo materiale unita alle Plastiche), nomi in inglese.
+- **Dispersione:** ogni trasparente ha il numero di Abbe (vetro 58, cristallo al piombo 32, vetro ottico 64, diamante 55, PMMA 57, policarbonato 30, resina trasparente 45, silicone 50, acqua 56, vini e liquori 55, olio d'oliva 47); la preparazione si ferma su un trasparente che non ce l'ha.
+- **Mappe convertite senza cambiare il render:** le EXR e le PNG diventano JPEG (qualità 95), perché il motore legge rugosità, normal, metallicità e occlusione a 8 bit; le height diventano PNG a 16 bit, perché le legge a 16 bit; il colore lineare delle EXR diventa sRGB. Misurato sulle mappe convertite: PSNR 41–44 dB rispetto alle originali.
+- **Niente BlenderKit:** i 29 materiali `bk-` e i 19 importati da BlenderKit (anodizzati, oro, tessuti) non sono nel programma; li sostituiscono materiali CC0 scaricati con l'esempio `sostituti_cc0` di `forge_library`: 21 da ambientCG (acciaio spazzolato e graffiato, alluminio tornito e graffiato, lamiera mandorlata, forata e ondulata, oro, rame, verderame, titanio, nichel, bronzo antico, ferro grezzo e arrugginito, verniciatura a polvere nera, metallo verniciato rosso, la base spazzolata dell'alluminio anodizzato) e 12 da Poly Haven (jersey, lino, velluto, velluto a coste, scamosciato, spugna, pile, vichy, piqué, pelle bianca e rossa, jacquard floreale). Fonti in `assets/materiali/LEGGIMI.md`.
+- **Pacchetto aggiuntivo:** altri 109 materiali con mappe a 2K (circa 1,6 GB), non nel repository: si leggono da `materiali-aggiuntivi` accanto al programma, `assets/materiali-aggiuntivi` (compilazione locale) o `FORGE_EXTRA_MATERIALS_DIR` (`extra_materials_dir`); un materiale con lo stesso id sostituisce quello compreso.
+- Progetti salvati: le vecchie cartelle delle mappe (`legno-rovere`, `marmo-bianco`, `pelle-nera`) restano in `assets/materiali/_vecchi`, e le mappe dei materiali di serie si ritrovano in ogni cartella di categoria (`builtin_map_dirs`). I progetti tengono i loro materiali come salvati.
+
 ## 0.37.0 — 04/11/2026
 
 **Simulazione del fumo**

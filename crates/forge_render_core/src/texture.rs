@@ -63,13 +63,7 @@ impl Texture {
 
     fn load_with(path: &Path, srgb: bool, precise: bool) -> anyhow::Result<Self> {
         use image::DynamicImage as D;
-        let img = match image::open(path) {
-            Ok(img) => img,
-            Err(e) if path.extension().is_some_and(|x| x.eq_ignore_ascii_case("exr")) => {
-                open_exr_any_channels(path).with_context(|| format!("lettura texture {} ({e})", path.display()))?
-            }
-            Err(e) => return Err(e).with_context(|| format!("lettura texture {}", path.display())),
-        };
+        let img = open_image(path)?;
         let (w, h) = (img.width(), img.height());
         anyhow::ensure!(w > 0 && h > 0, "texture vuota");
         let float = matches!(img, D::ImageRgb32F(_) | D::ImageRgba32F(_));
@@ -121,6 +115,17 @@ impl Texture {
         let top = self.texel(x0, y0).lerp(self.texel(x0 + 1, y0), tx);
         let bot = self.texel(x0, y0 + 1).lerp(self.texel(x0 + 1, y0 + 1), tx);
         top.lerp(bot, ty)
+    }
+}
+
+/// Apre un'immagine come la leggono le texture, compresi gli EXR con la sola luminanza.
+pub fn open_image(path: &Path) -> anyhow::Result<image::DynamicImage> {
+    match image::open(path) {
+        Ok(img) => Ok(img),
+        Err(e) if path.extension().is_some_and(|x| x.eq_ignore_ascii_case("exr")) => {
+            open_exr_any_channels(path).with_context(|| format!("lettura texture {} ({e})", path.display()))
+        }
+        Err(e) => Err(e).with_context(|| format!("lettura texture {}", path.display())),
     }
 }
 

@@ -1,0 +1,54 @@
+{
+  "abbe": 0.0,
+  "ao_strength": 0.5,
+  "ao_texture": "checkered_pavement_tiles_ao_2k.jpg",
+  "base_color": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "base_color_texture": "checkered_pavement_tiles_diff_2k.jpg",
+  "bump_mm": 9.5,
+  "category": "Ceramiche e pietre",
+  "displacement_mid": 0.5,
+  "displacement_mm": 5.0,
+  "emission": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "emission_strength": 0.0,
+  "height_texture": "checkered_pavement_tiles_disp_2k.png",
+  "id": "piastrelle-a-scacchi",
+  "ior": 1.5,
+  "mapping": {
+    "anchor": "Component",
+    "fit_object": false,
+    "offset": [
+      0.0,
+      0.0
+    ],
+    "projection": "Box",
+    "rotation_deg": 0.0,
+    "scale": 3.0
+  },
+  "metallic": 0.0,
+  "metallic_texture": null,
+  "name": "Piastrelle a scacchi",
+  "normal_directx": false,
+  "normal_strength": 1.0,
+  "normal_texture": "checkered_pavement_tiles_nor_gl_2k.jpg",
+  "opacity_texture": null,
+  "priority": 0,
+  "roughness": 0.56,
+  "roughness_is_gloss": false,
+  "roughness_texture": "checkered_pavement_tiles_rough_2k.jpg",
+  "specular": 0.5,
+  "transmission": 0.0,
+  "volume_color": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "volume_depth_cm": 10.0
+}

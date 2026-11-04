@@ -10,6 +10,17 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.38.0 — 4 Nov 2026
+
+**New built-in material library**
+- The built-in materials are data, not code: `assets/materiali/<NN Category>/<id>/materiale.json` plus maps (the "Export zip…" format), read once by `forge_scene::material::presets()` (`library_presets`, cached). 125 materials in 13 categories (Metals, Anodised, Paints, Plastics, Rubbers, Glass, Liquids, Ceramics and stone, Woods, Fabrics and leather, Asphalt, Roofing, Emissive): every plain material, plus at most five textured ones per category with maps reduced to 1024 px (108 MB in all). Without the folder a few plain materials remain (the test scene ids).
+- Built from the material zips prepared by Valerio, following `tools/libreria-serie/tabella.json` (id, Italian name, category, dispersion, included or additional) with the `forge_render_core` example `libreria_serie`. Fixed on the way: duplicate ids (anodised, glossy, matte and soft-touch plastics, seals), wrong categories (water was in Glass and was not treated as a liquid; plasters in Woods; Poly Haven materials all in "Libreria"; the one-material "Classici" category merged into Plastics), English names.
+- **Dispersion:** every transparent material has an Abbe number (glass 58, lead crystal 32, optical glass 64, diamond 55, PMMA 57, polycarbonate 30, clear resin 45, silicone 50, water 56, wines and spirits 55, olive oil 47); the build fails on a transparent material without one.
+- **Map conversion without changing the render:** EXR and PNG maps become JPEG (quality 95), because the engine reads roughness, normal, metalness and AO at 8 bits; height maps become 16-bit PNG, because it reads them at 16 bits; linear EXR colour becomes sRGB. Measured on the converted maps: PSNR 41–44 dB against the originals.
+- **BlenderKit removed:** the 29 `bk-` materials and the 19 materials imported from BlenderKit (anodised, gold, fabrics) are not in the program; they are replaced by CC0 materials downloaded with the `forge_library` example `sostituti_cc0`: 21 from ambientCG (brushed and scratched steel, turned and scratched aluminium, diamond plate, perforated and corrugated sheet, gold, copper, verdigris, titanium, nickel, antique bronze, raw and rusty iron, black powder coat, red painted metal, the brushed base of the anodised aluminium) and 12 from Poly Haven (jersey, linen, velvet, corduroy, suede, terry, fleece, gingham, piqué, white and red leather, floral jacquard). Sources in `assets/materiali/LEGGIMI.md`.
+- **Additional pack:** 109 more textured materials at 2K (about 1.6 GB), not in the repository: read from `materiali-aggiuntivi` next to the program, `assets/materiali-aggiuntivi` (local build) or `FORGE_EXTRA_MATERIALS_DIR` (`extra_materials_dir`); a material with the same id replaces the included one.
+- Saved projects: the old map folders (`legno-rovere`, `marmo-bianco`, `pelle-nera`) stay in `assets/materiali/_vecchi`, and the maps of built-in materials are found again in every category folder (`builtin_map_dirs`). Projects keep their materials as saved.
+
 ## 0.37.0 — 4 Nov 2026
 
 **Smoke simulation**

@@ -1,0 +1,54 @@
+{
+  "abbe": 0.0,
+  "ao_strength": 0.5,
+  "ao_texture": "brown_leather_ao_2k.jpg",
+  "base_color": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "base_color_texture": "brown_leather_albedo_2k.jpg",
+  "bump_mm": 0.0,
+  "category": "Tessuti e pelle",
+  "displacement_mid": 0.5,
+  "displacement_mm": 0.0,
+  "emission": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "emission_strength": 0.0,
+  "height_texture": "brown_leather_disp_2k.png",
+  "id": "pelle-marrone",
+  "ior": 1.5,
+  "mapping": {
+    "anchor": "Component",
+    "fit_object": false,
+    "offset": [
+      0.0,
+      0.0
+    ],
+    "projection": "Box",
+    "rotation_deg": 0.0,
+    "scale": 0.4
+  },
+  "metallic": 0.0,
+  "metallic_texture": null,
+  "name": "Pelle marrone",
+  "normal_directx": false,
+  "normal_strength": 2.1,
+  "normal_texture": "brown_leather_nor_gl_2k.jpg",
+  "opacity_texture": null,
+  "priority": 0,
+  "roughness": 1.0,
+  "roughness_is_gloss": true,
+  "roughness_texture": "brown_leather_rough_2k.jpg",
+  "specular": 0.5,
+  "transmission": 0.0,
+  "volume_color": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "volume_depth_cm": 10.0
+}

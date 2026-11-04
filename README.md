@@ -18,16 +18,15 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
-### What's new in 0.37.0
+### What's new in 0.38.0
 
-- **Smoke simulation:** volumetric smoke can now be *simulated* (hot smoke that rises, heavy gas that sinks and spreads, swirls, turbulence, wind, objects that deflect it), frozen at the chosen instant, with the procedural detail on top.
-- **Camera as a component:** render cameras listed above the lights, with a target point or object, moved, orbited and re-aimed with the gizmo in the viewport; **tilt-shift** with a sharp band, angle and independent transitions, separate from the depth of field.
-- **Styles and outlines:** black and white cartoon and technical illustration, solid background colour, ink outlines without stray dots, with depth sensitivity, cleanup and no line on the floor edge.
-- **Dust:** its own box moved with the gizmo (so the specks fill the whole beam down to the table), specks up to 18 mm, much lower amounts, and specks that cast shadows.
+- **New built-in material library:** 125 materials in 13 categories, with Italian names and the right dispersion (Abbe number) on every transparent material. Every plain material is included, plus five textured ones per category, chosen to differ from each other, with 1K maps to keep the download light. Water and drinks are in Liquids. The BlenderKit materials, whose licence does not allow redistribution, are replaced by CC0 materials from Poly Haven and ambientCG.
+- **Additional material pack:** 109 more textured materials at 2K (about 1.6 GB), installed separately next to the program.
 
 <details>
 <summary><strong>Previous versions — complete release history</strong></summary>
 
+- **0.37.0 — Smoke simulation, cameras as components, tilt-shift:** simulated smoke (heat, buoyancy, swirls, wind, objects that deflect it); render cameras with a target, moved and orbited with the gizmo; tilt-shift band separate from the depth of field; black and white styles, solid background, outlines without stray dots; dust in its own box, larger specks with shadows.
 - **0.36.0 — Volumetric smoke, haze start height:** procedural smoke clouds in a box moved with the gizmo, six presets; haze from a start height to a maximum height; wider sliders.
 - **0.35.0 — Render styles, haze that does not veil everything:** cartoon and technical illustration with ink outlines; haze in "light rays only" mode with clumping, maximum height and puffs; dust lit only in the beams and kept by the denoiser.
 - **0.34.0 — Haze in five kinds, dust as its own effect:** low fog, gas clouds, toxic floor smoke, floating layers and vapour curls with fractal and quality controls; dust visible only in direct light; icons instead of missing symbols.
@@ -171,6 +170,10 @@ Apply an image (a logo, a label, a PNG with transparency) to the selected object
 
 Diffuse materials, GGX metals and plastics, Fresnel glass, frosted glass and emissive surfaces. PBR maps include base colour, roughness, metallic, normal, bump, true displacement, ambient occlusion and opacity. For CAD models without UVs, metric Box projection is available, with Piece, Assembly or World anchoring.
 
+- **Built-in library:** 125 ready materials in 13 categories: metals, anodised aluminium, paints, plastics, rubbers, glass, liquids, ceramics and stone, woods, fabrics and leather, asphalt, roofing and emissive. Every plain material (metals, paints, plastics, glass, liquids, LEDs) is included, plus five textured materials per category, chosen to be different from each other: brushed steel, turned aluminium, diamond plate, perforated sheet and rusty metal; oak, walnut, herringbone parquet, plywood and bark; denim, leather, bouclé wool, jute and satin. Transparent materials carry the right dispersion (Abbe number: crown glass 58, lead crystal 32, optical glass 64, diamond 55, polycarbonate 30, water 56…), visible in the spectral render, and water and drinks behave as liquids inside their glass. Maps are 1024 px to keep the program light.
+- **Additional pack:** 109 more textured materials with 2K maps (woods and barks, stones and plasters, fabrics, rusty and worn metals, asphalt, roofs), about 1.6 GB, downloaded separately and copied as `materiali-aggiuntivi` next to `forgerender.exe`: at the next start they appear in the same library.
+- **Free to redistribute:** the textured materials come from Poly Haven and ambientCG (CC0); each material's source is listed in `assets/materiali/LEGGIMI.md`.
+
 ### 10. Product studio and lighting
 
 ![ForgeRender photographic studio look](docs/img/mcp/esempi/aspetto_studio.jpg)
@@ -243,7 +246,7 @@ A STEP file is converted to meshes once. The result is kept in a conversion cach
   Full PBR maps: base colour, roughness/gloss, metallic, normal (OpenGL/DirectX), height (bump),
   **true displacement**, ambient occlusion, opacity cutout; UV mapping or world-space box
   projection in metres for CAD models without UVs, with repeat size, rotation and offset.
-- **Library**: built-in materials, plus materials and HDRIs downloaded from ambientCG and
+- **Library**: 125 built-in materials in 13 categories (an additional pack adds 109 textured ones), plus materials and HDRIs downloaded from ambientCG and
   Poly Haven or imported from folders/ZIP files, kept in a local `Library` folder with previews.
 - **Lights and environment**: area, point, spot and directional lights, studio presets;
   uniform, gradient or HDRI environment (.hdr/.exr) with importance sampling. Point and spot

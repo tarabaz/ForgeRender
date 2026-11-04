@@ -1,0 +1,54 @@
+{
+  "abbe": 0.0,
+  "ao_strength": 0.5,
+  "ao_texture": "hessian_230_ao_2k.jpg",
+  "base_color": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "base_color_texture": "hessian_230_diff_2k.jpg",
+  "bump_mm": 8.0,
+  "category": "Tessuti e pelle",
+  "displacement_mid": 0.5,
+  "displacement_mm": 5.0,
+  "emission": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "emission_strength": 0.0,
+  "height_texture": "hessian_230_disp_2k.png",
+  "id": "juta",
+  "ior": 1.5,
+  "mapping": {
+    "anchor": "Component",
+    "fit_object": false,
+    "offset": [
+      0.0,
+      0.0
+    ],
+    "projection": "Box",
+    "rotation_deg": 0.0,
+    "scale": 0.3
+  },
+  "metallic": 1.0,
+  "metallic_texture": "hessian_230_metal_2k.jpg",
+  "name": "Juta",
+  "normal_directx": false,
+  "normal_strength": 4.0,
+  "normal_texture": "hessian_230_nor_gl_2k.jpg",
+  "opacity_texture": "hessian_230_mask_2k.jpg",
+  "priority": 0,
+  "roughness": 1.0,
+  "roughness_is_gloss": false,
+  "roughness_texture": "hessian_230_rough_2k.jpg",
+  "specular": 0.5,
+  "transmission": 0.0,
+  "volume_color": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "volume_depth_cm": 10.0
+}

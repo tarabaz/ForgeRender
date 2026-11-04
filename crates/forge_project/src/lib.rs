@@ -490,19 +490,13 @@ pub fn load(path: &Path) -> anyhow::Result<LoadedProject> {
     if let forge_scene::Environment::Hdri { path: hdri, .. } = &mut scene.environment {
         relocate_asset(hdri, project_dir, &["hdri"], &source_dirs, &mut report);
     }
-    // Mappe dei materiali predefiniti (`materiali/<id>/…` e le eventuali cartelle a dati accanto):
-    // si ritrovano anche se il programma è in un'altra cartella (portable spostata, nuova versione).
-    let builtin = forge_scene::material::builtin_textures_dir();
+    // Mappe dei materiali di serie (`materiali/<categoria>/<id>/…`, il pacchetto aggiuntivo e le
+    // vecchie `materiali/_vecchi/<id>/…`): si ritrovano anche se il programma è in un'altra
+    // cartella (portable spostata, nuova versione).
     let texture_dirs: Vec<PathBuf> = source_dirs
         .iter()
         .cloned()
-        .chain(builtin.map(Path::to_path_buf))
-        .chain(
-            builtin
-                .and_then(Path::parent)
-                .into_iter()
-                .flat_map(|p| forge_scene::material::DATA_PRESET_DIRS.iter().map(move |d| p.join(d))),
-        )
+        .chain(forge_scene::material::builtin_map_dirs())
         .collect();
     for m in &mut scene.materials.materials {
         for slot in m.texture_slots_mut().into_iter().flatten() {
@@ -744,10 +738,9 @@ mod tests {
         std::fs::write(&path, moved).unwrap();
         let loaded = load(&path).unwrap();
         let m = loaded.scene.materials.get(&MaterialId::new("legno-rovere")).unwrap();
-        assert_eq!(
-            m.base_color_texture.as_deref(),
-            Some(builtin.join("legno-rovere").join("colore.jpg").as_path())
-        );
+        let original = scene.materials.get(&MaterialId::new("legno-rovere")).unwrap();
+        assert!(original.base_color_texture.as_ref().is_some_and(|t| t.starts_with(builtin)));
+        assert_eq!(m.base_color_texture, original.base_color_texture);
         assert!(loaded.report.warnings.is_empty(), "{:?}", loaded.report.warnings);
         std::fs::remove_dir_all(dir).ok();
     }

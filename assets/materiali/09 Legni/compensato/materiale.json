@@ -1,0 +1,54 @@
+{
+  "abbe": 0.0,
+  "ao_strength": 0.5,
+  "ao_texture": "plywood_ao_2k.jpg",
+  "base_color": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "base_color_texture": "plywood_diff_2k.jpg",
+  "bump_mm": 2.0,
+  "category": "Legni",
+  "displacement_mid": 0.5,
+  "displacement_mm": 10.0,
+  "emission": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "emission_strength": 0.0,
+  "height_texture": "plywood_disp_2k.png",
+  "id": "compensato",
+  "ior": 1.5,
+  "mapping": {
+    "anchor": "Component",
+    "fit_object": false,
+    "offset": [
+      0.0,
+      0.0
+    ],
+    "projection": "Box",
+    "rotation_deg": 0.0,
+    "scale": 2.0
+  },
+  "metallic": 0.05,
+  "metallic_texture": null,
+  "name": "Compensato",
+  "normal_directx": false,
+  "normal_strength": 1.6,
+  "normal_texture": "plywood_nor_gl_2k.jpg",
+  "opacity_texture": null,
+  "priority": 0,
+  "roughness": 0.81,
+  "roughness_is_gloss": false,
+  "roughness_texture": "plywood_rough_2k.jpg",
+  "specular": 0.5,
+  "transmission": 0.0,
+  "volume_color": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "volume_depth_cm": 10.0
+}

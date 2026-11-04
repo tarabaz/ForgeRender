@@ -1,0 +1,36 @@
+# Metalli (ambientCG, CC0) al posto dei BlenderKit
+acg Metal049A 01_Metalli acciaio-inox-lucido
+acg Metal009 01_Metalli acciaio-spazzolato
+acg Metal038 01_Metalli acciaio-graffiato
+acg Metal041A 01_Metalli ferro-grezzo
+acg Metal053C 01_Metalli ferro-corroso
+acg Metal055C 01_Metalli ferro-arrugginito
+acg Metal027 01_Metalli acciaio-verniciato-polvere-nero
+acg Metal051A 01_Metalli alluminio-tornito
+acg Metal050B 01_Metalli alluminio-graffiato
+acg Metal042A 01_Metalli oro-lucido-texture
+acg Metal048B 01_Metalli oro-con-impronte
+acg Metal047A 01_Metalli rame-lucido
+acg Metal058C 01_Metalli rame-ossidato-verde
+acg Metal059A 01_Metalli titanio-texture
+acg Metal045A 01_Metalli nichel-lucido
+acg Metal017 01_Metalli bronzo-antico
+acg CorrugatedSteel005 01_Metalli lamiera-ondulata
+acg DiamondPlate009 01_Metalli lamiera-mandorlata
+acg SheetMetal001 01_Metalli lamiera-forata
+acg PaintedMetal004 01_Metalli metallo-verniciato-rosso
+# Base per gli anodizzati (alluminio spazzolato, la tinta la dà il materiale)
+acg Metal051B 02_Anodizzati base-anodizzato
+# Tessuti e pelle (Poly Haven, CC0) al posto dei BlenderKit
+ph cotton_jersey 10_Tessuti_e_pelle jersey-di-cotone
+ph rough_linen 10_Tessuti_e_pelle lino-grezzo
+ph velour_velvet 10_Tessuti_e_pelle velluto
+ph ribbed_corduroy 10_Tessuti_e_pelle velluto-a-coste
+ph scuba_suede 10_Tessuti_e_pelle scamosciato
+ph terry_cloth 10_Tessuti_e_pelle spugna
+ph polar_fleece 10_Tessuti_e_pelle pile
+ph gingham_check 10_Tessuti_e_pelle quadretti-vichy
+ph waffle_pique_cotton 10_Tessuti_e_pelle pique-di-cotone
+ph leather_white 10_Tessuti_e_pelle pelle-bianca
+ph leather_red_02 10_Tessuti_e_pelle pelle-rossa
+ph floral_jacquard 10_Tessuti_e_pelle jacquard-floreale

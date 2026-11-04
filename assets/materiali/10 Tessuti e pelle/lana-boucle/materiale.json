@@ -1,0 +1,54 @@
+{
+  "abbe": 0.0,
+  "ao_strength": 0.5,
+  "ao_texture": "wool_boucle_ao_2k.jpg",
+  "base_color": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "base_color_texture": "wool_boucle_diff_2k.jpg",
+  "bump_mm": 4.5,
+  "category": "Tessuti e pelle",
+  "displacement_mid": 0.5,
+  "displacement_mm": 5.0,
+  "emission": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "emission_strength": 0.0,
+  "height_texture": "wool_boucle_disp_2k.png",
+  "id": "lana-boucle",
+  "ior": 1.5,
+  "mapping": {
+    "anchor": "Component",
+    "fit_object": false,
+    "offset": [
+      0.0,
+      0.0
+    ],
+    "projection": "Box",
+    "rotation_deg": 0.0,
+    "scale": 1.3
+  },
+  "metallic": 1.0,
+  "metallic_texture": "wool_boucle_metal_2k.jpg",
+  "name": "Lana bouclé",
+  "normal_directx": false,
+  "normal_strength": 4.0,
+  "normal_texture": "wool_boucle_nor_gl_2k.jpg",
+  "opacity_texture": null,
+  "priority": 0,
+  "roughness": 1.0,
+  "roughness_is_gloss": false,
+  "roughness_texture": "wool_boucle_rough_2k.jpg",
+  "specular": 0.5,
+  "transmission": 0.0,
+  "volume_color": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "volume_depth_cm": 10.0
+}

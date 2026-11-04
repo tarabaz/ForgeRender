@@ -18,16 +18,15 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
-### Novità della versione 0.37.0
+### Novità della versione 0.38.0
 
-- **Simulazione del fumo:** il fumo volumetrico ora si può *simulare* (fumo caldo che sale, gas pesante che scende e si stende, vortici, turbolenza, vento, oggetti che lo deviano), congelato all'istante scelto, con il dettaglio procedurale sopra.
-- **Camera come componente:** le camere di rendering nell'elenco sopra le luci, con un bersaglio (punto o oggetto), spostate, fatte orbitare e rimirate con il gizmo nella viewport; **tilt-shift** con fascia nitida, angolo e transizioni indipendenti, separato dalla profondità di campo.
-- **Stili e contorni:** fumetto e illustrazione tecnica in bianco e nero, sfondo a tinta unita, contorni a inchiostro senza puntini sparsi, con sensibilità alla profondità, pulizia e niente linea sul bordo del pavimento.
-- **Polvere:** un suo riquadro spostabile con il gizmo (così i granelli riempiono tutto il fascio fino al tavolo), granelli fino a 18 mm, quantità molto più basse e granelli che fanno ombra.
+- **Nuova libreria di materiali di serie:** 125 materiali in 13 categorie, con nomi italiani e la dispersione giusta (numero di Abbe) su ogni trasparente. Ci sono tutti i materiali senza texture e cinque materiali con texture per categoria, scelti diversi tra loro, con mappe da 1K perché il download resti leggero. Acqua e bevande sono nei Liquidi. I materiali BlenderKit, la cui licenza non permette di ridistribuirli, sono sostituiti da materiali CC0 di Poly Haven e ambientCG.
+- **Pacchetto aggiuntivo di materiali:** altri 109 materiali con texture a 2K (circa 1,6 GB), da installare a parte accanto al programma.
 
 <details>
-<summary><strong>Versioni precedenti — storico completo delle release</strong></summary>
+<summary><strong>Versioni precedenti — cronologia completa</strong></summary>
 
+- **0.37.0 — Simulazione del fumo, camere come componenti, tilt-shift:** fumo simulato (calore, galleggiamento, vortici, vento, oggetti che lo deviano); camere di rendering con bersaglio, spostate e fatte orbitare con il gizmo; fascia di tilt-shift separata dalla profondità di campo; stili in bianco e nero, sfondo a tinta unita, contorni senza puntini; polvere nel suo riquadro, granelli più grandi che fanno ombra.
 - **0.36.0 — Fumo volumetrico, altezza di partenza della foschia:** nubi di fumo procedurali in un riquadro spostabile con il gizmo, sei preset; foschia da un'altezza di partenza a una massima; slider più ampi.
 - **0.35.0 — Stili di rendering, foschia che non vela tutto:** fumetto e illustrazione tecnica con i contorni a inchiostro; foschia in modalità "solo raggi delle luci" con addensamenti, altezza massima e sbuffi; polvere illuminata solo nei fasci e tenuta dal denoiser.
 - **0.34.0 — Foschia in cinque tipi, polvere come effetto a sé:** nebbia bassa, nuvole di gas, fumo tossico a terra, strati sospesi e riccioli di vapore con frattale e qualità; polvere visibile solo con la luce diretta; icone al posto dei simboli mancanti.
@@ -182,6 +181,10 @@ Applica un'immagine (un logo, un'etichetta, un PNG con trasparenza) sull'oggetto
 
 Materiali diffusi, metalli e plastiche GGX, vetro Fresnel, vetro satinato ed emissivi. Le mappe PBR includono colore base, rugosità, metallicità, normal, bump, displacement reale, occlusione ambientale e opacità. Per i modelli CAD senza UV è disponibile la proiezione Box in scala metrica, con ancoraggio a pezzo, assieme o mondo.
 
+- **Libreria di serie:** 125 materiali pronti in 13 categorie: metalli, alluminio anodizzato, vernici, plastiche, gomme, vetri, liquidi, ceramiche e pietre, legni, tessuti e pelle, asfalto, coperture ed emissivi. Ci sono tutti i materiali senza texture (metalli, vernici, plastiche, vetri, liquidi, LED) e cinque materiali con texture per categoria, scelti diversi tra loro: acciaio spazzolato, alluminio tornito, lamiera mandorlata, lamiera forata e metallo arrugginito; rovere, noce, parquet a spina di pesce, compensato e corteccia; denim, pelle, lana bouclé, juta e raso. I trasparenti hanno la dispersione giusta (numero di Abbe: vetro 58, cristallo al piombo 32, vetro ottico 64, diamante 55, policarbonato 30, acqua 56…), che si vede nel render spettrale, e acqua e bevande si comportano da liquidi dentro il loro bicchiere. Le mappe sono da 1024 px perché il programma resti leggero.
+- **Pacchetto aggiuntivo:** altri 109 materiali con mappe a 2K (legni e cortecce, pietre e intonaci, tessuti, metalli arrugginiti e consumati, asfalti, tetti), circa 1,6 GB, da scaricare a parte e copiare come `materiali-aggiuntivi` accanto a `forgerender.exe`: al riavvio compaiono nella stessa libreria.
+- **Liberi da ridistribuire:** i materiali con texture vengono da Poly Haven e ambientCG (CC0); la fonte di ogni materiale è in `assets/materiali/LEGGIMI.md`.
+
 ### 10. Studio fotografico e illuminazione
 
 ![Aspetto studio fotografico di ForgeRender](docs/img/mcp/esempi/aspetto_studio.jpg)
@@ -255,7 +258,7 @@ Un file STEP si converte in mesh una volta sola. Il risultato resta in una cache
   height (bump), **displacement vero**, occlusione ambientale, ritaglio con opacità; mapping UV o
   proiezione box in metri per i modelli CAD senza UV, con dimensione della ripetizione, rotazione
   e spostamento.
-- **Libreria**: materiali predefiniti inclusi, più materiali e HDRI scaricati da ambientCG e
+- **Libreria**: 125 materiali di serie in 13 categorie (un pacchetto aggiuntivo ne aggiunge 109 con texture), più materiali e HDRI scaricati da ambientCG e
   Poly Haven o importati da cartelle/ZIP, conservati nella cartella locale `Libreria` con anteprime.
 - **Luci e ambiente**: luci ad area, puntiformi, spot e direzionali, preset da studio; ambiente
   uniforme, a gradiente o HDRI (.hdr/.exr) con importance sampling. Puntiformi e spot hanno un

@@ -1,0 +1,54 @@
+{
+  "abbe": 0.0,
+  "ao_strength": 0.5,
+  "ao_texture": null,
+  "base_color": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "base_color_texture": null,
+  "bump_mm": 1.0,
+  "category": "Emissivi",
+  "displacement_mid": 0.5,
+  "displacement_mm": 0.0,
+  "emission": [
+    1.0,
+    0.9920796,
+    0.9563378
+  ],
+  "emission_strength": 30.0,
+  "height_texture": null,
+  "id": "led-bianco-freddo",
+  "ior": 1.5,
+  "mapping": {
+    "anchor": "Component",
+    "fit_object": false,
+    "offset": [
+      0.0,
+      0.0
+    ],
+    "projection": "Box",
+    "rotation_deg": 0.0,
+    "scale": 0.1
+  },
+  "metallic": 0.0,
+  "metallic_texture": null,
+  "name": "LED bianco freddo (6500 K)",
+  "normal_directx": false,
+  "normal_strength": 1.0,
+  "normal_texture": null,
+  "opacity_texture": null,
+  "priority": 0,
+  "roughness": 1.0,
+  "roughness_is_gloss": false,
+  "roughness_texture": null,
+  "specular": 0.5,
+  "transmission": 0.0,
+  "volume_color": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "volume_depth_cm": 10.0
+}

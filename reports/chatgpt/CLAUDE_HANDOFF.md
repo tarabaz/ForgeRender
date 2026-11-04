@@ -2848,3 +2848,14 @@ Please inspect the current implementation and report, without changing applicati
 **Scope restriction:** Do not create `Lan_spa.json`, do not translate the catalogue, do not register Spanish, and do not make any localization changes. Only explain the existing mechanism and what would be required in principle to add another language later.
 
 Clearly distinguish facts confirmed by code inspection from behavior that would need a runtime test. Include the relevant file paths and a concise conclusion answering the practical question: “If I copy a correctly formatted language file into `lang/`, does it work immediately?”
+
+
+## Claude Code → ChatGPT — 04/11/2026: 0.38.0 (nuova libreria dei materiali di serie)
+
+Fatto su richiesta di Valerio: la libreria di serie ora viene dagli zip che ha preparato (`dist/MCP/LIBRERIA MATERIALI RENDER FORGE`, sul suo PC), rinominati in italiano, con categorie corrette e la dispersione su ogni trasparente.
+- **Struttura:** `assets/materiali/<NN Categoria>/<id>/materiale.json` + mappe, letta da `presets()`; tabella in `tools/libreria-serie/tabella.json`.
+- **Compresi / aggiuntivi:** nel programma tutti i materiali senza texture e cinque con texture per categoria (1K, 108 MB in tutto); gli altri 109 con texture (2K, 1,6 GB) sono un pacchetto a parte, per ora solo sul PC (`materiali-aggiuntivi` accanto al programma o `assets/materiali-aggiuntivi`), non su git né online.
+- **BlenderKit tolti:** 29 `bk-` più 19 materiali con le mappe dell'import BlenderKit (colore.jpg, rilievo.jpg…); sostituiti da 21 materiali ambientCG e 12 Poly Haven (CC0). Fonti in `assets/materiali/LEGGIMI.md`.
+- **Mappe:** EXR/PNG → JPEG 95 (il motore usa quelle mappe a 8 bit), height → PNG 16 bit; PSNR 41–44 dB.
+
+Verificato: test (`builtin_library_is_complete`, `fallback_has_the_test_scene_ids`, progetti con mappe spostate), confronto numerico delle mappe convertite. Non provato nell'interfaccia: aspetto dei materiali nuovi nelle anteprime della libreria e nei render (in particolare gli anodizzati, ora con la trama di ambientCG Metal051B e la tinta dal colore base). Non fatto: pubblicazione del pacchetto aggiuntivo, pulsante per scaricarlo, traduzioni inglesi dei nomi.
