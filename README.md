@@ -18,14 +18,16 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
-### What's new in 0.38.0
+### What's new in 0.39.0
 
-- **New built-in material library:** 125 materials in 13 categories, with Italian names and the right dispersion (Abbe number) on every transparent material. Every plain material is included, plus five textured ones per category, chosen to differ from each other, with 1K maps to keep the download light. Water and drinks are in Liquids. The BlenderKit materials, whose licence does not allow redistribution, are replaced by CC0 materials from Poly Haven and ambientCG.
-- **Additional material pack:** 109 more textured materials at 2K (about 1.6 GB), installed separately next to the program.
+- **Smoke you can place:** the source of the simulated smoke is a sphere in the viewport, moved with the gizmo; a quick particle preview shows where the smoke goes and how it moves over time, without rendering; the simulation cells follow the source, so large boxes no longer lose the smoke.
+- **Colour picker:** one panel for every material colour with RGB, CMYK and palettes (RAL Classic with indicative values included, or the official RAL file), Apply and Cancel, and the RAL code shown next to the swatch.
+- **Fixes:** the render starts at once with ink outlines and tilt-shift on (lines arrive a moment later); smooth tilt-shift blur without repeated copies of bright spots; cartoon highlights only where a light is really reflected; no more missing symbols (squares) in the interface; the manual follows the interface language; the material preview turns the way you drag it.
 
 <details>
 <summary><strong>Previous versions — complete release history</strong></summary>
 
+- **0.38.0 — New built-in material library:** 125 materials in 13 categories with Italian names, the right dispersion on transparent materials and five textured materials per category; BlenderKit materials replaced by CC0 ones; an additional pack of 109 textured materials.
 - **0.37.0 — Smoke simulation, cameras as components, tilt-shift:** simulated smoke (heat, buoyancy, swirls, wind, objects that deflect it); render cameras with a target, moved and orbited with the gizmo; tilt-shift band separate from the depth of field; black and white styles, solid background, outlines without stray dots; dust in its own box, larger specks with shadows.
 - **0.36.0 — Volumetric smoke, haze start height:** procedural smoke clouds in a box moved with the gizmo, six presets; haze from a start height to a maximum height; wider sliders.
 - **0.35.0 — Render styles, haze that does not veil everything:** cartoon and technical illustration with ink outlines; haze in "light rays only" mode with clumping, maximum height and puffs; dust lit only in the beams and kept by the denoiser.
@@ -151,6 +153,7 @@ Real volumetric smoke clouds for product shots: incense smoke next to a perfume 
 - **Computed ahead of time** with the other effects, one at a time on the progress bar, and saved with the project.
 
 - **Simulated mode:** instead of a chosen shape, the smoke can come from a physical simulation inside the box (a Eulerian fluid with temperature and buoyancy, as in Fedkiw, Stam and Jensen 2001): a source emits smoke and heat, hot smoke rises, heavy gas sinks and spreads, vorticity confinement keeps the curls, curl-noise turbulence breaks the column into puffs, wind pushes it and the objects in the box deflect it. The simulation is frozen at the chosen instant and the procedural detail (puffs, filaments) is added on its edge. Controls: source position and radius, amount, heat, buoyancy, weight, exit speed, cooling, fading, swirls, turbulence and its size, wind, instant and simulation quality (48 to 136 cells per side). Presets: simulated hot smoke and simulated heavy gas.
+- **Placing the simulated smoke:** the source is a light blue sphere in the viewport, as large as the real source: click it (or "Select the source") and the gizmo moves it, while Scale changes its radius. The **viewport preview** runs the same simulation on a coarse grid in about a second and shows it as a cloud of points that moves from 0 to the chosen instant, in a loop or paused at any time: you find the place, the source and the behaviour without rendering, then refine with the render. The simulation cells follow the source: in a large box they get finer (within the computing limit of the quality), so the smoke no longer comes out in a few lumps or vanishes into the floor, and the panel warns when the source is still smaller than a cell.
 
 Fire (combustion, emission, flames lighting the scene) is a separate, later step: see the [smoke and fire study](docs/studio-fumo-fuoco.md).
 
@@ -173,6 +176,7 @@ Diffuse materials, GGX metals and plastics, Fresnel glass, frosted glass and emi
 - **Built-in library:** 125 ready materials in 13 categories: metals, anodised aluminium, paints, plastics, rubbers, glass, liquids, ceramics and stone, woods, fabrics and leather, asphalt, roofing and emissive. Every plain material (metals, paints, plastics, glass, liquids, LEDs) is included, plus five textured materials per category, chosen to be different from each other: brushed steel, turned aluminium, diamond plate, perforated sheet and rusty metal; oak, walnut, herringbone parquet, plywood and bark; denim, leather, bouclé wool, jute and satin. Transparent materials carry the right dispersion (Abbe number: crown glass 58, lead crystal 32, optical glass 64, diamond 55, polycarbonate 30, water 56…), visible in the spectral render, and water and drinks behave as liquids inside their glass. Maps are 1024 px to keep the program light.
 - **Additional pack:** 109 more textured materials with 2K maps (woods and barks, stones and plasters, fabrics, rusty and worn metals, asphalt, roofs), about 1.6 GB, downloaded separately and copied as `materiali-aggiuntivi` next to `forgerender.exe`: at the next start they appear in the same library.
 - **Free to redistribute:** the textured materials come from Poly Haven and ambientCG (CC0); each material's source is listed in `assets/materiali/LEGGIMI.md`.
+- **Colour picker:** clicking the swatch of a material colour (base colour, volume colour, emission) opens one panel with three tabs: **RGB** (colour wheel, R, G, B and hex code), **CMYK** (cyan, magenta, yellow and black in percent, with a simple mathematical conversion, not a print profile) and **Palette** (colours with code and name). The colour changes live; **Apply** keeps it, **Cancel** (or Esc) restores the previous one. The palette tab includes the RAL Classic codes with Italian and English names and **indicative** RGB values (an average of public sources, not the official RAL values, which RAL sells as a digital library); you can also import the official RAL CLASSIC `.ase` library or your own `.json`/`.csv` palette into the Colours folder of the library. A colour picked from a palette shows its code (for example **RAL 7016**) next to the swatch, saved with the project; changing the colour by hand turns it back into a plain RGB colour.
 
 ### 10. Product studio and lighting
 
@@ -195,7 +199,7 @@ For fog that fills the whole scene see [Ambient haze](#5-ambient-haze--five-kind
 Render cameras provide focal length, aperture, depth of field and lens shift. Automatic front, rear, side, top and three-quarter views help present a product from multiple angles; turntable videos can be exported as MP4.
 
 - **Cameras as components:** the render cameras are listed in the left panel, just above the lights. Selecting one shows a line to its target (a diamond) in the viewport: the gizmo moves the camera and its target together, orbits the camera around the target (Rotate), or, after clicking the diamond, moves only the target. The target can follow an object, like a spot light, so the object stays centred even when you move it.
-- **Tilt-shift:** a sharp band on the final image (position, width and angle, horizontal, vertical or tilted) with the blur growing on both sides, each side with its own transition, from a hard edge to a very wide fade. It is separate from the depth of field: aperture, focal length and focus do not change, and with both on the band adds to the lens blur. The blur is depth-aware (a near sharp object does not bleed into the blurred background), it works the same on CPU and GPU, and moving the band shows immediately without re-rendering.
+- **Tilt-shift:** a sharp band on the final image (position, width and angle, horizontal, vertical or tilted) with the blur growing on both sides, each side with its own transition, from a hard edge to a very wide fade. It is separate from the depth of field: aperture, focal length and focus do not change, and with both on the band adds to the lens blur. The blur is depth-aware (a near sharp object does not bleed into the blurred background) and smooth even with a strong blur (it is gathered from progressively reduced copies of the image, so bright reflections become a soft blur instead of repeated copies), it works the same on CPU and GPU, and moving the band shows immediately without re-rendering.
 
 ### 13. Render passes and post-production
 
@@ -206,7 +210,7 @@ ForgeRender can export separate **Albedo, Normals, Depth, Product Mask and Compo
 At the top of the Render tab you choose how the image is drawn; hovering over each choice shows a small example.
 
 - **Photorealistic:** physically based path tracing, as always.
-- **Cartoon (cel shading):** flat material colours in three sharp bands (light, half shadow, shadow) from the scene lights, with their hard shadows and a crisp highlight on shiny materials.
+- **Cartoon (cel shading):** flat material colours in three sharp bands (light, half shadow, shadow) from the scene lights, with their hard shadows and a crisp highlight on shiny materials, only where a light is really reflected (the shape of a softbox for area lights) and as strong as the material reflects (faint on dark plastics, full on metals).
 - **Technical illustration (Gooch):** soft shading from warm in the light to cool in the shadow, with no black shadows, so shapes and volumes read clearly.
 - **Black and white:** the cartoon with the same bands in greys, the technical illustration like a pencil drawing; off, they stay in colour.
 - **Solid background:** where the camera sees nothing, a colour (white, light grey, black or any) instead of the environment, which still lights the scene.

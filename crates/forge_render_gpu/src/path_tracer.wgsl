@@ -1383,12 +1383,33 @@ fn style_key_light() -> vec3<f32> {
 
 // Fumetto: tre fasce dalla luce delle lampade (con le ombre, pesate per intensità) e un riflesso
 // netto sui materiali lucidi; senza lampade la luce da disegnatore.
+// Riflesso netto del fumetto (come forge_render_cpu::style::sees_light): dove la direzione
+// speculare vede davvero la lampada; luci ad area con la loro forma, le altre con un cerchietto.
+fn style_sees_light(i: u32, p: vec3<f32>, n: vec3<f32>, wo: vec3<f32>, wi: vec3<f32>, rough: f32) -> bool {
+    let r = normalize(n * (2.0 * dot(n, wo)) - wo);
+    if (dot(r, n) <= 0.0) { return false; }
+    if (S[light_base(i)] == 3u) {
+        let h = intersect_area(i, p + n * 1e-4, r, 1e30);
+        return h.x > 0.0 && h.z > 0.5;
+    }
+    let a = rough * rough;
+    return dot(r, wi) > cos(radians(1.5 + 30.0 * a));
+}
+
+// Forza del riflesso netto (come forge_render_cpu::style::toon_highlight): la riflettanza del
+// materiale resa visibile, più debole sui materiali meno lucidi.
+fn style_toon_highlight(m: Mat) -> vec3<f32> {
+    let f0d = min(m.spec_scale * m.f0d, 1.0);
+    let f0 = mix(vec3<f32>(f0d), m.base, m.metallic);
+    return min(f0 * 7.5, vec3<f32>(1.0)) * (0.6 * max(1.0 - m.roughness / 0.5, 0.0));
+}
+
 fn style_toon(m: Mat, n: vec3<f32>, wo: vec3<f32>, p: vec3<f32>) -> vec3<f32> {
     let so = p + n * 1e-4;
     var lit = 0.0;
     var total = 0.0;
-    var best_w = -1.0;
-    var best_l = vec3<f32>(0.0);
+    let glossy = m.roughness < 0.5;
+    var highlight = false;
     let n_lights = min(pu(P_N_LIGHTS), 16u);
     for (var i: u32 = 0u; i < n_lights; i = i + 1u) {
         let ls = sample_light(i, p, 0.5, 0.5);
@@ -1402,23 +1423,22 @@ fn style_toon(m: Mat, n: vec3<f32>, wo: vec3<f32>, p: vec3<f32>) -> vec3<f32> {
         if (ndl <= 0.0) { continue; }
         let vis = light_visibility(so, ls);
         lit = lit + w * ndl * vis;
-        if (vis > 0.0 && w * ndl > best_w) { best_w = w * ndl; best_l = ls.wi; }
+        if (glossy && vis > 0.0 && !highlight) { highlight = style_sees_light(i, p, n, wo, ls.wi, m.roughness); }
     }
     var t = 0.0;
     if (total > 0.0) {
         t = lit / total;
     } else {
-        best_l = style_key_light();
-        best_w = 1.0;
-        t = max(dot(n, best_l), 0.0);
+        let l = style_key_light();
+        let r = normalize(n * (2.0 * dot(n, wo)) - wo);
+        let a = m.roughness * m.roughness;
+        highlight = glossy && dot(r, l) > cos(radians(1.5 + 30.0 * a));
+        t = max(dot(n, l), 0.0);
     }
     var band = 0.3;
     if (t > 0.5) { band = 1.0; } else if (t > 0.15) { band = 0.6; }
     var c = m.base * band;
-    if (best_w > 0.0 && m.roughness < 0.5) {
-        let h = normalize(best_l + wo);
-        if (dot(n, h) > 0.985 - 0.06 * m.roughness) { c = c + vec3<f32>(0.6 * (1.0 - m.roughness)); }
-    }
+    if (highlight) { c = c + style_toon_highlight(m); }
     return c;
 }
 

@@ -107,6 +107,32 @@ pub fn simulate_smoke(
     progress: &dyn Fn(f32),
     cancelled: &dyn Fn() -> bool,
 ) -> Option<SmokeField> {
+    run(p, solid, progress, cancelled, None)
+}
+
+/// Come [`simulate_smoke`], e in più consegna il fumo ogni `every` secondi simulati (e
+/// all'istante finale) a `on_frame(tempo, densità)`: serve all'anteprima nella viewport, che
+/// mostra come si muove il fumo nel tempo.
+pub fn simulate_smoke_frames(
+    p: &SmokeSimParams,
+    solid: Option<&[bool]>,
+    every: f32,
+    on_frame: &mut dyn FnMut(f32, &[f32]),
+    cancelled: &dyn Fn() -> bool,
+) -> Option<SmokeField> {
+    run(p, solid, &|_| {}, cancelled, Some((every.max(1e-3), on_frame)))
+}
+
+/// Destinatario dei fotogrammi di [`simulate_smoke_frames`]: (tempo, densità).
+type FrameSink<'a> = &'a mut dyn FnMut(f32, &[f32]);
+
+fn run(
+    p: &SmokeSimParams,
+    solid: Option<&[bool]>,
+    progress: &dyn Fn(f32),
+    cancelled: &dyn Fn() -> bool,
+    mut frames: Option<(f32, FrameSink<'_>)>,
+) -> Option<SmokeField> {
     let t0 = std::time::Instant::now();
     let g = Grid { s: p.spec };
     let [rx, ry, rz] = p.spec.res;
@@ -347,6 +373,12 @@ pub fn simulate_smoke(
             .unzip();
         rho = nr;
         temp = nt;
+        if let Some((every, f)) = frames.as_mut() {
+            let (before, after) = (time, time + dt);
+            if (after / *every).floor() > (before / *every).floor() || step + 1 == steps {
+                f(after, &rho);
+            }
+        }
     }
     progress(1.0);
     // Riferimento: il 90° percentile delle celle con fumo (non la sorgente, sempre piena).

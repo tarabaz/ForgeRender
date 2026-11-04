@@ -60,6 +60,8 @@ enum DragStart {
     Fog(usize, Vec3, Vec3, Vec3),
     /// Fumo volumetrico: centro e dimensioni del riquadro all'inizio.
     Smoke(usize, Vec3, Vec3),
+    /// Sorgente della simulazione del fumo: posizione (mondo) e raggio all'inizio.
+    SmokeSource(usize, Vec3, f32),
     /// Polvere: riquadro all'inizio.
     Dust(Vec3, Vec3),
     /// Camera di rendering all'inizio.
@@ -326,7 +328,15 @@ fn frame_for(app: &ForgeApp, rect: egui::Rect, t: Target, sel: &[usize]) -> Opti
             };
             (c, [Vec3::X, Vec3::Y, Vec3::Z])
         }
-        Target::Smoke(i) => (app.scene.smokes[i].center, [Vec3::X, Vec3::Y, Vec3::Z]),
+        Target::Smoke(i) => {
+            let s = &app.scene.smokes[i];
+            let c = if app.smoke_source_handle {
+                s.sanitized().sim_source()
+            } else {
+                s.center
+            };
+            (c, [Vec3::X, Vec3::Y, Vec3::Z])
+        }
         Target::Dust => (dust_region(app).0, [Vec3::X, Vec3::Y, Vec3::Z]),
         Target::Camera(i) => {
             let c = &app.scene.render_cameras[i].camera;
@@ -504,6 +514,10 @@ pub fn update(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::
                         let f = &app.scene.fogs[i];
                         DragStart::Fog(i, f.emitter, f.size, f.zone_offset)
                     }
+                    Target::Smoke(i) if app.smoke_source_handle => {
+                        let s = app.scene.smokes[i].sanitized();
+                        DragStart::SmokeSource(i, s.sim_source(), s.sim.source_radius)
+                    }
                     Target::Smoke(i) => {
                         let s = &app.scene.smokes[i];
                         DragStart::Smoke(i, s.center, s.size)
@@ -557,6 +571,13 @@ pub fn update(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::
                 DragStart::Smoke(i, c, size) => {
                     app.scene.smokes[*i].center = *c;
                     app.scene.smokes[*i].size = *size;
+                    app.shading_changed();
+                }
+                DragStart::SmokeSource(i, p, r) => {
+                    let s = &mut app.scene.smokes[*i];
+                    let base = s.sim_source() - s.sim.source_offset;
+                    s.sim.source_offset = *p - base;
+                    s.sim.source_radius = *r;
                     app.shading_changed();
                 }
                 DragStart::Dust(c, size) => {
@@ -801,6 +822,17 @@ fn apply_drag(app: &mut ForgeApp, rect: egui::Rect, drag: &Drag, pos: egui::Pos2
             };
             app.scene.haze_dust.region = Some(r);
             crate::ui::atmosphere::dust_changed(app);
+        }
+        // Sorgente del fumo: si sposta (resta riferita al fondo del riquadro) o, con Scala, cambia
+        // raggio.
+        DragStart::SmokeSource(i, p, r) => {
+            let s = &mut app.scene.smokes[*i];
+            let base = s.sim_source() - s.sim.source_offset;
+            match &op {
+                Op::World(m) => s.sim.source_offset = m.transform_point3(*p) - base,
+                Op::Scale(k) => s.sim.source_radius = (*r * k.abs().max_element()).clamp(0.002, 50.0),
+            }
+            app.shading_changed();
         }
         // Fumo: il riquadro si sposta (e il fumo con lui) o si ridimensiona attorno al centro.
         DragStart::Smoke(i, c, size) => {

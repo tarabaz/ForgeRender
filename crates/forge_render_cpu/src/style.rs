@@ -4,7 +4,7 @@
 //! ([`forge_render_core::outline`]).
 
 use crate::integrator::shadow;
-use crate::lights::sample_light;
+use crate::lights::{intersect_area, sample_light};
 use forge_math::{luminance, Pcg32, Vec3};
 use forge_render_core::{RenderMaterial, RenderScene, RenderStyle};
 
@@ -51,13 +51,41 @@ fn gooch_mono(scene: &RenderScene, mat: &RenderMaterial, n: Vec3, wo: Vec3) -> V
     Vec3::splat(g)
 }
 
+/// Riflesso netto del fumetto: c'è dove la direzione speculare (lo specchio di `wo` sulla
+/// normale) vede davvero la lampada, come nel render fotorealistico. Per le luci ad area si usa
+/// la loro forma (il riflesso di una softbox è la softbox); per le altre un piccolo cerchio
+/// attorno alla direzione della luce, più largo sui materiali meno lucidi.
+fn sees_light(light: &forge_render_core::RenderLight, p: Vec3, n: Vec3, wo: Vec3, wi: Vec3, roughness: f32) -> bool {
+    let r = (n * (2.0 * n.dot(wo)) - wo).normalize_or(n);
+    if r.dot(n) <= 0.0 {
+        return false;
+    }
+    if matches!(light.kind, forge_render_core::RenderLightKind::Area { .. }) {
+        return intersect_area(light, p + n * 1e-4, r, f32::INFINITY).is_some_and(|(_, e, _)| e != Vec3::ZERO);
+    }
+    let a = roughness * roughness;
+    let angle = (1.5 + 30.0 * a).to_radians();
+    r.dot(wi) > angle.cos()
+}
+
+/// Forza del riflesso netto: la riflettanza del materiale (circa 4 % per plastiche e vernici, il
+/// colore per i metalli), resa visibile come nel disegno a fasce ma senza superare il bianco
+/// pieno, e più debole sui materiali meno lucidi.
+fn toon_highlight(mat: &RenderMaterial) -> Vec3 {
+    let f0d = (mat.specular_scale * mat.f0_dielectric).min(1.0);
+    let f0 = Vec3::splat(f0d) * (1.0 - mat.metallic) + mat.base_color * mat.metallic;
+    (f0 * 7.5).min(Vec3::ONE) * (0.6 * (1.0 - mat.roughness / 0.5).max(0.0))
+}
+
 /// Fumetto: colore pieno del materiale in tre fasce (luce, mezz'ombra, ombra) dalla luce delle
 /// lampade della scena con le loro ombre (pesate per intensità), più un riflesso netto sui
-/// materiali lucidi. Senza lampade si usa la luce da disegnatore.
+/// materiali lucidi dove la lampada si riflette davvero ([`sees_light`]), forte quanto riflette
+/// il materiale ([`toon_highlight`]). Senza lampade si usa la luce da disegnatore.
 fn toon(scene: &RenderScene, mat: &RenderMaterial, n: Vec3, wo: Vec3, p: Vec3, rng: &mut Pcg32) -> Vec3 {
     let so = p + n * 1e-4;
     let (mut lit, mut total) = (0.0f32, 0.0f32);
-    let mut best: Option<(f32, Vec3, f32)> = None;
+    let glossy = mat.roughness < 0.5;
+    let mut highlight = false;
     for light in scene.lights.iter().take(16) {
         let Some(ls) = sample_light(light, p, 0.5, 0.5) else { continue };
         let li = if ls.delta { ls.li } else { ls.li / ls.pdf.max(1e-8) };
@@ -72,15 +100,18 @@ fn toon(scene: &RenderScene, mat: &RenderMaterial, n: Vec3, wo: Vec3, p: Vec3, r
         }
         let vis = shadow(scene, so, &ls, light.cast_shadows, rng);
         lit += w * ndl * vis;
-        if vis > 0.0 && best.is_none_or(|b| w * ndl > b.0) {
-            best = Some((w * ndl, ls.wi, vis));
+        if glossy && vis > 0.0 && !highlight {
+            highlight = sees_light(light, p, n, wo, ls.wi, mat.roughness);
         }
     }
     let t = if total > 0.0 {
         lit / total
     } else {
         let l = key_light(scene);
-        best = Some((1.0, l, 1.0));
+        // Luce da disegnatore: riflesso nella sua direzione.
+        let r = (n * (2.0 * n.dot(wo)) - wo).normalize_or(n);
+        let a = mat.roughness * mat.roughness;
+        highlight = glossy && r.dot(l) > (1.5 + 30.0 * a).to_radians().cos();
         n.dot(l).max(0.0)
     };
     let band = if t > 0.5 {
@@ -91,15 +122,8 @@ fn toon(scene: &RenderScene, mat: &RenderMaterial, n: Vec3, wo: Vec3, p: Vec3, r
         0.3
     };
     let mut c = mat.base_color * band;
-    // Riflesso netto: solo sui materiali lucidi, verso la luce principale.
-    if let Some((_, wi, _)) = best {
-        if mat.roughness < 0.5 {
-            let h = (wi + wo).normalize_or(n);
-            let size = 0.985 - 0.06 * mat.roughness;
-            if n.dot(h) > size {
-                c += Vec3::splat(0.6 * (1.0 - mat.roughness));
-            }
-        }
+    if highlight {
+        c += toon_highlight(mat);
     }
     c
 }
@@ -116,4 +140,32 @@ fn gooch(scene: &RenderScene, mat: &RenderMaterial, n: Vec3, wo: Vec3) -> Vec3 {
     let h = (l + wo).normalize_or(n);
     c += Vec3::splat(0.35 * (1.0 - mat.roughness).max(0.0) * n.dot(h).max(0.0).powf(60.0));
     c
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use forge_scene::{Material, MaterialId};
+
+    fn mat(base: f32, metallic: f32, roughness: f32) -> RenderMaterial {
+        RenderMaterial::from_material(&Material {
+            id: MaterialId::new("m"),
+            base_color: [base; 3],
+            metallic,
+            roughness,
+            ..Default::default()
+        })
+    }
+
+    /// Il riflesso del fumetto è forte quanto riflette il materiale: su una plastica scura e
+    /// lucida è un grigio tenue (il 4 % di riflettanza), non la macchia bianca di prima (+0,6);
+    /// sui metalli lucidi resta pieno; sui materiali ruvidi sparisce.
+    #[test]
+    fn toon_highlight_follows_the_reflectance() {
+        let dark_plastic = toon_highlight(&mat(0.02, 0.0, 0.1));
+        assert!(dark_plastic.x > 0.05 && dark_plastic.x < 0.2, "{dark_plastic:?}");
+        let chrome = toon_highlight(&mat(0.9, 1.0, 0.05));
+        assert!(chrome.x > 0.5, "{chrome:?}");
+        assert_eq!(toon_highlight(&mat(0.5, 0.0, 0.6)), Vec3::ZERO);
+    }
 }

@@ -120,3 +120,66 @@ mod glyph_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod font_coverage_tests {
+    use eframe::egui;
+
+    /// Ogni carattere non ASCII dei testi dell'interfaccia (letterali nel codice di `src` e
+    /// traduzioni in `lang/Lan_eng.json`) c'è nei caratteri installati da [`super::install`]
+    /// (testo, icone Phosphor, simboli di egui): niente quadratini. Controlla anche i simboli
+    /// che egui disegna da sé nei suoi widget (il 📋 del selettore colore, le frecce delle tendine).
+    #[test]
+    fn every_interface_character_has_a_glyph() {
+        let ctx = egui::Context::default();
+        super::install(&ctx);
+        let _ = ctx.run_ui(Default::default(), |_| {});
+        let font = egui::FontId::proportional(14.0);
+        let mut chars = std::collections::BTreeMap::<char, String>::new();
+        fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+            for e in std::fs::read_dir(dir).unwrap().flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    walk(&p, out);
+                } else if p.extension().is_some_and(|x| x == "rs") {
+                    out.push(p);
+                }
+            }
+        }
+        let mut files = Vec::new();
+        walk(std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/src")), &mut files);
+        for f in &files {
+            let s = std::fs::read_to_string(f).unwrap();
+            for (n, line) in s.lines().enumerate() {
+                // Solo dentro le virgolette e fuori dai commenti e dai test (messaggi che non si vedono).
+                let code = line.split("//").next().unwrap_or("");
+                if code.contains("assert") || code.contains("panic!") || code.contains("tracing::") {
+                    continue;
+                }
+                for (k, part) in code.split('"').enumerate() {
+                    if k % 2 == 1 {
+                        for c in part.chars().filter(|c| !c.is_ascii()) {
+                            chars.entry(c).or_insert_with(|| format!("{}:{}", f.display(), n + 1));
+                        }
+                    }
+                }
+            }
+        }
+        let lang = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../lang/Lan_eng.json")).unwrap();
+        for c in lang.chars().filter(|c| !c.is_ascii()) {
+            chars.entry(c).or_insert_with(|| "lang/Lan_eng.json".into());
+        }
+        // Simboli disegnati dai widget di egui usati dal programma.
+        for c in ['📋', '⏷', '⏶', '✔', '🗙', '⊗', '⏴', '⏵'] {
+            chars.entry(c).or_insert_with(|| "widget di egui".into());
+        }
+        let missing: Vec<String> = ctx.fonts_mut(|f| {
+            chars
+                .iter()
+                .filter(|(c, _)| !c.is_whitespace() && !c.is_control() && !f.has_glyph(&font, **c))
+                .map(|(c, at)| format!("{c:?} (U+{:04X}) in {at}", *c as u32))
+                .collect()
+        });
+        assert!(missing.is_empty(), "caratteri senza glifo:\n{}", missing.join("\n"));
+    }
+}

@@ -17,7 +17,6 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             cmd_button(app, ui, cmd, short_label(cmd));
         }
         ui.separator();
-        cmd_button(app, ui, Cmd::LibraryMine, tr("Libreria"));
         dropdown(ui, icons::ADD, tr("Aggiungi"), |ui| {
             for (label, kind) in crate::app::ADD_MENU {
                 if ui.button(tr(label)).clicked() {

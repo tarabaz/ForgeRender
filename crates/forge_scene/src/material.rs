@@ -86,6 +86,12 @@ pub struct Material {
     pub priority: i32,
     /// Categoria per la libreria. [`LIQUIDS_CATEGORY`] rende il materiale un liquido.
     pub category: String,
+    /// Codice di una palette (per esempio "RAL 7016 Grigio antracite") per le proprietà colore
+    /// scelte da una palette nel selettore colore: chiave = nome del campo (`base_color`,
+    /// `volume_color`, `emission`). Solo informativo: il colore vero è il valore RGB del campo.
+    /// Si toglie quando il colore viene cambiato a mano.
+    #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub color_codes: std::collections::BTreeMap<String, String>,
 }
 
 /// Categoria dei liquidi della libreria: un materiale di questa categoria è un liquido.
@@ -204,6 +210,7 @@ impl Default for Material {
             volume_depth_cm: 10.0,
             priority: 0,
             category: "Generico".into(),
+            color_codes: Default::default(),
         }
     }
 }

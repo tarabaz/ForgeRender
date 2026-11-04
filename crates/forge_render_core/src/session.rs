@@ -167,7 +167,39 @@ enum Cmd {
     SetAdaptive(f32, u32),
     SetDenoise(DenoiseSettings),
     SetDenoiser(Option<Box<dyn Denoiser>>),
+    /// Contorni e profondità calcolati a parte per il render `job` (vedi [`Overlays`]).
+    Overlays(u64, Arc<Overlays>),
     Shutdown,
+}
+
+/// Livelli sopra l'immagine che dipendono solo da geometria, camera e risoluzione: i contorni a
+/// inchiostro e la profondità del tilt-shift. Si calcolano in un thread a parte mentre il render
+/// è già partito (l'immagine compare subito, le linee appena pronte) e si riusano finché la
+/// chiave non cambia (una luce o un materiale non li fanno ricalcolare).
+pub struct Overlays {
+    key: String,
+    outline: Option<Arc<crate::outline::Outline>>,
+    depth: Option<Arc<crate::tiltshift::DepthBuffer>>,
+}
+
+/// Chiave dei livelli: (None) se il render non ne ha bisogno.
+fn overlay_key(scene: &RenderScene, s: &RenderSettings) -> Option<String> {
+    if !s.outlines.enabled && !s.tilt_shift.enabled {
+        return None;
+    }
+    let mut backdrop: Vec<&u32> = scene.backdrop_nodes.iter().collect();
+    backdrop.sort();
+    Some(format!(
+        "{}|{}|{:?}|{}x{}|{:?}|{}|{:?}",
+        scene.geometry.id,
+        scene.has_dust,
+        scene.camera,
+        s.width,
+        s.height,
+        s.outlines.enabled.then_some(&s.outlines),
+        s.tilt_shift.enabled,
+        backdrop
+    ))
 }
 
 struct Job {
@@ -222,9 +254,10 @@ impl RenderSession {
             interrupt: AtomicBool::new(false),
         });
         let s2 = shared.clone();
+        let tx2 = tx.clone();
         let handle = std::thread::Builder::new()
             .name("forge-render-session".into())
-            .spawn(move || worker(rx, s2))
+            .spawn(move || worker(rx, tx2, s2))
             .expect("impossibile creare il thread di rendering");
         Self {
             tx,
@@ -444,8 +477,17 @@ impl DenoiseState {
     }
 }
 
-fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
+/// Contorni arrivati per un render già scartato: restano come cache per i prossimi.
+fn backlog_keep_overlays(cache: &mut Option<Arc<Overlays>>, _job: u64, o: Arc<Overlays>) {
+    *cache = Some(o);
+}
+
+fn worker(rx: Receiver<Cmd>, tx: Sender<Cmd>, shared: Arc<Shared>) {
     let mut active: Option<Active> = None;
+    // Comandi letti in anticipo: un avvio scarta quelli vecchi ancora in coda.
+    let mut backlog: std::collections::VecDeque<Cmd> = std::collections::VecDeque::new();
+    // Ultimi contorni e profondità calcolati (si riusano con la stessa chiave).
+    let mut overlays: Option<Arc<Overlays>> = None;
     let mut state = SessionState::Idle;
     let mut dn = DenoiseState {
         denoiser: None,
@@ -510,13 +552,40 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
             }
             shared.interrupt.store(false, Ordering::SeqCst);
         }
-        let cmd = if wants_render {
+        let cmd = if let Some(c) = backlog.pop_front() {
+            Some(c)
+        } else if wants_render {
             rx.try_recv().ok()
         } else {
             match rx.recv() {
                 Ok(c) => Some(c),
                 Err(_) => return,
             }
+        };
+        // Un avvio: se in coda ce ne sono di più recenti (si è mosso qualcosa mentre il render
+        // ripartiva), vale solo l'ultimo e quelli intermedi non si fanno.
+        let cmd = match cmd {
+            Some(Cmd::Start(job)) => {
+                backlog.extend(rx.try_iter());
+                match backlog.iter().rposition(|c| matches!(c, Cmd::Start(_))) {
+                    Some(i) => {
+                        let mut newer = None;
+                        for c in backlog.drain(..=i) {
+                            match c {
+                                Cmd::Start(j) => newer = Some(Cmd::Start(j)),
+                                // Contorni calcolati per un render vecchio: si tengono per la cache.
+                                Cmd::Overlays(id, o) => backlog_keep_overlays(&mut overlays, id, o),
+                                Cmd::Shutdown => return,
+                                _ => {}
+                            }
+                        }
+                        drop(job);
+                        newer
+                    }
+                    None => Some(Cmd::Start(job)),
+                }
+            }
+            other => other,
         };
 
         if let Some(cmd) = cmd {
@@ -535,8 +604,28 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
                         Some(ref a) if a.width == w && a.height == h => a.clone(),
                         _ => Accumulator::new(w, h),
                     };
-                    let outline = crate::outline::compute(&job.scene, &job.settings).map(Arc::new);
-                    let depth = crate::tiltshift::depth_buffer(&job.scene, &job.settings).map(Arc::new);
+                    // Contorni e profondità: dalla cache se la chiave è la stessa, altrimenti in un
+                    // thread a parte (il render parte subito, le linee arrivano con Cmd::Overlays).
+                    let (mut outline, mut depth) = (None, None);
+                    if let Some(key) = overlay_key(&job.scene, &job.settings) {
+                        match overlays.as_ref().filter(|o| o.key == key) {
+                            Some(o) => {
+                                outline = o.outline.clone();
+                                depth = o.depth.clone();
+                            }
+                            None => {
+                                let (scene, settings, tx, id) = (job.scene.clone(), job.settings.clone(), tx.clone(), job.id);
+                                let _ = std::thread::Builder::new().name("forge-contorni".into()).spawn(move || {
+                                    let o = Overlays {
+                                        key,
+                                        outline: crate::outline::compute(&scene, &settings).map(Arc::new),
+                                        depth: crate::tiltshift::depth_buffer(&scene, &settings).map(Arc::new),
+                                    };
+                                    let _ = tx.send(Cmd::Overlays(id, Arc::new(o)));
+                                });
+                            }
+                        }
+                    }
                     let a = Active {
                         outline,
                         depth,
@@ -622,6 +711,16 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
                         a.denoised_at = None;
                         publish(a, &dn, &shared);
                     }
+                }
+                Cmd::Overlays(id, o) => {
+                    if let Some(a) = active.as_mut() {
+                        if a.job.id == id {
+                            a.outline = o.outline.clone();
+                            a.depth = o.depth.clone();
+                            publish(a, &dn, &shared);
+                        }
+                    }
+                    overlays = Some(o);
                 }
                 Cmd::SetAdaptive(threshold, min) => {
                     if let Some(a) = active.as_mut() {

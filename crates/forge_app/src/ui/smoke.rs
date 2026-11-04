@@ -87,6 +87,8 @@ pub fn sections(app: &mut ForgeApp, ui: &mut egui::Ui) {
     let selected = app.selected_smoke;
     let base = base_point(app);
     let has_selection = !app.selection.is_empty();
+    let preview = &mut app.smoke_preview;
+    let mut select_source = false;
     for (i, s) in app.scene.smokes.iter_mut().enumerate() {
         ui.push_id(("fumo", s.n), |ui| {
             let id = ui.make_persistent_id("fumo");
@@ -118,11 +120,12 @@ pub fn sections(app: &mut ForgeApp, ui: &mut egui::Ui) {
                     });
                 })
                 .body(|ui| {
-                    changed |= body(ui, s, base, has_selection, &mut select, i);
+                    changed |= body(ui, s, base, has_selection, &mut select, i, preview, &mut select_source);
                 });
         });
     }
     if let Some(i) = select {
+        app.smoke_source_handle = select_source;
         app.selected_dust = false;
         app.selected_smoke = Some(i);
         app.selected_fog = None;
@@ -207,7 +210,17 @@ fn slider(ui: &mut egui::Ui, label: &str, hint: &str, v: &mut f32, range: std::o
     r
 }
 
-fn body(ui: &mut egui::Ui, s: &mut SmokeCloud, base: Vec3, has_selection: bool, select: &mut Option<usize>, i: usize) -> bool {
+#[allow(clippy::too_many_arguments)]
+fn body(
+    ui: &mut egui::Ui,
+    s: &mut SmokeCloud,
+    base: Vec3,
+    has_selection: bool,
+    select: &mut Option<usize>,
+    i: usize,
+    preview: &mut crate::ui::smoke_preview::SmokePreviewState,
+    source: &mut bool,
+) -> bool {
     let mut changed = false;
     ui.horizontal(|ui| {
         ui.label(tr("Nome"));
@@ -264,6 +277,30 @@ fn body(ui: &mut egui::Ui, s: &mut SmokeCloud, base: Vec3, has_selection: bool, 
             .changed();
     });
     if s.mode == SmokeMode::Simulated {
+        if ui
+            .button(tr("Seleziona la sorgente"))
+            .on_hover_text(tr("Il gizmo sposta la sorgente del fumo (Sposta) o ne cambia il raggio (Scala); nella viewport è la sfera azzurra, si seleziona anche con un clic"))
+            .clicked()
+        {
+            *select = Some(i);
+            *source = true;
+        }
+        crate::ui::smoke_preview::controls(ui, preview, s.sanitized().sim.time);
+        if let Some((cell, r)) = s.sim_warning() {
+            ui.colored_label(
+                egui::Color32::from_rgb(240, 180, 80),
+                tf(
+                    "Riquadro grande per la sorgente: celle della simulazione di {} cm, sorgente di {} cm. Il fumo nasce in pochi grumi e un gas pesante può sparire nel pavimento: rimpicciolisci il riquadro attorno al fumo, alza la qualità o allarga la sorgente.",
+                    &[format!("{:.1}", cell * 100.0), format!("{:.1}", r * 100.0)],
+                ),
+            );
+        } else {
+            ui.label(
+                egui::RichText::new(tf("Celle della simulazione: {} cm", &[format!("{:.1}", s.sim_cell() * 100.0)]))
+                    .small()
+                    .weak(),
+            );
+        }
         changed |= sim_controls(ui, s);
         ui.label(
             egui::RichText::new(tr("Dettaglio fine sul bordo (sopra la simulazione):"))

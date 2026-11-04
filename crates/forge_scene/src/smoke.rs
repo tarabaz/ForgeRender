@@ -444,4 +444,66 @@ impl SmokeCloud {
         let (lo, _) = self.bounds();
         Vec3::new(self.center.x, lo.y, self.center.z) + self.sim.source_offset
     }
+
+    /// Celle sul lato più lungo del riquadro per la simulazione. Partono da
+    /// [`SMOKE_SIM_CELLS`] della qualità; se così una cella è più grande della sorgente (riquadro
+    /// grande, sorgente piccola) si rimpiccioliscono fino a far stare la sorgente in circa tre
+    /// celle di diametro, senza superare il numero totale di celle della qualità calcolato su un
+    /// riquadro cubico (oltre, il calcolo diventerebbe troppo lungo: vedi [`Self::sim_warning`]).
+    pub fn sim_cells(&self) -> usize {
+        let s = self.sanitized();
+        let ext = s.size.max(Vec3::splat(1e-3));
+        let longest = ext.max_element();
+        let base = SMOKE_SIM_CELLS[(s.sim.quality.clamp(1, 4) - 1) as usize];
+        let want = (2.0 * s.sim.source_radius / 3.0).max(1e-4);
+        // Lato della cella che tiene il totale entro base³ (il riquadro di partenza è un cubo).
+        let budget = (ext.x * ext.y * ext.z / (base as f32).powi(3)).cbrt();
+        let cell = (longest / base as f32).min(want.max(budget));
+        ((longest / cell).ceil() as usize).clamp(base, 1024)
+    }
+
+    /// Lato di una cella della simulazione (m).
+    pub fn sim_cell(&self) -> f32 {
+        self.sanitized().size.max_element() / self.sim_cells() as f32
+    }
+
+    /// Avviso se la simulazione è troppo grossolana per la sorgente: la cella è più grande del
+    /// raggio della sorgente, quindi il fumo nasce in pochi grumi (e un gas pesante resta in uno
+    /// strato più sottile di una cella, che il pavimento può cancellare). `None` se va bene.
+    pub fn sim_warning(&self) -> Option<(f32, f32)> {
+        let cell = self.sim_cell();
+        let r = self.sanitized().sim.source_radius;
+        (self.mode == SmokeMode::Simulated && cell > r).then_some((cell, r))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Riquadro piccolo: le celle della qualità. Riquadro grande con sorgente piccola (il caso
+    /// del gas pesante in un riquadro di 10 × 1,5 × 5 m): celle più fini, entro il totale della
+    /// qualità, e l'avviso solo se la sorgente resta più piccola di una cella.
+    #[test]
+    fn sim_cells_follow_the_source() {
+        let mut s = SmokeCloud {
+            mode: SmokeMode::Simulated,
+            size: Vec3::new(1.6, 0.5, 1.6),
+            ..Default::default()
+        };
+        s.sim.source_radius = 0.07;
+        s.sim.quality = 2;
+        assert_eq!(s.sim_cells(), 72);
+        assert!(s.sim_warning().is_none());
+        s.size = Vec3::new(10.0845, 1.5035, 4.9446);
+        let n = s.sim_cells();
+        assert!(n > 72, "{n}");
+        let cell = s.sim_cell();
+        let total = (s.size / cell).ceil();
+        assert!(total.x * total.y * total.z <= 72f32.powi(3) * 1.1, "{total:?}");
+        assert!(cell < 0.07 && s.sim_warning().is_none(), "{cell}");
+        // Sorgente minuscola: celle al limite del calcolo, avviso.
+        s.sim.source_radius = 0.01;
+        assert!(s.sim_warning().is_some());
+    }
 }

@@ -138,7 +138,9 @@ fn preview_image(ui: &mut egui::Ui, pv: &mut Preview, m: &Material) {
     // Trascina per girare la vista attorno all'oggetto; doppio clic = vista iniziale.
     if resp.dragged() {
         let d = resp.drag_delta();
-        pv.yaw += d.x * 0.5;
+        // Si gira l'oggetto come se lo si prendesse in mano: trascinando a destra ruota verso
+        // destra (la camera gira attorno nel verso opposto).
+        pv.yaw -= d.x * 0.5;
         pv.pitch = (pv.pitch + d.y * 0.4).clamp(-70.0, 70.0);
         pv.dragging = true;
     } else if pv.dragging {
