@@ -210,6 +210,25 @@ pub struct OutlineSettings {
     pub crease_deg: f32,
 }
 
+impl OutlineSettings {
+    /// Impronta delle impostazioni (0 = spenti): cambiarle rifà i contorni.
+    pub fn key(&self) -> u64 {
+        if !self.enabled {
+            return 0;
+        }
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        (
+            self.width_px.to_bits(),
+            self.color.map(f32::to_bits),
+            self.creases,
+            self.crease_deg.to_bits(),
+        )
+            .hash(&mut h);
+        h.finish().max(1)
+    }
+}
+
 impl Default for OutlineSettings {
     fn default() -> Self {
         Self {
@@ -297,7 +316,7 @@ impl RenderSettings {
     /// Le impostazioni che, se cambiano, invalidano l'accumulo.
     /// (Tone mapping ed esposizione si applicano in visualizzazione, e anche
     /// il numero di campioni obiettivo si può cambiare senza ripartire.)
-    pub fn accumulation_key(&self) -> (u32, u32, u32, u32, u32, u64, bool, ColorMode, u64, RenderStyle) {
+    pub fn accumulation_key(&self) -> AccumulationKey {
         (
             self.width,
             self.height,
@@ -308,10 +327,15 @@ impl RenderSettings {
             self.environment_visible,
             self.color_mode,
             self.caustics.key(),
-            self.style,
+            (self.style, self.outlines.key()),
         )
     }
 }
+
+/// Impostazioni che invalidano l'accumulo: risoluzione, rimbalzi, roulette russa, clamp,
+/// seme, ambiente visibile, colore, caustiche, stile e contorni (vedi
+/// [`RenderSettings::accumulation_key`]).
+pub type AccumulationKey = (u32, u32, u32, u32, u32, u64, bool, ColorMode, u64, (RenderStyle, u64));
 
 /// Come si trasporta la luce.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]

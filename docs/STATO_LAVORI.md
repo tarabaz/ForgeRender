@@ -694,5 +694,12 @@
 - Polvere come effetto a sé, trasparente, visibile solo con la luce diretta (CPU e GPU).
 - Icone al posto dei simboli che il font non ha (✕, frecce).
 
+### 0.35.0 (04/11/2026): stili di rendering, foschia "solo raggi", polvere nei fasci
+- Fumetto, illustrazione tecnica, contorni a inchiostro (scheda Render, con esempi).
+- Foschia: solo raggi delle luci di serie, addensamenti, altezza massima con sbuffi, scala, griglia
+  più fitta, pavimento trovato con i raggi.
+- Polvere illuminata solo da spot e sole, brillantezza, tenuta dal denoiser.
+- Da valutare: un simulatore di fumo e fuoco (tipo Phoenix/FumeFX) partendo dal solver del ghiaccio secco.
+
 ## Prossimi passi
 Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.

@@ -9,8 +9,8 @@ use forge_scene::{Environment, Projection};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// Numero di parole dei parametri (uniform `array<vec4<u32>, 20>`).
-pub const PARAM_WORDS: usize = 84;
+/// Numero di parole dei parametri (uniform `array<vec4<u32>, 22>`).
+pub const PARAM_WORDS: usize = 88;
 
 // Indici dei parametri (devono coincidere con le costanti dello shader).
 pub const P_WIDTH: usize = 0;
@@ -86,8 +86,13 @@ pub const P_TILES_X: usize = 79;
 /// Laser: offset e numero (vedi [`LASER_WORDS`]).
 pub const P_OFF_LASERS: usize = 80;
 pub const P_N_LASERS: usize = 81;
-/// 1 se c'è la polvere in sospensione (bit 2 dei flag del materiale).
+/// Bit 0: c'è la polvere in sospensione (bit 2 dei flag del materiale); bit 1: c'è una nebbia
+/// "solo raggi" (`BakedFog::additive`).
 pub const P_HAS_DUST: usize = 82;
+/// Stile del render (`RenderStyle::code`: 0 fotorealistico, 1 fumetto, 2 tecnico).
+pub const P_STYLE: usize = 83;
+/// Brillantezza dei granelli di polvere (`RenderScene::dust_gain`).
+pub const P_DUST_GAIN: usize = 84;
 /// Laser: potenza(3), raggio, densità del fascio, 0, 0, 0; poi 1 + [`forge_render_core::laser::N_LAMBDA`]
 /// percorsi (RGB, poi le lunghezze d'onda) di [`LASER_PATH_WORDS`] parole.
 pub const LASER_HEADER_WORDS: usize = 8;
@@ -494,8 +499,9 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
             off_data,
             off_major,
             forge_volume::MACRO_CELLS as u32,
-            // Flag: bit 0 = solo per i raggi dalla camera, diffusione singola (fasci delle spot).
-            u32::from(f.camera_only),
+            // Flag: bit 0 = solo per i raggi dalla camera, diffusione singola (fasci delle spot);
+            // bit 1 = solo raggi delle luci, aggiunti senza attenuazione (`BakedFog::additive`).
+            u32::from(f.camera_only) | u32::from(f.additive) << 1,
         ];
         h.copy_from_slice(&words);
     }
@@ -559,7 +565,8 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
 
     p[P_N_SELECT] = scene.lights.len() as u32 + scene.samples_environment() as u32 + scene.emissive.is_some() as u32;
     p[P_HAS_CUTOUT] = scene.has_cutout as u32;
-    p[P_HAS_DUST] = scene.has_dust as u32;
+    p[P_HAS_DUST] = scene.has_dust as u32 | (scene.fogs.iter().any(|f| f.additive) as u32) << 1;
+    set_f(&mut p, P_DUST_GAIN, scene.dust_gain);
     if w.w.is_empty() {
         w.u(0);
     }

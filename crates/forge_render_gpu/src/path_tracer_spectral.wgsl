@@ -472,10 +472,15 @@ fn radiance_spectral(o_in: vec3<f32>, d_in: vec3<f32>) -> vec4<f32> {
             if (lt > 0.0) { t_end = lt; }
             l = l + beta * laser_beams_s(o, d, t_end);
         }
-        if (camera_path && pu(P_HAS_DUST) != 0u) {
+        if (camera_path && (pu(P_HAS_DUST) & 1u) != 0u) {
             var t_end = t_surf;
             if (lt > 0.0) { t_end = lt; }
             l = l + beta * illum4(dust_glints(o, d, t_end));
+        }
+        if (camera_path && (pu(P_HAS_DUST) & 2u) != 0u) {
+            var t_end = t_surf;
+            if (lt > 0.0) { t_end = lt; }
+            l = l + beta * illum4(additive_rays(o, d, t_end));
         }
         if (media_n > 0u) {
             var t_end = t_surf;
@@ -596,6 +601,11 @@ fn radiance_spectral(o_in: vec3<f32>, d_in: vec3<f32>) -> vec4<f32> {
         bs.m = m;
         bs.entering = entering;
         let col = albedo4(m.base);
+
+        if (camera_path && pu(P_STYLE) != 0u && has_non_delta(bs)) {
+            l = l + beta * illum4(style_shade(m, ns, wo, p));
+            break;
+        }
 
         // Caustiche: il throughput spettrale diventa un fattore unico (media delle lunghezze
         // d'onda ancora attive), come nel backend CPU.

@@ -144,6 +144,7 @@ mod tests {
             denoised_samples: 0,
             guides: None,
             adaptive: None,
+            outline: None,
         };
         for f in ExportFormat::ALL {
             let p = dir.join(format!("t.{}", f.extensions()[0]));

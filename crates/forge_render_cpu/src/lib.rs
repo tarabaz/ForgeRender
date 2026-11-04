@@ -14,6 +14,7 @@ pub mod medium;
 pub mod passes;
 pub mod photons;
 pub mod spectral;
+mod style;
 mod textures;
 
 pub use guides::{render_guides, GUIDE_SAMPLES};

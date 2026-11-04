@@ -5,7 +5,7 @@
 // luci analitiche, HDRI ed emissivi, Russian roulette, texture.
 // Tutta la scena è in un unico buffer di parole a 32 bit (vedi layout.rs).
 
-@group(0) @binding(0) var<uniform> P: array<vec4<u32>, 21>;
+@group(0) @binding(0) var<uniform> P: array<vec4<u32>, 22>;
 @group(0) @binding(1) var<storage, read> S: array<u32>;
 @group(0) @binding(2) var<storage, read_write> OUT: array<vec4<f32>>;
 // Campionamento adattivo: un bit per riquadro di 16×16 pixel (1 = riceve ancora campioni).
@@ -109,6 +109,8 @@ const P_TILES_X: u32 = 79u;
 const P_OFF_LASERS: u32 = 80u;
 const P_N_LASERS: u32 = 81u;
 const P_HAS_DUST: u32 = 82u;
+const P_STYLE: u32 = 83u;
+const P_DUST_GAIN: u32 = 84u;
 const ADAPTIVE_TILE: u32 = 16u;
 const PORTAL_WORDS: u32 = 16u;
 
@@ -1216,7 +1218,7 @@ fn fog_collision(o: vec3<f32>, d: vec3<f32>, tmax: f32, camera_path: bool) -> ve
     var best_k = 0u;
     for (var k: u32 = 0u; k < pu(P_N_FOGS); k = k + 1u) {
         let b = fog_base(k);
-        if ((S[b + 15u] & 1u) != 0u && !camera_path) { continue; }
+        if ((S[b + 15u] & 2u) != 0u || ((S[b + 15u] & 1u) != 0u && !camera_path)) { continue; }
         var limit = tmax;
         if (best_t >= 0.0) { limit = best_t; }
         let c = fog_clip(b, o, d, limit);
@@ -1245,6 +1247,7 @@ fn fog_transmittance(o: vec3<f32>, d: vec3<f32>, tmax: f32) -> f32 {
     var tr = 1.0;
     for (var k: u32 = 0u; k < pu(P_N_FOGS); k = k + 1u) {
         let b = fog_base(k);
+        if ((S[b + 15u] & 2u) != 0u) { continue; }
         let c = fog_clip(b, o, d, tmax);
         var t = c.x;
         var guard = 0u;
@@ -1287,6 +1290,67 @@ fn hg_sample(g: f32, d: vec3<f32>, u1: f32, u2: f32) -> vec3<f32> {
     return to_world(onb(d), vec3<f32>(sn * cos(phi), sn * sin(phi), c));
 }
 
+// Nebbie "solo raggi" (parola 15, bit 1) lungo il raggio fino a `tmax`, come
+// forge_render_cpu::medium::additive_rays: un punto scelto in proporzione al majorant dei tratti,
+// luce diretta di una lampada diffusa con Henyey–Greenstein, nessuna attenuazione.
+fn additive_rays(o: vec3<f32>, d: vec3<f32>, tmax: f32) -> vec3<f32> {
+    let n_lights = pu(P_N_LIGHTS);
+    var c = vec3<f32>(0.0);
+    if (n_lights == 0u) { return c; }
+    for (var k: u32 = 0u; k < pu(P_N_FOGS); k = k + 1u) {
+        let b = fog_base(k);
+        if ((S[b + 15u] & 2u) == 0u) { continue; }
+        let cl = fog_clip(b, o, d, min(tmax, 1e4));
+        if (cl.x >= cl.y) { continue; }
+        // Prima passata: peso totale dei tratti (majorant × lunghezza).
+        var total = 0.0;
+        var t = cl.x;
+        var guard = 0u;
+        loop {
+            if (t >= cl.y || guard > 4096u) { break; }
+            guard = guard + 1u;
+            let seg = fog_segment(b, o, d, t, cl.y);
+            total = total + seg.y * (seg.x - t);
+            t = seg.x;
+        }
+        if (total <= 0.0) { continue; }
+        // Seconda passata: il tratto che contiene il punto scelto.
+        var u = rnd() * total;
+        t = cl.x;
+        guard = 0u;
+        var ta = 0.0;
+        var tb = 0.0;
+        var maj = 0.0;
+        loop {
+            if (t >= cl.y || guard > 4096u) { break; }
+            guard = guard + 1u;
+            let seg = fog_segment(b, o, d, t, cl.y);
+            let w = seg.y * (seg.x - t);
+            ta = t;
+            tb = seg.x;
+            maj = seg.y;
+            if (u < w && w > 0.0) { break; }
+            u = u - w;
+            t = seg.x;
+        }
+        if (maj <= 0.0) { continue; }
+        let ts = ta + rnd() * (tb - ta);
+        let p = o + d * ts;
+        let sigma = fog_density(b, p);
+        if (sigma <= 0.0) { continue; }
+        let weight = sigma * total / maj;
+        let li_idx = min(u32(rnd() * f32(n_lights)), n_lights - 1u);
+        let ls = sample_light(li_idx, p, rnd(), rnd());
+        if (!ls.ok) { continue; }
+        var li = ls.li;
+        if (!ls.delta) { li = li / max(ls.pdf, 1e-8); }
+        let vis = light_visibility(p, ls);
+        if (vis <= 0.0) { continue; }
+        c = c + sv3(b + 8u) * li * (weight * vis * f32(n_lights) * hg_pdf(sf(b + 11u), dot(d, ls.wi)));
+    }
+    return c;
+}
+
 // Visibilità di una luce campionata da `so`: 0 se coperta, altrimenti trasmittanza delle nebbie.
 fn light_visibility(so: vec3<f32>, ls: LSample) -> f32 {
     if (!ls.shadows) { return 1.0; }
@@ -1297,10 +1361,85 @@ fn light_visibility(so: vec3<f32>, ls: LSample) -> f32 {
     return fog_transmittance(so, ls.wi, tmax);
 }
 
+// ---------------------------------------------------------------- Stili non fotorealistici
+// Come forge_render_cpu::style: alla prima superficie non speculare vista dalla camera.
+
+// Luce "da disegnatore": in alto a sinistra della camera, un po' dalla parte di chi guarda.
+fn style_key_light() -> vec3<f32> {
+    let r = pv3(P_CAM_R);
+    let u = pv3(P_CAM_U);
+    let f = pv3(P_CAM_F);
+    return normalize(-normalize(r) * 0.6 + normalize(u) * 0.8 - normalize(f) * 0.35);
+}
+
+// Fumetto: tre fasce dalla luce delle lampade (con le ombre, pesate per intensità) e un riflesso
+// netto sui materiali lucidi; senza lampade la luce da disegnatore.
+fn style_toon(m: Mat, n: vec3<f32>, wo: vec3<f32>, p: vec3<f32>) -> vec3<f32> {
+    let so = p + n * 1e-4;
+    var lit = 0.0;
+    var total = 0.0;
+    var best_w = -1.0;
+    var best_l = vec3<f32>(0.0);
+    let n_lights = min(pu(P_N_LIGHTS), 16u);
+    for (var i: u32 = 0u; i < n_lights; i = i + 1u) {
+        let ls = sample_light(i, p, 0.5, 0.5);
+        if (!ls.ok) { continue; }
+        var li = ls.li;
+        if (!ls.delta) { li = li / max(ls.pdf, 1e-8); }
+        let w = luminance(li);
+        if (w <= 0.0) { continue; }
+        total = total + w;
+        let ndl = dot(n, ls.wi);
+        if (ndl <= 0.0) { continue; }
+        let vis = light_visibility(so, ls);
+        lit = lit + w * ndl * vis;
+        if (vis > 0.0 && w * ndl > best_w) { best_w = w * ndl; best_l = ls.wi; }
+    }
+    var t = 0.0;
+    if (total > 0.0) {
+        t = lit / total;
+    } else {
+        best_l = style_key_light();
+        best_w = 1.0;
+        t = max(dot(n, best_l), 0.0);
+    }
+    var band = 0.3;
+    if (t > 0.5) { band = 1.0; } else if (t > 0.15) { band = 0.6; }
+    var c = m.base * band;
+    if (best_w > 0.0 && m.roughness < 0.5) {
+        let h = normalize(best_l + wo);
+        if (dot(n, h) > 0.985 - 0.06 * m.roughness) { c = c + vec3<f32>(0.6 * (1.0 - m.roughness)); }
+    }
+    return c;
+}
+
+// Illustrazione tecnica (Gooch): da freddo in ombra a caldo in luce, tinti dal materiale.
+fn style_gooch(m: Mat, n: vec3<f32>, wo: vec3<f32>) -> vec3<f32> {
+    let l = style_key_light();
+    let k = 0.5 * (1.0 + dot(n, l));
+    let cool = vec3<f32>(0.05, 0.1, 0.4) + m.base * 0.3;
+    let warm = vec3<f32>(0.45, 0.38, 0.08) + m.base * 0.6;
+    var c = mix(cool, warm, k);
+    let h = normalize(l + wo);
+    c = c + vec3<f32>(0.35 * max(1.0 - m.roughness, 0.0) * pow(max(dot(n, h), 0.0), 60.0));
+    return c;
+}
+
+fn style_shade(m: Mat, n: vec3<f32>, wo: vec3<f32>, p: vec3<f32>) -> vec3<f32> {
+    if (pu(P_STYLE) == 1u) { return style_toon(m, n, wo, p); }
+    return style_gooch(m, n, wo);
+}
+
 // Luce dei granelli di polvere lungo il raggio fino a `t_end` (come `dust_glints` sulla CPU):
 // luce diretta di una luce della scena scelta a caso, diffusa soprattutto in avanti.
 fn dust_glints(o: vec3<f32>, d: vec3<f32>, t_end: f32) -> vec3<f32> {
-    let n_lights = pu(P_N_LIGHTS);
+    // Solo le luci a fascio (spot = 1, sole = 2), come sulla CPU.
+    var beams: array<u32, 16>;
+    var n_lights = 0u;
+    for (var i: u32 = 0u; i < pu(P_N_LIGHTS) && n_lights < 16u; i = i + 1u) {
+        let kind = S[light_base(i)];
+        if (kind == 1u || kind == 2u) { beams[n_lights] = i; n_lights = n_lights + 1u; }
+    }
     var c = vec3<f32>(0.0);
     if (n_lights == 0u) { return c; }
     var t0 = 0.0;
@@ -1311,7 +1450,7 @@ fn dust_glints(o: vec3<f32>, d: vec3<f32>, t_end: f32) -> vec3<f32> {
         if (!h.found) { break; }
         t0 = h.t + 4e-3;
         let p = o + d * h.t;
-        let li_idx = min(u32(rnd() * f32(n_lights)), n_lights - 1u);
+        let li_idx = beams[min(u32(rnd() * f32(n_lights)), n_lights - 1u)];
         let ls = sample_light(li_idx, p, rnd(), rnd());
         if (!ls.ok) { continue; }
         var li = ls.li;
@@ -1320,7 +1459,7 @@ fn dust_glints(o: vec3<f32>, d: vec3<f32>, t_end: f32) -> vec3<f32> {
         if (vis <= 0.0) { continue; }
         let pb = pu(P_OFF_PRIMS) + h.prim * PRIM_WORDS;
         let albedo = sv3(pu(P_OFF_MATS) + S[pb + 3u] * MAT_WORDS);
-        c = c + albedo * li * (vis * f32(n_lights) * 2.0 * hg_pdf(0.5, dot(d, ls.wi)));
+        c = c + albedo * li * (vis * f32(n_lights) * 2.0 * pf(P_DUST_GAIN) * hg_pdf(0.5, dot(d, ls.wi)));
     }
     return c;
 }
@@ -1616,10 +1755,16 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
             l = l + beta * laser_beams_rgb(o, d, t_end);
         }
         // Polvere in sospensione: brilla solo dove la colpisce la luce diretta.
-        if (camera_path && pu(P_HAS_DUST) != 0u) {
+        if (camera_path && (pu(P_HAS_DUST) & 1u) != 0u) {
             var t_end = t_surf;
             if (lt > 0.0) { t_end = lt; }
             l = l + beta * dust_glints(o, d, t_end);
+        }
+        // Nebbie "solo raggi": luce delle lampade aggiunta, senza velo.
+        if (camera_path && (pu(P_HAS_DUST) & 2u) != 0u) {
+            var t_end = t_surf;
+            if (lt > 0.0) { t_end = lt; }
+            l = l + beta * additive_rays(o, d, t_end);
         }
         // Assorbimento del volume trasparente attraversato.
         if (media_n > 0u) {
@@ -1747,6 +1892,12 @@ fn radiance(o_in: vec3<f32>, d_in: vec3<f32>) -> vec3<f32> {
         bs.ng = ng;
         bs.m = m;
         bs.entering = entering;
+
+        // Stili non fotorealistici: alla prima superficie non speculare vista dalla camera.
+        if (camera_path && pu(P_STYLE) != 0u && has_non_delta(bs)) {
+            l = l + beta * style_shade(m, ns, wo, p);
+            break;
+        }
 
         var excl_after = false;
         if (has_non_delta(bs)) {

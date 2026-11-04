@@ -229,6 +229,14 @@ pub fn radiance_spectral_with(
                 add(&mut l, beta * c, depth);
             }
         }
+        // Nebbie "solo raggi" (come nel render RGB).
+        if camera_path && scene.fogs.iter().any(|f| f.additive) {
+            let t_end = light_hit.map(|x| x.0).unwrap_or(t_surf);
+            let c = crate::medium::additive_rays(scene, o, d, t_end, rng);
+            if c != Vec3::ZERO {
+                add(&mut l, beta * illuminant(c, w), depth);
+            }
+        }
         // Polvere in sospensione (come nel render RGB, colore portato sulle lunghezze d'onda).
         if camera_path && scene.has_dust {
             let t_end = light_hit.map(|x| x.0).unwrap_or(t_surf);
@@ -373,6 +381,13 @@ pub fn radiance_spectral_with(
             entering,
             color: albedo(mat.base_color, w),
         };
+
+        // Stili non fotorealistici (come nel render RGB).
+        if camera_path && settings.style != forge_render_core::RenderStyle::Photoreal && bsdf.has_non_delta() {
+            let c = crate::style::shade(scene, settings.style, mat, ns, wo, p, rng);
+            add(&mut l, beta * illuminant(c, w), depth);
+            break;
+        }
 
         // Caustiche: come nel render RGB; il throughput spettrale diventa un fattore unico (media
         // delle lunghezze d'onda ancora attive).

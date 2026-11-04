@@ -17,7 +17,7 @@
 use crate::bsdf::Bsdf;
 use crate::lights::{intersect_area, sample_light, LightSample};
 use forge_math::{luminance, offset_ray_origin, sampling::power_heuristic, Onb, Pcg32, Vec3};
-use forge_render_core::{RenderScene, RenderSettings};
+use forge_render_core::{RenderLightKind, RenderScene, RenderSettings};
 
 pub fn radiance(scene: &RenderScene, settings: &RenderSettings, o: Vec3, d: Vec3, rng: &mut Pcg32) -> Vec3 {
     radiance_with(scene, settings, o, d, rng, None)
@@ -123,6 +123,14 @@ pub fn radiance_with(
         if camera_path && !scene.lasers.is_empty() {
             let t_end = light_hit.map(|x| x.0).unwrap_or(t_surf);
             let c = laser_beams_rgb(scene, o, d, t_end);
+            if c != Vec3::ZERO {
+                add(&mut l, beta * c, depth);
+            }
+        }
+        // Nebbie "solo raggi": luce delle lampade aggiunta, senza velo.
+        if camera_path && scene.fogs.iter().any(|f| f.additive) {
+            let t_end = light_hit.map(|x| x.0).unwrap_or(t_surf);
+            let c = crate::medium::additive_rays(scene, o, d, t_end, rng);
             if c != Vec3::ZERO {
                 add(&mut l, beta * c, depth);
             }
@@ -272,6 +280,16 @@ pub fn radiance_with(
             entering,
             color: mat.base_color,
         };
+
+        // Stili non fotorealistici: alla prima superficie non speculare vista dalla camera.
+        if camera_path && settings.style != forge_render_core::RenderStyle::Photoreal && bsdf.has_non_delta() {
+            add(
+                &mut l,
+                beta * crate::style::shade(scene, settings.style, mat, ns, wo, p, rng),
+                depth,
+            );
+            break;
+        }
 
         // Caustiche: al primo vertice non speculare si raccolgono i fotoni; da lì in poi i percorsi
         // che arrivano a una luce passando solo da vetri lisci non contano (li contano i fotoni).
@@ -518,10 +536,19 @@ pub(crate) fn sample_any_light(scene: &RenderScene, s: &LightSlots, p: Vec3, rng
 }
 
 /// Luce dei granelli di polvere lungo il raggio fino a `t_end`: per ognuno la luce diretta di una
-/// luce della scena scelta a caso (niente ambiente né superfici emissive né rimbalzi: la polvere
+/// luce a fascio della scena scelta a caso (niente ambiente né superfici emissive né rimbalzi: la polvere
 /// si vede solo in un fascio), diffusa soprattutto in avanti come dai granelli veri.
 pub(crate) fn dust_glints(scene: &RenderScene, o: Vec3, d: Vec3, t_end: f32, rng: &mut Pcg32) -> Vec3 {
-    let n_lights = scene.lights.len();
+    // Solo le luci a fascio (spot e sole): la polvere si vede nei raggi, non nella luce diffusa
+    // di lampadine e pannelli.
+    let mut beams = [0usize; 16];
+    let mut n_lights = 0;
+    for (i, l) in scene.lights.iter().enumerate() {
+        if n_lights < beams.len() && matches!(l.kind, RenderLightKind::Spot { .. } | RenderLightKind::Directional { .. }) {
+            beams[n_lights] = i;
+            n_lights += 1;
+        }
+    }
     if n_lights == 0 {
         return Vec3::ZERO;
     }
@@ -530,7 +557,7 @@ pub(crate) fn dust_glints(scene: &RenderScene, o: Vec3, d: Vec3, t_end: f32, rng
     for &(t, prim) in &hits[..n] {
         let p = o + d * t;
         let k = ((rng.next_f32() * n_lights as f32) as usize).min(n_lights - 1);
-        let light = &scene.lights[k];
+        let light = &scene.lights[beams[k]];
         let (u1, u2) = rng.next_2d();
         let Some(ls) = sample_light(light, p, u1, u2) else { continue };
         let li = if ls.delta { ls.li } else { ls.li / ls.pdf.max(1e-8) };
@@ -542,7 +569,7 @@ pub(crate) fn dust_glints(scene: &RenderScene, o: Vec3, d: Vec3, t_end: f32, rng
             continue;
         }
         let albedo = scene.material_of(prim as usize).base_color;
-        c += albedo * li * (vis * n_lights as f32 * 2.0 * crate::medium::hg_pdf(0.5, d.dot(ls.wi)));
+        c += albedo * li * (vis * n_lights as f32 * 2.0 * scene.dust_gain * crate::medium::hg_pdf(0.5, d.dot(ls.wi)));
     }
     c
 }

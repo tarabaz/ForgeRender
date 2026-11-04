@@ -76,7 +76,10 @@ fn print_help() {
              --noise-threshold T (campionamento adattivo, es. 0.01; --spp resta il massimo)  --adaptive-min N\n    \
              --adaptive-map F.png (mappa dei campioni per pixel, PNG a 16 bit con i conteggi esatti)\n    \
              --hdri F.hdr|F.exr  --hdri-strength S  --hdri-rotation GRADI\n    \
-             --denoise off|finale  --denoise-quality veloce|bilanciata|alta  --cuda  --denoise-strength 0..1\n  \
+             --denoise off|finale  --denoise-quality veloce|bilanciata|alta  --cuda  --denoise-strength 0..1\n    \
+             --style fotorealistico|fumetto|tecnico  --outlines  --dust\n    \
+             --haze nebbia-bassa|gas|fumo|strati|riccioli  --haze-density D  --haze-quality 1..4\n    \
+             --haze-clumping 0..1  --haze-top METRI\n  \
          bench [opzioni]            benchmark della scena di test con diversi numeri di thread\n    \
              --spp N (default 16)  --width W  --height H  --threads 1,2,4  --json F\n  \
          libreria elenco            materiali e HDRI della libreria\n  \
@@ -196,6 +199,75 @@ fn render(args: &Args) -> anyhow::Result<()> {
     settings.denoise.use_cuda = args.flag("--cuda");
     if let Some(v) = args.parse("--denoise-strength")? {
         settings.denoise.strength = v;
+    }
+    if let Some(s) = args.value("--style") {
+        settings.style = match s {
+            "fotorealistico" | "photoreal" => forge_render_core::RenderStyle::Photoreal,
+            "fumetto" | "toon" => forge_render_core::RenderStyle::Toon,
+            "tecnico" | "technical" => forge_render_core::RenderStyle::Technical,
+            _ => bail!("--style: valori ammessi fotorealistico|fumetto|tecnico"),
+        };
+    }
+    if args.flag("--outlines") {
+        settings.outlines.enabled = true;
+    }
+    if let Some(k) = args.value("--haze") {
+        use forge_scene::HazeKind;
+        let kind = match k {
+            "nebbia-bassa" | "low-fog" => HazeKind::Ambient,
+            "gas" => HazeKind::GasClouds,
+            "fumo" | "smoke" => HazeKind::ToxicFloor,
+            "strati" | "layers" => HazeKind::Layers,
+            "riccioli" | "curls" => HazeKind::Billows,
+            _ => bail!("--haze: valori ammessi nebbia-bassa|gas|fumo|strati|riccioli"),
+        };
+        let seed = scene.haze.seed;
+        scene.haze = forge_scene::Haze::of_kind(kind);
+        scene.haze.seed = seed;
+    }
+    if let Some(v) = args.parse("--haze-density")? {
+        scene.haze.density = v;
+    }
+    if let Some(v) = args.parse("--haze-quality")? {
+        scene.haze.quality = v;
+    }
+    if let Some(v) = args.parse("--haze-clumping")? {
+        scene.haze.clumping = v;
+    }
+    if let Some(v) = args.parse("--haze-top")? {
+        scene.haze.top_height = v;
+    }
+    // Prove della foschia: ambiente quasi spento e una spot dall'alto a sinistra sul centro.
+    if args.flag("--dark") {
+        match &mut scene.environment {
+            forge_scene::Environment::Uniform { strength, .. }
+            | forge_scene::Environment::Gradient { strength, .. }
+            | forge_scene::Environment::Hdri { strength, .. } => *strength *= 0.03,
+        }
+        for l in &mut scene.lights {
+            l.intensity *= 0.05;
+        }
+    }
+    if args.flag("--spot") {
+        let target = scene.bounds().center();
+        scene.lights.push(forge_scene::Light {
+            kind: forge_scene::LightKind::Spot {
+                inner_angle_deg: 8.0,
+                outer_angle_deg: 14.0,
+            },
+            target,
+            ..forge_scene::Light::point("Spot di prova", target + forge_math::Vec3::new(-1.2, 2.2, 0.6), 40.0)
+        });
+    }
+    if args.flag("--dust") {
+        scene.haze_dust.enabled = true;
+        if let Some(v) = args.parse("--dust-size")? {
+            scene.haze_dust.size_mm = v;
+        }
+        if let Some(v) = args.parse("--dust-amount")? {
+            scene.haze_dust.per_m3 = v;
+        }
+        scene.sync_effects();
     }
     let out = PathBuf::from(args.value("--out").unwrap_or("render.png"));
     let t_compile = Instant::now();

@@ -113,6 +113,8 @@ pub struct Frame {
     pub guides: Option<Arc<Guides>>,
     /// Diagnostica del campionamento adattivo (solo se è acceso).
     pub adaptive: Option<Arc<AdaptiveDiag>>,
+    /// Contorni a inchiostro da disegnare sopra l'immagine (se accesi).
+    pub outline: Option<Arc<crate::outline::Outline>>,
 }
 
 /// Diagnostica del campionamento adattivo: dove sono finiti i campioni e quanta parte è
@@ -125,12 +127,17 @@ pub struct AdaptiveDiag {
 }
 
 impl Frame {
-    /// Immagine da mostrare/esportare: grezza o miscelata con quella ripulita.
+    /// Immagine da mostrare/esportare: grezza o miscelata con quella ripulita, con i contorni
+    /// sopra (se accesi).
     pub fn display(&self, strength: f32) -> std::borrow::Cow<'_, [[f32; 3]]> {
-        match &self.denoised {
+        let img = match &self.denoised {
             Some(d) if strength >= 1.0 => std::borrow::Cow::Borrowed(d.as_slice()),
             Some(d) if strength > 0.0 => std::borrow::Cow::Owned(crate::mix_denoised(&self.linear, d, strength)),
             _ => std::borrow::Cow::Borrowed(self.linear.as_slice()),
+        };
+        match &self.outline {
+            Some(o) if o.coverage.len() == img.len() => std::borrow::Cow::Owned(o.apply(&img)),
+            _ => img,
         }
     }
 }
@@ -328,6 +335,8 @@ struct Active {
     mask: Option<TileMask>,
     /// La prima valutazione della maschera è già stata registrata nel log.
     mask_logged: bool,
+    /// Contorni a inchiostro (calcolati all'avvio, se accesi).
+    outline: Option<Arc<crate::outline::Outline>>,
 }
 
 type DenoiseKey = (crate::DenoiseQuality, bool, bool);
@@ -441,6 +450,7 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
             denoised: if on { a.denoised.clone() } else { None },
             denoised_samples: if on { a.denoised_at.map(|d| d.0).unwrap_or(0) } else { 0 },
             guides: if on { dn.guides.as_ref().map(|g| g.1.clone()) } else { None },
+            outline: a.outline.clone(),
             adaptive: a.mask.as_ref().map(|_| {
                 Arc::new(AdaptiveDiag {
                     counts: a.accum.counts().to_vec(),
@@ -506,7 +516,9 @@ fn worker(rx: Receiver<Cmd>, shared: Arc<Shared>) {
                         Some(ref a) if a.width == w && a.height == h => a.clone(),
                         _ => Accumulator::new(w, h),
                     };
+                    let outline = crate::outline::compute(&job.scene, &job.settings).map(Arc::new);
                     let a = Active {
+                        outline,
                         pass: vec![[0.0; 3]; accum.pixel_count()],
                         accum,
                         job: Job { resume: None, ..job },

@@ -10,6 +10,24 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.35.0 — 4 Nov 2026
+
+**Render styles**
+- At the top of the Render tab: **Photorealistic**, **Cartoon** (cel shading: material colour in three bands from the scene lights, with their shadows, and a crisp highlight on shiny materials) and **Technical illustration** (Gooch: warm to cool with an illustrator's light, no black shadows), with an example image on hover (`assets/stili/`). Applied at the first non-specular surface seen by the camera (glass and mirrors stay real); CPU and GPU, RGB and spectral (`forge_render_cpu::style`, `style_shade` in the shader).
+- **Ink outlines** (with any style): silhouettes, object borders, depth jumps and sharp edges from 3×3 rays per pixel, drawn over the final image also after the denoiser (`forge_render_core::outline`, `Frame::outline`). Thickness, colour, edges and angle. Changing style or outlines restarts the render.
+
+**Haze**
+- **Light rays only** (default): the haze adds to camera rays the light of spots, sun and lamps scattered once, without veiling or darkening the objects (`BakedFog::additive`); off = physical haze as before.
+- **Clumping**, **Maximum height** above the floor with randomly rising **Puffs**, and next to the density the scale "visible up to ~X m".
+- Floor found with 5×5 downward rays (before, the lowest point of the scene was used: the floor smoke ended up inside the thickness of the floor).
+- Grid also tied to the size of the scene (quality 2: at least 160 cells per side; before ~60 on the test scene), 2.5× stronger swirls, more contrast in the banks, lower default densities. Tuned with test renders (`forgerender-cli render --dark --spot --haze …`).
+
+**Dust**
+- Lit only by spots and sun (the beams); larger (2.5 mm) and sparser default specks, adjustable **Brightness**; the specks are in the denoiser guides.
+
+**Command line**
+- `render`: `--style`, `--outlines`, `--haze`, `--haze-density`, `--haze-quality`, `--haze-clumping`, `--haze-top`, `--dust`, `--dust-size`, `--dust-amount`, `--dark`, `--spot`.
+
 ## 0.34.0 — 4 Nov 2026
 
 **Haze in five kinds, with fractal and quality controls**

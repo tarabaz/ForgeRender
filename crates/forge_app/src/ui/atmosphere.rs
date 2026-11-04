@@ -48,8 +48,8 @@ pub fn add_buttons(app: &mut ForgeApp, ui: &mut egui::Ui) {
     if ui
         .add_enabled(!app.scene.haze_dust.enabled, egui::Button::new(tr("Polvere in sospensione")))
         .on_hover_text(tr(
-            "Granelli minuscoli nell'aria che si vedono solo dove li colpisce direttamente una luce, come \
-             la polvere nei raggi che entrano da una finestra: altrove sono invisibili",
+            "Granelli nell'aria che si vedono solo dentro i fasci di spot e sole, come la polvere nei raggi \
+             che entrano da una finestra: altrove sono invisibili",
         ))
         .on_disabled_hover_text(tr("Già nella scena: le impostazioni sono qui sotto"))
         .clicked()
@@ -175,14 +175,79 @@ fn haze(app: &mut ForgeApp, ui: &mut egui::Ui) {
                     changed = true;
                 }
                 ui.end_row();
-                ui.label(tr("Densità"));
+                ui.label(tr("Solo raggi delle luci"));
                 changed |= ui
-                    .add(egui::Slider::new(&mut h.density, 0.005..=10.0).logarithmic(true).max_decimals(3))
+                    .checkbox(&mut h.rays_only, "")
                     .on_hover_text(tr(
-                        "Quanto è spessa l'aria (1/m): 0,05 = velo, 0,2 = raggi ben visibili, oltre 1 = nebbia",
+                        "Acceso: la foschia mostra solo la luce di spot, sole e lampade che la attraversa (i raggi), senza \
+                         velare né scurire gli oggetti. Spento: foschia fisica, che vela tutto con la luce dell'ambiente",
                     ))
                     .changed();
                 ui.end_row();
+                ui.label(tr("Densità"));
+                ui.horizontal(|ui| {
+                    changed |= ui
+                        .add(egui::Slider::new(&mut h.density, 0.005..=10.0).logarithmic(true).max_decimals(3))
+                        .on_hover_text(tr(
+                            "Quanto è spessa l'aria (1/m): più alta = raggi più luminosi e, se la foschia è fisica, oggetti \
+                             più velati",
+                        ))
+                        .changed();
+                    // Scala: distanza a cui un oggetto sparirebbe nella foschia (contrasto al 5 %).
+                    let vis = 3.0 / h.density.max(1e-4);
+                    let text = if vis >= 1.0 {
+                        format!("{vis:.1} m")
+                    } else {
+                        format!("{:.0} cm", vis * 100.0)
+                    };
+                    ui.label(egui::RichText::new(tf("si vede fino a ~{}", &[text])).small().weak())
+                        .on_hover_text(tr(
+                            "Scala della densità: a questa distanza un oggetto sparirebbe nella foschia (nei punti più \
+                             densi prima, in quelli più tenui dopo)",
+                        ));
+                });
+                ui.end_row();
+                ui.label(tr("Addensamenti"));
+                changed |= ui
+                    .add(egui::Slider::new(&mut h.clumping, 0.0..=1.0))
+                    .on_hover_text(tr(
+                        "Zone grandi più dense e altre più tenui, sparse nella scena: 0 = uguale ovunque, 1 = ammassi \
+                         marcati e vuoti",
+                    ))
+                    .changed();
+                ui.end_row();
+                ui.label(tr("Altezza massima"));
+                ui.horizontal(|ui| {
+                    let mut limited = h.top_height > 0.0;
+                    if ui
+                        .checkbox(&mut limited, "")
+                        .on_hover_text(tr("Ferma la foschia a un'altezza dal pavimento, salvo qualche sbuffo che sale"))
+                        .changed()
+                    {
+                        h.top_height = if limited { 0.5 } else { 0.0 };
+                        changed = true;
+                    }
+                    if limited {
+                        changed |= ui
+                            .add(
+                                egui::Slider::new(&mut h.top_height, 0.02..=5.0)
+                                    .logarithmic(true)
+                                    .suffix(" m")
+                                    .max_decimals(2),
+                            )
+                            .on_hover_text(tr("Fino a che altezza dal pavimento arriva la foschia"))
+                            .changed();
+                    }
+                });
+                ui.end_row();
+                if h.top_height > 0.0 {
+                    ui.label(tr("Sbuffi"));
+                    changed |= ui
+                        .add(egui::Slider::new(&mut h.puffs, 0.0..=1.0))
+                        .on_hover_text(tr("Quanti sbuffi salgono a caso sopra l'altezza massima: 0 = taglio netto"))
+                        .changed();
+                    ui.end_row();
+                }
                 ui.label(tr("Colore"));
                 changed |= ui
                     .color_edit_button_rgb(&mut h.color)
@@ -342,8 +407,8 @@ fn dust(app: &mut ForgeApp, ui: &mut egui::Ui) {
         .body(|ui| {
             ui.label(
                 egui::RichText::new(tr(
-                    "Si vede solo dove la colpisce direttamente una luce (spot, sole, luci della scena): serve \
-                     un fascio che attraversi l'aria. La luce dell'ambiente e quella di rimbalzo non la illuminano.",
+                    "Si vede solo dentro i fasci di spot e sole: serve un raggio che attraversi l'aria. Lampadine, \
+                     pannelli, ambiente e luce di rimbalzo non la illuminano.",
                 ))
                 .small()
                 .weak(),
@@ -363,8 +428,21 @@ fn dust(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 ui.end_row();
                 ui.label(tr("Dimensione"));
                 changed |= ui
-                    .add(egui::Slider::new(&mut dust.size_mm, 0.1..=3.0).suffix(" mm").max_decimals(2))
-                    .on_hover_text(tr("Diametro medio dei granelli: più grandi = puntini più visibili e sfocati"))
+                    .add(egui::Slider::new(&mut dust.size_mm, 0.3..=6.0).suffix(" mm").max_decimals(2))
+                    .on_hover_text(tr(
+                        "Diametro medio dei granelli: più grandi = puntini più visibili (sotto la grandezza di un pixel il \
+                         denoiser li scambia per rumore)",
+                    ))
+                    .changed();
+                ui.end_row();
+                ui.label(tr("Brillantezza"));
+                changed |= ui
+                    .add(
+                        egui::Slider::new(&mut dust.brightness, 1.0..=50.0)
+                            .logarithmic(true)
+                            .max_decimals(1),
+                    )
+                    .on_hover_text(tr("Quanto brillano i granelli nel fascio"))
                     .changed();
                 ui.end_row();
                 ui.label(tr("Colore"));

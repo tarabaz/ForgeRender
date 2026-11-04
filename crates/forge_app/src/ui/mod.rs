@@ -25,6 +25,7 @@ mod simple;
 mod splash;
 mod status;
 pub mod style;
+pub(crate) mod styles;
 mod transform;
 pub mod tree;
 

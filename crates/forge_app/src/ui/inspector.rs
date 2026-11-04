@@ -1967,11 +1967,13 @@ fn camera(app: &mut ForgeApp, ui: &mut egui::Ui) {
 // ----------------------------------------------------------------------
 
 fn render(app: &mut ForgeApp, ui: &mut egui::Ui) {
+    // In cima: lo stile del render (con le immagini d'esempio) e i contorni.
+    let mut changed = crate::ui::styles::show(app, ui);
+    ui.separator();
     if !app.scene.render_cameras.is_empty() {
         camera_picker(app, ui, "render-tab-camera");
         ui.separator();
     }
-    let mut changed = false;
     let prev_backend = app.settings.backend;
     egui::ComboBox::from_label(tr("Dispositivo"))
         .selected_text(tr(app.settings.backend.label()))

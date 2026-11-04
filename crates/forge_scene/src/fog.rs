@@ -224,6 +224,15 @@ pub struct Haze {
     pub roughness: f32,
     /// Qualità della griglia (1–4): celle più fitte, calcolo più lungo e più memoria.
     pub quality: u32,
+    /// Addensamenti, 0–1: zone grandi più dense e altre più tenui (la media resta la densità).
+    pub clumping: f32,
+    /// Altezza massima sopra il punto più basso (m, 0 = nessun limite): sopra, solo sbuffi.
+    pub top_height: f32,
+    /// Quanti sbuffi salgono sopra l'altezza massima, 0–1.
+    pub puffs: f32,
+    /// Solo i raggi delle luci: la foschia aggiunge la luce di lampade e sole diffusa nell'aria,
+    /// senza velare né oscurare il resto (niente luce dell'ambiente). Spento = foschia fisica.
+    pub rays_only: bool,
 }
 
 /// Tipo di foschia d'ambiente.
@@ -262,7 +271,7 @@ impl Haze {
         };
         match kind {
             HazeKind::Ambient => Haze {
-                density: 0.9,
+                density: 0.6,
                 variation: 0.7,
                 swirl_scale: 0.5,
                 anisotropy: 0.3,
@@ -270,11 +279,11 @@ impl Haze {
                 ..base
             },
             HazeKind::GasClouds => Haze {
-                density: 1.2,
+                density: 0.8,
                 variation: 0.45,
-                swirl_scale: 0.9,
+                swirl_scale: 0.4,
                 anisotropy: 0.4,
-                warp: 1.4,
+                warp: 0.8,
                 octaves: 5,
                 roughness: 0.55,
                 ..base
@@ -286,23 +295,23 @@ impl Haze {
                 swirl_scale: 0.35,
                 anisotropy: 0.3,
                 falloff_height: 0.06,
-                warp: 1.0,
+                warp: 0.6,
                 ..base
             },
             HazeKind::Layers => Haze {
-                density: 0.8,
+                density: 0.25,
                 variation: 0.6,
-                swirl_scale: 0.8,
+                swirl_scale: 0.5,
                 anisotropy: 0.5,
-                falloff_height: 0.35,
+                falloff_height: 0.25,
                 ..base
             },
             HazeKind::Billows => Haze {
-                density: 0.7,
+                density: 0.3,
                 variation: 0.9,
-                swirl_scale: 0.7,
+                swirl_scale: 0.4,
                 anisotropy: 0.45,
-                warp: 2.6,
+                warp: 1.2,
                 octaves: 6,
                 roughness: 0.6,
                 ..base
@@ -323,10 +332,14 @@ impl Default for Haze {
             swirl_scale: 0.8,
             seed: 1,
             kind: HazeKind::Ambient,
-            warp: 1.6,
+            warp: 0.7,
             octaves: 4,
             roughness: 0.5,
             quality: 2,
+            clumping: 0.0,
+            top_height: 0.0,
+            puffs: 0.4,
+            rays_only: true,
         }
     }
 }

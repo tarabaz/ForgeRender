@@ -13,6 +13,40 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.35.0 — 04/11/2026
+
+**Stili di rendering**
+- In cima alla scheda Render: **Fotorealistico**, **Fumetto** (cel shading: colore del materiale in
+  tre fasce dalle luci della scena, con le loro ombre, e riflesso netto sui materiali lucidi) e
+  **Illustrazione tecnica** (Gooch: da caldo a freddo con una luce da disegnatore, senza ombre
+  nere), con un'immagine d'esempio al passaggio del mouse (`assets/stili/`). Applicati alla
+  prima superficie non speculare vista dalla camera (vetri e specchi restano veri); CPU e GPU,
+  RGB e spettrale (`forge_render_cpu::style`, `style_shade` nella shader).
+- **Contorni a inchiostro** (con qualsiasi stile): sagome, confini tra oggetti, salti di
+  profondità e spigoli vivi da 3×3 raggi per pixel, disegnati sopra l'immagine finale anche dopo
+  il denoiser (`forge_render_core::outline`, `Frame::outline`). Spessore, colore, spigoli e angolo.
+  Cambiare stile o contorni riavvia il render.
+
+**Foschia**
+- **Solo raggi delle luci** (di serie): la foschia aggiunge ai raggi dalla camera la luce di
+  spot, sole e lampade diffusa una volta, senza velare né oscurare gli oggetti
+  (`BakedFog::additive`); spento = foschia fisica come prima.
+- **Addensamenti**, **Altezza massima** dal pavimento con **Sbuffi** che salgono a caso, e accanto
+  alla densità la scala "si vede fino a ~X m".
+- Pavimento trovato con 5×5 raggi verso il basso (prima si usava il punto più basso della scena:
+  il fumo a terra finiva dentro lo spessore del pavimento).
+- Griglia legata anche alla grandezza della scena (qualità 2: almeno 160 celle per lato; prima
+  ~60 sulla scena di prova), vortici 2,5 volte più forti, più contrasto nei banchi, densità di
+  partenza più basse. Tarato con render di prova (`forgerender-cli render --dark --spot --haze …`).
+
+**Polvere**
+- La illuminano solo spot e sole (i fasci); granelli di serie più grandi (2,5 mm) e meno fitti,
+  **Brillantezza** regolabile; i granelli sono nelle guide del denoiser.
+
+**Riga di comando**
+- `render`: `--style`, `--outlines`, `--haze`, `--haze-density`, `--haze-quality`,
+  `--haze-clumping`, `--haze-top`, `--dust`, `--dust-size`, `--dust-amount`, `--dark`, `--spot`.
+
 ## 0.34.0 — 04/11/2026
 
 **Foschia in cinque tipi, con il frattale e la qualità**

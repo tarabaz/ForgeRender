@@ -2,7 +2,7 @@
 ; Compilazione:  ISCC.exe /DAppVersion=0.32.0 /DBinDir=..\..\target\release packaging\windows\forgerender.iss
 
 #ifndef AppVersion
-  #define AppVersion "0.34.0"
+  #define AppVersion "0.35.0"
 #endif
 #ifndef BinDir
   #define BinDir "..\..\target\release"

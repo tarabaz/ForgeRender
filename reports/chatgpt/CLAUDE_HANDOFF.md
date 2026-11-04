@@ -2495,3 +2495,15 @@ Queste idee sono candidate distinte: Claude deve cercare sovrapposizioni con fun
 - Simboli assenti dal font sostituiti da icone (`icons::{CLOSE, ARROWS_H, ARROWS_V}`), test
   `no_missing_symbols_in_interface_code`.
 - Non provato a vista in un render: i test controllano solo media e visibilità della polvere.
+
+## Claude Code — 04/11/2026: stili di rendering, foschia "solo raggi", polvere nei fasci (0.35.0)
+- Stili: `forge_render_cpu::style` (toon, Gooch) chiamato in `integrator`/`spectral` alla prima
+  superficie non delta dei raggi dalla camera; shader `style_shade` (`P_STYLE` = 83).
+- Contorni: `forge_render_core::outline::compute` all'avvio del lavoro nella sessione, applicati in
+  `Frame::display`; `OutlineSettings::key` nella chiave di accumulo.
+- Foschia: `BakedFog::additive` (`medium::additive_rays`, `additive_rays` nella shader, bit 1
+  della parola 15 della nebbia, bit 1 di `P_HAS_DUST`), `Haze::{clumping, top_height, puffs,
+  rays_only}`, `haze_floor`, `HAZE_QUALITY` con celle minime per lato.
+- Polvere: solo luci spot/direzionali, `Dust::brightness` → `RenderScene::dust_gain` →
+  `P_DUST_GAIN` (84, `PARAM_WORDS` 88); granelli nelle guide (`guides.rs`).
+- Render di prova con `forgerender-cli render --test-scene --dark --spot --haze … --dust`.

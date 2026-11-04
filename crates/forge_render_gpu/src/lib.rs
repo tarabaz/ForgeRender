@@ -719,6 +719,7 @@ impl GpuBackend {
         p[P_SEED_LO] = settings.seed as u32;
         p[P_SEED_HI] = (settings.seed >> 32) as u32;
         p[P_MAX_BOUNCES] = settings.max_bounces;
+        p[P_STYLE] = settings.style.code();
         p[P_RR_START] = settings.russian_roulette_start;
         p[P_FLAGS] = settings.environment_visible as u32;
         if let Some(m) = mask {

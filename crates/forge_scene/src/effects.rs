@@ -266,16 +266,20 @@ pub struct Dust {
     /// Colore dei granelli (0–1).
     pub color: [f32; 3],
     pub seed: u32,
+    /// Brillantezza dei granelli nel fascio (moltiplica la luce che diffondono): i granelli
+    /// veri sono più piccoli di un pixel e nelle foto si vedono come puntini luminosi sfocati.
+    pub brightness: f32,
 }
 
 impl Default for Dust {
     fn default() -> Self {
         Self {
             enabled: false,
-            per_m3: 4000.0,
-            size_mm: 0.6,
+            per_m3: 1500.0,
+            size_mm: 2.5,
             color: [0.85, 0.8, 0.72],
             seed: 1,
+            brightness: 12.0,
         }
     }
 }

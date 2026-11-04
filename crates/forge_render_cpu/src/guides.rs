@@ -81,6 +81,16 @@ fn guide_sample(scene: &RenderScene, settings: &RenderSettings, mut o: Vec3, mut
                 light = Some(h);
             }
         }
+        // Polvere: il granello davanti alla superficie va nelle guide, così il denoiser lo tiene
+        // come dettaglio vero invece di cancellarlo come rumore.
+        if scene.has_dust {
+            let t_end = light.map(|x| x.0).unwrap_or(t_surf);
+            let (hits, n) = crate::textures::dust_hits(scene, o, d, t_end);
+            if n > 0 {
+                let base = scene.material_of(hits[0].1 as usize).base_color;
+                return (tint * clamp01(base), -d);
+            }
+        }
         // Nebbia: dove il raggio vi si ferma la guida è l'albedo della nebbia con la normale
         // rivolta alla camera (la media sui campioni pesa nebbia e superficie per la trasmittanza).
         if !scene.fogs.is_empty() {

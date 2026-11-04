@@ -45,6 +45,10 @@ pub struct BakedFog {
     /// una sola diffusione: i fasci delle spot. Non illumina la scena con rimbalzi (deboli e
     /// molto rumorosi con una luce puntiforme); le nebbie simulate restano fisiche (false).
     pub camera_only: bool,
+    /// Solo i raggi delle luci: la nebbia aggiunge ai raggi dalla camera la luce delle lampade
+    /// diffusa una volta, senza velare né oscurare quello che c'è dietro e senza ombreggiare la
+    /// scena (non fisico, ma rende visibili i fasci senza imbiancare tutto). Implica `camera_only`.
+    pub additive: bool,
     /// Statistiche (per log e benchmark).
     pub sim_steps: u32,
     pub sim_ms: f64,
@@ -71,6 +75,7 @@ impl BakedFog {
             anisotropy,
             max_density: density,
             camera_only: false,
+            additive: false,
             sim_steps: 0,
             sim_ms: 0.0,
             bake_ms: 0.0,
@@ -105,6 +110,7 @@ impl BakedFog {
             anisotropy,
             max_density,
             camera_only: false,
+            additive: false,
             sim_steps: 0,
             sim_ms: 0.0,
             bake_ms: t0.elapsed().as_secs_f64() * 1e3,
@@ -431,6 +437,7 @@ pub fn bake_detail(fog: &FogVolume, sim_state: &SimState, solid: Option<SolidFn>
         anisotropy: f.anisotropy,
         max_density,
         camera_only: false,
+        additive: false,
         sim_steps: sim.steps,
         sim_ms,
         bake_ms,

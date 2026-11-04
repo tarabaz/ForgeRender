@@ -46,7 +46,7 @@ fn for_each_segment(f: &BakedFog, o: Vec3, d: Vec3, t0: f32, t1: f32, mut visit:
 pub fn sample_collision(scene: &RenderScene, o: Vec3, d: Vec3, t_max: f32, camera_path: bool, rng: &mut Pcg32) -> Option<(f32, usize)> {
     let mut best: Option<(f32, usize)> = None;
     for (fi, f) in scene.fogs.iter().enumerate() {
-        if f.camera_only && !camera_path {
+        if f.additive || (f.camera_only && !camera_path) {
             continue;
         }
         let limit = best.map(|b| b.0).unwrap_or(t_max);
@@ -75,10 +75,73 @@ pub fn sample_collision(scene: &RenderScene, o: Vec3, d: Vec3, t_max: f32, camer
     best
 }
 
+/// Nebbie "solo raggi" ([`BakedFog::additive`]) lungo il raggio fino a `t_max`: un punto per
+/// nebbia scelto in proporzione al majorant dei tratti (dove la nebbia c'è), con la luce diretta
+/// di una lampada della scena diffusa con Henyey–Greenstein. Nessuna attenuazione.
+pub fn additive_rays(scene: &RenderScene, o: Vec3, d: Vec3, t_max: f32, rng: &mut Pcg32) -> Vec3 {
+    let n_lights = scene.lights.len();
+    if n_lights == 0 {
+        return Vec3::ZERO;
+    }
+    let mut c = Vec3::ZERO;
+    for f in scene.fogs.iter().filter(|f| f.additive) {
+        let Some((t0, t1)) = clip(f, o, d, t_max.min(1e4)) else { continue };
+        // Tratti a majorant costante: se ne sceglie uno in proporzione a majorant × lunghezza.
+        let mut segs: [(f32, f32, f32); 64] = [(0.0, 0.0, 0.0); 64];
+        let (mut n, mut total) = (0usize, 0.0f32);
+        for_each_segment(f, o, d, t0, t1, |ta, tb, maj| {
+            if maj > 0.0 && n < segs.len() {
+                segs[n] = (ta, tb, maj);
+                total += maj * (tb - ta);
+                n += 1;
+            }
+            n < segs.len()
+        });
+        if total <= 0.0 {
+            continue;
+        }
+        let mut u = rng.next_f32() * total;
+        let mut pick = segs[n - 1];
+        for &sg in &segs[..n] {
+            let w = sg.2 * (sg.1 - sg.0);
+            if u < w {
+                pick = sg;
+                break;
+            }
+            u -= w;
+        }
+        let (ta, tb, maj) = pick;
+        let t = ta + rng.next_f32() * (tb - ta);
+        let p = o + d * t;
+        let sigma = f.density(p);
+        if sigma <= 0.0 {
+            continue;
+        }
+        // Peso del punto: σ / pdf, con pdf = majorant / totale.
+        let weight = sigma * total / maj;
+        let k = ((rng.next_f32() * n_lights as f32) as usize).min(n_lights - 1);
+        let light = &scene.lights[k];
+        let (u1, u2) = rng.next_2d();
+        let Some(ls) = crate::lights::sample_light(light, p, u1, u2) else {
+            continue;
+        };
+        let li = if ls.delta { ls.li } else { ls.li / ls.pdf.max(1e-8) };
+        if li == Vec3::ZERO {
+            continue;
+        }
+        let vis = crate::integrator::shadow(scene, p, &ls, light.cast_shadows, rng);
+        if vis <= 0.0 {
+            continue;
+        }
+        c += f.albedo * li * (weight * vis * n_lights as f32 * hg_pdf(f.anisotropy, d.dot(ls.wi)));
+    }
+    c
+}
+
 /// Trasmittanza stimata (ratio tracking) lungo il raggio fino a `t_max`.
 pub fn transmittance(scene: &RenderScene, o: Vec3, d: Vec3, t_max: f32, rng: &mut Pcg32) -> f32 {
     let mut tr = 1.0f32;
-    for f in &scene.fogs {
+    for f in scene.fogs.iter().filter(|f| !f.additive) {
         let Some((t0, t1)) = clip(f, o, d, t_max) else { continue };
         for_each_segment(f, o, d, t0, t1, |ta, tb, maj| {
             if maj <= 0.0 {

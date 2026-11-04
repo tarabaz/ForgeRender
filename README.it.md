@@ -18,17 +18,16 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
-### Novità della versione 0.34.0
+### Novità della versione 0.35.0
 
-- **Foschia d'ambiente in cinque tipi:** nebbia bassa, nuvole di gas, fumo tossico a terra, strati sospesi e riccioli di vapore, con i comandi del frattale (forza dei vortici, dettaglio, ruvidità) e lo slider di qualità fino a 24 milioni di celle.
-- **Polvere in sospensione come effetto a sé:** granelli che si vedono solo dentro i fasci di luce, come la polvere nei raggi di una finestra.
-- **Adesivi (decal):** loghi ed etichette su qualsiasi superficie, anche curva.
-- **STEP convertito una volta sola:** progetti e pacchetti tengono la conversione (demo del banco ottico: da 27 s a 0,2 s per aprirla).
-- **Niente foschia dentro vetri e pezzi pieni**, effetti calcolati uno alla volta con una sola barra di avanzamento, e il render parte su GPU di serie.
+- **Stili di rendering:** fumetto (cel shading) e illustrazione tecnica (Gooch), scelti in cima alla scheda Render con un piccolo esempio al passaggio del mouse, più i contorni a inchiostro che vanno con qualsiasi stile.
+- **Foschia che non vela tutto:** la modalità "solo raggi delle luci" (di serie) mostra i raggi di spot, sole e lampade senza ingrigire la scena; addensamenti, altezza massima con sbuffi, scala della densità, griglia più fitta e vortici più marcati.
+- **Polvere solo nei fasci:** la illuminano solo spot e sole, il denoiser la tiene, con lo slider della brillantezza.
 
 <details>
 <summary><strong>Versioni precedenti — storico completo delle release</strong></summary>
 
+- **0.34.0 — Foschia in cinque tipi, polvere come effetto a sé:** nebbia bassa, nuvole di gas, fumo tossico a terra, strati sospesi e riccioli di vapore con frattale e qualità; polvere visibile solo con la luce diretta; icone al posto dei simboli mancanti.
 - **0.33.0 — Foschia d'ambiente, polvere, adesivi:** foschia con banchi e riccioli illuminata con diffusione multipla; granelli di polvere; adesivi sulle superfici curve; conversione STEP salvata con progetti e pacchetti; calcolo della nebbia annullabile e che riparte alle modifiche.
 - **0.32.0 — Nebbia da ghiaccio secco molto più veloce:** la simulazione lavora solo dove c'è la nebbia (Ultra 182 → 37 s sulla demo del cocktail), calcolata in sottofondo con la barra di avanzamento; riflessi parziali del laser; demo del banco ottico e delle lenti; interruttore AI MCP ON/OFF.
 - **0.31.0 — Pacchetto completo e libreria staccabile:** .frpack, cartella o ZIP con tutti i file; libreria dei materiali staccabile con Applica alla selezione grande; laser viola UV e blu corretto; fasci larghi tagliati sulle facce del vetro; gli aspetti tengono le tue luci; nuova schermata di benvenuto.
@@ -145,12 +144,14 @@ Un mezzo partecipante che riempie la scena (o solo uno strato) e che ogni luce a
 
 - **Cinque tipi:** *Nebbia bassa* che si stende a terra e si dirada salendo; *Nuvole di gas*, aria quasi limpida con ammassi densi qua e là; *Fumo tossico a terra*, uno strato di pochi centimetri che aleggia sul pavimento raccolto in filamenti; *Strati sospesi*, veli orizzontali a quote diverse, ondulati e bucati; *Riccioli di vapore*, vortici dentro i vortici con contrasto alto.
 - **Comandi del frattale:** forza dei vortici (da macchie tonde a spirali ben visibili), dettaglio frattale (1–8 ottave), ruvidità (bordi morbidi o frastagliati), grandezza e quantità dei vortici, colore e diffusione in avanti (quanto brillano i raggi in controluce).
-- **Slider di qualità:** da una bozza di 1 milione di celle a 24 milioni (48 MB) per dettagli fini e bordi netti. La foschia si calcola in anticipo, un effetto alla volta, con la barra di avanzamento in basso.
+- **Solo raggi delle luci (di serie):** la foschia aggiunge solo la luce di spot, sole e lampade diffusa nell'aria, così i raggi si vedono senza velare né scurire gli oggetti; spento, diventa un mezzo fisico che diffonde anche la luce dell'ambiente e vela la scena.
+- **Comandi della forma:** addensamenti (zone grandi più dense e altre più tenui), altezza massima dal pavimento (trovato con i raggi) con qualche sbuffo che sale a caso, e la scala della densità che dice fino a che distanza ci si vede attraverso.
+- **Slider di qualità:** la griglia segue sia la grandezza dei vortici sia quella della scena, da una bozza di 2 milioni di celle a 24 milioni (48 MB) per dettagli fini e bordi netti. La foschia si calcola in anticipo, un effetto alla volta, con la barra di avanzamento in basso.
 - **Mai dentro gli oggetti:** i raggi che viaggiano nel vetro o nel liquido la saltano (lenti e bicchieri restano limpidi) e si toglie dall'interno pieno dei pezzi, mentre l'aria di una stanza chiusa resta velata.
 
 ### 6. Polvere in sospensione — granelli che brillano solo in un fascio
 
-Granelli veri minuscoli (sotto il millimetro, fino a 150 000) sparsi nell'aria, come effetto a sé. Sono invisibili tranne dove li colpisce direttamente una luce: dentro il fascio di una spot o il sole che entra da una finestra brillano, come la polvere nei raggi di una soffitta, mentre la luce dell'ambiente e quella di rimbalzo non li illuminano. Quantità, dimensione e colore sono regolabili.
+Granelli veri (qualche millimetro, fino a 150 000) sparsi nell'aria, come effetto a sé. Sono invisibili tranne dentro i fasci di spot e sole: lì brillano, come la polvere nei raggi che entrano dalla finestra di una soffitta, mentre lampadine, pannelli, ambiente e luce di rimbalzo non li illuminano. Sono segnati nelle guide del denoiser, così il denoiser li tiene invece di cancellarli come rumore. Quantità, dimensione, brillantezza e colore sono regolabili.
 
 ### 7. Adesivi (decal) — etichette e loghi su qualsiasi superficie
 
@@ -188,7 +189,18 @@ Le camere di rendering offrono focale, diaframma, profondità di campo e decentr
 
 ForgeRender può esportare pass separati **Albedo, Normals, Depth, Product Mask e Component ID**, utili per compositing, mascherature e interventi successivi sull'immagine. Sono buffer tecnici di output, non ulteriori render beauty.
 
-### 13. Modelli STEP: convertiti una volta, poi riaperti subito
+### 13. Stili di rendering — fumetto, illustrazione tecnica e contorni a inchiostro
+
+In cima alla scheda Render scegli come si disegna l'immagine; passando sopra a ogni scelta compare un piccolo esempio.
+
+- **Fotorealistico:** il path tracing fisico di sempre.
+- **Fumetto (cel shading):** colori pieni del materiale in tre fasce nette (luce, mezz'ombra, ombra) dalle luci della scena, con le loro ombre nette e un riflesso secco sui materiali lucidi.
+- **Illustrazione tecnica (Gooch):** ombreggiatura morbida da caldo in luce a freddo in ombra, senza ombre nere, così forme e volumi si leggono bene.
+- **Contorni a inchiostro:** linee scure su sagome, confini tra oggetti, salti di profondità e (a scelta) spigoli vivi, tracciati con 3×3 raggi per pixel e disegnati sopra l'immagine finale, anche dopo il denoiser. Vanno con qualsiasi stile; spessore, colore e angolo degli spigoli sono regolabili.
+
+Gli stili si applicano alla prima superficie vista dalla camera, quindi vetri e specchi riflettono e rifrangono come sempre; funzionano su CPU e GPU, anche nel render spettrale.
+
+### 14. Modelli STEP: convertiti una volta, poi riaperti subito
 
 Un file STEP si converte in mesh una volta sola. Il risultato resta in una cache delle conversioni e si salva accanto al progetto (`modelli-convertiti/`) e dentro i pacchetti `.frpack`, così riaprendo il progetto lo STEP non si riconverte. Sulla demo del banco ottico l'apertura è passata da 27 s a 0,2 s. Se lo STEP cambia (o cambiano i pezzi di un assieme a più file, o la qualità), si riconverte. I pacchetti ora includono anche i file dei pezzi a cui rimanda un assieme STEP a più file.
 

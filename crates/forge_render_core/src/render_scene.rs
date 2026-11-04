@@ -596,6 +596,8 @@ pub struct RenderScene {
     /// C'è la polvere in sospensione (granelli che i raggi attraversano, vedi
     /// [`RenderMaterial::dust`]).
     pub has_dust: bool,
+    /// Brillantezza dei granelli di polvere (`Dust::brightness`).
+    pub dust_gain: f32,
     /// Riferimento della proiezione Box di ogni nodo (indice = nodo), secondo l'ancoraggio del
     /// suo materiale: lo legge lo shading di CPU e GPU.
     pub node_frames: Vec<crate::displace::BoxFrame>,
@@ -740,6 +742,7 @@ impl RenderScene {
         let mut rs = RenderScene {
             has_cutout,
             has_dust,
+            dust_gain: scene.haze_dust.brightness.max(0.0),
             node_frames: box_frames(scene),
             fogs,
             id,
@@ -781,6 +784,7 @@ impl RenderScene {
             portals: self.portals.clone(),
             has_cutout: self.has_cutout,
             has_dust: self.has_dust,
+            dust_gain: self.dust_gain,
             node_frames: self.node_frames.clone(),
             fogs: self.fogs.clone(),
             lasers: self.lasers.clone(),
