@@ -2659,3 +2659,55 @@ Screenshot di riferimento: carattere non renderizzato nella riga del selettore c
 Il simbolo accanto a U8 deve essere visualizzato correttamente e non devono rimanere glifi mancanti nelle aree dell'interfaccia controllate. Nel report indicare il simbolo previsto, la causa individuata, i file modificati, i controlli effettuati e i test realmente eseguiti.
 
 **Nota:** lo screenshot mostra il problema visivo, ma non permette da solo di identificare con certezza il carattere previsto o la causa tecnica. Non presumere quale icona sia senza verificare il codice.
+
+
+## Valerio → Claude Code — 04/11/2026: pannello professionale di selezione colore RGB / CMYK / RAL
+
+Valerio chiede di migliorare il selettore colore esistente di ForgeRender. Quando l'utente clicca su una qualsiasi casella/campione colore nelle proprietà dei materiali, deve aprirsi un pannello dedicato alla selezione colore, integrato nel sistema attuale.
+
+### Modalità di selezione richieste
+
+1. **RGB**
+   - Selezione colore RGB standard con picker visuale.
+   - Campi numerici R, G e B modificabili.
+   - Campo di input HEX.
+2. **CMYK**
+   - Campi modificabili Cyan, Magenta, Yellow e Black.
+   - Conversione automatica in RGB per anteprima e rendering.
+   - Definire chiaramente la convenzione/range dei valori e la conversione usata; se non si implementa un profilo ICC, documentare che si tratta di una conversione matematica generica e non di una conversione colorimetrica specifica per stampa.
+3. **RAL**
+   - Palette RAL Classic.
+   - Campioni con codice e nome.
+   - Ricerca per codice RAL o nome del colore.
+   - Selezionando un colore RAL, aggiornare immediatamente l'anteprima del colore selezionato.
+
+### Requisiti UI/UX
+- Il pannello si apre direttamente cliccando il campione colore già esistente nelle proprietà del materiale.
+- Interfaccia moderna, compatta e professionale, coerente con ForgeRender.
+- Tab o selettore segmentato per RGB, CMYK e RAL.
+- Anteprima ben visibile del colore corrente/selezionato.
+- Pulsanti **Applica** e **Annulla**.
+- Durante la modifica, l'anteprima deve riflettere la selezione corrente; **Applica** conferma il valore nella proprietà materiale, mentre **Annulla** ripristina il valore precedente senza lasciare modifiche.
+- Mantenere un flusso semplice e senza controlli superflui.
+
+### Requisiti tecnici
+- Prima di implementare, ispezionare il selettore colore esistente, il modello delle proprietà materiale, il binding UI e il percorso con cui il colore raggiunge il renderer. Individuare il punto di integrazione corretto.
+- Integrare il pannello nell'architettura del color picker esistente: non creare un sistema parallelo o scollegato.
+- RGB, CMYK e RAL devono convergere sullo stesso colore sottostante usato dalla proprietà materiale e dalla pipeline di rendering.
+- Creare un file dati dedicato per RAL Classic (JSON o formato equivalente) con codice, nome e valore digitale del colore.
+- **Licenza RAL: requisito bloccante da verificare prima di includere/distribuire i dati.** Accertare da una fonte ufficiale o dal titolare dei diritti quali dati e valori digitali siano redistribuibili nel software. Non copiare o incorporare un dataset proprietario senza autorizzazione. Se la licenza non consente la redistribuzione, fermarsi e proporre a Valerio alternative lecite (ad esempio dataset con licenza esplicita compatibile, importazione di un file fornito dall'utente o integrazione opzionale), senza spacciare valori approssimativi per colori RAL ufficiali.
+- Tenere il sistema modulare per poter aggiungere in futuro altri standard colore.
+- Preservare i materiali e i progetti esistenti, evitando cambiamenti di colore o regressioni.
+
+### Piano di verifica richiesto
+- Test unitari per conversioni RGB ↔ CMYK e parsing/validazione HEX.
+- Test per la selezione RAL e la validazione dei dati (quando il dataset utilizzabile legalmente sarà definito).
+- Verificare che Applica aggiorni la proprietà materiale e il colore renderizzato e che Annulla ripristini il valore originale.
+- Provare i diversi tipi di proprietà colore che usano il selettore, non soltanto un singolo campo.
+- Verificare che i progetti esistenti continuino a caricarsi senza modifiche.
+- Eseguire build e test pertinenti; riportare i comandi e i risultati reali.
+
+### Modalità di lavoro
+Prima di modificare il codice, riportare una breve analisi dell'architettura attuale e il punto d'integrazione scelto. Se emergono vincoli tecnici o di licenza per RAL, comunicarli prima di implementare quella parte. Non dichiarare completata la palette RAL finché la provenienza e i diritti di redistribuzione dei dati non sono stati verificati.
+
+**Criterio di accettazione:** cliccando un campione colore si apre un unico pannello integrato con RGB, CMYK e RAL; tutte le modalità aggiornano coerentemente lo stesso colore materiale; Applica/Annulla funzionano; la palette RAL è inclusa soltanto con dati utilizzabili legalmente; la resa e le funzioni preesistenti restano integre.
