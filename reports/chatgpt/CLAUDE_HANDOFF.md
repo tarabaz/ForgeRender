@@ -2784,3 +2784,33 @@ Before changing code, report the actual code path and the most likely root cause
 Valerio clarified that the render stopping after 9 samples is **not being reported as a bug**. The scene is very flat/simple, and the render completes in about one second because the adaptive noise-threshold stopping criterion is reached quickly. Do not treat this as a rendering hang or a sample-count regression.
 
 If reviewing the Cell Shading issue requires inspecting adaptive sampling, keep the two topics separate. Only investigate sample-count behavior if there is independent evidence that the adaptive stopping logic is incorrect; the current report is simply an explanation of the observed early convergence on a flat image.
+
+
+## Additional visual reference from Valerio — 04/11/2026: black speckle artifacts in Cell Shading outlines
+
+Valerio supplied an additional screenshot showing a Cell Shading / outline render of a simple scene containing a torus, a cube, and a sphere. Small, isolated black dots/specks appear scattered along or near the visible object contours and surfaces (for example on the torus and sphere). These are unwanted rendering artifacts, not intentional stippling or design elements.
+
+### Required outcome
+
+The black specks must be eliminated. The outline result must look clean and deliberate: either contours are rendered as continuous, stable lines, or they are omitted where a valid contour cannot be established. A result with intermittent black dots is not acceptable for a usable production feature.
+
+### Investigation and implementation guidance
+
+- Reproduce the issue using the supplied simple geometry (torus, cube, sphere) and inspect the exact contour/edge-detection and line-generation pipeline.
+- Determine whether the dots are caused by isolated edge samples, triangle boundaries, discontinuous contour classification, depth/normal discontinuities, z-fighting, insufficient neighborhood filtering, rasterization/anti-aliasing, or a sampling/threshold issue. These are hypotheses to test, not assumptions.
+- Check mesh tessellation and triangle seams, especially on curved surfaces. Do not mistake internal triangulation or isolated sample hits for valid visible silhouettes/creases.
+- Ensure contour detection uses a stable neighborhood/connected-line criterion rather than emitting individual pixels or isolated samples.
+- Filter invalid short segments and isolated points, but preserve genuine small geometric features where possible. Avoid a blunt global threshold that erases legitimate contours.
+- Check line thickness, continuity, depth bias/depth testing, and antialiasing so outlines do not flicker, break into dots, or create speckling.
+- Verify behavior on both curved and planar geometry, at multiple resolutions and viewing angles, and in CPU/GPU paths if applicable.
+- Keep intentional material shading and the normal non-Cell-Shading render unchanged.
+
+### Acceptance criteria
+
+1. No isolated black dots remain on otherwise smooth surfaces or along contours in the supplied scene.
+2. Genuine silhouettes and intended crease/feature edges remain continuous and visually stable.
+3. No new gaps, excessive thickening, halos, or loss of legitimate edges are introduced.
+4. Add a regression test or deterministic test scene/check where practical.
+5. Report the root cause, chosen filtering/line-continuity strategy, files changed, and actual build/test results. Visually inspect the reproduced scene before declaring the issue fixed.
+
+Treat this as part of the existing Cell Shading/outline quality investigation above, but track it as a separate artifact with its own reproduction and acceptance checks. The earlier white-patch issue and these black speckles may have different causes; do not assume one fix will solve both.
