@@ -18,16 +18,18 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
-### What's new in 0.42.0
+### What's new in 0.43.0
 
-- **Replace material:** every object with one material switches to another in one click, without selecting them.
-- **Dust in two colours:** a second colour with its share, opacity and a random size variation.
-- **Fairy dust:** flat flakes that reflect like tiny mirrors, so only some of them sparkle, depending on how the light hits them.
-- **Smoke preview only:** a simulated smoke can stay as a quick point preview in the viewport while you place it; the render runs the full simulation only when you turn it back on.
+- **Timeline (animation):** keys with six interpolations, modifiers (wiggle, oscillation, continuous ramp, loop, ping-pong, offset, multiply, limits, stepped), position, rotation, scale and opacity of objects, lights, camera and effects; it sits at the bottom in place of the console (Console | Timeline tabs) or in its own window; animation render to PNG frames and MP4. Off by default (Features menu), it turns on by itself with an effect computed over time.
+- **Particle smoke:** thin veils and long filaments that fold instead of a puffy cloud: new *Steam from a cup* (transparent ribbons rising from the coffee) and *Incense or cigarette* presets.
+- **Glowing dust:** some specks light up in colours you choose with +, each with its own intensity and share.
+- **Object opacity:** a fading object, shadows included, on CPU and GPU.
+- **Interface:** colour picker fixed (the colour square was blank) and used by every colour button; the quick bar no longer overlaps in a narrow window and AI MCP is a double button at the far right; reopened library and material editor windows come back to the front; turning the view no longer restarts a running dry-ice or smoke simulation.
 
 <details>
 <summary><strong>Previous versions — complete release history</strong></summary>
 
+- **0.42.0–0.42.1 — Replace material, two-colour dust, fairy dust:** every object with one material switches to another without selecting them; dust in two colours with opacity, size variation and sparkling flakes; simulated smoke as a viewport-only preview; Esc deselects everything.
 - **0.41.0 — Smoke and fog computed once:** smoke and fog already computed are reused at the render when nothing has changed; the smoke simulation works only where the smoke is (up to four times faster on large boxes); smoke contrast for a light, transparent smoke that keeps its relief.
 - **0.40.0 — Smoke that does not end at the box:** soft fractal edges on the simulated smoke; a box that turns and scales with its source, growing upwards only; simulated steam from a cup; material previews at 512 px; black and white also through coloured glass.
 - **0.39.0 — Smoke you can place, colour picker:** the source of the simulated smoke is a sphere in the viewport, moved with the gizmo; a quick particle preview shows where the smoke goes and how it moves over time, without rendering; the simulation cells follow the source, so large boxes no longer lose the smoke; a colour picker for every material colour with RGB, CMYK and palettes (RAL Classic with indicative values included); the render starts at once with ink outlines and tilt-shift; smooth tilt-shift blur; cartoon highlights only where a light is really reflected; the manual follows the interface language.
@@ -171,6 +173,8 @@ Real volumetric smoke clouds for product shots: incense smoke next to a perfume 
 - **Preview only:** turn off "Full computation for the render" and the simulated smoke stays as the quick point preview in the viewport (also when it is not selected), with its collisions with the objects, while the render skips the full simulation. Place it, check how it flows around the objects, then turn the computation back on for the real render.
 - **Box with its source:** the gizmo follows the box: Move moves box and source, Rotate turns them around the vertical (also with the "Rotation" field), Scale enlarges box, source position and source radius together. Height and scale grow upwards only, from the bottom of the box, so the smoke never goes below the floor. The viewport preview shows the time being played and is kept when you click elsewhere, so it is not recomputed while you turn the camera.
 
+- **Particle smoke (veils and filaments):** with "Particle smoke" the grid computes only the motion of the air and the smoke travels on about 2.4 million particles that never blur, deposited at the end on a grid two or three times finer. The smoke keeps thin veils that fold over themselves, bright where you see them edge-on, and long compact threads, instead of the puffy cloud of grid smoke. A **patchy source** makes it rise from a few spots that drift slowly, in separate ribbons. Two presets use it: **Steam from a cup** (light, transparent ribbons rising from the whole surface of the coffee, twisting and fading within a few centimetres) and **Incense or cigarette** (a thread of a couple of millimetres that rises straight and then breaks into long filaments and curling veils).
+
 Fire (combustion, emission, flames lighting the scene) is a separate, later step: see the [smoke and fire study](docs/studio-fumo-fuoco.md).
 
 ### 7. Floating dust — specks that shine only in a beam
@@ -181,6 +185,7 @@ Real specks (a few millimetres, up to 150,000) scattered in the air, as their ow
 
 - **Size variation:** how much the size of each speck differs at random from the set size, from all the same to tiny-to-triple.
 - **Two colours and opacity:** a second colour with the share of specks that take it (for example gold and white), and an opacity that makes them semi-transparent: they scatter less light and, if they cast shadows, block only part of it.
+- **Glowing specks:** with **+** you choose a colour: part of the specks lights up in that colour, like fireflies or sparks, and is visible also outside the spot beams (it is ordinary geometry that emits light and lights what is around it). Each colour has its intensity and its share of specks; low intensities keep the colour, high ones turn white like a bulb seen straight on.
 - **Grains or flakes (fairy dust):** *Grains* are round and scatter the light evenly. *Flakes* are flat and face random directions: they reflect like tiny mirrors, so only those turned the right way between the light and the camera sparkle while the others stay dark, like glitter or fairy dust. **Sparkle** sets how much light the flakes reflect like a mirror, **reflection roughness** how small and intense (low) or wide and soft (high) the sparkles are. The same on CPU and GPU.
 
 ### 8. Decals — labels and logos on any surface
@@ -250,6 +255,18 @@ The styles are applied at the first surface seen by the camera, so glass and mir
 
 A STEP file is converted to meshes once. The result is kept in a conversion cache and saved next to the project (`modelli-convertiti/`) and inside `.frpack` packages, so reopening a project does not convert the STEP again. On the optical bench demo, opening went from 27 s to 0.2 s. When the STEP changes (or the parts of a multi-file assembly change, or the quality changes), it is converted again. Packages now also include the part files that a multi-file STEP assembly refers to.
 
+
+### 16. Timeline — animation of objects, lights, camera and effects
+
+A professional timeline, to turn on from **Features → Timeline (animation)** (off by default; it turns on by itself when the scene has an effect computed over time, such as simulated smoke or dry ice). It sits at the bottom in place of the console, with **Console | Timeline** tabs, or in its own window with "Detach from the program", to be moved to another screen.
+
+- **Elements and properties:** "+ Element" adds the selected objects, the camera, a light, a smoke, a dry-ice fog, the haze, the dust or the environment. Each element shows its base properties (for objects position, rotation, scale and opacity; for the camera position and target; for lights position and intensity) and "+" adds the other compatible ones one by one (scale per axis, visibility, colour, target, cone angle, field of view, aperture, focus distance, density, HDRI rotation, brightness).
+- **Keys:** the diamond sets or removes a key at the playhead with the current value; moving an object with the gizmo, or changing a value in the panels, when its property already has keys records a key there. Keys are dragged along the time (snapping to frames) and the right click chooses the interpolation towards the next one: hold, linear, ease in, ease out, ease in and out, smooth curve.
+- **Modifiers:** "ƒ+" adds to each property, one at a time and in order, wiggle (amplitude, frequency, seed), oscillation, continuous ramp (for example 90°/s for a turntable), loop, ping-pong, offset, multiply, limits and stepped (stop motion); each can be switched off.
+- **Playback:** start, previous key, play/pause, next key, end, loop; duration and frames per second; zoom and scroll of the time.
+- **Effects over time:** with the timeline on, simulated smoke and dry ice follow the playhead: the simulated instant is the playhead time minus the start of the effect, set with the bar on its row; the duration chosen in the timeline decides how long they are computed.
+- **Animation render:** every frame of the timeline as PNG in a folder, then the MP4 video, with fixed samples and the denoiser at the end.
+- **Object opacity:** a property of its own, rendered by letting each ray through with probability 1 − opacity, so the object fades with its shadow, the same on CPU and GPU.
 
 ## What it does today
 

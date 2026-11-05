@@ -10,6 +10,25 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.43.0 — 5 Nov 2026
+
+**Timeline (animation)**
+- `forge_scene::timeline`: `Timeline` (duration, fps, playhead, elements, tracks, effect starts) saved in the project; `Track` with keys (`Interp`: hold, linear, ease in, ease out, ease in-out, Catmull-Rom smooth), base value and modifiers (`Modifier`: wiggle, oscillate, ramp, loop, ping-pong, offset, multiply, clamp, steps); `Target` (object, light, camera, smoke, fog, haze, dust, environment) and `Prop` with base and compatible properties; `Timeline::apply` writes the values into the scene and records as a key (or as the base value) a property changed by the user since the last application; simulated smoke and dry ice follow the playhead (`effect_time` = playhead − start). Tests `interpolations_pass_through_the_keys`, `modifiers_change_the_value`, `apply_moves_objects_and_records_user_changes`, `effects_follow_the_playhead`.
+- App: Features menu with Timeline (animation), off by default, turned on automatically when an effect over time is added; bottom panel with Console | Timeline tabs; detachable window; playback, key and modifier editing, animation render to PNG frames and MP4 (`ui/timeline.rs`); smoke "Instant" follows the timeline; `--timeline` and `--timeline-demo` startup options.
+- Object opacity: `Material::opacity` (0–1), `MaterialParams::opacity`; CPU `opaque_at` and GPU `opaque_at` let a ray through with probability 1 − opacity (material word 36, `MAT_WORDS` 37); the timeline gives the object its own material copy.
+
+**Particle smoke**
+- `SmokeSim::particles` and `patchiness`: the grid computes only the air motion; about 2.4 M particles (midpoint advection, dissipation and edges as the smoke) are deposited at the end on a grid up to 3× finer with a 1-2-1 blur (`splat_particles`); the render uses the field proportionally (no thresholds or procedural noise), with the contrast. Test `particle_smoke_stays_thin`.
+- Presets: *Steam from a cup* redone with particles (patchy source, low heat, low density) and new *Incense or cigarette* (2 mm source, fast hot exit, little dissipation, contrast 1.8).
+- CLI `--patch F.json` (camera, environment, settings, lights, smokes, dust, materials) for tests without recompiling.
+
+**Glowing dust**
+- `Dust::glow` (`DustGlow`: colour, intensity, share): the specks of each colour go in their own node `effetto:polvere:luce:<n>` with an emissive material; `is_any_dust_id`; test `glowing_dust_gets_its_own_emissive_nodes`. Dust panel: "Glowing specks" with +.
+
+**Interface**
+- Quick bar: the left group is clipped to the space left by the right group (no overlap); AI MCP at the far right after a divider, big switch with icon and state and a small gear below it; Auto restart on two lines.
+- Library and material editor: reopening them brings the detached window to the front (`ViewportCommand::Focus`) or the docked one to the top.
+
 ## 0.42.1 — 5 Nov 2026
 
 **Colour picker**

@@ -144,6 +144,9 @@ pub struct ProjectFile {
     /// Nubi di fumo volumetrico.
     #[serde(default)]
     pub smokes: Vec<forge_scene::SmokeCloud>,
+    /// Animazione (timeline).
+    #[serde(default)]
+    pub timeline: forge_scene::Timeline,
     #[serde(default)]
     pub render: RenderSettings,
     /// Materiali Box messi su ancoraggio "mondo" dalla migrazione di un progetto precedente
@@ -256,6 +259,7 @@ pub fn to_project_file(scene: &Scene, meta: &ProjectMeta, settings: &RenderSetti
         haze_dust: scene.haze_dust.clone(),
         decals: scene.decals.clone(),
         smokes: scene.smokes.clone(),
+        timeline: scene.timeline.clone(),
         render: settings.clone(),
         migrated_world_anchor: 0,
     }
@@ -511,6 +515,7 @@ pub fn load(path: &Path) -> anyhow::Result<LoadedProject> {
     scene.haze_dust = pf.haze_dust;
     scene.decals = pf.decals;
     scene.smokes = pf.smokes;
+    scene.timeline = pf.timeline;
     for d in &mut scene.decals {
         if let Some(img) = &mut d.image {
             relocate_asset(img, project_dir, &["textures", "texture"], &texture_dirs, &mut report);

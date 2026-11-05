@@ -27,6 +27,21 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             ui.separator();
             item(app, ui, Cmd::LibraryFolder);
         });
+        ui.menu_button(tr("Funzioni"), |ui| {
+            ui.label(egui::RichText::new(tr("Funzioni da attivare quando servono")).weak());
+            let mut on = app.prefs.timeline_enabled;
+            if ui
+                .checkbox(&mut on, format!("{}  {}", icons::RENDER, tr("Timeline (animazione)")))
+                .on_hover_text(tr(
+                    "Animazione nel tempo: chiavi, interpolazioni e modificatori per oggetti, luci, camera ed effetti, \
+                     render dell'animazione. Si accende da sola quando aggiungi un effetto che si calcola nel tempo \
+                     (fumo simulato, ghiaccio secco)",
+                ))
+                .clicked()
+            {
+                crate::ui::timeline::set_enabled(app, on);
+            }
+        });
         ui.menu_button(tr("Strumenti"), |ui| {
             let mut on = app.mcp.is_some();
             let sp = commands::spec(Cmd::AiControl);

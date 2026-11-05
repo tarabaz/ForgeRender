@@ -59,6 +59,12 @@ pub struct Preferences {
     pub auto_restart: bool,
     /// Ultimi progetti aperti o salvati (il più recente per primo, al massimo [`MAX_RECENT`]).
     pub recent_projects: Vec<PathBuf>,
+    // --- Funzioni ---
+    /// Timeline (animazione) attiva: pannello in basso e menu. Di serie spenta; si accende da
+    /// sola quando nella scena c'è un effetto che si calcola nel tempo.
+    pub timeline_enabled: bool,
+    /// Timeline in una finestra a parte invece che in basso.
+    pub timeline_detached: bool,
 }
 
 /// Quanti progetti tiene File → Progetti recenti.
@@ -95,6 +101,8 @@ impl Default for Preferences {
             new_threads: r.threads,
             auto_restart: true,
             recent_projects: Vec::new(),
+            timeline_enabled: false,
+            timeline_detached: false,
         }
     }
 }
@@ -232,6 +240,8 @@ mod tests {
             new_threads: 8,
             auto_restart: false,
             recent_projects: vec![PathBuf::from("/x/a.frproject")],
+            timeline_enabled: true,
+            timeline_detached: true,
         };
         custom.save_to(&p).unwrap();
         let (back, err) = Preferences::load_from(&p);

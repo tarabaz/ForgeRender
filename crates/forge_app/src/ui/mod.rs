@@ -29,6 +29,7 @@ mod splash;
 mod status;
 pub mod style;
 pub(crate) mod styles;
+pub(crate) mod timeline;
 mod transform;
 pub mod tree;
 
@@ -54,9 +55,9 @@ impl eframe::App for ForgeApp {
         self.handle_close_request(&ctx);
         egui::Panel::top("menubar").show(ui, |ui| menubar::show(self, ui));
         egui::Panel::top("quickbar").show(ui, |ui| quickbar::show(self, ui));
-        egui::Panel::bottom("status")
+        egui::Panel::bottom(if self.prefs.timeline_enabled { "status-timeline" } else { "status" })
             .resizable(true)
-            .default_size(170.0)
+            .default_size(if self.prefs.timeline_enabled { 400.0 } else { 170.0 })
             .min_size(70.0)
             .show(ui, |ui| status::show(self, ui));
         // Limiti di larghezza: un contenuto largo (es. molte miniature) non può più far
@@ -81,6 +82,7 @@ impl eframe::App for ForgeApp {
         egui::CentralPanel::default().show(ui, |ui| central::show(self, ui, frame));
 
         self.dialogs(&ctx);
+        timeline::window(self, &ctx);
     }
 }
 

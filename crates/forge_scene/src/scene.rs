@@ -161,6 +161,8 @@ pub struct Scene {
     pub decals: Vec<crate::effects::Decal>,
     /// Nubi di fumo volumetrico.
     pub smokes: Vec<crate::smoke::SmokeCloud>,
+    /// Animazione (timeline).
+    pub timeline: crate::timeline::Timeline,
 }
 
 impl Default for Scene {
@@ -184,6 +186,7 @@ impl Default for Scene {
             haze_dust: Default::default(),
             decals: Vec::new(),
             smokes: Vec::new(),
+            timeline: Default::default(),
         }
     }
 }

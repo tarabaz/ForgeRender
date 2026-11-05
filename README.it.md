@@ -18,16 +18,18 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
-### Novità della versione 0.42.0
+### Novità della versione 0.43.0
 
-- **Sostituisci materiale:** tutti gli oggetti con un materiale passano a un altro con un clic, senza selezionarli.
-- **Polvere a due colori:** un secondo colore con la sua quota, l'opacità e una variazione casuale della dimensione.
-- **Polvere di fata:** scaglie piatte che riflettono come piccoli specchi, così solo alcune luccicano, secondo come le colpisce la luce.
-- **Fumo solo anteprima:** un fumo simulato può restare come anteprima veloce a punti nella viewport mentre lo sistemi; il render fa la simulazione completa solo quando la riaccendi.
+- **Timeline (animazione):** chiavi con sei interpolazioni, modificatori (tremolio, oscillazione, rampa continua, ripeti, avanti e indietro, spostamento, moltiplica, limiti, a scatti), posizione, rotazione, scala e opacità di oggetti, luci, camera ed effetti; sta in basso al posto della console (schede Console | Timeline) o in una finestra a parte; render dell'animazione in fotogrammi PNG e MP4. Spenta di serie (menu Funzioni), si accende da sola con un effetto che si calcola nel tempo.
+- **Fumo a particelle:** veli sottili e filamenti lunghi che si ripiegano invece della nuvola gonfia: nuovi preset *Vapore da tazza* (nastri trasparenti che salgono dal caffè) e *Incenso o sigaretta*.
+- **Polvere luminosa:** una parte dei granelli si accende dei colori che scegli con +, ognuno con la sua intensità e la sua percentuale.
+- **Opacità degli oggetti:** un oggetto che sfuma, ombra compresa, su CPU e GPU.
+- **Interfaccia:** selettore colore sistemato (il quadrato dei colori era vuoto) e usato da ogni pulsante colore; la barra rapida non si sovrappone più con la finestra stretta e AI MCP è un pulsante doppio in fondo a destra; libreria ed editor dei materiali riaperti tornano davanti; girare la vista non fa più ripartire una simulazione di ghiaccio secco o fumo in corso.
 
 <details>
 <summary><strong>Versioni precedenti — cronologia completa</strong></summary>
 
+- **0.42.0–0.42.1 — Sostituisci materiale, polvere a due colori, polvere di fata:** tutti gli oggetti con un materiale passano a un altro senza selezionarli; polvere a due colori con opacità, variazione della dimensione e scaglie che luccicano; fumo simulato solo come anteprima nella viewport; Esc deseleziona tutto.
 - **0.41.0 — Fumo e nebbia calcolati una volta:** fumo e nebbia già calcolati si riusano al render se non cambia niente; la simulazione del fumo lavora solo dove c'è il fumo (fino a quattro volte più veloce nei riquadri grandi); contrasto del fumo per un fumo leggero e trasparente che tiene il rilievo.
 - **0.40.0 — Fumo che non finisce sul riquadro:** bordi sfumati frattali sul fumo simulato; un riquadro che gira e si scala con la sua sorgente, crescendo solo verso l'alto; vapore da tazza simulato; anteprime dei materiali a 512 px; bianco e nero anche attraverso i vetri colorati.
 - **0.39.0 — Fumo da posizionare, selettore colore:** la sorgente del fumo simulato è una sfera nella viewport, spostata con il gizmo; un'anteprima veloce a particelle mostra dove va il fumo e come si muove nel tempo, senza fare il render; le celle della simulazione seguono la sorgente, così nei riquadri grandi il fumo non si perde più; un selettore colore per ogni colore dei materiali con RGB, CMYK e palette (RAL Classic con valori indicativi compresa); il render parte subito con contorni a inchiostro e tilt-shift; sfocatura del tilt-shift continua; riflessi del fumetto solo dove una luce si riflette davvero; il manuale segue la lingua dell'interfaccia.
@@ -182,6 +184,8 @@ Nubi di fumo volumetrico vere per le foto di prodotto: il fumo d'incenso accanto
 - **Solo anteprima:** spegni "Calcolo vero per il render" e il fumo simulato resta come anteprima veloce a punti nella viewport (anche quando non è selezionato), con le collisioni con gli oggetti, mentre il render salta la simulazione completa. Lo sistemi, guardi come gira attorno agli oggetti, poi riaccendi il calcolo per il render vero.
 - **Riquadro con la sua sorgente:** il gizmo segue il riquadro: Sposta muove riquadro e sorgente, Ruota li gira attorno alla verticale (anche con il campo "Rotazione"), Scala ingrandisce insieme riquadro, posizione e raggio della sorgente. Altezza e scala crescono solo verso l'alto, dal fondo del riquadro, così il fumo non va mai sotto il piano. L'anteprima in viewport mostra l'istante riprodotto e resta pronta quando clicchi altrove, quindi non si ricalcola mentre giri la camera.
 
+- **Fumo a particelle (veli e filamenti):** con "Fumo a particelle" la griglia calcola solo il moto dell'aria e il fumo viaggia su circa 2,4 milioni di particelle che non si sfumano mai, depositate alla fine su una griglia due o tre volte più fitta. Il fumo tiene veli sottili che si ripiegano su sé stessi, luminosi dove li vedi di taglio, e fili lunghi e compatti, invece della nuvola gonfia del fumo sulla griglia. Con la **sorgente a chiazze** sale da pochi punti che si spostano piano, in nastri separati. Lo usano due preset: **Vapore da tazza** (nastri leggeri e trasparenti che salgono da tutta la superficie del caffè, si torcono e svaniscono in pochi centimetri) e **Incenso o sigaretta** (un filo di un paio di millimetri che sale dritto e poi si rompe in lunghi filamenti e veli che si arricciano).
+
 Il fuoco (combustione, emissione, fiamme che illuminano la scena) è un passo a parte, successivo: vedi lo [studio su fumo e fuoco](docs/studio-fumo-fuoco.md).
 
 ### 7. Polvere in sospensione — granelli che brillano solo in un fascio
@@ -192,6 +196,7 @@ Granelli veri (qualche millimetro, fino a 150 000) sparsi nell'aria, come effett
 
 - **Variazione della dimensione:** quanto la dimensione di ogni granello si scosta a caso da quella impostata, da tutti uguali a da piccolissimi al triplo.
 - **Due colori e opacità:** un secondo colore con la parte di granelli che lo prende (per esempio oro e bianco), e un'opacità che li rende semitrasparenti: diffondono meno luce e, se fanno ombra, ne fermano solo una parte.
+- **Granelli luminosi:** con **+** scegli un colore: una parte dei granelli si accende di quel colore, come lucciole o scintille, e si vede anche fuori dai fasci delle spot (è geometria normale che emette luce e illumina quello che ha intorno). Ogni colore ha la sua intensità e la sua percentuale di granelli; con intensità basse il colore resta, con intensità alte diventa bianco come una lampadina vista dritta.
 - **Granelli o scaglie (polvere di fata):** i *granelli* sono tondi e diffondono la luce uguale da ogni lato. Le *scaglie* sono piatte e girate a caso: riflettono come piccoli specchi, quindi brillano solo quelle girate giuste tra luce e camera mentre le altre restano spente, come brillantini o polvere di fata. **Luccichio** regola quanta luce le scaglie riflettono a specchio, **ruvidità del riflesso** se le scintille sono piccole e intense (bassa) o larghe e tenui (alta). Uguale su CPU e GPU.
 
 ### 8. Adesivi (decal) — etichette e loghi su qualsiasi superficie
@@ -261,6 +266,18 @@ Gli stili si applicano alla prima superficie vista dalla camera, quindi vetri e 
 
 Un file STEP si converte in mesh una volta sola. Il risultato resta in una cache delle conversioni e si salva accanto al progetto (`modelli-convertiti/`) e dentro i pacchetti `.frpack`, così riaprendo il progetto lo STEP non si riconverte. Sulla demo del banco ottico l'apertura è passata da 27 s a 0,2 s. Se lo STEP cambia (o cambiano i pezzi di un assieme a più file, o la qualità), si riconverte. I pacchetti ora includono anche i file dei pezzi a cui rimanda un assieme STEP a più file.
 
+
+### 16. Timeline — animazione di oggetti, luci, camera ed effetti
+
+Una timeline professionale, da accendere da **Funzioni → Timeline (animazione)** (spenta di serie; si accende da sola quando nella scena c'è un effetto che si calcola nel tempo, come il fumo simulato o il ghiaccio secco). Sta in basso al posto della console, con le schede **Console | Timeline**, oppure in una finestra a parte con "Stacca dal programma", da spostare su un altro schermo.
+
+- **Elementi e proprietà:** "+ Elemento" aggiunge gli oggetti selezionati, la camera, una luce, un fumo, una nebbia di ghiaccio secco, la foschia, la polvere o l'ambiente. Ogni elemento mostra le sue proprietà di base (per gli oggetti posizione, rotazione, scala e opacità; per la camera posizione e bersaglio; per le luci posizione e intensità) e con "+" si aggiungono una alla volta le altre compatibili (scala per asse, visibilità, colore, bersaglio, apertura del cono, campo visivo, diaframma, distanza di fuoco, densità, rotazione dell'HDRI, brillantezza).
+- **Chiavi:** il rombo mette o toglie una chiave nell'istante del cursore con il valore attuale; spostare un oggetto con il gizmo, o cambiare un valore nei pannelli, quando la sua proprietà ha già delle chiavi registra lì una chiave. Le chiavi si trascinano nel tempo (a scatti di fotogramma) e il clic destro sceglie l'interpolazione verso la successiva: a scatto, lineare, morbida in entrata, in uscita, in entrata e uscita, curva continua.
+- **Modificatori:** "ƒ+" aggiunge a ogni proprietà, uno alla volta e in ordine, tremolio (ampiezza, frequenza, seme), oscillazione, rampa continua (per esempio 90°/s per una piattaforma girevole), ripeti, avanti e indietro, spostamento, moltiplica, limiti e a scatti (stop motion); ognuno si può spegnere.
+- **Riproduzione:** inizio, chiave prima, play/pausa, chiave dopo, fine, ripeti; durata e fotogrammi al secondo; zoom e scorrimento del tempo.
+- **Effetti nel tempo:** con la timeline accesa fumo simulato e ghiaccio secco seguono il cursore: l'istante simulato è il tempo del cursore meno l'inizio dell'effetto, che si sceglie con la barra sulla sua riga; la durata scelta nella timeline decide fino a quando si calcolano.
+- **Render dell'animazione:** ogni fotogramma della timeline in PNG in una cartella, poi il video MP4, con campioni fissi e il denoiser alla fine.
+- **Opacità degli oggetti:** una proprietà a sé, resa lasciando passare ogni raggio con probabilità 1 − opacità, così l'oggetto sfuma con la sua ombra, uguale su CPU e GPU.
 
 ## Cosa fa oggi
 

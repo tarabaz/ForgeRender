@@ -60,6 +60,14 @@ pub enum PackageKind {
     Pack,
 }
 
+/// Scheda della parte bassa: console (registro) o timeline.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum BottomTab {
+    #[default]
+    Console,
+    Timeline,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum View {
     Viewport,
@@ -139,6 +147,11 @@ pub struct StartupOptions {
     pub mesh: bool,
     /// Finestra "Integrazione AI" aperta all'avvio (`--integrazione-ai`).
     pub ai_setup: bool,
+    /// Timeline accesa e mostrata per questa sessione (`--timeline`, prove e screenshot; non
+    /// cambia le impostazioni salvate).
+    pub timeline: bool,
+    /// Con `--timeline-demo`: anche un'animazione di prova sul primo oggetto (screenshot).
+    pub timeline_demo: bool,
     /// "AI MCP" acceso all'avvio (`--controllo-ia`, prove automatiche).
     pub mcp: bool,
     /// Esegue "Prepara scena prodotto" all'avvio con l'aspetto indicato (test e screenshot).
@@ -305,6 +318,10 @@ pub struct ForgeApp {
     pub ai_setup: crate::ui::ai_setup::AiSetupUi,
     /// Finestra "Viste e turntable" e sequenza in corso.
     pub sequence: crate::sequence::SequenceUi,
+    /// Timeline: riproduzione, pannello e render dell'animazione.
+    pub timeline_ui: crate::ui::timeline::TimelineUi,
+    /// Scheda mostrata nella parte bassa.
+    pub bottom_tab: BottomTab,
     /// Finestra "Modifica materiale" (clic su un materiale della libreria).
     pub material_editor: crate::ui::material_editor::MaterialEditorUi,
     /// Impostazioni dell'app (menu Impostazioni) e finestra aperta.
@@ -459,6 +476,8 @@ impl ForgeApp {
             ai_setup: crate::ui::ai_setup::AiSetupUi::new(),
             material_editor: Default::default(),
             sequence: Default::default(),
+            timeline_ui: Default::default(),
+            bottom_tab: BottomTab::Console,
             prefs: Default::default(),
             prefs_open: false,
             prefs_error: None,
@@ -524,7 +543,7 @@ impl ForgeApp {
         }
         app.apply_prefs(prefs, true);
         // Avviato già comandato dall'assistente (prove automatiche): niente schermata davanti.
-        app.splash_open = app.prefs.show_splash && !startup.mcp;
+        app.splash_open = app.prefs.show_splash && !startup.mcp && !startup.timeline && !startup.timeline_demo;
         // Scelta della modalità: non nelle prove automatiche (modalità già indicata, assistente,
         // sequenze, screenshot) salvo `--scelta-modalita`.
         app.mode_choice_open = startup.mode_choice
@@ -592,6 +611,11 @@ impl ForgeApp {
         app.viewport_mesh = startup.mesh;
         if startup.ai_setup {
             app.ai_setup.open();
+        }
+        app.timeline_ui.demo_pending = startup.timeline_demo;
+        if startup.timeline || startup.timeline_demo {
+            app.prefs.timeline_enabled = true;
+            app.bottom_tab = BottomTab::Timeline;
         }
         app.sequence.open = startup.sequences_window;
         if startup.prism_demo {
@@ -2596,6 +2620,7 @@ impl ForgeApp {
         }
         self.update_render_job();
         self.tick_sequence();
+        crate::ui::timeline::tick(self, ctx);
         self.auto_sequence(ctx);
         self.monitor.tick();
         let state = self.render_state();

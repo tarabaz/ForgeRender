@@ -2894,3 +2894,11 @@ Richieste di Valerio: "Sostituisci materiale" (tutti i componenti con un materia
 - Selettore colore: quadrato S/V e barra della tinta disegnati con mesh a colori per vertice (`sv_square`, `hue_bar` in `ui/color_picker.rs`); egui 0.37 li disegna con `load_texture_cached`, che nel programma restava vuoto (causa precisa non trovata). Tutti i `color_edit_button_rgb` sostituiti da `color_picker::rgb_edit` / `rgb_edit_hint` (stesso pannello dei materiali).
 - Nebbia: `fog_fingerprint_parts` separa effetti (nebbie, fumi, geometria) e foschia (foschia, camera di render, luci, solo se la foschia è accesa); `precompute_fog` annulla il calcolo in corso se cambiano gli effetti, o se cambia la foschia mentre la fase è `Haze`. Girare la vista non ferma più una simulazione di ghiaccio secco o di fumo.
 - Non provato nell'interfaccia.
+
+## 0.43.0 — 05/11/2026 (Claude)
+
+- Fumo a particelle (`SmokeSim::particles`, `patchiness`, `splat_particles` in `forge_volume/src/smoke_sim.rs`): la griglia muove l'aria, 2,4 M particelle portano il fumo, griglia fine fino a 3×; render in proporzione al campo (`smoke_density_with`, limite 64× il riferimento perché un filo sottile resti denso). Preset Vapore da tazza rifatto, nuovo Incenso o sigaretta. Prove con `forgerender-cli render --patch`.
+- Polvere luminosa (`Dust::glow`, nodi `effetto:polvere:luce:<n>` emissivi; i granelli normali restano `is_dust_id`).
+- Timeline (`forge_scene/src/timeline.rs`, `forge_app/src/ui/timeline.rs`): modello, applicazione, chiavi registrate dalle modifiche dell'utente, effetti che seguono il cursore, pannello in basso o staccato, render dell'animazione. Opacità del materiale (`Material::opacity`, CPU e GPU, `MAT_WORDS` 37).
+- Barra rapida senza sovrapposizioni e AI MCP doppio; libreria ed editor riportati davanti.
+- Da sapere: il render dell'animazione rifà la simulazione del fumo a ogni fotogramma (corretto ma lento); l'opacità è stocastica e a pochi campioni resta granulosa; render dell'animazione e finestra staccata non provati a mano (solo screenshot del pannello con `--timeline-demo`).

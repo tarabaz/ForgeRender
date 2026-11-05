@@ -184,6 +184,11 @@ pub fn opaque_at(scene: &RenderScene, prim: u32, t: f32, u: f32, v: f32, o: Vec3
     if scene.materials[mi].dust {
         return false;
     }
+    // Opacità del materiale: il raggio passa con probabilità 1 − opacità (scelta per raggio).
+    let op = scene.materials[mi].opacity;
+    if op < 1.0 && !dust_blocks(op, prim, o, d) {
+        return false;
+    }
     let Some(tex) = &scene.material_textures[mi] else { return true };
     let Some(op) = &tex.opacity else { return true };
     let geo = &scene.geometry;

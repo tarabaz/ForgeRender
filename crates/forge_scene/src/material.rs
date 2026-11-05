@@ -60,6 +60,9 @@ pub struct Material {
     pub height_texture: Option<PathBuf>,
     pub ao_texture: Option<PathBuf>,
     pub opacity_texture: Option<PathBuf>,
+    /// Opacità dell'intero materiale (0–1, 1 = opaco): un raggio attraversa la superficie con
+    /// probabilità 1 − opacità, così l'oggetto sfuma (ombre comprese). La anima la timeline.
+    pub opacity: f32,
     /// Normal map in convenzione DirectX (verde invertito rispetto a OpenGL).
     pub normal_directx: bool,
     /// La mappa di rugosità è una mappa di lucidità (gloss): viene invertita.
@@ -199,6 +202,7 @@ impl Default for Material {
             height_texture: None,
             ao_texture: None,
             opacity_texture: None,
+            opacity: 1.0,
             normal_directx: false,
             roughness_is_gloss: false,
             bump_mm: 1.0,
@@ -224,6 +228,7 @@ impl Material {
         m.metallic = c01(m.metallic);
         m.roughness = c01(m.roughness);
         m.specular = c01(m.specular);
+        m.opacity = if m.opacity.is_finite() { m.opacity.clamp(0.0, 1.0) } else { 1.0 };
         m.transmission = c01(m.transmission);
         m.ior = if m.ior.is_finite() { m.ior.clamp(1.0, 3.0) } else { 1.5 };
         m.emission = m.emission.map(|v| if v.is_finite() { v.max(0.0) } else { 0.0 });

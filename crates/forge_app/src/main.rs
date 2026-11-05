@@ -9,6 +9,8 @@
 //!     --modalita semplice|avanzata   modalità dell'interfaccia per questa sessione
 //!     --mesh               viewport in vista Mesh (wireframe) all'avvio
 //!     --integrazione-ai    apre la finestra Integrazione AI (collegamento degli assistenti)
+//!     --timeline           timeline accesa e in vista per questa sessione
+//!     --timeline-demo      come --timeline, con un'animazione di prova sul primo oggetto
 //!     --prepara studio|chiaro|scuro|scenografico   "Prepara scena prodotto" all'avvio
 
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
@@ -57,6 +59,8 @@ fn parse_args() -> StartupOptions {
             "--iso" => o.iso = true,
             "--mesh" => o.mesh = true,
             "--integrazione-ai" => o.ai_setup = true,
+            "--timeline" => o.timeline = true,
+            "--timeline-demo" => o.timeline_demo = true,
             "--controllo-ia" | "--mcp" => o.mcp = true,
             "--prepara" => {
                 i += 1;

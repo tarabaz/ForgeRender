@@ -36,6 +36,8 @@ pub struct RenderMaterial {
     /// Polvere in sospensione: trasparente per tutti i raggi; i raggi dalla camera vi aggiungono
     /// la luce diretta delle luci della scena (si vede solo dentro un fascio).
     pub dust: bool,
+    /// Opacità del materiale (0–1): un raggio passa con probabilità 1 − opacità.
+    pub opacity: f32,
 }
 
 /// Texture di un materiale, già caricate.
@@ -132,6 +134,7 @@ impl RenderMaterial {
             volume_color: Vec3::from_array(m.volume_color),
             volume_depth: m.volume_depth_cm * 0.01,
             dust: forge_scene::effects::is_dust_id(&m.id.0),
+            opacity: m.opacity,
         }
     }
 }
@@ -862,7 +865,8 @@ impl RenderScene {
         let emissive = build_emissive(&geometry, &node_material, &materials).map(Arc::new);
 
         let has_dust = node_material.iter().any(|&m| materials[m as usize].dust);
-        let has_cutout = has_dust || material_textures.iter().flatten().any(|t| t.opacity.is_some());
+        let has_cutout =
+            has_dust || material_textures.iter().flatten().any(|t| t.opacity.is_some()) || materials.iter().any(|m| m.opacity < 1.0);
         let mut fogs = crate::fog::bake_fogs(scene, &geometry);
         fogs.extend(crate::smoke::smoke_fogs(scene, &geometry));
         fogs.extend(crate::fog::beam_fogs(scene));

@@ -119,7 +119,7 @@ pub const TRI_WORDS: usize = 12;
 pub const PRIM_WORDS: usize = 28;
 pub const FRAME_WORDS: u32 = 8;
 /// Materiale: … 30–32 assorbimento del volume (1/m), 33 priorità, 34–35 liberi.
-pub const MAT_WORDS: usize = 36;
+pub const MAT_WORDS: usize = 37;
 pub const LIGHT_WORDS: usize = 24;
 /// Intestazione di una nebbia: min(3), lato cella, risoluzione(3), unità di densità,
 /// albedo(3), anisotropia, offset dei dati (u16 a coppie), offset dei majorant per blocco,
@@ -300,6 +300,8 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
         // Solo per il render spettrale (parole 34, 35).
         w.f(m.abbe);
         w.f(m.volume_depth);
+        // Parola 36: opacità del materiale.
+        w.f(m.opacity);
         assert_eq!(
             (w.pos() - p[P_OFF_MATS]) as usize,
             (i + 1) * MAT_WORDS,

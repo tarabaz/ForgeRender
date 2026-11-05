@@ -123,7 +123,7 @@ const PORTAL_WORDS: u32 = 16u;
 
 const TRI_WORDS: u32 = 12u;
 const PRIM_WORDS: u32 = 28u;
-const MAT_WORDS: u32 = 36u;
+const MAT_WORDS: u32 = 37u;
 const LIGHT_WORDS: u32 = 24u;
 const ROUGH_GLASS: f32 = 0.03;
 
@@ -625,6 +625,9 @@ fn opaque_at(prim: u32, t: f32, bu: f32, bv: f32, o: vec3<f32>, d: vec3<f32>) ->
     let is_dust = (S[mb + 27u] & 4u) != 0u;
     if (dust_only) { return is_dust; }
     if (is_dust) { return shadow_ray && (pu(P_HAS_DUST) & 4u) != 0u && (pf(P_DUST_OPACITY) >= 1.0 || rnd() < pf(P_DUST_OPACITY)); }
+    // Opacità del materiale: il raggio passa con probabilità 1 − opacità.
+    let op = sf(mb + 36u);
+    if (op < 1.0 && rnd() >= op) { return false; }
     let top = bitcast<i32>(S[mb + 26u]);
     if (top < 0) { return true; }
     let m = load_mat(S[pb + 3u]);

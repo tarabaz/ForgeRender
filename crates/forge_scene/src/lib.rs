@@ -15,6 +15,7 @@ pub mod mesh;
 pub mod primitives;
 pub mod scene;
 pub mod smoke;
+pub mod timeline;
 pub mod units;
 
 pub use added::{AddedKind, AddedRecord};
@@ -27,4 +28,5 @@ pub use material::{Material, MaterialId, MaterialLibrary, Projection, TextureAnc
 pub use mesh::Mesh;
 pub use scene::{ComponentId, CopyRecord, Node, NodeIndex, Scene, UserTransform};
 pub use smoke::{SmokeCloud, SmokeMode, SmokePreset, SmokeShape, SmokeSim, SMOKE_PRESETS, SMOKE_SIM_CELLS};
+pub use timeline::{Interp, Key, ModSlot, Modifier, Prop, Target, Timeline, Track};
 pub use units::LengthUnit;

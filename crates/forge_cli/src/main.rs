@@ -150,6 +150,17 @@ fn apply_patch(scene: &mut Scene, settings: &mut RenderSettings, path: &std::pat
     if let Some(s) = j.get("settings") {
         *settings = patched(settings, s)?;
     }
+    // "materials": { "id del materiale": { campi } }: unisce i campi al materiale con quell'id.
+    if let Some(serde_json::Value::Object(ms)) = j.get("materials") {
+        for (id, m) in ms {
+            let cur = scene
+                .materials
+                .get(&forge_scene::MaterialId::new(id.clone()))
+                .cloned()
+                .ok_or_else(|| anyhow::anyhow!("--patch: materiale sconosciuto «{id}»"))?;
+            scene.materials.upsert(patched(&cur, m)?);
+        }
+    }
     if let Some(d) = j.get("dust") {
         scene.haze_dust = patched(&scene.haze_dust, d)?;
         scene.sync_effects();

@@ -13,6 +13,25 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.43.0 — 05/11/2026
+
+**Timeline (animazione)**
+- `forge_scene::timeline`: `Timeline` (durata, fps, cursore, elementi, tracce, inizi degli effetti) salvata nel progetto; `Track` con chiavi (`Interp`: a scatto, lineare, morbida in entrata, in uscita, in entrata e uscita, curva continua Catmull-Rom), valore di base e modificatori (`Modifier`: tremolio, oscillazione, rampa, ripeti, avanti e indietro, spostamento, moltiplica, limiti, a scatti); `Target` (oggetto, luce, camera, fumo, nebbia, foschia, polvere, ambiente) e `Prop` con proprietà di base e compatibili; `Timeline::apply` scrive i valori nella scena e registra come chiave (o come valore di base) una proprietà cambiata dall'utente dall'ultima applicazione; fumo simulato e ghiaccio secco seguono il cursore (`effect_time` = cursore − inizio). Test `interpolations_pass_through_the_keys`, `modifiers_change_the_value`, `apply_moves_objects_and_records_user_changes`, `effects_follow_the_playhead`.
+- App: menu Funzioni con Timeline (animazione), spenta di serie, accesa da sola quando arriva un effetto nel tempo; parte bassa con le schede Console | Timeline; finestra staccabile; riproduzione, modifica di chiavi e modificatori, render dell'animazione in fotogrammi PNG e MP4 (`ui/timeline.rs`); "Istante" del fumo che segue la timeline; opzioni di avvio `--timeline` e `--timeline-demo`.
+- Opacità degli oggetti: `Material::opacity` (0–1), `MaterialParams::opacity`; `opaque_at` su CPU e GPU lascia passare un raggio con probabilità 1 − opacità (parola 36 del materiale, `MAT_WORDS` 37); la timeline dà all'oggetto una copia del suo materiale.
+
+**Fumo a particelle**
+- `SmokeSim::particles` e `patchiness`: la griglia calcola solo il moto dell'aria; circa 2,4 M particelle (trasporto al punto medio, dissolvenza e bordi come il fumo) si depositano alla fine su una griglia fino a 3 volte più fitta con una sfocatura 1-2-1 (`splat_particles`); il render usa il campo in proporzione (niente soglie né rumore procedurale), con il contrasto. Test `particle_smoke_stays_thin`.
+- Preset: *Vapore da tazza* rifatto a particelle (sorgente a chiazze, poco calore, poca densità) e nuovo *Incenso o sigaretta* (sorgente di 2 mm, uscita calda e veloce, poca dissolvenza, contrasto 1,8).
+- CLI `--patch F.json` (camera, ambiente, impostazioni, luci, fumi, polvere, materiali) per le prove senza ricompilare.
+
+**Polvere luminosa**
+- `Dust::glow` (`DustGlow`: colore, intensità, parte): i granelli di ogni colore vanno in un nodo `effetto:polvere:luce:<n>` con un materiale emissivo; `is_any_dust_id`; test `glowing_dust_gets_its_own_emissive_nodes`. Pannello Polvere: "Granelli luminosi" con +.
+
+**Interfaccia**
+- Barra rapida: il gruppo di sinistra si taglia allo spazio lasciato da quello di destra (niente sovrapposizioni); AI MCP in fondo dopo un divisore, interruttore grande con icona e stato e ingranaggio piccolo sotto; Riavvio automatico su due righe.
+- Libreria ed editor del materiale: riaprendoli la finestra staccata torna davanti (`ViewportCommand::Focus`) o quella interna va sopra le altre.
+
 ## 0.42.1 — 05/11/2026
 
 **Selettore colore**
