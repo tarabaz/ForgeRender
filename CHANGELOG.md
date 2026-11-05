@@ -13,6 +13,17 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.41.0 — 05/11/2026
+
+**Fumo e nebbia non si ricalcolano per niente**
+- La chiave delle cache che dipendono dalla geometria (`RenderGeometry::id`) era un contatore che cambiava a ogni ricostruzione della geometria, anche identica: al render si rifacevano il fumo simulato, il fumo calcolato su griglia, gli ostacoli della nebbia da ghiaccio secco e la foschia già pronti, anche senza modifiche. Ora è un'impronta del contenuto (triangoli, normali, UV, nodi): una scena identica dà la stessa chiave (test `same_scene_same_geometry_key`).
+
+**Simulazione del fumo più veloce**
+- Come la nebbia da ghiaccio secco, la simulazione lavora solo nella **zona attiva**: il riquadro di celle con fumo o calore, allargato di quanto il fluido può spostarsi in un passo più un margine; fuori l'aria è ferma e vuota, lì non si calcola niente e la pressione vale 0 (bordo aperto). Misurato (esempio `fumo_tempi` di `forge_volume`): fumo caldo 0,8 × 1,4 × 0,8 m 13,5 → 6,2 s, gas pesante 1,6 × 0,5 × 1,6 m 3,9 → 3,0 s, riquadro grande 3 × 2 × 3 m 25,5 → 6,1 s, con la stessa quantità di fumo.
+
+**Contrasto del fumo**
+- `SmokeCloud::contrast` (0,5–4, 1 = come prima): la densità relativa elevata a una potenza, così le parti diradate diventano trasparenti mentre i grumi restano densi e fanno ombra su sé stessi; un fumo leggero tiene il rilievo e i dettagli di uno denso invece di diventare un velo uniforme (test `contrast_thins_the_wisps_more_than_the_core`). Per un fumo trasparente ma contrastato: densità più bassa, contrasto a 2–3.
+
 ## 0.40.0 — 05/11/2026
 
 **Fumo simulato che non finisce sul riquadro**

@@ -541,6 +541,8 @@
     "Risalita": "Rise",
     "Quanto la nebbia, scaldandosi, risale a sbuffi prima di svanire (0 = resta a terra come un liquido; alta = sbuffi sopra la sorgente)": "How much the fog, warming up, rises in puffs before vanishing (0 = stays on the ground like a liquid; high = puffs above the source)",
     "Dissolvenza": "Fade",
+    "Contrasto": "Contrast",
+    "Più alto: le parti diradate diventano trasparenti e i grumi restano densi e fanno ombra su sé stessi, così un fumo leggero tiene il rilievo e i dettagli. Per un fumo trasparente ma con contrasto abbassa la densità e alza il contrasto (2–3). 1 = come prima": "Higher: the thin parts become transparent while the clumps stay dense and shade themselves, so a light smoke keeps its relief and detail. For a transparent smoke with contrast, lower the density and raise the contrast (2–3). 1 = as before",
     "Rotazione del riquadro attorno alla verticale (anche con il gizmo Ruota)": "Rotation of the box around the vertical axis (also with the Rotate gizmo)",
     "Bordi sfumati": "Soft edges",
     "Fascia vicino alle pareti e al soffitto del riquadro (frazione del lato) in cui il fumo si dissolve: non si ammassa contro il riquadro e non finisce tagliato netto. 0 = pieno fino al bordo": "Band near the walls and the ceiling of the box (fraction of the side) where the smoke dissolves: it does not pile up against the box and is not cut off sharply. 0 = full up to the edge",

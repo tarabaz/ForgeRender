@@ -173,7 +173,16 @@ pub fn smoke_density_with(s: &SmokeCloud, p: Vec3, field: Option<&SmokeField>) -
     };
     // Mai un taglio netto sulle facce del riquadro.
     let walls = smoothstep(0.0, 0.08, box_edge);
-    s.density * cov * inner * fade * walls * cut
+    // Contrasto: la densità relativa (0–1 circa) elevata a una potenza; con le parti piene a 1
+    // i grumi restano densi e le parti diradate si fanno più trasparenti.
+    let shape = cov * inner * fade * walls * cut;
+    let k = if s.contrast.is_finite() { s.contrast.clamp(0.5, 4.0) } else { 1.0 };
+    let shape = if (k - 1.0).abs() < 1e-3 {
+        shape
+    } else {
+        shape.clamp(0.0, 2.0).powf(k)
+    };
+    s.density * shape
 }
 
 /// Qualità: (celle sul lato più lungo, celle al massimo).
@@ -526,6 +535,60 @@ mod tests {
         // Fotogramma per istante: il primo all'inizio, l'ultimo alla fine.
         assert!(std::ptr::eq(p.at(0.0).unwrap(), p.frames[0].1.as_slice()));
         assert!(std::ptr::eq(p.at(1e9).unwrap(), late.as_slice()));
+    }
+
+    /// La stessa scena ricostruita dà la stessa impronta della geometria (il fumo e la nebbia già
+    /// calcolati si riusano al render), una scena diversa no.
+    #[test]
+    fn same_scene_same_geometry_key() {
+        let mut scene = Scene::default();
+        let m = scene.add_mesh(forge_scene::primitives::uv_sphere(0.1, 16, 8));
+        scene.add_node(None, forge_scene::ComponentId("s".into()), "S", forge_math::Mat4::IDENTITY, Some(m));
+        let (a, b) = (RenderGeometry::build(&scene), RenderGeometry::build(&scene));
+        assert_eq!(a.id, b.id);
+        scene.nodes[0].user.translation += Vec3::new(0.01, 0.0, 0.0);
+        assert_ne!(RenderGeometry::build(&scene).id, a.id);
+    }
+
+    /// Contrasto: con la stessa nube, alzandolo le parti diradate perdono densità molto più del
+    /// cuore (più rilievo), e a 1 non cambia niente.
+    #[test]
+    fn contrast_thins_the_wisps_more_than_the_core() {
+        let base = SmokeCloud {
+            center: Vec3::new(0.0, 0.3, 0.0),
+            ..Default::default()
+        };
+        let pts: Vec<Vec3> = (0..4000)
+            .map(|i| {
+                let a = i as f32 * 0.618_034;
+                let r = (i as f32 / 4000.0).sqrt() * 0.3;
+                base.center
+                    + Vec3::new(
+                        r * (a * std::f32::consts::TAU).cos(),
+                        ((i * 7919) % 1000) as f32 / 1000.0 * 0.5 - 0.25,
+                        r * (a * std::f32::consts::TAU).sin(),
+                    )
+            })
+            .collect();
+        let field = |k: f32| -> Vec<f32> {
+            let s = SmokeCloud {
+                contrast: k,
+                ..base.clone()
+            };
+            pts.iter().map(|&p| smoke_density_at(&s, p)).collect()
+        };
+        let (one, high) = (field(1.0), field(3.0));
+        assert_eq!(one, field(1.0));
+        let core = |d: &[f32]| d.iter().copied().fold(0.0f32, f32::max);
+        let thin = |d: &[f32]| {
+            let m = core(&one);
+            let idx: Vec<usize> = (0..one.len()).filter(|&i| one[i] > 0.0 && one[i] < m * 0.3).collect();
+            idx.iter().map(|&i| d[i]).sum::<f32>() / idx.len().max(1) as f32
+        };
+        let (rc, rt) = (core(&high) / core(&one), thin(&high) / thin(&one));
+        eprintln!("cuore ×{rc:.2}, parti diradate ×{rt:.3}");
+        assert!(rt < 0.2, "le parti diradate si fanno trasparenti: ×{rt}");
+        assert!(rc > rt * 4.0, "il cuore resta denso: ×{rc}");
     }
 
     /// Vapore da tazza: sale sopra la metà del riquadro in filamenti (riempie poco del riquadro)

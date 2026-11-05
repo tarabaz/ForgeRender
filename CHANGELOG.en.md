@@ -10,6 +10,17 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.41.0 — 5 Nov 2026
+
+**Smoke and fog are not computed again for nothing**
+- The key of the caches that depend on the geometry (`RenderGeometry::id`) was a counter that changed at every rebuild of the geometry, even an identical one: the simulated smoke, the baked smoke, the dry-ice fog obstacles and the haze already computed were done again at the render although nothing had changed. Now it is a fingerprint of the content (triangles, normals, UVs, nodes): an identical scene gives the same key (test `same_scene_same_geometry_key`).
+
+**Faster smoke simulation**
+- Like the dry-ice fog, the simulation works only in the **active zone**: the box of cells with smoke or heat, enlarged by how far the fluid can move in a step plus a margin; outside, the air is still and empty, nothing is computed there and the pressure is 0 (open boundary). Measured (`forge_volume` example `fumo_tempi`): hot smoke 0.8 × 1.4 × 0.8 m 13.5 → 6.2 s, heavy gas 1.6 × 0.5 × 1.6 m 3.9 → 3.0 s, large box 3 × 2 × 3 m 25.5 → 6.1 s, with the same amount of smoke.
+
+**Smoke contrast**
+- `SmokeCloud::contrast` (0.5–4, 1 = as before): the relative density is raised to a power, so thin parts become transparent while the clumps stay dense and shade themselves; a light smoke keeps the relief and the detail of a dense one instead of becoming a uniform veil (test `contrast_thins_the_wisps_more_than_the_core`). For a transparent smoke with contrast: lower the density, raise the contrast to 2–3.
+
 ## 0.40.0 — 5 Nov 2026
 
 **Simulated smoke that does not end at the box**

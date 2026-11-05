@@ -18,16 +18,16 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
-### What's new in 0.40.0
+### What's new in 0.41.0
 
-- **Smoke that does not end at the box:** with "Soft edges" the simulated smoke frays and dissolves near the walls and the ceiling of its box, in a fractal, natural way, instead of filling it and being cut off; the box turns with the gizmo and scales together with its source, growing upwards only.
-- **Steam from a cup:** a new simulated preset with thin, curling wisps that fade away.
-- **Sharp material previews:** rendered once at 512 px and scaled down for every card size.
-- **Fixes:** black and white styles are grey also through coloured glass; the smoke preview is no longer recomputed when you click in the viewport.
+- **No more waiting twice:** smoke and fog already computed are reused at the render when nothing has changed.
+- **Faster smoke simulation:** it works only where the smoke is (up to four times faster on large boxes).
+- **Smoke contrast:** a light, transparent smoke that keeps the relief and detail of a dense one.
 
 <details>
 <summary><strong>Previous versions — complete release history</strong></summary>
 
+- **0.40.0 — Smoke that does not end at the box:** soft fractal edges on the simulated smoke; a box that turns and scales with its source, growing upwards only; simulated steam from a cup; material previews at 512 px; black and white also through coloured glass.
 - **0.39.0 — Smoke you can place, colour picker:** the source of the simulated smoke is a sphere in the viewport, moved with the gizmo; a quick particle preview shows where the smoke goes and how it moves over time, without rendering; the simulation cells follow the source, so large boxes no longer lose the smoke; a colour picker for every material colour with RGB, CMYK and palettes (RAL Classic with indicative values included); the render starts at once with ink outlines and tilt-shift; smooth tilt-shift blur; cartoon highlights only where a light is really reflected; the manual follows the interface language.
 
 - **0.38.0 — New built-in material library:** 125 materials in 13 categories with Italian names, the right dispersion on transparent materials and five textured materials per category; BlenderKit materials replaced by CC0 ones; an additional pack of 109 textured materials.
@@ -158,6 +158,8 @@ Real volumetric smoke clouds for product shots: incense smoke next to a perfume 
 - **Simulated mode:** instead of a chosen shape, the smoke can come from a physical simulation inside the box (a Eulerian fluid with temperature and buoyancy, as in Fedkiw, Stam and Jensen 2001): a source emits smoke and heat, hot smoke rises, heavy gas sinks and spreads, vorticity confinement keeps the curls, curl-noise turbulence breaks the column into puffs, wind pushes it and the objects in the box deflect it. The simulation is frozen at the chosen instant and the procedural detail (puffs, filaments) is added on its edge. Controls: source position and radius, amount, heat, buoyancy, weight, exit speed, cooling, fading, swirls, turbulence and its size, wind, instant and simulation quality (48 to 136 cells per side). Presets: simulated hot smoke, simulated heavy gas and steam from a cup (thin wisps that curl and fade away, from a source as wide as the cup).
 - **Placing the simulated smoke:** the source is a light blue sphere in the viewport, as large as the real source: click it (or "Select the source") and the gizmo moves it, while Scale changes its radius. The **viewport preview** runs the same simulation on a coarse grid in about a second and shows it as a cloud of points that moves from 0 to the chosen instant, in a loop or paused at any time: you find the place, the source and the behaviour without rendering, then refine with the render. The simulation cells follow the source: in a large box they get finer (within the computing limit of the quality), so the smoke no longer comes out in a few lumps or vanishes into the floor, and the panel warns when the source is still smaller than a cell.
 - **Soft edges:** the simulated smoke does not fill the box and end with a cut: in a band near the walls and the ceiling (not the bottom) it dissolves as if it left the box, and the edge frays in a fractal way, with tongues, holes and wisps, like real smoke thinning out in the air. The width of the band is adjustable (0 = full up to the edge).
+- **Contrast:** raises the difference between the clumps and the thin parts: with a low density and a high contrast the smoke is transparent but keeps its relief, the clumps stay dense and shade themselves.
+- **Computed once:** the simulation works only in the zone where the smoke and the heat are (like the dry-ice fog), and the result is reused by the render as long as smoke, box and objects stay the same.
 - **Box with its source:** the gizmo follows the box: Move moves box and source, Rotate turns them around the vertical (also with the "Rotation" field), Scale enlarges box, source position and source radius together. Height and scale grow upwards only, from the bottom of the box, so the smoke never goes below the floor. The viewport preview shows the time being played and is kept when you click elsewhere, so it is not recomputed while you turn the camera.
 
 Fire (combustion, emission, flames lighting the scene) is a separate, later step: see the [smoke and fire study](docs/studio-fumo-fuoco.md).
