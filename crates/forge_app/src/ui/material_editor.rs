@@ -200,9 +200,16 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
         .unwrap_or_else(|| tr("Modifica materiale").to_string());
     let docked = app.material_editor.docked;
     let raise = std::mem::take(&mut app.material_editor.raise);
-    crate::ui::detachable(ctx, "win-modifica-materiale", &title, [980.0, 680.0], docked, raise, &mut open, |ui| {
-        body(app, ui, &mut action)
-    });
+    crate::ui::detachable(
+        ctx,
+        "win-modifica-materiale",
+        &title,
+        [980.0, 680.0],
+        docked,
+        raise,
+        &mut open,
+        |ui| body(app, ui, &mut action),
+    );
     app.material_editor.open = open;
     if let Some(action) = action {
         run_action(app, action);

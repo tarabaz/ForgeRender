@@ -293,35 +293,9 @@ fn render_menu(app: &mut ForgeApp, ui: &mut egui::Ui) {
     item(app, ui, Cmd::ExportPasses);
 }
 
-/// "AI MCP": l'utente decide quando un assistente (Claude, tramite `forgerender-mcp`)
-/// può comandare questa finestra. "Controllato da IA" compare solo mentre è collegato.
-pub fn ai_control(app: &mut ForgeApp, ui: &mut egui::Ui) {
-    let on = app.mcp.is_some();
-    let hint = if on {
-        tr("Acceso: Claude può comandare questa finestra (tramite forgerender-mcp). Clic per spegnere.")
-    } else {
-        tr("Spento: nessun assistente può comandare ForgeRender. Clic per permettere a Claude di collegarsi.")
-    };
-    // Interruttore: "AI MCP" con lo stato ben visibile.
-    let (state, color) = if on {
-        ("ON", style::OK)
-    } else {
-        ("OFF", ui.visuals().weak_text_color())
-    };
-    let label = egui::RichText::new(format!("{}  AI MCP: {state}", icons::AI)).color(color).strong();
-    if ui.selectable_label(on, label).on_hover_text(hint).clicked() {
-        run(app, ui, Cmd::AiControl);
-    }
-    // Ingranaggio: collegare o scollegare gli assistenti (Claude Desktop, Claude Code, Codex).
-    if ui
-        .small_button(icons::SETTINGS)
-        .on_hover_text(tr(
-            "Impostazioni dell'integrazione AI: collega o scollega Claude Desktop, Claude Code e Codex",
-        ))
-        .clicked()
-    {
-        run(app, ui, Cmd::AiSetup);
-    }
+/// "Controllato da …": solo mentre un assistente è collegato (l'interruttore AI MCP è nella
+/// barra rapida, [`crate::ui::quickbar`]).
+pub fn ai_controlled_label(app: &ForgeApp, ui: &mut egui::Ui) {
     if let Some(s) = app.mcp.as_ref().filter(|s| s.connected()) {
         let last = s.last.clone().unwrap_or_else(|| "—".into());
         // Chi è collegato, se l'assistente si è presentato al ponte.
