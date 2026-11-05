@@ -1,8 +1,11 @@
 //! Selettore colore delle proprietà dei materiali: un solo pannello con le schede RGB, CMYK e
 //! Palette (RAL), che si apre cliccando il campione del colore.
 //!
-//! - **RGB**: il selettore di egui (tinta/saturazione/valore), i valori R, G, B (0–255, sRGB) e
-//!   il codice esadecimale.
+//! - **RGB**: quadrato saturazione/valore e barra della tinta (disegnati qui, senza texture), i
+//!   valori R, G, B (0–255, sRGB) e il codice esadecimale.
+//!
+//! Lo stesso pannello si apre da ogni pulsante colore del programma ([`rgb_edit`]: luci,
+//! ambiente, foschia, fumo, polvere, stili), al posto di quello di egui.
 //! - **CMYK**: ciano, magenta, giallo e nero in percentuale, con la conversione matematica
 //!   semplice R = 255 · (1 − C) · (1 − K) (e così via). Non è una conversione colorimetrica per
 //!   la stampa (nessun profilo ICC): serve a inserire un colore dato in CMYK.
@@ -361,11 +364,120 @@ fn palettes(ctx: &egui::Context, reload: bool) -> Palettes {
 
 /// Campione colore con il pannello RGB / CMYK / Palette. `code` = codice di palette associato
 /// (mostrato accanto al campione). Vero se il colore o il codice sono cambiati.
+/// Quadrato saturazione (orizzontale) / valore (verticale) della tinta corrente. Disegnato con
+/// triangoli colorati ai vertici, non con una texture: il selettore di egui 0.37 usa una texture
+/// creata al volo che nel programma non compariva (restavano solo il cerchietto e il triangolo).
+fn sv_square(ui: &mut egui::Ui, hsva: &mut Hsva) -> bool {
+    let size = egui::vec2(ui.available_width().max(120.0), 150.0);
+    let (rect, resp) = ui.allocate_exact_size(size, egui::Sense::click_and_drag());
+    let mut changed = false;
+    if let Some(p) = resp.interact_pointer_pos() {
+        hsva.s = egui::remap_clamp(p.x, rect.left()..=rect.right(), 0.0..=1.0);
+        hsva.v = egui::remap_clamp(p.y, rect.bottom()..=rect.top(), 0.0..=1.0);
+        changed = true;
+    }
+    if ui.is_rect_visible(rect) {
+        const N: u32 = 16;
+        let mut mesh = egui::Mesh::default();
+        for yi in 0..=N {
+            let v = yi as f32 / N as f32;
+            for xi in 0..=N {
+                let s = xi as f32 / N as f32;
+                let pos = egui::pos2(egui::lerp(rect.left()..=rect.right(), s), egui::lerp(rect.bottom()..=rect.top(), v));
+                mesh.colored_vertex(pos, egui::Color32::from(Hsva::new(hsva.h, s, v, 1.0)));
+                if xi < N && yi < N {
+                    let i = yi * (N + 1) + xi;
+                    mesh.add_triangle(i, i + 1, i + N + 1);
+                    mesh.add_triangle(i + 1, i + N + 2, i + N + 1);
+                }
+            }
+        }
+        ui.painter().add(egui::Shape::mesh(mesh));
+        ui.painter()
+            .rect_stroke(rect, 0.0, ui.visuals().widgets.noninteractive.bg_stroke, egui::StrokeKind::Inside);
+        let c = egui::pos2(
+            egui::lerp(rect.left()..=rect.right(), hsva.s),
+            egui::lerp(rect.bottom()..=rect.top(), hsva.v),
+        );
+        let ring = if hsva.v > 0.6 && hsva.s < 0.5 {
+            egui::Color32::BLACK
+        } else {
+            egui::Color32::WHITE
+        };
+        ui.painter().circle(
+            c,
+            6.0,
+            egui::Color32::from(Hsva::new(hsva.h, hsva.s, hsva.v, 1.0)),
+            egui::Stroke::new(1.5, ring),
+        );
+    }
+    changed
+}
+
+/// Barra della tinta (0–360°), disegnata come il quadrato senza texture.
+fn hue_bar(ui: &mut egui::Ui, hsva: &mut Hsva) -> bool {
+    let size = egui::vec2(ui.available_width().max(120.0), 16.0);
+    let (rect, resp) = ui.allocate_exact_size(size, egui::Sense::click_and_drag());
+    let mut changed = false;
+    if let Some(p) = resp.interact_pointer_pos() {
+        hsva.h = egui::remap_clamp(p.x, rect.left()..=rect.right(), 0.0..=1.0);
+        changed = true;
+    }
+    if ui.is_rect_visible(rect) {
+        const N: u32 = 36;
+        let mut mesh = egui::Mesh::default();
+        for xi in 0..=N {
+            let h = xi as f32 / N as f32;
+            let x = egui::lerp(rect.left()..=rect.right(), h);
+            let col = egui::Color32::from(Hsva::new(h, 1.0, 1.0, 1.0));
+            mesh.colored_vertex(egui::pos2(x, rect.top()), col);
+            mesh.colored_vertex(egui::pos2(x, rect.bottom()), col);
+            if xi < N {
+                let i = xi * 2;
+                mesh.add_triangle(i, i + 1, i + 2);
+                mesh.add_triangle(i + 1, i + 3, i + 2);
+            }
+        }
+        ui.painter().add(egui::Shape::mesh(mesh));
+        ui.painter()
+            .rect_stroke(rect, 0.0, ui.visuals().widgets.noninteractive.bg_stroke, egui::StrokeKind::Inside);
+        let x = egui::lerp(rect.left()..=rect.right(), hsva.h);
+        let marker = egui::Rect::from_x_y_ranges(x - 3.0..=x + 3.0, rect.top() - 2.0..=rect.bottom() + 2.0);
+        ui.painter()
+            .rect_stroke(marker, 2.0, egui::Stroke::new(2.0, egui::Color32::WHITE), egui::StrokeKind::Middle);
+    }
+    changed
+}
+
+/// Pulsante colore (lineare) per luci, ambiente, effetti e stili: apre lo stesso selettore dei
+/// materiali (RGB, CMYK, palette) al posto di quello di egui. Il codice della palette scelta non
+/// si conserva: resta solo il colore. Vero se il colore è cambiato.
+pub fn rgb_edit(ui: &mut egui::Ui, color: &mut [f32; 3]) -> bool {
+    rgb_edit_hint(ui, color, "")
+}
+
+/// Come [`rgb_edit`], con un suggerimento in più sul campione.
+pub fn rgb_edit_hint(ui: &mut egui::Ui, color: &mut [f32; 3], hint: &str) -> bool {
+    let salt = ui.next_auto_id();
+    let mut code = None;
+    color_field_hint(ui, salt, color, &mut code, hint)
+}
+
 pub fn color_field(
     ui: &mut egui::Ui,
     id_salt: impl std::hash::Hash + std::fmt::Debug,
     color: &mut [f32; 3],
     code: &mut Option<String>,
+) -> bool {
+    color_field_hint(ui, id_salt, color, code, "")
+}
+
+fn color_field_hint(
+    ui: &mut egui::Ui,
+    id_salt: impl std::hash::Hash + std::fmt::Debug,
+    color: &mut [f32; 3],
+    code: &mut Option<String>,
+    hint: &str,
 ) -> bool {
     let id = ui.make_persistent_id(("selettore-colore", id_salt));
     let mut changed = false;
@@ -384,7 +496,12 @@ pub fn color_field(
         }
         resp
     });
-    let resp = resp.inner.on_hover_text(tr("Clic: selettore colore (RGB, CMYK, palette RAL)"));
+    let resp = if hint.is_empty() {
+        resp.inner.on_hover_text(tr("Clic: selettore colore (RGB, CMYK, palette RAL)"))
+    } else {
+        resp.inner
+            .on_hover_text(format!("{hint}\n{}", tr("Clic: selettore colore (RGB, CMYK, palette RAL)")))
+    };
     let mut state: Option<PickerState> = ui.ctx().data(|d| d.get_temp(id));
     if resp.clicked() && state.is_none() {
         let s8 = to_srgb8(*color);
@@ -425,7 +542,9 @@ pub fn color_field(
             let mut manual: Option<[f32; 3]> = None;
             match st.tab {
                 Tab::Rgb => {
-                    if egui::widgets::color_picker::color_picker_hsva_2d(ui, &mut st.hsva, egui::widgets::color_picker::Alpha::Opaque) {
+                    let mut moved = sv_square(ui, &mut st.hsva);
+                    moved |= hue_bar(ui, &mut st.hsva);
+                    if moved {
                         manual = Some(st.hsva.to_rgb());
                     }
                     let mut s8 = to_srgb8(manual.unwrap_or(*color));

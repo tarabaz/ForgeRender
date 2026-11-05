@@ -407,7 +407,7 @@ fn params_column(ui: &mut egui::Ui, s: &mut BlendImportUi) {
             egui::Grid::new("blend-values").num_columns(2).spacing([10.0, 6.0]).show(ui, |ui| {
                 ui.label(tr("Colore base"));
                 ui.horizontal(|ui| {
-                    ui.color_edit_button_rgb(&mut m.base_color);
+                    crate::ui::color_picker::rgb_edit(ui, &mut m.base_color);
                     if m.base_color_texture.is_some() {
                         ui.label(egui::RichText::new(tr("× mappa")).small().weak());
                     }

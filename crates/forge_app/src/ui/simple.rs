@@ -381,7 +381,7 @@ fn light_colors(app: &mut ForgeApp, ui: &mut egui::Ui) {
             for i in lights {
                 ui.horizontal(|ui| {
                     let l = &mut app.scene.lights[i];
-                    changed |= ui.color_edit_button_rgb(&mut l.color).changed();
+                    changed |= crate::ui::color_picker::rgb_edit(ui, &mut l.color);
                     ui.label(&l.name);
                 });
             }

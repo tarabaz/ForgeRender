@@ -395,10 +395,11 @@ fn body(
             .changed();
         ui.end_row();
         ui.label(tr("Colore"));
-        changed |= ui
-            .color_edit_button_rgb(&mut s.color)
-            .on_hover_text(tr("Bianco = vapore, grigio = fumo, scuro = fuliggine che assorbe la luce"))
-            .changed();
+        changed |= crate::ui::color_picker::rgb_edit_hint(
+            ui,
+            &mut s.color,
+            tr("Bianco = vapore, grigio = fumo, scuro = fuliggine che assorbe la luce"),
+        );
         ui.end_row();
         changed |= slider(
             ui,

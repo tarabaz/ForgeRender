@@ -293,12 +293,11 @@ fn haze(app: &mut ForgeApp, ui: &mut egui::Ui) {
                     ui.end_row();
                 }
                 ui.label(tr("Colore"));
-                changed |= ui
-                    .color_edit_button_rgb(&mut h.color)
-                    .on_hover_text(tr(
-                        "Colore della luce diffusa dalla foschia: bianco = aria neutra, caldo = polvere, freddo = nebbia",
-                    ))
-                    .changed();
+                changed |= crate::ui::color_picker::rgb_edit_hint(
+                    ui,
+                    &mut h.color,
+                    tr("Colore della luce diffusa dalla foschia: bianco = aria neutra, caldo = polvere, freddo = nebbia"),
+                );
                 ui.end_row();
                 ui.label(tr("Raggi in controluce"));
                 changed |= ui
@@ -543,11 +542,11 @@ fn dust(app: &mut ForgeApp, ui: &mut egui::Ui) {
                     .changed();
                 ui.end_row();
                 ui.label(tr("Colore"));
-                changed |= ui.color_edit_button_rgb(&mut dust.color).changed();
+                changed |= crate::ui::color_picker::rgb_edit(ui, &mut dust.color);
                 ui.end_row();
                 ui.label(tr("Secondo colore"));
                 ui.horizontal(|ui| {
-                    changed |= ui.color_edit_button_rgb(&mut dust.color2).changed();
+                    changed |= crate::ui::color_picker::rgb_edit(ui, &mut dust.color2);
                     changed |= ui
                         .add(egui::Slider::new(&mut dust.color2_share, 0.0..=1.0).custom_formatter(|v, _| format!("{:.0} %", v * 100.0)))
                         .on_hover_text(tr("Parte dei granelli con il secondo colore (0 = tutti del primo)"))

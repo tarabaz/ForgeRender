@@ -2888,3 +2888,9 @@ Fumo/nebbia ricalcolati al render senza modifiche: causa la chiave `RenderGeomet
 ## Claude Code → ChatGPT — 05/11/2026: 0.42.0
 
 Richieste di Valerio: "Sostituisci materiale" (tutti i componenti con un materiale passano a un altro senza selezionarli, `Scene::replace_material`); pulviscolo con secondo colore e quota, opacità, variazione casuale della dimensione e forma a scaglie piatte che riflettono a specchio (polvere di fata: brillano solo quelle girate giuste, CPU e GPU con la stessa funzione); fumo simulato "solo anteprima" (il render non lo calcola, la viewport lo mostra a punti). Non provato nell'interfaccia.
+
+## 0.42.1 — 05/11/2026 (Claude)
+
+- Selettore colore: quadrato S/V e barra della tinta disegnati con mesh a colori per vertice (`sv_square`, `hue_bar` in `ui/color_picker.rs`); egui 0.37 li disegna con `load_texture_cached`, che nel programma restava vuoto (causa precisa non trovata). Tutti i `color_edit_button_rgb` sostituiti da `color_picker::rgb_edit` / `rgb_edit_hint` (stesso pannello dei materiali).
+- Nebbia: `fog_fingerprint_parts` separa effetti (nebbie, fumi, geometria) e foschia (foschia, camera di render, luci, solo se la foschia è accesa); `precompute_fog` annulla il calcolo in corso se cambiano gli effetti, o se cambia la foschia mentre la fase è `Haze`. Girare la vista non ferma più una simulazione di ghiaccio secco o di fumo.
+- Non provato nell'interfaccia.

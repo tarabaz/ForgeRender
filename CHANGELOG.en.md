@@ -10,6 +10,15 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.42.1 — 5 Nov 2026
+
+**Colour picker**
+- The saturation/value square and the hue bar of the colour picker were blank (only the marker circle and triangle showed): egui 0.37 draws them as a texture created on the fly, which did not appear in the program. They are now drawn in `color_picker.rs` as meshes with per-vertex colours, without textures.
+- Every colour button (lights, environment, haze, smoke, dust, rendering styles, Blender import) now opens the same picker as the materials (RGB, CMYK, RAL palette) instead of the egui one (`color_picker::rgb_edit`); the palette code is not kept there, only the colour.
+
+**Fog not restarted by the camera**
+- The fingerprint that decides whether to recompute fog, smoke and haze included the render camera and the lights even with the haze off, so turning the view during a dry-ice or smoke simulation cancelled it and started again from zero. Camera and lights now count only when the haze is on, and when only the haze inputs change the running job stops only if it is computing the haze: a dry-ice or smoke simulation finishes, then only the haze is redone.
+
 ## 0.42.0 — 5 Nov 2026
 
 **Replace material**

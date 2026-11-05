@@ -13,6 +13,15 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.42.1 — 05/11/2026
+
+**Selettore colore**
+- Il quadrato saturazione/valore e la barra della tinta del selettore colore erano vuoti (si vedevano solo il cerchietto e il triangolo): egui 0.37 li disegna con una texture creata al volo, che nel programma non compariva. Ora sono disegnati in `color_picker.rs` con triangoli colorati ai vertici, senza texture.
+- Ogni pulsante colore (luci, ambiente, foschia, fumo, polvere, stili di rendering, importazione da Blender) apre lo stesso selettore dei materiali (RGB, CMYK, palette RAL) al posto di quello di egui (`color_picker::rgb_edit`); lì il codice della palette non si conserva, resta solo il colore.
+
+**La nebbia non riparte girando la camera**
+- L'impronta che decide se rifare nebbia, fumo e foschia comprendeva la camera di render e le luci anche a foschia spenta, così girare la vista durante una simulazione di ghiaccio secco o di fumo la annullava e la faceva ripartire da zero. Ora camera e luci contano solo con la foschia accesa, e se cambia solo ciò che decide la foschia il calcolo in corso si ferma solo se sta calcolando la foschia: una simulazione di ghiaccio secco o di fumo finisce, poi si rifà solo la foschia.
+
 ## 0.42.0 — 05/11/2026
 
 **Sostituisci materiale**

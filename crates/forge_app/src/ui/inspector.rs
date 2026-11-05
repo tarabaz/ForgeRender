@@ -1228,7 +1228,7 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 ui.end_row();
             } else {
                 ui.label(tr("Colore"));
-                changed |= ui.color_edit_button_rgb(&mut l.color).changed();
+                changed |= crate::ui::color_picker::rgb_edit(ui, &mut l.color);
                 ui.end_row();
                 ui.label(tr("Temperatura"));
                 ui.horizontal(|ui| {
@@ -1502,7 +1502,7 @@ fn environment(app: &mut ForgeApp, ui: &mut egui::Ui) {
         .show(ui, |ui| match &mut app.scene.environment {
             Environment::Uniform { color, strength } => {
                 ui.label(tr("Colore"));
-                changed |= ui.color_edit_button_rgb(color).changed();
+                changed |= crate::ui::color_picker::rgb_edit(ui, color);
                 ui.end_row();
                 ui.label(tr("Intensità"));
                 changed |= ui.add(egui::Slider::new(strength, 0.0..=10.0).logarithmic(true)).changed();
@@ -1515,13 +1515,13 @@ fn environment(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 strength,
             } => {
                 ui.label(tr("Zenit"));
-                changed |= ui.color_edit_button_rgb(zenith).changed();
+                changed |= crate::ui::color_picker::rgb_edit(ui, zenith);
                 ui.end_row();
                 ui.label(tr("Orizzonte"));
-                changed |= ui.color_edit_button_rgb(horizon).changed();
+                changed |= crate::ui::color_picker::rgb_edit(ui, horizon);
                 ui.end_row();
                 ui.label(tr("Suolo"));
-                changed |= ui.color_edit_button_rgb(ground).changed();
+                changed |= crate::ui::color_picker::rgb_edit(ui, ground);
                 ui.end_row();
                 ui.label(tr("Intensità"));
                 changed |= ui.add(egui::Slider::new(strength, 0.0..=10.0).logarithmic(true)).changed();
@@ -1787,7 +1787,7 @@ fn effects(app: &mut ForgeApp, ui: &mut egui::Ui) {
                             .changed();
                         ui.end_row();
                         ui.label(tr("Colore scattering"));
-                        changed |= ui.color_edit_button_rgb(&mut f.albedo).changed();
+                        changed |= crate::ui::color_picker::rgb_edit(ui, &mut f.albedo);
                         ui.end_row();
                         ui.label(tr("Intensità scattering"));
                         let mut a = f.albedo.iter().cloned().fold(0.0f32, f32::max);

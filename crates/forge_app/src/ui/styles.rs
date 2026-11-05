@@ -106,7 +106,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) -> bool {
             changed = true;
         }
         if let Some(c) = &mut app.settings.background {
-            changed |= ui.color_edit_button_rgb(c).changed();
+            changed |= crate::ui::color_picker::rgb_edit(ui, c);
             for (label, v) in [(tr("Bianco"), 1.0), (tr("Grigio chiaro"), 0.8), (tr("Nero"), 0.0)] {
                 if ui.small_button(label).clicked() {
                     *c = [v; 3];
@@ -137,7 +137,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) -> bool {
                 .changed();
             ui.horizontal(|ui| {
                 ui.label(tr("Colore"));
-                changed |= ui.color_edit_button_rgb(&mut o.color).changed();
+                changed |= crate::ui::color_picker::rgb_edit(ui, &mut o.color);
             });
             changed |= ui
                 .checkbox(&mut o.creases, tr("Anche gli spigoli vivi"))

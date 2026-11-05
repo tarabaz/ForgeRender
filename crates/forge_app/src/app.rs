@@ -280,8 +280,9 @@ pub struct ForgeApp {
     /// e l'ultima impronta già controllata.
     fog_watch: Option<(String, std::time::Instant)>,
     fog_checked: Option<String>,
-    /// Impronta della nebbia che si sta calcolando: se la nebbia cambia, il calcolo si annulla.
-    fog_running: Option<String>,
+    /// Impronta (effetti, foschia) del calcolo in corso: se gli effetti cambiano davvero, il
+    /// calcolo si annulla (vedi [`Self::precompute_fog`]).
+    fog_running: Option<(String, String)>,
     job: Option<JobInfo>,
     pub session: RenderSession,
 
@@ -1377,9 +1378,22 @@ impl ForgeApp {
     fn precompute_fog(&mut self) {
         let fp = self.fog_fingerprint();
         if self.pending_fog.is_some() {
-            // La nebbia (o la scena) è cambiata durante il calcolo: lo si ferma subito e si
-            // riparte da capo con i valori nuovi.
-            if self.fog_running.as_deref().is_some_and(|r| r != fp) {
+            // Nebbia, fumo o scena cambiati durante il calcolo: lo si ferma subito e si riparte
+            // da capo con i valori nuovi. Se è cambiato solo ciò che decide la foschia (camera,
+            // luci, foschia) si ferma solo la foschia: una simulazione di ghiaccio secco o di
+            // fumo in corso non dipende dalla camera e finisce; dopo si rifà solo la foschia
+            // (nebbie e fumo sono già in cache).
+            let (effects, haze) = self.fog_fingerprint_parts();
+            let stop = match &self.fog_running {
+                Some((e, h)) => {
+                    *e != effects
+                        || (*h != haze
+                            && forge_render_core::fog::progress::get()
+                                .is_some_and(|p| p.phase == forge_render_core::fog::progress::Phase::Haze))
+                }
+                None => false,
+            };
+            if stop {
                 forge_render_core::fog::progress::cancel();
                 self.fog_running = None;
             }
@@ -1419,17 +1433,23 @@ impl ForgeApp {
     }
 
     fn fog_fingerprint(&self) -> String {
-        // La foschia copre scena, camera e luci: spostarle cambia il suo riquadro.
-        let lights: Vec<_> = self.scene.lights.iter().map(|l| (l.enabled, l.position)).collect();
-        format!(
-            "{:?}|{:?}|{}|{:?}|{:?}|{:?}",
-            self.scene.fogs,
-            self.scene.smokes,
-            self.geometry_rev,
-            self.scene.haze,
-            self.scene.render_camera().position,
-            lights
-        )
+        let (effects, haze) = self.fog_fingerprint_parts();
+        format!("{effects}#{haze}")
+    }
+
+    /// Impronta di ciò che decide nebbie di ghiaccio secco e fumo (non dipendono dalla camera) e
+    /// di ciò che decide la foschia. La foschia copre scena, camera e luci (spostarle cambia il
+    /// suo riquadro), ma camera e luci contano solo se la foschia è accesa: girare la vista non
+    /// rifà niente se c'è solo ghiaccio secco o fumo.
+    fn fog_fingerprint_parts(&self) -> (String, String) {
+        let effects = format!("{:?}|{:?}|{}", self.scene.fogs, self.scene.smokes, self.geometry_rev);
+        let haze = if forge_render_core::fog::haze_on(&self.scene) {
+            let lights: Vec<_> = self.scene.lights.iter().map(|l| (l.enabled, l.position)).collect();
+            format!("{:?}|{:?}|{:?}", self.scene.haze, self.scene.render_camera().position, lights)
+        } else {
+            String::new()
+        };
+        (effects, haze)
     }
 
     /// Annulla il calcolo della nebbia in corso (pulsante X): non riparte da solo, si rifà
@@ -1447,7 +1467,7 @@ impl ForgeApp {
 
     /// Calcola le nebbie della scena su un thread a sé.
     fn spawn_fog_bake(&mut self, geometry: Arc<RenderGeometry>) {
-        self.fog_running = Some(self.fog_fingerprint());
+        self.fog_running = Some(self.fog_fingerprint_parts());
         let (tx, rx) = std::sync::mpsc::channel();
         let scene = self.scene.clone();
         std::thread::Builder::new()
