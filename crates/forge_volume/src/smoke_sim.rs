@@ -56,7 +56,19 @@ pub struct SmokeSimParams {
     pub box_center: Vec3,
     pub box_yaw: f32,
     pub box_half: Vec3,
+    /// Fumo portato da particelle (veli sottili): la griglia calcola solo il moto dell'aria e il
+    /// fumo viaggia su particelle che non si sfumano (il trasporto sulla griglia stende ogni velo
+    /// in una nuvola gonfia). Alla fine si depositano su una griglia `fine` volte più fitta.
+    pub particles: bool,
+    /// Sorgente a chiazze (0 = uniforme, 1 = solo pochi punti che si spostano piano): il vapore di
+    /// una tazza sale in nastri separati, non da tutta la superficie insieme.
+    pub patchiness: f32,
 }
+
+/// Particelle emesse in tutto (circa) con il fumo a particelle.
+pub const SMOKE_PARTICLES: f32 = 2.4e6;
+/// Celle al massimo della griglia fine su cui si depositano le particelle.
+const PARTICLE_GRID_CELLS: f32 = 30.0e6;
 
 /// Risultato: densità (0–1 circa) al centro delle celle di `spec`.
 #[derive(Clone, Debug)]
@@ -76,6 +88,73 @@ impl SmokeField {
 }
 
 const PRESSURE_ITERS: usize = 40;
+
+/// Numero pseudo-casuale in [0, 1) da seme, passo, particella e componente.
+fn hash01(seed: u32, step: u32, k: u32, j: u32) -> f32 {
+    let mut x = seed.wrapping_mul(0x9E37_79B9) ^ step.wrapping_mul(0x85EB_CA6B) ^ k.wrapping_mul(0xC2B2_AE35) ^ j.wrapping_mul(0x27D4_EB2F);
+    x ^= x >> 15;
+    x = x.wrapping_mul(0x2C1B_3C6D);
+    x ^= x >> 12;
+    x = x.wrapping_mul(0x297A_2D39);
+    x ^= x >> 15;
+    (x >> 8) as f32 / (1u32 << 24) as f32
+}
+
+fn smooth01(t: f32) -> f32 {
+    let t = t.clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+/// Deposita le particelle (coordinate della griglia `spec`) su una griglia più fitta che copre lo
+/// stesso riquadro, con pesi trilineari e una leggera sfocatura (niente puntinato dove sono rade).
+fn splat_particles(spec: &GridSpec, parts: &[(Vec3, f32)]) -> (GridSpec, Vec<f32>) {
+    let cells = spec.len() as f32;
+    let f = ((PARTICLE_GRID_CELLS / cells.max(1.0)).cbrt().floor() as usize).clamp(1, 3);
+    let fine = GridSpec {
+        min: spec.min,
+        res: spec.res.map(|r| r * f),
+        cell: spec.cell / f as f32,
+    };
+    let [fx, fy, fz] = fine.res;
+    let mut d = vec![0.0f32; fine.len()];
+    for &(q, wgt) in parts {
+        let c = q * f as f32 - Vec3::splat(0.5);
+        let b = c.floor();
+        let t = c - b;
+        for (dz, wz) in [(0i64, 1.0 - t.z), (1, t.z)] {
+            for (dy, wy) in [(0i64, 1.0 - t.y), (1, t.y)] {
+                for (dx, wx) in [(0i64, 1.0 - t.x), (1, t.x)] {
+                    let (x, y, z) = (b.x as i64 + dx, b.y as i64 + dy, b.z as i64 + dz);
+                    if x < 0 || y < 0 || z < 0 || x >= fx as i64 || y >= fy as i64 || z >= fz as i64 {
+                        continue;
+                    }
+                    d[fine.index(x as usize, y as usize, z as usize)] += wgt * wx * wy * wz;
+                }
+            }
+        }
+    }
+    // Sfocatura 1-2-1 sui tre assi.
+    for axis in 0..3 {
+        let src = d.clone();
+        d.par_iter_mut().enumerate().for_each(|(i, out)| {
+            let (x, y, z) = fine.coords(i);
+            let (a, m) = match axis {
+                0 => (x, fx),
+                1 => (y, fy),
+                _ => (z, fz),
+            };
+            let at = |k: usize| match axis {
+                0 => src[fine.index(k, y, z)],
+                1 => src[fine.index(x, k, z)],
+                _ => src[fine.index(x, y, k)],
+            };
+            let l = if a > 0 { at(a - 1) } else { 0.0 };
+            let r = if a + 1 < m { at(a + 1) } else { 0.0 };
+            *out = 0.25 * l + 0.5 * src[i] + 0.25 * r;
+        });
+    }
+    (fine, d)
+}
 
 struct Grid {
     s: GridSpec,
@@ -211,6 +290,12 @@ fn run(
         .collect();
     // Celle calcolate in tutto (somma delle zone attive dei passi), per il registro.
     let mut active_cells = 0.0f64;
+    // Particelle: posizione in coordinate di griglia (centri a i + 0,5) e peso.
+    let mut parts: Vec<(Vec3, f32)> = Vec::new();
+    let part_rate = SMOKE_PARTICLES / p.time.max(0.1);
+    let mut part_debt = 0.0f32;
+    let src_g = (p.source - p.spec.min) / h;
+    let src_rg = p.source_radius.max(h * 0.75) / h;
     for step in 0..steps {
         if cancelled() {
             return None;
@@ -489,6 +574,64 @@ fn run(
             .unzip();
         rho = nr;
         temp = nt;
+        if p.particles {
+            // Nuove particelle sul disco della sorgente (la superficie che fuma), a chiazze che
+            // si spostano piano.
+            part_debt += part_rate * dt;
+            let count = part_debt as usize;
+            part_debt -= count as f32;
+            let patch = p.patchiness.clamp(0.0, 1.0);
+            let born: Vec<(Vec3, f32)> = (0..count)
+                .into_par_iter()
+                .filter_map(|k| {
+                    // Punto a caso sul disco; con le chiazze si riprova (fino a 12 volte) finché
+                    // non cade in una chiazza accesa: il numero di particelle non cambia.
+                    let mut q = src_g;
+                    for attempt in 0..12u32 {
+                        let r = |j: u32| hash01(p.seed, step, k as u32, j + attempt * 4);
+                        let rad = src_rg * r(0).sqrt();
+                        let ang = r(1) * std::f32::consts::TAU;
+                        q = src_g + Vec3::new(rad * ang.cos(), (r(2) - 0.5) * 0.8, rad * ang.sin());
+                        if patch <= 0.0 {
+                            break;
+                        }
+                        let world = p.spec.min + q * h;
+                        let n = crate::noise::fbm(
+                            world / (p.source_radius.max(h) * 0.7) + Vec3::new(time * 0.25, time * 0.4, -time * 0.2),
+                            p.seed ^ 0x6a09_e667,
+                            3,
+                        );
+                        // Con chiazze piene la soglia lascia pochi punti accesi.
+                        let keep = smooth01((n - (patch * 0.45 - 0.15)) / 0.2);
+                        if r(3) <= keep {
+                            break;
+                        }
+                    }
+                    let (x, y, z) = (q.x as i64, q.y as i64, q.z as i64);
+                    if x < 0 || y < 0 || z < 0 || x >= rx as i64 || y >= ry as i64 || z >= rz as i64 {
+                        return None;
+                    }
+                    (!solid[g.idx(x as usize, y as usize, z as usize)]).then_some((q, 1.0))
+                })
+                .collect();
+            parts.extend(born);
+            // Trasporto (punto medio) nel vento della griglia, dissolvenza come il fumo e i bordi.
+            let vel = |q: Vec3| Vec3::new(g.sample(&u, q), g.sample(&v, q), g.sample(&w, q)) / h;
+            parts = parts
+                .into_par_iter()
+                .filter_map(|(q, wgt)| {
+                    let mid = q + vel(q) * (dt * 0.5);
+                    let q = q + vel(mid) * dt;
+                    let (x, y, z) = (q.x.floor() as i64, q.y.floor() as i64, q.z.floor() as i64);
+                    if x < 0 || y < 0 || z < 0 || x >= rx as i64 || y >= ry as i64 || z >= rz as i64 {
+                        return None;
+                    }
+                    let i = g.idx(x as usize, y as usize, z as usize);
+                    let wgt = wgt * keep_r * edge[i];
+                    (wgt > 2e-3 && !solid[i]).then_some((q, wgt))
+                })
+                .collect();
+        }
         if let Some((every, f)) = frames.as_mut() {
             let (before, after) = (time, time + dt);
             if (after / *every).floor() > (before / *every).floor() || step + 1 == steps {
@@ -501,6 +644,13 @@ fn run(
         "fumo simulato: zona attiva media {:.0} % della griglia",
         active_cells / (steps as f64 * n as f64) * 100.0
     );
+    let (spec, rho) = if p.particles {
+        let fine = splat_particles(&p.spec, &parts);
+        tracing::debug!("fumo a particelle: {} particelle, griglia fine {:?}", parts.len(), fine.0.res);
+        fine
+    } else {
+        (p.spec, rho)
+    };
     // Riferimento: il 90° percentile delle celle con fumo (non la sorgente, sempre piena).
     let mut vals: Vec<f32> = rho.iter().copied().filter(|&v| v > 1e-4).collect();
     let max = if vals.is_empty() {
@@ -511,7 +661,7 @@ fn run(
         *vals.select_nth_unstable_by(k, |a, b| a.total_cmp(b)).1
     };
     Some(SmokeField {
-        spec: p.spec,
+        spec,
         max,
         density: rho,
         steps,
@@ -557,6 +707,8 @@ mod tests {
             box_center: Vec3::ZERO,
             box_yaw: 0.0,
             box_half: Vec3::ONE,
+            particles: false,
+            patchiness: 0.0,
         }
     }
 
@@ -589,6 +741,47 @@ mod tests {
         assert!(top(&hard) > 0.05, "senza bordi sfumati il fumo arriva al soffitto");
         assert!(top(&soft) < top(&hard) * 0.1, "con i bordi sfumati sotto il soffitto quasi niente");
         assert!(mid(&soft) > mid(&hard) * 0.3, "il fumo più in basso resta");
+    }
+
+    /// Fumo a particelle: griglia più fitta di quella della simulazione, deterministico, il fumo
+    /// sale, ed è più concentrato (veli e fili) di quello trasportato sulla griglia, che si sfuma:
+    /// meno celle occupate per la stessa quantità.
+    #[test]
+    fn particle_smoke_stays_thin() {
+        let spec = GridSpec::covering(Vec3::ZERO, Vec3::new(1.0, 1.5, 1.0), 32);
+        let none = || false;
+        let p = SmokeSimParams {
+            particles: true,
+            ..params(spec)
+        };
+        let a = simulate_smoke(&p, None, &|_| {}, &none).unwrap();
+        let b = simulate_smoke(&p, None, &|_| {}, &none).unwrap();
+        assert_eq!(a.density, b.density, "deterministico");
+        assert!(a.spec.res[0] > spec.res[0], "griglia fine: {:?}", a.spec.res);
+        let grid = simulate_smoke(&params(spec), None, &|_| {}, &none).unwrap();
+        // Frazione del volume occupata dal fumo (sopra il 5 % del riferimento).
+        let occ = |f: &SmokeField| {
+            let r = f.max.max(1e-9);
+            f.density.iter().filter(|&&d| d > 0.05 * r).count() as f32 / f.density.len() as f32
+        };
+        // Quota media del fumo sopra la sorgente.
+        let mean_y = |f: &SmokeField| {
+            let (mut m, mut s) = (0.0f32, 0.0f32);
+            for i in 0..f.spec.len() {
+                let (x, y, z) = f.spec.coords(i);
+                m += f.density[i] * f.spec.center(x, y, z).y;
+                s += f.density[i];
+            }
+            m / s.max(1e-9)
+        };
+        eprintln!(
+            "occupazione particelle {:.4} griglia {:.4}, quota media {:.3}",
+            occ(&a),
+            occ(&grid),
+            mean_y(&a)
+        );
+        assert!(occ(&a) < occ(&grid), "le particelle restano più sottili della griglia");
+        assert!(mean_y(&a) > p.source.y + 0.05, "il fumo a particelle sale");
     }
 
     /// Fumo caldo: sale dalla sorgente (più fumo in alto che in basso dopo un po'), è

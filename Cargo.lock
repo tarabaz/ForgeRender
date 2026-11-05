@@ -955,6 +955,7 @@ dependencies = [
  "forge_scene",
  "forge_telemetry",
  "image",
+ "serde",
  "serde_json",
  "tracing",
 ]

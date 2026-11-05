@@ -147,7 +147,22 @@ fn sim_controls(ui: &mut egui::Ui, s: &mut SmokeCloud) -> bool {
     let mut changed = false;
     let m = &mut s.sim;
     changed |= crate::ui::inspector::vec3_edit(ui, tr("Sorgente (m dal fondo)"), &mut m.source_offset, 0.005);
+    changed |= ui
+        .checkbox(&mut m.particles, tr("Fumo a particelle (veli e filamenti sottili)"))
+        .on_hover_text(tr(
+            "Il fumo viaggia su particelle che non si sfumano: veli sottili che si ripiegano e filamenti lunghi (vapore, incenso, sigaretta) invece della nuvola gonfia. Calcolo più lungo",
+        ))
+        .changed();
     egui::Grid::new("fumo-sim").num_columns(2).show(ui, |ui| {
+        if m.particles {
+            changed |= slider(
+                ui,
+                tr("Sorgente a chiazze"),
+                tr("0 = il fumo esce da tutta la sorgente, 1 = da pochi punti che si spostano piano: nastri separati, come il vapore di una tazza"),
+                &mut m.patchiness,
+                0.0..=1.0,
+            );
+        }
         ui.label(tr("Raggio della sorgente"));
         changed |= ui
             .add(egui::Slider::new(&mut m.source_radius, 0.002..=2.0).logarithmic(true).suffix(" m").max_decimals(3))

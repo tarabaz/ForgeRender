@@ -75,6 +75,12 @@ pub struct SmokeSim {
     /// 0–0,4) in cui il fumo si dissolve, così non si ammassa contro il riquadro e non finisce
     /// tagliato netto. 0 = come prima (riquadro pieno fino al bordo). Il fondo non si sfuma.
     pub edge_fade: f32,
+    /// Fumo portato da particelle: veli e filamenti sottili che si ripiegano (vapore, incenso)
+    /// invece della nuvola gonfia del fumo sulla griglia. Più lento da calcolare.
+    pub particles: bool,
+    /// Sorgente a chiazze, 0–1 (solo con le particelle): il fumo esce da pochi punti che si
+    /// spostano piano, in nastri separati.
+    pub patchiness: f32,
 }
 
 /// Celle della simulazione sul lato più lungo per qualità 1–4.
@@ -99,6 +105,8 @@ impl Default for SmokeSim {
             time: 3.0,
             quality: 2,
             edge_fade: 0.2,
+            particles: false,
+            patchiness: 0.0,
         }
     }
 }
@@ -211,7 +219,7 @@ pub struct SmokePreset {
     pub make: fn() -> SmokeCloud,
 }
 
-pub const SMOKE_PRESETS: [SmokePreset; 8] = [
+pub const SMOKE_PRESETS: [SmokePreset; 9] = [
     SmokePreset {
         name: "Nube sospesa",
         hint: "Un ammasso di fumo morbido a mezz'aria, con sbuffi e bordi sfilacciati",
@@ -247,42 +255,78 @@ pub const SMOKE_PRESETS: [SmokePreset; 8] = [
     },
     SmokePreset {
         name: "Vapore da tazza",
-        hint: "Simulazione fisica: vapore bianco e leggero che sale piano dalla tazza in filamenti che si arricciano e svaniscono: il fondo del riquadro va sulla superficie del caffè, la sorgente è larga come la tazza",
-        // Simulato: il vapore è poco caldo e sale piano da tutta la superficie, si arriccia in
-        // filamenti sottili che si staccano e svaniscono presto (non una colonna che si allarga).
+        hint: "Simulazione a particelle: vapore leggero e trasparente che sale piano dalla superficie in nastri separati, si torce e svanisce: il fondo del riquadro va sulla superficie del caffè, la sorgente è larga come la tazza",
+        // Particelle (veli sottili, niente nuvola gonfia), sorgente su tutta la superficie a
+        // chiazze che si spostano (nastri separati), poco caldo e poca densità: trasparente.
         make: || SmokeCloud {
             name: "Vapore".into(),
             mode: SmokeMode::Simulated,
             shape: SmokeShape::Plume,
             size: Vec3::new(0.16, 0.26, 0.16),
-            density: 70.0,
+            density: 2.5,
+            contrast: 1.0,
             color: [0.96, 0.96, 0.96],
             anisotropy: 0.55,
             detail_scale: 0.012,
-            octaves: 6,
-            roughness: 0.6,
-            turbulence: 1.2,
-            billows: 0.1,
-            wisps: 0.95,
-            softness: 0.55,
-            variation: 0.6,
             quality: 3,
             sim: SmokeSim {
                 source_offset: Vec3::new(0.0, 0.008, 0.0),
-                source_radius: 0.035,
+                source_radius: 0.034,
                 emission: 1.2,
                 temperature: 0.7,
-                buoyancy: 2.2,
+                buoyancy: 1.2,
                 weight: 0.0,
                 exit_speed: 0.04,
                 cooling: 1.0,
-                dissipation: 1.1,
-                vorticity: 7.0,
-                turbulence: 2.8,
-                turbulence_scale: 0.02,
-                time: 3.0,
-                quality: 3,
+                dissipation: 0.6,
+                vorticity: 5.0,
+                turbulence: 0.25,
+                turbulence_scale: 0.06,
+                time: 4.0,
+                quality: 2,
                 edge_fade: 0.25,
+                particles: true,
+                patchiness: 0.85,
+                ..SmokeSim::default()
+            },
+            ..Default::default()
+        },
+    },
+    SmokePreset {
+        name: "Incenso o sigaretta",
+        hint: "Simulazione a particelle: un filo sottile e compatto che sale dritto e poi si rompe in lunghi filamenti e veli che si arricciano: il fondo del riquadro va sulla punta del bastoncino o della sigaretta",
+        // Sorgente di un paio di millimetri, fumo caldo che esce veloce (il filo resta dritto e
+        // compatto), poca dissolvenza (filamenti lunghi); il contrasto tiene pieno il filo e
+        // trasparenti i veli.
+        make: || SmokeCloud {
+            name: "Incenso".into(),
+            mode: SmokeMode::Simulated,
+            shape: SmokeShape::Wisp,
+            size: Vec3::new(0.22, 0.46, 0.22),
+            density: 2.5,
+            contrast: 1.8,
+            color: [0.85, 0.87, 0.9],
+            anisotropy: 0.55,
+            detail_scale: 0.012,
+            quality: 4,
+            sim: SmokeSim {
+                source_offset: Vec3::new(0.0, 0.004, 0.0),
+                source_radius: 0.002,
+                emission: 1.0,
+                temperature: 2.0,
+                buoyancy: 10.0,
+                weight: 0.0,
+                exit_speed: 0.3,
+                cooling: 0.3,
+                dissipation: 0.05,
+                vorticity: 5.0,
+                turbulence: 0.3,
+                turbulence_scale: 0.05,
+                time: 5.0,
+                quality: 2,
+                edge_fade: 0.1,
+                particles: true,
+                patchiness: 0.0,
                 ..SmokeSim::default()
             },
             ..Default::default()
@@ -517,6 +561,7 @@ impl SmokeCloud {
         m.time = fin(m.time, 3.0).clamp(0.05, 60.0);
         m.quality = m.quality.clamp(1, 4);
         m.edge_fade = fin(m.edge_fade, 0.2).clamp(0.0, 0.4);
+        m.patchiness = fin(m.patchiness, 0.0).clamp(0.0, 1.0);
         s
     }
 

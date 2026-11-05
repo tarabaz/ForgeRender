@@ -1581,6 +1581,10 @@
     " · solo anteprima, il render non lo calcola": " · preview only, the render does not compute it",
     "Calcolo vero per il render": "Full computation for the render",
     "Spento: il fumo resta solo come anteprima a punti nella viewport (veloce) e il render non fa la simulazione completa. Utile per sistemare posizione, sorgente e come gira attorno agli oggetti; poi lo riaccendi per il render vero": "Off: the smoke stays only as a point preview in the viewport (fast) and the render does not run the full simulation. Useful to set position, source and how it flows around objects; then turn it back on for the real render",
-    "Solo anteprima: nel render questo fumo non c'è finché non riaccendi il calcolo vero.": "Preview only: this smoke is not in the render until you turn the full computation back on."
+    "Solo anteprima: nel render questo fumo non c'è finché non riaccendi il calcolo vero.": "Preview only: this smoke is not in the render until you turn the full computation back on.",
+    "0 = il fumo esce da tutta la sorgente, 1 = da pochi punti che si spostano piano: nastri separati, come il vapore di una tazza": "0 = the smoke comes out of the whole source, 1 = from a few spots that drift slowly: separate ribbons, like the steam from a cup",
+    "Fumo a particelle (veli e filamenti sottili)": "Particle smoke (thin veils and filaments)",
+    "Il fumo viaggia su particelle che non si sfumano: veli sottili che si ripiegano e filamenti lunghi (vapore, incenso, sigaretta) invece della nuvola gonfia. Calcolo più lungo": "The smoke travels on particles that do not blur: thin veils that fold and long filaments (steam, incense, cigarette) instead of a puffy cloud. Longer to compute",
+    "Sorgente a chiazze": "Patchy source"
   }
 }

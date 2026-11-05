@@ -1,4 +1,4 @@
-[package]
+﻿[package]
 name = "forge_cli"
 description = "Rendering da riga di comando e benchmark (senza interfaccia grafica)."
 version.workspace = true
@@ -23,5 +23,6 @@ forge_image_io.workspace = true
 forge_telemetry.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 image.workspace = true

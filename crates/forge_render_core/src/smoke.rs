@@ -97,6 +97,14 @@ pub fn smoke_density_with(s: &SmokeCloud, p: Vec3, field: Option<&SmokeField>) -
     if cut <= 0.0 {
         return 0.0;
     }
+    // Fumo a particelle: il campo ha già veli e filamenti; la densità lo segue in proporzione
+    // (niente soglie né rumore, che lo farebbero pieno e gonfio), con il contrasto per i veli.
+    if let Some(f) = field.filter(|_| s.sim.particles) {
+        // Limite alto: un filo sottile ma concentrato (incenso) deve restare denso, non spianato.
+        let v = (f.sample(p) / f.max.max(1e-6) * s.edge_keep(p)).clamp(0.0, 64.0);
+        let k = if s.contrast.is_finite() { s.contrast.clamp(0.5, 4.0) } else { 1.0 };
+        return s.density * v.powf(k) * smoothstep(0.0, 0.08, box_edge) * cut;
+    }
     let l = s.detail_scale.max(0.002);
     let seed = s.seed;
     let q = rel / l + Vec3::new(17.0, -3.0, 9.0) * (seed % 97) as f32;
@@ -266,6 +274,8 @@ fn simulated_field(s: &SmokeCloud, geo: &RenderGeometry, p0: f32, p1: f32) -> Op
         box_center: s.center,
         box_yaw: s.rotation_deg.to_radians(),
         box_half: s.half(),
+        particles: m.particles,
+        patchiness: m.patchiness,
     };
     let f = simulate_smoke(
         &params,
@@ -284,6 +294,23 @@ fn simulated_field(s: &SmokeCloud, geo: &RenderGeometry, p0: f32, p1: f32) -> Op
         max,
         full
     );
+    if std::env::var_os("FORGE_SMOKE_AXIS").is_some() {
+        let src = s.sim_source();
+        let line: Vec<String> = (0..24)
+            .map(|k| {
+                let y = lo.y + (hi.y - lo.y) * k as f32 / 24.0;
+                let mut best = 0.0f32;
+                for dx in -6..=6 {
+                    for dz in -6..=6 {
+                        let q = Vec3::new(src.x + dx as f32 * 0.002, y, src.z + dz as f32 * 0.002);
+                        best = best.max(f.sample(q));
+                    }
+                }
+                format!("{:.2}:{:.1}", y, best / f.max.max(1e-6))
+            })
+            .collect();
+        tracing::info!("asse del fumo (quota:densità/rif): {}", line.join(" "));
+    }
     let f = Arc::new(f);
     let mut c = sim_cache().lock().unwrap();
     if c.len() > 8 {
@@ -371,6 +398,9 @@ pub fn smoke_preview(s: &SmokeCloud, geo: &RenderGeometry, cancelled: &dyn Fn() 
         box_center: s.center,
         box_yaw: s.rotation_deg.to_radians(),
         box_half: s.half(),
+        // L'anteprima mostra il moto del fumo sulla griglia: le particelle servono al render.
+        particles: false,
+        patchiness: 0.0,
     };
     let mut raw: Vec<(f32, Vec<f32>)> = Vec::new();
     simulate_smoke_frames(

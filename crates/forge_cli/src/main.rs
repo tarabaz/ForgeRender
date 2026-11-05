@@ -108,6 +108,79 @@ fn print_help() {
     );
 }
 
+/// Unisce `patch` in `base`: gli oggetti campo per campo, il resto (numeri, testi, elenchi)
+/// sostituito.
+fn merge_json(base: &mut serde_json::Value, patch: &serde_json::Value) {
+    match (base, patch) {
+        (serde_json::Value::Object(b), serde_json::Value::Object(p)) => {
+            for (k, v) in p {
+                match b.get_mut(k) {
+                    Some(slot) => merge_json(slot, v),
+                    None => {
+                        b.insert(k.clone(), v.clone());
+                    }
+                }
+            }
+        }
+        (b, p) => *b = p.clone(),
+    }
+}
+
+/// `value` con i campi di `patch` sopra.
+fn patched<T: serde::Serialize + serde::de::DeserializeOwned>(value: &T, patch: &serde_json::Value) -> anyhow::Result<T> {
+    let mut v = serde_json::to_value(value)?;
+    merge_json(&mut v, patch);
+    Ok(serde_json::from_value(v)?)
+}
+
+/// `--patch F.json`: prove senza ricompilare. Chiavi ammesse: `camera`, `environment`,
+/// `settings` (uniti ai valori attuali), `lights` (elenco che sostituisce le luci; ogni luce
+/// sopra una luce puntiforme di serie), `smokes` (elenco di nubi che si aggiungono; ognuna sopra
+/// il preset `preset`, nome o parte del nome, o sopra la nube di serie).
+fn apply_patch(scene: &mut Scene, settings: &mut RenderSettings, path: &std::path::Path) -> anyhow::Result<()> {
+    let text = std::fs::read_to_string(path).with_context(|| format!("lettura di {}", path.display()))?;
+    let j: serde_json::Value = serde_json::from_str(&text).with_context(|| format!("JSON non valido: {}", path.display()))?;
+    if let Some(c) = j.get("camera") {
+        scene.camera = patched(&scene.camera, c)?;
+    }
+    if let Some(e) = j.get("environment") {
+        // Un tipo d'ambiente diverso non si unisce a quello di prima: si sostituisce.
+        scene.environment = serde_json::from_value(e.clone())?;
+    }
+    if let Some(s) = j.get("settings") {
+        *settings = patched(settings, s)?;
+    }
+    if let Some(serde_json::Value::Array(ls)) = j.get("lights") {
+        scene.lights = ls
+            .iter()
+            .map(|l| patched(&forge_scene::Light::point("Luce", forge_math::Vec3::ZERO, 1.0), l))
+            .collect::<anyhow::Result<_>>()?;
+    }
+    if let Some(serde_json::Value::Array(ss)) = j.get("smokes") {
+        for s in ss {
+            let base = match s.get("preset").and_then(|p| p.as_str()) {
+                Some(k) => {
+                    let k = k.to_lowercase();
+                    let p = forge_scene::SMOKE_PRESETS
+                        .iter()
+                        .find(|p| p.name.to_lowercase().contains(&k))
+                        .ok_or_else(|| anyhow::anyhow!("--patch: preset del fumo sconosciuto «{k}»"))?;
+                    (p.make)()
+                }
+                None => forge_scene::SmokeCloud::default(),
+            };
+            let mut s = s.clone();
+            if let Some(o) = s.as_object_mut() {
+                o.remove("preset");
+            }
+            let mut cloud: forge_scene::SmokeCloud = patched(&base, &s)?;
+            cloud.n = scene.smokes.iter().map(|c| c.n).max().unwrap_or(0) + 1;
+            scene.smokes.push(cloud);
+        }
+    }
+    Ok(())
+}
+
 fn load_scene(args: &Args) -> anyhow::Result<(Scene, RenderSettings)> {
     if let Some(p) = args.value("--project") {
         let l = forge_project::load(&PathBuf::from(p))?;
@@ -342,6 +415,9 @@ fn render(args: &Args) -> anyhow::Result<()> {
             scene.haze_dust.region = Some(scene.default_dust_region());
         }
         scene.sync_effects();
+    }
+    if let Some(p) = args.value("--patch") {
+        apply_patch(&mut scene, &mut settings, &PathBuf::from(p))?;
     }
     let out = PathBuf::from(args.value("--out").unwrap_or("render.png"));
     let t_compile = Instant::now();
