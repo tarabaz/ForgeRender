@@ -147,6 +147,7 @@ mod tests {
             outline: None,
             depth: None,
             tilt: Default::default(),
+            glow: None,
         };
         for f in ExportFormat::ALL {
             let p = dir.join(format!("t.{}", f.extensions()[0]));

@@ -715,6 +715,41 @@ pub struct RenderScene {
     pub fogs: Vec<Arc<forge_volume::BakedFog>>,
     /// Laser con il percorso del fascio già calcolato (vedi [`crate::laser`]).
     pub lasers: Arc<Vec<crate::laser::RenderLaser>>,
+    /// Granelli luminosi della polvere e il loro alone (vedi [`crate::glow`]).
+    pub glow_points: Arc<Vec<crate::glow::GlowPoint>>,
+    /// Alone: grandezza in diametri del granello e forza (0 = niente alone).
+    pub glow_size: f32,
+    pub glow_strength: f32,
+}
+
+/// Granelli luminosi della polvere: centro, diametro e luce di ognuno, dai vertici dei nodi
+/// `effetto:polvere:luce:<n>` (ogni granello ha i vertici della sua forma, uno dopo l'altro).
+fn glow_points(scene: &Scene) -> Vec<crate::glow::GlowPoint> {
+    let d = &scene.haze_dust;
+    if !d.enabled || d.glow.is_empty() || d.halo_strength <= 0.0 || d.halo_size <= 0.0 {
+        return Vec::new();
+    }
+    let per = if d.shape == forge_scene::DustShape::Flakes { 6 } else { 12 };
+    let mut out = Vec::new();
+    for (k, g) in d.glow.iter().enumerate() {
+        let id = forge_scene::ComponentId(forge_scene::effects::dust_glow_id(k));
+        let Some(i) = scene.find(&id).filter(|&i| scene.is_visible(i)) else {
+            continue;
+        };
+        let Some(m) = scene.nodes[i].mesh else { continue };
+        let xf = scene.world_transform(i);
+        let emission = Vec3::from_array(g.color) * g.intensity.max(0.0);
+        for chunk in scene.meshes[m].positions.chunks_exact(per) {
+            let c = chunk.iter().fold(Vec3::ZERO, |a, p| a + *p) / per as f32;
+            let r = chunk.iter().map(|p| (*p - c).length()).fold(0.0f32, f32::max);
+            out.push(crate::glow::GlowPoint {
+                center: xf.transform_point3(c),
+                diameter: 2.0 * r,
+                emission,
+            });
+        }
+    }
+    out
 }
 
 /// Nodi di pavimenti, fondali e pareti: gli oggetti aggiunti di quel tipo e il pavimento della
@@ -894,6 +929,9 @@ impl RenderScene {
             camera: scene.render_camera().clone(),
             portals,
             lasers: Arc::new(Vec::new()),
+            glow_points: Arc::new(glow_points(scene)),
+            glow_size: scene.haze_dust.halo_size.max(0.0),
+            glow_strength: scene.haze_dust.halo_strength.max(0.0),
         };
         // Percorsi dei fasci laser (servono geometria e materiali già compilati).
         if scene.lights.iter().any(|l| l.enabled && matches!(l.kind, LightKind::Laser { .. })) {
@@ -927,6 +965,9 @@ impl RenderScene {
             node_frames: self.node_frames.clone(),
             fogs: self.fogs.clone(),
             lasers: self.lasers.clone(),
+            glow_points: self.glow_points.clone(),
+            glow_size: self.glow_size,
+            glow_strength: self.glow_strength,
         }
     }
 

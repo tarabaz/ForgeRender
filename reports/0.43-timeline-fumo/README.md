@@ -45,6 +45,20 @@ di partenza è 3.
 
 ![Polvere luminosa](polvere_luminosa.jpg)
 
+### Alone delle lucciole
+
+**Alone** e **Forza dell'alone** aggiungono attorno a ogni granello luminoso un bagliore del suo
+colore: un nucleo largo quanto il granello e una coda tenue tre volte più larga, che sfuma a zero.
+Si aggiunge all'immagine finita, uguale su CPU e GPU, e un granello coperto da un oggetto non fa
+alone. Nella viewport non si vede.
+
+Da sinistra:
+1. senza alone;
+2. alone di partenza (grandezza 6, forza 1);
+3. grandezza 12 e forza 1,5.
+
+![Lucciole](lucciole.jpg)
+
 ## 3. Timeline
 
 **Come si accende:**

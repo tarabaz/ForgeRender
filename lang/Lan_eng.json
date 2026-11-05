@@ -1697,6 +1697,10 @@
     "Rotazione HDRI": "HDRI rotation",
     "Simulazione a particelle: vapore leggero e trasparente che sale piano dalla superficie in nastri separati, si torce e svanisce: il fondo del riquadro va sulla superficie del caffè, la sorgente è larga come la tazza": "Particle simulation: light, transparent steam rising slowly from the surface in separate ribbons that twist and fade: the bottom of the box goes on the surface of the coffee, the source is as wide as the cup",
     "Incenso o sigaretta": "Incense or cigarette",
-    "Simulazione a particelle: un filo sottile e compatto che sale dritto e poi si rompe in lunghi filamenti e veli che si arricciano: il fondo del riquadro va sulla punta del bastoncino o della sigaretta": "Particle simulation: a thin, compact thread rising straight and then breaking into long filaments and curling veils: the bottom of the box goes on the tip of the stick or cigarette"
+    "Simulazione a particelle: un filo sottile e compatto che sale dritto e poi si rompe in lunghi filamenti e veli che si arricciano: il fondo del riquadro va sulla punta del bastoncino o della sigaretta": "Particle simulation: a thin, compact thread rising straight and then breaking into long filaments and curling veils: the bottom of the box goes on the tip of the stick or cigarette",
+    "Alone": "Halo",
+    "Grandezza del bagliore attorno ai granelli luminosi, come lucciole (in diametri del granello: 0 = niente alone). Si vede nel render, non nella viewport": "Size of the glow around the glowing specks, like fireflies (in speck diameters: 0 = no halo). Visible in the render, not in the viewport",
+    "Forza dell'alone": "Halo strength",
+    "Quanto è luminoso il bagliore (0 = niente, 1 = normale)": "How bright the glow is (0 = none, 1 = normal)"
   }
 }

@@ -14,6 +14,7 @@ mod denoise;
 pub mod displace;
 pub mod env_map;
 pub mod fog;
+pub mod glow;
 pub mod laser;
 pub mod outline;
 mod render_scene;

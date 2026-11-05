@@ -22,7 +22,7 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 - **Timeline (animation):** keys with six interpolations, modifiers (wiggle, oscillation, continuous ramp, loop, ping-pong, offset, multiply, limits, stepped), position, rotation, scale and opacity of objects, lights, camera and effects; it sits at the bottom in place of the console (Console | Timeline tabs) or in its own window; animation render to PNG frames and MP4. Off by default (Features menu), it turns on by itself with an effect computed over time.
 - **Particle smoke:** thin veils and long filaments that fold instead of a puffy cloud: new *Steam from a cup* (transparent ribbons rising from the coffee) and *Incense or cigarette* presets.
-- **Glowing dust:** some specks light up in colours you choose with +, each with its own intensity and share.
+- **Glowing dust and fireflies:** some specks light up in colours you choose with +, each with its own intensity and share, with an adjustable halo around them.
 - **Object opacity:** a fading object, shadows included, on CPU and GPU.
 - **Interface:** colour picker fixed (the colour square was blank) and used by every colour button; the quick bar no longer overlaps in a narrow window and AI MCP is a double button at the far right; reopened library and material editor windows come back to the front; turning the view no longer restarts a running dry-ice or smoke simulation.
 
@@ -185,7 +185,7 @@ Real specks (a few millimetres, up to 150,000) scattered in the air, as their ow
 
 - **Size variation:** how much the size of each speck differs at random from the set size, from all the same to tiny-to-triple.
 - **Two colours and opacity:** a second colour with the share of specks that take it (for example gold and white), and an opacity that makes them semi-transparent: they scatter less light and, if they cast shadows, block only part of it.
-- **Glowing specks:** with **+** you choose a colour: part of the specks lights up in that colour, like fireflies or sparks, and is visible also outside the spot beams (it is ordinary geometry that emits light and lights what is around it). Each colour has its intensity and its share of specks; low intensities keep the colour, high ones turn white like a bulb seen straight on.
+- **Glowing specks:** with **+** you choose a colour: part of the specks lights up in that colour, like fireflies or sparks, and is visible also outside the spot beams (it is ordinary geometry that emits light and lights what is around it). Each colour has its intensity and its share of specks; low intensities keep the colour, high ones turn white like a bulb seen straight on. **Halo** and **halo strength** add a soft glow around each glowing speck the camera sees, like fireflies: a bright core as wide as the speck and a faint tail three times wider, fading to nothing, of the speck's colour. It is added to the finished image (before the tilt-shift), the same on CPU and GPU; a speck hidden by an object has no halo, and the viewport does not show it.
 - **Grains or flakes (fairy dust):** *Grains* are round and scatter the light evenly. *Flakes* are flat and face random directions: they reflect like tiny mirrors, so only those turned the right way between the light and the camera sparkle while the others stay dark, like glitter or fairy dust. **Sparkle** sets how much light the flakes reflect like a mirror, **reflection roughness** how small and intense (low) or wide and soft (high) the sparkles are. The same on CPU and GPU.
 
 ### 8. Decals — labels and logos on any surface

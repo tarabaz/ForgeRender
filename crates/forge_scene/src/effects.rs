@@ -364,6 +364,10 @@ pub struct Dust {
     pub flake_roughness: f32,
     /// Granelli luminosi: ogni colore prende la sua parte di granelli, che emettono luce.
     pub glow: Vec<DustGlow>,
+    /// Alone dei granelli luminosi (lucciole): grandezza in diametri del granello (0 = niente).
+    pub halo_size: f32,
+    /// Forza dell'alone (0 = niente, 1 = normale).
+    pub halo_strength: f32,
 }
 
 impl Default for Dust {
@@ -385,6 +389,8 @@ impl Default for Dust {
             sparkle: 0.8,
             flake_roughness: 0.08,
             glow: Vec::new(),
+            halo_size: 6.0,
+            halo_strength: 1.0,
         }
     }
 }

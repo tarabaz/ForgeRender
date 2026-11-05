@@ -120,6 +120,8 @@ pub struct Frame {
     /// Tilt-shift da applicare (quello del render; l'interfaccia lo sostituisce con
     /// [`Frame::with_tilt`] per vedere subito le modifiche).
     pub tilt: crate::tiltshift::TiltShift,
+    /// Alone dei granelli luminosi (vedi [`crate::glow`]).
+    pub glow: Option<Arc<crate::glow::Glow>>,
 }
 
 /// Diagnostica del campionamento adattivo: dove sono finiti i campioni e quanta parte è
@@ -143,6 +145,11 @@ impl Frame {
         let img = match &self.outline {
             Some(o) if o.coverage.len() == img.len() => std::borrow::Cow::Owned(o.apply(&img)),
             _ => img,
+        };
+        // Alone delle lucciole prima del tilt-shift (che lo sfoca con il resto).
+        let img = match &self.glow {
+            Some(g) => std::borrow::Cow::Owned(g.apply(&img)),
+            None => img,
         };
         if self.tilt.enabled {
             let depth = self.depth.as_deref();
@@ -369,6 +376,8 @@ impl Drop for RenderSession {
 
 struct Active {
     job: Job,
+    /// Alone dei granelli luminosi per questo render.
+    glow: Option<Arc<crate::glow::Glow>>,
     accum: Accumulator,
     pass: Vec<[f32; 3]>,
     running_since: Option<Instant>,
@@ -512,6 +521,7 @@ fn worker(rx: Receiver<Cmd>, tx: Sender<Cmd>, shared: Arc<Shared>) {
             outline: a.outline.clone(),
             depth: a.depth.clone(),
             tilt: a.job.settings.tilt_shift,
+            glow: a.glow.clone(),
             adaptive: a.mask.as_ref().map(|_| {
                 Arc::new(AdaptiveDiag {
                     counts: a.accum.counts().to_vec(),
@@ -626,9 +636,11 @@ fn worker(rx: Receiver<Cmd>, tx: Sender<Cmd>, shared: Arc<Shared>) {
                             }
                         }
                     }
+                    let glow = crate::glow::compute(&job.scene, w, h).map(Arc::new);
                     let a = Active {
                         outline,
                         depth,
+                        glow,
                         pass: vec![[0.0; 3]; accum.pixel_count()],
                         accum,
                         job: Job { resume: None, ..job },

@@ -23,6 +23,7 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - CLI `--patch F.json` (camera, environment, settings, lights, smokes, dust, materials) for tests without recompiling.
 
 **Glowing dust**
+- Firefly halo: `Dust::halo_size` (in speck diameters, 6 by default) and `halo_strength`; `RenderScene::glow_points` (centre, diameter and emission of every glowing speck, from its vertices); `forge_render_core::glow`: at the start of the render the specks are projected with the render camera (perspective or orthographic, with shift) and the ones hidden by an object are dropped; `Frame::display` adds a core gaussian plus a tail three times wider, fading to zero at 9σ, before the tilt-shift. Test `glow_adds_a_soft_disc_around_the_point`.
 - `Dust::glow` (`DustGlow`: colour, intensity, share): the specks of each colour go in their own node `effetto:polvere:luce:<n>` with an emissive material; `is_any_dust_id`; test `glowing_dust_gets_its_own_emissive_nodes`. Dust panel: "Glowing specks" with +.
 
 **Interface**

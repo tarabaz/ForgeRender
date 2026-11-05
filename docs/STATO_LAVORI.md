@@ -796,3 +796,7 @@ Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
 - Timeline (`forge_scene/src/timeline.rs`, `forge_app/src/ui/timeline.rs`): modello, applicazione, chiavi registrate dalle modifiche dell'utente, effetti che seguono il cursore, pannello in basso o staccato, render dell'animazione. Opacità del materiale (`Material::opacity`, CPU e GPU, `MAT_WORDS` 37).
 - Barra rapida senza sovrapposizioni e AI MCP doppio; libreria ed editor riportati davanti.
 - Da sapere: il render dell'animazione rifà la simulazione del fumo a ogni fotogramma (corretto ma lento); l'opacità è stocastica e a pochi campioni resta granulosa; render dell'animazione e finestra staccata non provati a mano (solo screenshot del pannello con `--timeline-demo`).
+
+## 0.43.0 (aggiunta) — 05/11/2026 (Claude)
+
+- Alone delle lucciole sui granelli luminosi (`forge_render_core/src/glow.rs`): post-produzione sull'immagine finita, granelli proiettati con la camera del render e scartati se coperti; `Dust::halo_size`, `halo_strength`; cursori Alone e Forza dell'alone nel pannello Polvere. Non si vede nella viewport.

@@ -26,6 +26,7 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - CLI `--patch F.json` (camera, ambiente, impostazioni, luci, fumi, polvere, materiali) per le prove senza ricompilare.
 
 **Polvere luminosa**
+- Alone delle lucciole: `Dust::halo_size` (in diametri del granello, 6 di serie) e `halo_strength`; `RenderScene::glow_points` (centro, diametro e luce di ogni granello luminoso, dai suoi vertici); `forge_render_core::glow`: all'avvio del render i granelli si proiettano con la camera del render (prospettica o ortografica, con il decentramento) e si scartano quelli coperti da un oggetto; `Frame::display` aggiunge una gaussiana del nucleo più una coda tre volte più larga, che va a zero a 9σ, prima del tilt-shift. Test `glow_adds_a_soft_disc_around_the_point`.
 - `Dust::glow` (`DustGlow`: colore, intensità, parte): i granelli di ogni colore vanno in un nodo `effetto:polvere:luce:<n>` con un materiale emissivo; `is_any_dust_id`; test `glowing_dust_gets_its_own_emissive_nodes`. Pannello Polvere: "Granelli luminosi" con +.
 
 **Interfaccia**

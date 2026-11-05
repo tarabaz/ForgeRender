@@ -642,6 +642,24 @@ fn dust(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 dust.glow.remove(k);
                 changed = true;
             }
+            if !dust.glow.is_empty() {
+                egui::Grid::new("polvere-alone").num_columns(2).show(ui, |ui| {
+                    ui.label(tr("Alone"));
+                    changed |= ui
+                        .add(egui::Slider::new(&mut dust.halo_size, 0.0..=30.0).max_decimals(1))
+                        .on_hover_text(tr(
+                            "Grandezza del bagliore attorno ai granelli luminosi, come lucciole (in diametri del granello: 0 = niente alone). Si vede nel render, non nella viewport",
+                        ))
+                        .changed();
+                    ui.end_row();
+                    ui.label(tr("Forza dell'alone"));
+                    changed |= ui
+                        .add(egui::Slider::new(&mut dust.halo_strength, 0.0..=5.0).max_decimals(2))
+                        .on_hover_text(tr("Quanto è luminoso il bagliore (0 = niente, 1 = normale)"))
+                        .changed();
+                    ui.end_row();
+                });
+            }
         });
     if select {
         app.selected_dust = true;
