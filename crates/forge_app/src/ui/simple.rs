@@ -210,7 +210,7 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
         .on_hover_text(tr("Clic su un materiale: lo applica ai pezzi selezionati"))
         .clicked()
     {
-        app.library.open = true;
+        app.library.show();
     }
 }
 

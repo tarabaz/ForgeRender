@@ -37,6 +37,8 @@ struct Preview {
 #[derive(Default)]
 pub struct MaterialEditorUi {
     pub open: bool,
+    /// Da riportare davanti (vedi [`crate::ui::detachable`]).
+    pub raise: bool,
     source: Option<Source>,
     original: Option<Material>,
     edited: Option<Material>,
@@ -65,6 +67,7 @@ impl MaterialEditorUi {
         self.preview = Preview::default();
         self.status = None;
         self.open = true;
+        self.raise = true;
     }
 
     /// Nome del materiale aperto nella scheda (la libreria lo mostra con "Applica alla selezione").
@@ -196,7 +199,8 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
         .map(|m| tf("Modifica materiale: {}", std::slice::from_ref(&m.name)))
         .unwrap_or_else(|| tr("Modifica materiale").to_string());
     let docked = app.material_editor.docked;
-    crate::ui::detachable(ctx, "win-modifica-materiale", &title, [980.0, 680.0], docked, &mut open, |ui| {
+    let raise = std::mem::take(&mut app.material_editor.raise);
+    crate::ui::detachable(ctx, "win-modifica-materiale", &title, [980.0, 680.0], docked, raise, &mut open, |ui| {
         body(app, ui, &mut action)
     });
     app.material_editor.open = open;

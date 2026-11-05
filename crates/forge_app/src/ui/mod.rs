@@ -339,13 +339,16 @@ impl ForgeApp {
 /// Finestra che si può staccare dal programma. `docked`: sopra la scena, come prima; altrimenti
 /// in una finestra del sistema a parte, che si sposta anche fuori dal programma o su un altro
 /// schermo (se il sistema non permette più finestre resta dentro). `open` diventa falso quando la
-/// si chiude.
+/// si chiude. `raise`: riportarla davanti (riaperta mentre era già aperta: una finestra a parte
+/// finita dietro al programma non torna davanti da sola).
+#[allow(clippy::too_many_arguments)]
 pub fn detachable(
     ctx: &egui::Context,
     id: &str,
     title: &str,
     size: [f32; 2],
     docked: bool,
+    raise: bool,
     open: &mut bool,
     mut body: impl FnMut(&mut egui::Ui),
 ) {
@@ -358,8 +361,16 @@ pub fn detachable(
             .show(ctx, |ui| body(ui));
     };
     if docked {
+        if raise {
+            ctx.move_to_top(egui::LayerId::new(egui::Order::Middle, egui::Id::NULL.with(id)));
+        }
         window(ctx, open, &mut body);
         return;
+    }
+    if raise {
+        let vid = egui::ViewportId::from_hash_of(id);
+        ctx.send_viewport_cmd_to(vid, egui::ViewportCommand::Minimized(false));
+        ctx.send_viewport_cmd_to(vid, egui::ViewportCommand::Focus);
     }
     let builder = egui::ViewportBuilder::default().with_title(title).with_inner_size(size);
     ctx.show_viewport_immediate(egui::ViewportId::from_hash_of(id), builder, |ui, class| {

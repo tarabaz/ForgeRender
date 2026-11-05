@@ -237,7 +237,7 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
             .on_hover_text(tr("Tutti i materiali: libreria ufficiale e scaricati"))
             .clicked()
         {
-            app.library.open = true;
+            app.library.show();
         }
     });
     let ctx = ui.ctx().clone();

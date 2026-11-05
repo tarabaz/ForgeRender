@@ -58,6 +58,8 @@ enum Thumb {
 
 pub struct LibraryUi {
     pub open: bool,
+    /// Da riportare davanti (aperta di nuovo mentre era già aperta, magari dietro al programma).
+    pub raise: bool,
     /// Dentro la finestra del programma invece che in una finestra a parte.
     pub docked: bool,
     tab: Tab,
@@ -88,8 +90,14 @@ pub struct LibraryUi {
 impl LibraryUi {
     /// Apre la finestra sulla scheda "La mia libreria" (`online` = false) o "Online".
     pub fn open_on(&mut self, online: bool) {
-        self.open = true;
+        self.show();
         self.tab = if online { Tab::Online } else { Tab::Mine };
+    }
+
+    /// Apre la finestra, o la riporta davanti se è già aperta.
+    pub fn show(&mut self) {
+        self.open = true;
+        self.raise = true;
     }
 }
 
@@ -98,6 +106,7 @@ impl Default for LibraryUi {
         let (tx, rx) = channel();
         Self {
             open: false,
+            raise: false,
             docked: false,
             tab: Tab::Mine,
             provider: Provider::AmbientCg,
@@ -219,7 +228,7 @@ fn scaled_thumb(img: image::RgbaImage, size: u32) -> image::RgbaImage {
 impl LibraryUi {
     /// Apre la finestra sulla ricerca di HDRI online (Poly Haven).
     pub fn open_hdri_tab(&mut self) {
-        self.open = true;
+        self.show();
         self.tab = Tab::Online;
         self.provider = Provider::PolyHaven;
         self.kind = AssetKind::Hdri;
@@ -564,12 +573,14 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
     }
     let mut open = true;
     let docked = app.library.docked;
+    let raise = std::mem::take(&mut app.library.raise);
     crate::ui::detachable(
         ctx,
         "win-libreria-materiali-e-hdri",
         tr("Libreria materiali e HDRI"),
         [860.0, 600.0],
         docked,
+        raise,
         &mut open,
         |ui| {
             crate::ui::dock_button(ui, &mut app.library.docked);
