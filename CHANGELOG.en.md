@@ -10,6 +10,30 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.44.0 — 6 Nov 2026
+
+**Smoke computed once over the timeline**
+- `forge_render_core::smoke_bake`: the simulation runs once over the duration and leaves in the temporary folder a sparse 8-bit file per frame and the complete state (`SimState`) once per second; each frame has a cumulative fingerprint (objects inside the box, emission on or off) and a change resumes from the last state before the first different frame. Tests `only_what_changed_is_computed_again`, `resuming_from_a_state_gives_the_same_smoke` (bit-identical, grid and particles). On a test scene: 60 frames 6.3 s, another frame 1 s, change from second 1 resumed from frame 25, 176 MB.
+- `simulate_bake`: steps tied to the frames, independent of the duration.
+- Viewport preview of the smoke over the whole duration, shown at the playhead instead of being recomputed.
+
+**Air displacement**
+- `SmokeSim::air_push` (on by default): animated objects are voxelized once in their space, brought into the grid with their matrix at every step and used as moving boundaries (u·n = u_solid·n in the projection, air in solid cells moves with them, smoke pushed out of the cells they enter). Test `a_moving_solid_pushes_the_air`.
+
+**Start and stop of the emission**
+- `Timeline::stops`, `SmokeSim::emit_stop`, `FogVolume::emit_stop`: after the stop the source is off and what came out keeps living. Test `emission_stops_but_the_smoke_lives_on`.
+
+**Timeline**
+- Always on (Features menu removed), Timeline | Console tabs; rows for position, rotation, target, colour and scale per axis (`Target::rows`): a key goes on every axis of the row, also when recorded by the gizmo.
+- Key selection: click, Ctrl/Shift, rectangle, group drag, Delete, Ctrl+C/V, F9, Esc (`Timeline::shift_keys`, `settle_keys`, `delete_keys`, `set_keys_interp`, `copy_keys`, `paste_keys`). X Y Z letters on modifiers.
+- Work area bar (`work_in`, `work_out`); Save animation: render of every frame or viewport preview (`ViewportRenderer::capture`), from the viewport or a camera, in a new folder inside Rendering, with optional MP4; Play in the Render view with adjustable samples per frame.
+- Time controls hidden in the smoke panel (`SHOW_TIME_CONTROLS`).
+
+**Fixes and performance**
+- Viewport: vertices in object space and matrices in a storage buffer read by the vertex shader; `transforms_changed` updates only the matrices (about 185 fps on the 100,000-triangle test scene during playback).
+- Endless "BVH building": Play in the Render view chased a geometry revision that changed every frame (Render view Play now advances when the frame is done) and a value clamped by the scene (scale 0, opacity over 100 %) was written again every frame (test `a_clamped_value_settles`).
+- `prefs::rendering_dir`: `Rendering` next to the program, or in Documents\ForgeRender if it is read-only, default for saving and exporting.
+
 ## 0.43.0 — 5 Nov 2026
 
 **Timeline (animation)**

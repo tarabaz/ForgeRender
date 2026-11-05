@@ -161,6 +161,13 @@ fn apply_patch(scene: &mut Scene, settings: &mut RenderSettings, path: &std::pat
             scene.materials.upsert(patched(&cur, m)?);
         }
     }
+    // "timeline": animazione; si applica all'istante `time` (come il cursore nel programma).
+    if let Some(t) = j.get("timeline") {
+        let mut tl = patched(&scene.timeline, t)?;
+        tl.adopt_effects(scene);
+        tl.apply(scene);
+        scene.timeline = tl;
+    }
     if let Some(d) = j.get("dust") {
         scene.haze_dust = patched(&scene.haze_dust, d)?;
         scene.sync_effects();

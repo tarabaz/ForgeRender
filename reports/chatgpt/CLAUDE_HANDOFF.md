@@ -2906,3 +2906,10 @@ Richieste di Valerio: "Sostituisci materiale" (tutti i componenti con un materia
 ## 0.43.0 (aggiunta) — 05/11/2026 (Claude)
 
 - Alone delle lucciole sui granelli luminosi (`forge_render_core/src/glow.rs`): post-produzione sull'immagine finita, granelli proiettati con la camera del render e scartati se coperti; `Dust::halo_size`, `halo_strength`; cursori Alone e Forza dell'alone nel pannello Polvere. Non si vede nella viewport.
+
+## 0.44.0 — 06/11/2026 (Claude)
+
+- Fumo precalcolato su file temporanei con ripresa dal primo fotogramma cambiato (`forge_render_core/src/smoke_bake.rs`, `simulate_bake` in `forge_volume/src/smoke_sim.rs`); solidi in movimento con la loro velocità (`air_push`); stop dell'emissione per fumo e ghiaccio secco.
+- Timeline sempre attiva, righe unite, selezione delle chiavi, area di lavoro, Salva animazione (render o anteprima viewport, da viewport o camera), Play nel Render a pochi campioni.
+- Viewport: matrici in uno storage buffer, `transforms_changed` non ricarica la geometria. Cartella Rendering (`prefs::rendering_dir`).
+- Da sapere: il ghiaccio secco ha lo stop ma non ha ancora precalcolo né spostamento d'aria (si ricalcola da zero per istante). Una nube spostata con la timeline (centro animato) rifà il precalcolo a ogni posizione. Non provati a mano: selezione col mouse, trascinamento dell'area di lavoro, cattura dell'anteprima.

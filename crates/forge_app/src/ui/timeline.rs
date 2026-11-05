@@ -852,6 +852,7 @@ enum Action {
     DeleteSelected,
     SetInterp(Interp),
     SetStart(Target, f32),
+    SetStop(Target, Option<f32>),
 }
 
 /// Posizione di una chiave sullo schermo, per il rettangolo di selezione.
@@ -959,6 +960,10 @@ fn rows(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale) {
             }
             Action::SetInterp(interp) => tl.set_keys_interp(&app.timeline_ui.selection, interp),
             Action::SetStart(t, s) => tl.set_start(&t, tl.snap(s.max(0.0))),
+            Action::SetStop(t, s) => {
+                let s = s.map(|v| tl.snap(v));
+                tl.set_stop(&t, s);
+            }
         }
     }
     for (t, p, v) in push_scene {
@@ -1111,6 +1116,23 @@ fn element_rows(
             {
                 actions.push(Action::SetStart(target.clone(), start));
             }
+            // Fine dell'emissione: 0 = emette sempre.
+            let mut stop = app.scene.timeline.stop_of(target).unwrap_or(0.0);
+            if lui
+                .add(
+                    egui::DragValue::new(&mut stop)
+                        .range(0.0..=3600.0)
+                        .speed(0.02)
+                        .prefix(tr("stop "))
+                        .suffix(" s"),
+                )
+                .on_hover_text(tr(
+                    "Quando la sorgente smette di emettere (0 = mai): quello che è uscito non sparisce, continua a muoversi e a dissolversi da solo",
+                ))
+                .changed()
+            {
+                actions.push(Action::SetStop(target.clone(), (stop > 0.0).then_some(stop)));
+            }
         }
         // Colonna del tempo: barra dell'effetto (dal suo inizio) o fascia dell'elemento.
         let (rect, resp) = lane(app, ui, scale, is_effect);
@@ -1122,7 +1144,11 @@ fn element_rows(
             let x1 = s.x(app.scene.timeline.duration).min(rect.right());
             if x1 > x0 {
                 let bar = egui::Rect::from_min_max(egui::pos2(x0, rect.top() + 3.0), egui::pos2(x1, rect.bottom() - 3.0));
-                painter.rect_filled(bar, 3.0, style::ACCENT.gamma_multiply(0.45));
+                painter.rect_filled(bar, 3.0, style::ACCENT.gamma_multiply(0.2));
+                // Parte piena: la sorgente emette. Dopo lo stop il fumo vive da solo.
+                let stop_x = app.scene.timeline.stop_of(target).map(|v| s.x(v).clamp(x0, x1)).unwrap_or(x1);
+                let emitting = egui::Rect::from_min_max(bar.min, egui::pos2(stop_x, bar.max.y));
+                painter.rect_filled(emitting, 3.0, style::ACCENT.gamma_multiply(0.55));
                 painter.text(
                     bar.left_center() + egui::vec2(4.0, 0.0),
                     egui::Align2::LEFT_CENTER,

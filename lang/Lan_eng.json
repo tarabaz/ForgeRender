@@ -1704,6 +1704,10 @@
     "Su quali assi agisce il modificatore": "Which axes the modifier acts on",
     "Trascina per spostare l'area da riprodurre e salvare": "Drag to move the area to play and save",
     "Scala per asse": "Scale per axis",
-    "Play nella vista Render: ogni fotogramma si calcola con questi campioni e si passa al successivo. Va più lento del tempo reale, ma si vede l'animazione renderizzata": "Play in the Render view: each frame is computed with these samples and then the next one follows. It runs slower than real time, but you see the rendered animation"
+    "Play nella vista Render: ogni fotogramma si calcola con questi campioni e si passa al successivo. Va più lento del tempo reale, ma si vede l'animazione renderizzata": "Play in the Render view: each frame is computed with these samples and then the next one follows. It runs slower than real time, but you see the rendered animation",
+    "Spostamento d'aria degli oggetti animati": "Air displacement from animated objects",
+    "Gli oggetti animati spingono davvero l'aria: nelle equazioni del fluido sono bordi che si muovono con la loro velocità, quindi la massa d'aria e il fumo si spostano e dietro nascono scia e vortici. Spento: il fumo si adatta attorno all'oggetto senza essere spinto": "Animated objects really push the air: in the fluid equations they are boundaries moving at their own velocity, so the air mass and the smoke are displaced and a wake and vortices form behind them. Off: the smoke adapts around the object without being pushed",
+    "stop ": "stop ",
+    "Quando la sorgente smette di emettere (0 = mai): quello che è uscito non sparisce, continua a muoversi e a dissolversi da solo": "When the source stops emitting (0 = never): what has come out does not vanish, it keeps moving and fading by itself"
   }
 }

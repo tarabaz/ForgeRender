@@ -17,7 +17,9 @@ use crate::RenderGeometry;
 use forge_math::Vec3;
 use forge_scene::{Scene, SmokeCloud, SmokeMode, SmokeShape};
 use forge_volume::noise::{fbm, fbm_gain, gradient};
-use forge_volume::smoke_sim::{simulate_smoke, simulate_smoke_frames, SmokeField, SmokeSimParams};
+#[cfg(test)]
+use forge_volume::smoke_sim::simulate_smoke;
+use forge_volume::smoke_sim::{simulate_smoke_frames, SmokeField, SmokeSimParams};
 use forge_volume::{progress, BakedFog, GridSpec};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -223,37 +225,19 @@ fn key(s: &SmokeCloud, geo: &RenderGeometry) -> String {
     format!("{k:?}|{}", if s.collisions { geo.id } else { 0 })
 }
 
+#[cfg(test)]
 type SimCache = Mutex<HashMap<String, Arc<SmokeField>>>;
 
+#[cfg(test)]
 fn sim_cache() -> &'static SimCache {
     static C: OnceLock<SimCache> = OnceLock::new();
     C.get_or_init(Default::default)
 }
 
-/// Simulazione della nube (dalla cache o calcolata qui, avanzamento da `p0` a `p1` sulla barra).
-fn simulated_field(s: &SmokeCloud, geo: &RenderGeometry, p0: f32, p1: f32) -> Option<Arc<SmokeField>> {
-    let (lo, hi) = s.bounds();
-    let k = format!(
-        "{:?}|{:?}|{:?}|{}|{}|{}",
-        s.sim,
-        lo,
-        hi,
-        s.rotation_deg,
-        s.seed,
-        if s.collisions { geo.id } else { 0 }
-    );
-    if let Some(f) = sim_cache().lock().unwrap().get(&k) {
-        return Some(f.clone());
-    }
-    let cells = s.sim_cells();
-    let spec = GridSpec::covering(lo, hi, cells);
-    let solid = (s.collisions && !geo.accel.is_empty()).then(|| {
-        let shell = voxelize(geo, &spec);
-        let inside = interior_cells(geo, &spec, &shell);
-        shell.iter().zip(&inside).map(|(a, b)| *a || *b).collect::<Vec<bool>>()
-    });
+/// Parametri della simulazione di una nube sulla griglia `spec`.
+pub(crate) fn sim_params(s: &SmokeCloud, spec: GridSpec) -> SmokeSimParams {
     let m = &s.sim;
-    let params = SmokeSimParams {
+    SmokeSimParams {
         spec,
         source: s.sim_source(),
         source_radius: m.source_radius,
@@ -276,7 +260,34 @@ fn simulated_field(s: &SmokeCloud, geo: &RenderGeometry, p0: f32, p1: f32) -> Op
         box_half: s.half(),
         particles: m.particles,
         patchiness: m.patchiness,
-    };
+        emit_stop: m.emit_stop,
+    }
+}
+
+/// Simulazione della nube fino al suo istante, senza precalcolo (per le prove).
+#[cfg(test)]
+fn simulated_field(s: &SmokeCloud, geo: &RenderGeometry, p0: f32, p1: f32) -> Option<Arc<SmokeField>> {
+    let (lo, hi) = s.bounds();
+    let k = format!(
+        "{:?}|{:?}|{:?}|{}|{}|{}",
+        s.sim,
+        lo,
+        hi,
+        s.rotation_deg,
+        s.seed,
+        if s.collisions { geo.id } else { 0 }
+    );
+    if let Some(f) = sim_cache().lock().unwrap().get(&k) {
+        return Some(f.clone());
+    }
+    let cells = s.sim_cells();
+    let spec = GridSpec::covering(lo, hi, cells);
+    let solid = (s.collisions && !geo.accel.is_empty()).then(|| {
+        let shell = voxelize(geo, &spec);
+        let inside = interior_cells(geo, &spec, &shell);
+        shell.iter().zip(&inside).map(|(a, b)| *a || *b).collect::<Vec<bool>>()
+    });
+    let params = sim_params(s, spec);
     let f = simulate_smoke(
         &params,
         solid.as_deref(),
@@ -401,6 +412,7 @@ pub fn smoke_preview(s: &SmokeCloud, geo: &RenderGeometry, cancelled: &dyn Fn() 
         // L'anteprima mostra il moto del fumo sulla griglia: le particelle servono al render.
         particles: false,
         patchiness: 0.0,
+        emit_stop: m.emit_stop,
     };
     let mut raw: Vec<(f32, Vec<f32>)> = Vec::new();
     simulate_smoke_frames(
@@ -463,7 +475,7 @@ pub fn smoke_preview(s: &SmokeCloud, geo: &RenderGeometry, cancelled: &dyn Fn() 
     Some(SmokePreview { frames, cell: h })
 }
 
-fn bake_one(s: &SmokeCloud, geo: &RenderGeometry) -> Option<Arc<BakedFog>> {
+fn bake_one(scene: &Scene, s: &SmokeCloud, geo: &RenderGeometry) -> Option<Arc<BakedFog>> {
     let k = key(s, geo);
     if let Some(b) = cache().lock().unwrap().get(&k) {
         return Some(b.clone());
@@ -484,7 +496,7 @@ fn bake_one(s: &SmokeCloud, geo: &RenderGeometry) -> Option<Arc<BakedFog>> {
     // Simulazione (se richiesta): la prima parte della barra.
     let simulated = s.mode == SmokeMode::Simulated;
     let field = if simulated {
-        Some(simulated_field(s, geo, 0.0, 0.6)?)
+        Some(crate::smoke_bake::frame_field(scene, s, geo, 0.0, 0.6)?)
     } else {
         None
     };
@@ -537,13 +549,13 @@ pub fn bake_smokes(scene: &Scene, geo: &RenderGeometry, first: usize, total: usi
             return;
         }
         progress::begin(progress::Phase::Smoke, first + k, total);
-        bake_one(&s, geo);
+        bake_one(scene, &s, geo);
     }
 }
 
 /// Nubi di fumo accese per il renderer (dalla cache, o calcolate qui).
 pub fn smoke_fogs(scene: &Scene, geo: &RenderGeometry) -> Vec<Arc<BakedFog>> {
-    active(scene).filter_map(|s| bake_one(&s, geo)).collect()
+    active(scene).filter_map(|s| bake_one(scene, &s, geo)).collect()
 }
 
 #[cfg(test)]

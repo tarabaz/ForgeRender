@@ -524,7 +524,7 @@ impl RenderGeometry {
         for (slot, &prim) in accel.bvh.prim_indices.iter().enumerate() {
             prim_to_slot[prim as usize] = slot as u32;
         }
-        tracing::info!(
+        tracing::debug!(
             "geometria compilata: {} triangoli, BVH {} nodi, in {:.0} ms",
             tris.len(),
             accel.bvh.nodes.len(),

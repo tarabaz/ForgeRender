@@ -32,6 +32,9 @@ pub struct FogVolume {
     pub anisotropy: f32,
     /// Secondi di emissione simulati.
     pub sim_time: f32,
+    /// Secondi simulati dopo cui la sorgente smette di emettere (0 = mai): la nebbia uscita
+    /// continua la sua vita. Lo decide la fine dell'emissione nella timeline.
+    pub emit_stop: f32,
     /// Raggio della sorgente (es. la ciotola) in metri.
     pub source_radius: f32,
     /// Quantità di nebbia emessa (1 = una ciotola di ghiaccio secco in acqua calda).
@@ -75,6 +78,7 @@ impl Default for FogVolume {
             albedo: [0.95; 3],
             anisotropy: 0.3,
             sim_time: 4.0,
+            emit_stop: 0.0,
             source_radius: 0.12,
             emission_rate: 1.0,
             dissipation: 1.0,

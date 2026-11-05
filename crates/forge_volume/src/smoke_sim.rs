@@ -10,8 +10,16 @@
 //! 4. proiezione: pressione con Gauss–Seidel rosso/nero, così il fluido non si comprime;
 //! 5. dissolvenza del fumo e raffreddamento.
 //!
-//! Gli oggetti sono celle solide (velocità nulla, niente fumo dentro). Il riquadro è aperto: il
-//! fumo che esce si perde. Deterministico: stessi parametri e stesso seme, stesso fumo.
+//! Gli oggetti sono celle solide (niente fumo dentro). Il riquadro è aperto: il fumo che esce si
+//! perde. Deterministico: stessi parametri e stesso seme, stesso fumo.
+//!
+//! Precalcolo sulla timeline ([`simulate_bake`]): i passi sono agganciati ai fotogrammi, a ogni
+//! fotogramma si consegna il fumo e ogni tanto lo stato completo ([`SimState`]), da cui il calcolo
+//! può ripartire identico. Gli oggetti in movimento sono bordi solidi con la loro velocità: nella
+//! proiezione la componente normale della velocità dell'aria sul bordo è quella del solido
+//! (u·n = u_solido·n, come in Bridson, "Fluid Simulation for Computer Graphics"), quindi la
+//! pressione spinge l'aria davanti all'oggetto e la richiama dietro, e il fluido fa da solo scia
+//! e vortici.
 
 use crate::grid::GridSpec;
 use crate::noise::curl;
@@ -63,6 +71,68 @@ pub struct SmokeSimParams {
     /// Sorgente a chiazze (0 = uniforme, 1 = solo pochi punti che si spostano piano): il vapore di
     /// una tazza sale in nastri separati, non da tutta la superficie insieme.
     pub patchiness: f32,
+    /// Secondi dopo cui la sorgente smette di emettere (≤ 0 = mai): il fumo già uscito continua la
+    /// sua vita.
+    pub emit_stop: f32,
+}
+
+/// Stato completo della simulazione a un fotogramma: da qui il calcolo riparte identico.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct SimState {
+    pub u: Vec<f32>,
+    pub v: Vec<f32>,
+    pub w: Vec<f32>,
+    pub rho: Vec<f32>,
+    pub temp: Vec<f32>,
+    pub pres: Vec<f32>,
+    /// Particelle: posizione in coordinate di griglia e peso.
+    pub parts: Vec<[f32; 4]>,
+    pub part_debt: f32,
+}
+
+/// Oggetti in un istante: celle solide e (per lo spostamento d'aria) la loro velocità.
+#[derive(Clone, Debug, Default)]
+pub struct SolidFrame {
+    pub mask: Vec<bool>,
+    /// Velocità delle celle (m/s); vuota = solidi fermi per l'aria.
+    pub velocity: Vec<[f32; 3]>,
+    /// Celle che contengono gli oggetti in movimento (min, max): l'aria lì si calcola anche se non
+    /// c'è ancora fumo.
+    pub zone: Option<([usize; 3], [usize; 3])>,
+}
+
+/// Chi segue il precalcolo: dà gli oggetti e riceve i fotogrammi.
+pub trait BakeHooks {
+    /// Oggetti all'istante `time` (secondi simulati); None = come al passo prima.
+    fn solid(&mut self, time: f32) -> Option<SolidFrame>;
+    /// Fumo alla fine del fotogramma `k` (1 = il primo).
+    fn frame(&mut self, k: usize, field: &SmokeField);
+    /// Salvare lo stato alla fine del fotogramma `k`?
+    fn wants_state(&self, k: usize) -> bool;
+    fn state(&mut self, k: usize, state: SimState);
+}
+
+/// Precalcolo: dal fotogramma `first` (0 = dall'inizio, altrimenti con `state`) a `last`.
+pub struct BakeRun<'a> {
+    pub frame_dt: f32,
+    pub first: usize,
+    pub last: usize,
+    pub state: Option<SimState>,
+    pub hooks: &'a mut dyn BakeHooks,
+}
+
+/// Particelle emesse al secondo nel precalcolo (non dipende dalla durata: allungare la timeline
+/// non cambia il fumo già calcolato).
+const BAKE_PARTICLE_RATE: f32 = SMOKE_PARTICLES / 5.0;
+
+/// 90° percentile delle celle con fumo (il riferimento della densità).
+fn reference(rho: &[f32]) -> f32 {
+    let mut vals: Vec<f32> = rho.iter().copied().filter(|&v| v > 1e-4).collect();
+    if vals.is_empty() {
+        return 0.0;
+    }
+    let k = ((vals.len() as f32 * 0.9) as usize).min(vals.len() - 1);
+    *vals.select_nth_unstable_by(k, |a, b| a.total_cmp(b)).1
 }
 
 /// Particelle emesse in tutto (circa) con il fumo a particelle.
@@ -194,7 +264,19 @@ pub fn simulate_smoke(
     progress: &dyn Fn(f32),
     cancelled: &dyn Fn() -> bool,
 ) -> Option<SmokeField> {
-    run(p, solid, progress, cancelled, None)
+    run(p, solid, progress, cancelled, None, None)
+}
+
+/// Precalcolo sulla timeline: vedi [`BakeRun`]. Falso se annullato (i fotogrammi già consegnati
+/// restano buoni).
+pub fn simulate_bake(
+    p: &SmokeSimParams,
+    solid: Option<&[bool]>,
+    bake: BakeRun<'_>,
+    progress: &dyn Fn(f32),
+    cancelled: &dyn Fn() -> bool,
+) -> bool {
+    run(p, solid, progress, cancelled, None, Some(bake)).is_some()
 }
 
 /// Come [`simulate_smoke`], e in più consegna il fumo ogni `every` secondi simulati (e
@@ -207,7 +289,7 @@ pub fn simulate_smoke_frames(
     on_frame: &mut dyn FnMut(f32, &[f32]),
     cancelled: &dyn Fn() -> bool,
 ) -> Option<SmokeField> {
-    run(p, solid, &|_| {}, cancelled, Some((every.max(1e-3), on_frame)))
+    run(p, solid, &|_| {}, cancelled, Some((every.max(1e-3), on_frame)), None)
 }
 
 /// Destinatario dei fotogrammi di [`simulate_smoke_frames`]: (tempo, densità).
@@ -219,13 +301,17 @@ fn run(
     progress: &dyn Fn(f32),
     cancelled: &dyn Fn() -> bool,
     mut frames: Option<(f32, FrameSink<'_>)>,
+    mut bake: Option<BakeRun<'_>>,
 ) -> Option<SmokeField> {
     let t0 = std::time::Instant::now();
     let g = Grid { s: p.spec };
     let [rx, ry, rz] = p.spec.res;
     let n = p.spec.len();
     let h = p.spec.cell;
-    let solid: Vec<bool> = solid.filter(|s| s.len() == n).map(|s| s.to_vec()).unwrap_or_else(|| vec![false; n]);
+    let mut solid: Vec<bool> = solid.filter(|s| s.len() == n).map(|s| s.to_vec()).unwrap_or_else(|| vec![false; n]);
+    // Velocità delle celle solide (vuota = ferme) e zona degli oggetti in movimento.
+    let mut solid_vel: Vec<[f32; 3]> = Vec::new();
+    let mut moving_zone: Option<([usize; 3], [usize; 3])> = None;
     let (mut u, mut v, mut w) = (vec![0.0f32; n], vec![0.0f32; n], vec![0.0f32; n]);
     let (mut rho, mut temp) = (vec![0.0f32; n], vec![0.0f32; n]);
     let mut pres = vec![0.0f32; n];
@@ -237,8 +323,18 @@ fn run(
         .max(0.2)
         * 1.5;
     let dt = (2.0 * h / v_typ).clamp(1.0 / 240.0, 1.0 / 24.0);
-    let steps = ((p.time / dt).ceil() as u32).max(1);
-    let dt = p.time / steps as f32;
+    // Nel precalcolo i passi stanno in un numero intero per fotogramma, e dipendono solo dai
+    // parametri: lo stesso fumo qualunque sia la durata o il punto da cui si riparte.
+    let (dt, first_step, steps, sub) = match &bake {
+        Some(b) => {
+            let sub = ((b.frame_dt / dt).ceil() as u32).max(1);
+            (b.frame_dt / sub as f32, b.first as u32 * sub, b.last as u32 * sub, sub)
+        }
+        None => {
+            let steps = ((p.time / dt).ceil() as u32).max(1);
+            (p.time / steps as f32, 0, steps, 0)
+        }
+    };
     let src_r2 = p.source_radius.max(h * 0.75).powi(2);
     let coords = |i: usize| p.spec.coords(i);
     // Bordi sfumati: in ogni cella quanto fumo resta a ogni passo (1 lontano dalle pareti; sulla
@@ -292,36 +388,59 @@ fn run(
     let mut active_cells = 0.0f64;
     // Particelle: posizione in coordinate di griglia (centri a i + 0,5) e peso.
     let mut parts: Vec<(Vec3, f32)> = Vec::new();
-    let part_rate = SMOKE_PARTICLES / p.time.max(0.1);
+    let part_rate = if bake.is_some() {
+        BAKE_PARTICLE_RATE
+    } else {
+        SMOKE_PARTICLES / p.time.max(0.1)
+    };
     let mut part_debt = 0.0f32;
+    if let Some(st) = bake.as_mut().and_then(|b| b.state.take()) {
+        if st.rho.len() == n {
+            (u, v, w, rho, temp, pres) = (st.u, st.v, st.w, st.rho, st.temp, st.pres);
+            parts = st.parts.iter().map(|q| (Vec3::new(q[0], q[1], q[2]), q[3])).collect();
+            part_debt = st.part_debt;
+        }
+    }
     let src_g = (p.source - p.spec.min) / h;
     let src_rg = p.source_radius.max(h * 0.75) / h;
-    for step in 0..steps {
+    for step in first_step..steps {
         if cancelled() {
             return None;
         }
-        progress(step as f32 / steps as f32);
+        progress((step - first_step) as f32 / (steps - first_step).max(1) as f32);
         let time = step as f32 * dt;
-        // 1. Sorgente (con un leggero sfarfallio per rompere la simmetria).
+        // Oggetti di questo istante.
+        if let Some(sf) = bake.as_mut().and_then(|b| b.hooks.solid(time)) {
+            if sf.mask.len() == n {
+                solid = sf.mask;
+            }
+            solid_vel = sf.velocity;
+            moving_zone = sf.zone;
+        }
+        // 1. Sorgente (con un leggero sfarfallio per rompere la simmetria). Dopo lo stop non esce
+        // più niente: quello che c'è continua a muoversi.
+        let emitting = p.emit_stop <= 0.0 || time < p.emit_stop;
         let flicker = 0.85 + 0.15 * (time * 7.3 + p.seed as f32).sin();
-        rho.par_iter_mut()
-            .zip(temp.par_iter_mut())
-            .zip(v.par_iter_mut())
-            .enumerate()
-            .for_each(|(i, ((r, t), vy))| {
-                let (x, y, z) = coords(i);
-                let c = p.spec.center(x, y, z);
-                let d2 = (c - p.source).length_squared();
-                if d2 < src_r2 && !solid[i] {
-                    let k = 1.0 - d2 / src_r2;
-                    *r = (*r + p.emission * flicker * k * dt).min(1.0);
-                    *t = t.max(p.temperature * k);
-                    *vy = vy.max(p.exit_speed * k).min(p.exit_speed.max(*vy));
-                    if p.exit_speed < 0.0 {
-                        *vy = vy.min(p.exit_speed * k);
+        if emitting {
+            rho.par_iter_mut()
+                .zip(temp.par_iter_mut())
+                .zip(v.par_iter_mut())
+                .enumerate()
+                .for_each(|(i, ((r, t), vy))| {
+                    let (x, y, z) = coords(i);
+                    let c = p.spec.center(x, y, z);
+                    let d2 = (c - p.source).length_squared();
+                    if d2 < src_r2 && !solid[i] {
+                        let k = 1.0 - d2 / src_r2;
+                        *r = (*r + p.emission * flicker * k * dt).min(1.0);
+                        *t = t.max(p.temperature * k);
+                        *vy = vy.max(p.exit_speed * k).min(p.exit_speed.max(*vy));
+                        if p.exit_speed < 0.0 {
+                            *vy = vy.min(p.exit_speed * k);
+                        }
                     }
-                }
-            });
+                });
+        }
         // Zona attiva (come per il ghiaccio secco): il riquadro di celle con fumo o calore,
         // allargato di quanto il fluido può spostarsi in un passo più un margine. Fuori l'aria è
         // ferma e senza fumo: lì non si calcola niente (e la pressione vale 0, bordo aperto).
@@ -354,6 +473,20 @@ fn run(
                 [0, 1, 2].map(|a| alo[a].saturating_sub(margin)),
                 [0, 1, 2].map(|a| (ahi[a] + margin).min(res[a] - 1)),
             )
+        };
+        // L'aria attorno a un oggetto in movimento si muove anche dove non c'è ancora fumo.
+        let (alo, ahi) = match moving_zone {
+            Some((zl, zh)) => {
+                let m = (margin + 4).min(64);
+                let lo = [0, 1, 2].map(|a| zl[a].saturating_sub(m));
+                let hi = [0, 1, 2].map(|a| (zh[a] + m).min(res[a] - 1));
+                if alo[0] > ahi[0] {
+                    (lo, hi)
+                } else {
+                    ([0, 1, 2].map(|a| lo[a].min(alo[a])), [0, 1, 2].map(|a| hi[a].max(ahi[a])))
+                }
+            }
+            None => (alo, ahi),
         };
         let act = |x: usize, y: usize, z: usize| x >= alo[0] && x <= ahi[0] && y >= alo[1] && y <= ahi[1] && z >= alo[2] && z <= ahi[2];
         let act_i = |i: usize| {
@@ -430,10 +563,16 @@ fn run(
             let (x, y, z) = coords(i);
             Vec3::new(x as f32 + 0.5, y as f32 + 0.5, z as f32 + 0.5) - Vec3::new(u[i], v[i], w[i]) * (dt / h)
         };
+        let cell_vel = |i: usize| solid_vel.get(i).copied().unwrap_or([0.0; 3]);
         let (nu, (nv, nw)): (Vec<f32>, (Vec<f32>, Vec<f32>)) = (0..n)
             .into_par_iter()
             .map(|i| {
-                if solid[i] || !act_i(i) {
+                // L'aria dentro un solido si muove con lui.
+                if solid[i] {
+                    let s = cell_vel(i);
+                    return (s[0], (s[1], s[2]));
+                }
+                if !act_i(i) {
                     return (0.0, (0.0, 0.0));
                 }
                 let q = back(i, &u, &v, &w);
@@ -451,20 +590,21 @@ fn run(
                     return 0.0;
                 }
                 let (x, y, z) = coords(i);
-                // Bordo del riquadro aperto (velocità estesa); oggetti: velocità nulla.
-                let get = |f: &[f32], xx: i64, yy: i64, zz: i64| {
+                // Bordo del riquadro aperto (velocità estesa); oggetti: la loro velocità (u·n del
+                // bordo: ferma per gli oggetti fermi, spinge l'aria per quelli in movimento).
+                let get = |f: &[f32], axis: usize, xx: i64, yy: i64, zz: i64| {
                     let c = |a: i64, m: usize| a.clamp(0, m as i64 - 1) as usize;
                     let j = g.idx(c(xx, rx), c(yy, ry), c(zz, rz));
                     if solid[j] {
-                        0.0
+                        cell_vel(j)[axis]
                     } else {
                         f[j]
                     }
                 };
                 let (xi, yi, zi) = (x as i64, y as i64, z as i64);
-                ((get(&u, xi + 1, yi, zi) - get(&u, xi - 1, yi, zi))
-                    + (get(&v, xi, yi + 1, zi) - get(&v, xi, yi - 1, zi))
-                    + (get(&w, xi, yi, zi + 1) - get(&w, xi, yi, zi - 1)))
+                ((get(&u, 0, xi + 1, yi, zi) - get(&u, 0, xi - 1, yi, zi))
+                    + (get(&v, 1, xi, yi + 1, zi) - get(&v, 1, xi, yi - 1, zi))
+                    + (get(&w, 2, xi, yi, zi + 1) - get(&w, 2, xi, yi, zi - 1)))
                     / (2.0 * h)
             })
             .collect();
@@ -577,7 +717,9 @@ fn run(
         if p.particles {
             // Nuove particelle sul disco della sorgente (la superficie che fuma), a chiazze che
             // si spostano piano.
-            part_debt += part_rate * dt;
+            if emitting {
+                part_debt += part_rate * dt;
+            }
             let count = part_debt as usize;
             part_debt -= count as f32;
             let patch = p.patchiness.clamp(0.0, 1.0);
@@ -628,9 +770,70 @@ fn run(
                     }
                     let i = g.idx(x as usize, y as usize, z as usize);
                     let wgt = wgt * keep_r * edge[i];
-                    (wgt > 2e-3 && !solid[i]).then_some((q, wgt))
+                    if wgt <= 2e-3 {
+                        return None;
+                    }
+                    if !solid[i] {
+                        return Some((q, wgt));
+                    }
+                    // Dentro un oggetto (che si è mosso): il fumo viene spinto fuori, nella cella
+                    // libera più vicina, invece di sparire.
+                    let free = |c: Vec3| {
+                        let (a, b, d) = (c.x.floor() as i64, c.y.floor() as i64, c.z.floor() as i64);
+                        a >= 0
+                            && b >= 0
+                            && d >= 0
+                            && a < rx as i64
+                            && b < ry as i64
+                            && d < rz as i64
+                            && !solid[g.idx(a as usize, b as usize, d as usize)]
+                    };
+                    for r in 1..=6i32 {
+                        let r = r as f32;
+                        for dir in [Vec3::X, Vec3::NEG_X, Vec3::Y, Vec3::NEG_Y, Vec3::Z, Vec3::NEG_Z] {
+                            let c = q + dir * r;
+                            if free(c) {
+                                return Some((c, wgt));
+                            }
+                        }
+                    }
+                    None
                 })
                 .collect();
+        }
+        // Fine di un fotogramma del precalcolo.
+        if let Some(b) = bake.as_mut() {
+            if (step + 1).is_multiple_of(sub) {
+                let k = ((step + 1) / sub) as usize;
+                let (spec_out, density) = if p.particles {
+                    splat_particles(&p.spec, &parts)
+                } else {
+                    (p.spec, rho.clone())
+                };
+                let field = SmokeField {
+                    spec: spec_out,
+                    max: reference(&density),
+                    density,
+                    steps: step + 1,
+                    ms: 0.0,
+                };
+                b.hooks.frame(k, &field);
+                if b.hooks.wants_state(k) {
+                    b.hooks.state(
+                        k,
+                        SimState {
+                            u: u.clone(),
+                            v: v.clone(),
+                            w: w.clone(),
+                            rho: rho.clone(),
+                            temp: temp.clone(),
+                            pres: pres.clone(),
+                            parts: parts.iter().map(|(q, a)| [q.x, q.y, q.z, *a]).collect(),
+                            part_debt,
+                        },
+                    );
+                }
+            }
         }
         if let Some((every, f)) = frames.as_mut() {
             let (before, after) = (time, time + dt);
@@ -652,14 +855,7 @@ fn run(
         (p.spec, rho)
     };
     // Riferimento: il 90° percentile delle celle con fumo (non la sorgente, sempre piena).
-    let mut vals: Vec<f32> = rho.iter().copied().filter(|&v| v > 1e-4).collect();
-    let max = if vals.is_empty() {
-        0.0
-    } else {
-        let k = (vals.len() as f32 * 0.9) as usize;
-        let k = k.min(vals.len() - 1);
-        *vals.select_nth_unstable_by(k, |a, b| a.total_cmp(b)).1
-    };
+    let max = reference(&rho);
     Some(SmokeField {
         spec,
         max,
@@ -709,6 +905,7 @@ mod tests {
             box_half: Vec3::ONE,
             particles: false,
             patchiness: 0.0,
+            emit_stop: 0.0,
         }
     }
 
@@ -741,6 +938,160 @@ mod tests {
         assert!(top(&hard) > 0.05, "senza bordi sfumati il fumo arriva al soffitto");
         assert!(top(&soft) < top(&hard) * 0.1, "con i bordi sfumati sotto il soffitto quasi niente");
         assert!(mid(&soft) > mid(&hard) * 0.3, "il fumo più in basso resta");
+    }
+
+    /// Segue un precalcolo in memoria.
+    #[derive(Default)]
+    struct Recorder {
+        frames: Vec<Vec<f32>>,
+        states: Vec<(usize, SimState)>,
+        solids: Vec<(f32, SolidFrame)>,
+    }
+
+    impl BakeHooks for Recorder {
+        fn solid(&mut self, time: f32) -> Option<SolidFrame> {
+            let i = self.solids.iter().rposition(|s| s.0 <= time)?;
+            Some(self.solids[i].1.clone())
+        }
+        fn frame(&mut self, _k: usize, field: &SmokeField) {
+            self.frames.push(field.density.clone());
+        }
+        fn wants_state(&self, k: usize) -> bool {
+            k.is_multiple_of(5)
+        }
+        fn state(&mut self, k: usize, state: SimState) {
+            self.states.push((k, state));
+        }
+    }
+
+    fn bake(p: &SmokeSimParams, r: &mut Recorder, first: usize, last: usize, state: Option<SimState>) {
+        let run = BakeRun {
+            frame_dt: 0.05,
+            first,
+            last,
+            state,
+            hooks: r,
+        };
+        assert!(simulate_bake(p, None, run, &|_| {}, &|| false));
+    }
+
+    /// Ripartendo da uno stato salvato il fumo è identico al bit a quello calcolato di fila, anche
+    /// con le particelle: la forma che piaceva non cambia.
+    #[test]
+    fn resuming_from_a_state_gives_the_same_smoke() {
+        let spec = GridSpec::covering(Vec3::ZERO, Vec3::ONE, 20);
+        for particles in [false, true] {
+            let p = SmokeSimParams { particles, ..params(spec) };
+            let mut all = Recorder::default();
+            bake(&p, &mut all, 0, 12, None);
+            assert_eq!(all.frames.len(), 12);
+            let (k, st) = all.states[0].clone();
+            assert_eq!(k, 5);
+            let mut rest = Recorder::default();
+            bake(&p, &mut rest, 5, 12, Some(st));
+            assert_eq!(rest.frames.len(), 7);
+            assert_eq!(rest.frames.last(), all.frames.last(), "particelle: {particles}");
+        }
+    }
+
+    /// Dopo lo stop la sorgente non emette più, ma il fumo c'è ancora e sale.
+    #[test]
+    fn emission_stops_but_the_smoke_lives_on() {
+        let spec = GridSpec::covering(Vec3::ZERO, Vec3::new(1.0, 1.5, 1.0), 24);
+        let p = SmokeSimParams {
+            emit_stop: 0.3,
+            dissipation: 0.0,
+            buoyancy: 0.8,
+            turbulence: 0.0,
+            ..params(spec)
+        };
+        let mut r = Recorder::default();
+        bake(&p, &mut r, 0, 16, None);
+        let total = |f: &Vec<f32>| f.iter().sum::<f32>();
+        let at_stop = total(&r.frames[5]);
+        let later = r.frames.last().unwrap();
+        assert!(at_stop > 0.1, "ha emesso");
+        assert!(total(later) > at_stop * 0.3, "non sparisce");
+        assert!(total(later) <= at_stop * 1.05, "non ne esce altro");
+        let mean_y = |f: &Vec<f32>| {
+            let (mut m, mut s) = (0.0, 0.0);
+            for (i, d) in f.iter().enumerate() {
+                m += d * spec.coords(i).1 as f32;
+                s += d;
+            }
+            m / s
+        };
+        assert!(mean_y(later) > mean_y(&r.frames[5]), "continua a salire");
+    }
+
+    /// Un oggetto veloce che attraversa aria ferma con fumo la sposta davvero: il fumo si muove
+    /// nella sua direzione, e nasce rotazione (vorticità) che con l'oggetto fermo non c'è.
+    #[test]
+    fn a_moving_solid_pushes_the_air() {
+        let spec = GridSpec::covering(Vec3::ZERO, Vec3::splat(1.0), 32);
+        let n = spec.len();
+        // Fumo fermo: niente sorgente dopo il primo istante, niente spinta.
+        let p = SmokeSimParams {
+            source: Vec3::new(0.5, 0.5, 0.5),
+            source_radius: 0.2,
+            emission: 40.0,
+            emit_stop: 0.1,
+            temperature: 0.0,
+            buoyancy: 0.0,
+            weight: 0.0,
+            exit_speed: 0.0,
+            dissipation: 0.0,
+            turbulence: 0.0,
+            vorticity: 0.0,
+            ..params(spec)
+        };
+        // Cubo che va da sinistra verso destra a 3 m/s attraverso il fumo.
+        let solids = |push: bool| -> Vec<(f32, SolidFrame)> {
+            (0..12)
+                .map(|f| {
+                    let t = f as f32 * 0.025;
+                    let cx = 0.1 + 3.0 * t;
+                    let mut mask = vec![false; n];
+                    let mut velocity = vec![[0.0f32; 3]; if push { n } else { 0 }];
+                    for (i, m) in mask.iter_mut().enumerate() {
+                        let (x, y, z) = spec.coords(i);
+                        let c = spec.center(x, y, z);
+                        if (c.x - cx).abs() < 0.1 && (c.y - 0.5).abs() < 0.12 && (c.z - 0.5).abs() < 0.12 {
+                            *m = true;
+                            if push {
+                                velocity[i] = [3.0, 0.0, 0.0];
+                            }
+                        }
+                    }
+                    let zone = Some(([0, 0, 0], [31, 31, 31]));
+                    (t, SolidFrame { mask, velocity, zone })
+                })
+                .collect()
+        };
+        let centre_x = |f: &Vec<f32>| {
+            let (mut m, mut s) = (0.0, 0.0);
+            for (i, d) in f.iter().enumerate() {
+                m += d * spec.coords(i).0 as f32;
+                s += d;
+            }
+            m / s
+        };
+        let mut pushed = Recorder {
+            solids: solids(true),
+            ..Default::default()
+        };
+        bake(&p, &mut pushed, 0, 6, None);
+        let mut through = Recorder {
+            solids: solids(false),
+            ..Default::default()
+        };
+        bake(&p, &mut through, 0, 6, None);
+        let (a, b) = (centre_x(pushed.frames.last().unwrap()), centre_x(through.frames.last().unwrap()));
+        eprintln!("centro del fumo: con la spinta {a:.2}, senza {b:.2}");
+        assert!(
+            a > b + 0.4,
+            "la massa d'aria si sposta nella direzione dell'oggetto: {a} contro {b}"
+        );
     }
 
     /// Fumo a particelle: griglia più fitta di quella della simulazione, deterministico, il fumo

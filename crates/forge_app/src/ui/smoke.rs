@@ -157,6 +157,12 @@ fn sim_controls(ui: &mut egui::Ui, s: &mut SmokeCloud) -> bool {
             "Il fumo viaggia su particelle che non si sfumano: veli sottili che si ripiegano e filamenti lunghi (vapore, incenso, sigaretta) invece della nuvola gonfia. Calcolo più lungo",
         ))
         .changed();
+    changed |= ui
+        .checkbox(&mut m.air_push, tr("Spostamento d'aria degli oggetti animati"))
+        .on_hover_text(tr(
+            "Gli oggetti animati spingono davvero l'aria: nelle equazioni del fluido sono bordi che si muovono con la loro velocità, quindi la massa d'aria e il fumo si spostano e dietro nascono scia e vortici. Spento: il fumo si adatta attorno all'oggetto senza essere spinto",
+        ))
+        .changed();
     egui::Grid::new("fumo-sim").num_columns(2).show(ui, |ui| {
         if m.particles {
             changed |= slider(

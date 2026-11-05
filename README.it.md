@@ -18,17 +18,19 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
-### Novità della versione 0.43.0
+### Novità della versione 0.44.0
 
-- **Timeline (animazione):** chiavi con sei interpolazioni, modificatori (tremolio, oscillazione, rampa continua, ripeti, avanti e indietro, spostamento, moltiplica, limiti, a scatti), posizione, rotazione, scala e opacità di oggetti, luci, camera ed effetti; sta in basso al posto della console (schede Console | Timeline) o in una finestra a parte; render dell'animazione in fotogrammi PNG e MP4. Spenta di serie (menu Funzioni), si accende da sola con un effetto che si calcola nel tempo.
-- **Fumo a particelle:** veli sottili e filamenti lunghi che si ripiegano invece della nuvola gonfia: nuovi preset *Vapore da tazza* (nastri trasparenti che salgono dal caffè) e *Incenso o sigaretta*.
-- **Polvere luminosa e lucciole:** una parte dei granelli si accende dei colori che scegli con +, ognuno con la sua intensità e la sua percentuale, con un alone regolabile attorno.
-- **Opacità degli oggetti:** un oggetto che sfuma, ombra compresa, su CPU e GPU.
-- **Interfaccia:** selettore colore sistemato (il quadrato dei colori era vuoto) e usato da ogni pulsante colore; la barra rapida non si sovrappone più con la finestra stretta e AI MCP è un pulsante doppio in fondo a destra; libreria ed editor dei materiali riaperti tornano davanti; girare la vista non fa più ripartire una simulazione di ghiaccio secco o fumo in corso.
+- **Fumo calcolato una volta su tutta la timeline:** ogni fotogramma resta in file temporanei, così spostare il cursore li legge subito. Se cambia qualcosa dal secondo 5 in poi, la simulazione riparte dall'ultimo stato salvato prima di lì: quello che viene prima resta identico al bit, quindi una forma che ti piace non si perde.
+- **Spostamento d'aria vero:** gli oggetti animati sono bordi in movimento nelle equazioni del fluido: spingono l'aria e il fumo, lasciando scia e vortici.
+- **Inizio e fine dell'emissione:** per fumo e ghiaccio secco; dopo lo stop la sorgente è spenta, ma quello che è uscito continua a muoversi e a dissolversi.
+- **Timeline in stile After Effects:** sempre attiva, una riga per posizione e rotazione, chiavi selezionate col mouse (rettangolo, Ctrl, trascinamento di gruppo, Canc, copia e incolla), barra dell'area di lavoro, salvataggio del render o di un'anteprima della viewport da viewport o da una camera, Play nella vista Render a pochi campioni.
+- **Viewport fluida:** muovere gli oggetti non ricarica più la geometria: sulla GPU vanno solo le loro matrici (circa 185 fps sulla scena di prova da 100.000 triangoli).
+- **Cartella Rendering:** quello che salvi o esporti finisce lì di serie.
 
 <details>
 <summary><strong>Versioni precedenti — cronologia completa</strong></summary>
 
+- **0.43.0 — Timeline, fumo a particelle, lucciole:** chiavi con sei interpolazioni e modificatori su oggetti, luci, camera ed effetti; fumo a particelle con i preset *Vapore da tazza* e *Incenso o sigaretta*; polvere luminosa con l'alone delle lucciole; opacità degli oggetti su CPU e GPU; selettore colore sistemato e usato da ogni pulsante colore; barra rapida senza sovrapposizioni e pulsante AI MCP doppio; finestre staccate che tornano davanti.
 - **0.42.0–0.42.1 — Sostituisci materiale, polvere a due colori, polvere di fata:** tutti gli oggetti con un materiale passano a un altro senza selezionarli; polvere a due colori con opacità, variazione della dimensione e scaglie che luccicano; fumo simulato solo come anteprima nella viewport; Esc deseleziona tutto.
 - **0.41.0 — Fumo e nebbia calcolati una volta:** fumo e nebbia già calcolati si riusano al render se non cambia niente; la simulazione del fumo lavora solo dove c'è il fumo (fino a quattro volte più veloce nei riquadri grandi); contrasto del fumo per un fumo leggero e trasparente che tiene il rilievo.
 - **0.40.0 — Fumo che non finisce sul riquadro:** bordi sfumati frattali sul fumo simulato; un riquadro che gira e si scala con la sua sorgente, crescendo solo verso l'alto; vapore da tazza simulato; anteprime dei materiali a 512 px; bianco e nero anche attraverso i vetri colorati.
@@ -186,6 +188,10 @@ Nubi di fumo volumetrico vere per le foto di prodotto: il fumo d'incenso accanto
 
 - **Fumo a particelle (veli e filamenti):** con "Fumo a particelle" la griglia calcola solo il moto dell'aria e il fumo viaggia su circa 2,4 milioni di particelle che non si sfumano mai, depositate alla fine su una griglia due o tre volte più fitta. Il fumo tiene veli sottili che si ripiegano su sé stessi, luminosi dove li vedi di taglio, e fili lunghi e compatti, invece della nuvola gonfia del fumo sulla griglia. Con la **sorgente a chiazze** sale da pochi punti che si spostano piano, in nastri separati. Lo usano due preset: **Vapore da tazza** (nastri leggeri e trasparenti che salgono da tutta la superficie del caffè, si torcono e svaniscono in pochi centimetri) e **Incenso o sigaretta** (un filo di un paio di millimetri che sale dritto e poi si rompe in lunghi filamenti e veli che si arricciano).
 
+- **Calcolato una volta sulla timeline:** la simulazione gira una volta su tutta la durata e lascia nella cartella temporanea un file per fotogramma e, una volta al secondo, lo stato completo. Spostare il cursore legge il file di quel fotogramma. Ogni fotogramma ha un'impronta cumulativa di quello che lo influenza fino a lì (oggetti dentro il riquadro, emissione accesa o spenta): quando cambia qualcosa, la simulazione riparte dall'ultimo stato prima del primo fotogramma diverso, e quello che viene prima resta identico al bit. In una prova 60 fotogrammi hanno richiesto 6,3 s, un altro fotogramma 1 s, e un'animazione cambiata dal secondo 1 è ripartita dal fotogramma 25.
+- **Spostamento d'aria degli oggetti animati:** con l'opzione accesa (di serie) gli oggetti animati sono bordi in movimento del fluido: la velocità normale dell'aria sulla loro superficie è la loro, quindi la pressione spinge l'aria davanti e la richiama dietro, e scia e vortici nascono dal fluido stesso. Spenta, il fumo si adatta soltanto attorno all'oggetto. Vale solo per il fumo simulato: fumo procedurale e foschia non sono simulati, e i vortici più piccoli di una cella della griglia non possono comparire.
+- **Inizio e fine:** sulla riga dell'effetto nella timeline scegli quando parte e quando la sorgente smette di emettere; quello che è uscito non sparisce, continua a muoversi e a dissolversi. I comandi del tempo nel pannello del fumo sono nascosti: il tempo lo decide la timeline.
+
 Il fuoco (combustione, emissione, fiamme che illuminano la scena) è un passo a parte, successivo: vedi lo [studio su fumo e fuoco](docs/studio-fumo-fuoco.md).
 
 ### 7. Polvere in sospensione — granelli che brillano solo in un fascio
@@ -269,14 +275,14 @@ Un file STEP si converte in mesh una volta sola. Il risultato resta in una cache
 
 ### 16. Timeline — animazione di oggetti, luci, camera ed effetti
 
-Una timeline professionale, da accendere da **Funzioni → Timeline (animazione)** (spenta di serie; si accende da sola quando nella scena c'è un effetto che si calcola nel tempo, come il fumo simulato o il ghiaccio secco). Sta in basso al posto della console, con le schede **Console | Timeline**, oppure in una finestra a parte con "Stacca dal programma", da spostare su un altro schermo.
+Una timeline professionale, sempre disponibile: sta in basso con le schede **Timeline | Console**, oppure in una finestra a parte con "Stacca dal programma", da spostare su un altro schermo.
 
-- **Elementi e proprietà:** "+ Elemento" aggiunge gli oggetti selezionati, la camera, una luce, un fumo, una nebbia di ghiaccio secco, la foschia, la polvere o l'ambiente. Ogni elemento mostra le sue proprietà di base (per gli oggetti posizione, rotazione, scala e opacità; per la camera posizione e bersaglio; per le luci posizione e intensità) e con "+" si aggiungono una alla volta le altre compatibili (scala per asse, visibilità, colore, bersaglio, apertura del cono, campo visivo, diaframma, distanza di fuoco, densità, rotazione dell'HDRI, brillantezza).
-- **Chiavi:** il rombo mette o toglie una chiave nell'istante del cursore con il valore attuale; spostare un oggetto con il gizmo, o cambiare un valore nei pannelli, quando la sua proprietà ha già delle chiavi registra lì una chiave. Le chiavi si trascinano nel tempo (a scatti di fotogramma) e il clic destro sceglie l'interpolazione verso la successiva: a scatto, lineare, morbida in entrata, in uscita, in entrata e uscita, curva continua.
-- **Modificatori:** "ƒ+" aggiunge a ogni proprietà, uno alla volta e in ordine, tremolio (ampiezza, frequenza, seme), oscillazione, rampa continua (per esempio 90°/s per una piattaforma girevole), ripeti, avanti e indietro, spostamento, moltiplica, limiti e a scatti (stop motion); ognuno si può spegnere.
-- **Riproduzione:** inizio, chiave prima, play/pausa, chiave dopo, fine, ripeti; durata e fotogrammi al secondo; zoom e scorrimento del tempo.
-- **Effetti nel tempo:** con la timeline accesa fumo simulato e ghiaccio secco seguono il cursore: l'istante simulato è il tempo del cursore meno l'inizio dell'effetto, che si sceglie con la barra sulla sua riga; la durata scelta nella timeline decide fino a quando si calcolano.
-- **Render dell'animazione:** ogni fotogramma della timeline in PNG in una cartella, poi il video MP4, con campioni fissi e il denoiser alla fine.
+- **Elementi e proprietà:** "+ Elemento" aggiunge gli oggetti selezionati, la camera, una luce, un fumo, una nebbia di ghiaccio secco, la foschia, la polvere o l'ambiente. Ogni elemento mostra le sue proprietà di base (per gli oggetti posizione, rotazione, scala e opacità; per la camera posizione e bersaglio; per le luci posizione e intensità) e con "+" si aggiungono una alla volta le altre compatibili (scala per asse, visibilità, colore, bersaglio, apertura del cono, campo visivo, diaframma, distanza di fuoco, densità, rotazione dell'HDRI, brillantezza). Posizione, rotazione, bersaglio e colore sono una riga sola con i tre valori: una chiave vale per tutti.
+- **Chiavi:** il rombo mette o toglie una chiave nell'istante del cursore con il valore attuale; spostare un oggetto con il gizmo, o cambiare un valore nei pannelli, quando la sua proprietà ha già delle chiavi registra lì una chiave. Come in After Effects, un clic seleziona una chiave, Ctrl o Maiusc aggiunge o toglie, trascinando sul vuoto si disegna un rettangolo di selezione e trascinando una chiave si spostano tutte le selezionate (a scatti di fotogramma); Canc le toglie, Ctrl+C e Ctrl+V le copiano nell'istante del cursore, F9 mette la morbida in entrata e uscita e il clic destro sceglie l'interpolazione verso la chiave dopo: a scatto, lineare, morbida in entrata, in uscita, in entrata e uscita, curva continua.
+- **Modificatori:** "ƒ+" aggiunge a ogni proprietà, uno alla volta e in ordine, tremolio (ampiezza, frequenza, seme), oscillazione, rampa continua (per esempio 90°/s per una piattaforma girevole), ripeti, avanti e indietro, spostamento, moltiplica, limiti e a scatti (stop motion); su una riga a tre assi le lettere X Y Z scelgono su quali agisce.
+- **Riproduzione:** inizio, chiave prima, play/pausa, chiave dopo, fine, ripeti; durata e fotogrammi al secondo; zoom e scorrimento del tempo. La barra dell'**area di lavoro** sopra il righello (si trascinano le due estremità e il centro) sceglie la parte che si riproduce e si salva. Nella viewport la riproduzione è in tempo reale; nella **vista Render** il Play calcola ogni fotogramma con pochi campioni (20 di serie, regolabili) e passa al successivo: più lento del tempo reale, ma si vede l'animazione renderizzata.
+- **Effetti nel tempo:** fumo simulato e ghiaccio secco seguono il cursore: l'istante simulato è il tempo del cursore meno l'inizio dell'effetto, che si sceglie sulla sua riga insieme alla fine dell'emissione; la durata scelta nella timeline decide fino a quando si calcolano.
+- **Salva animazione:** l'area di lavoro, come render di ogni fotogramma o come **anteprima della viewport** (pochi secondi, per controllare il movimento; fumo e nebbie non ci sono), dalla viewport o da una camera di rendering, in fotogrammi PNG in una cartella nuova dentro **Rendering** e, se vuoi, in un video MP4.
 - **Opacità degli oggetti:** una proprietà a sé, resa lasciando passare ogni raggio con probabilità 1 − opacità, così l'oggetto sfuma con la sua ombra, uguale su CPU e GPU.
 
 ## Cosa fa oggi
@@ -338,16 +344,23 @@ Una timeline professionale, da accendere da **Funzioni → Timeline (animazione)
   simulazione completa al render), i bordi sfumati frattali e un
   riquadro che si sposta, gira e si scala insieme alla sua sorgente. Il **fumo a particelle**
   tiene veli sottili che si ripiegano e filamenti lunghi invece della nuvola gonfia: preset
-  *Vapore da tazza* (nastri trasparenti che salgono dal caffè) e *Incenso o sigaretta*.
-- **Timeline (animazione)**: una timeline in stile After Effects, spenta di serie (menu Funzioni)
-  e accesa da sola con un effetto che si calcola nel tempo. Chiavi con sei interpolazioni (a
-  scatto, lineare, morbida in entrata, in uscita, in entrata e uscita, curva continua),
-  modificatori aggiunti uno alla volta (tremolio, oscillazione, rampa continua, ripeti, avanti e
-  indietro, spostamento, moltiplica, limiti, a scatti), posizione, rotazione, scala e opacità di
-  oggetti, luci, camera, fumo, nebbia, foschia, polvere e ambiente; chiavi registrate dal gizmo;
-  fumo e ghiaccio secco che seguono il cursore dal loro inizio; riproduzione con ripetizione;
-  render dell'animazione in fotogrammi PNG e MP4. Sta in basso con le schede Console | Timeline o
-  in una finestra a parte su un altro schermo.
+  *Vapore da tazza* (nastri trasparenti che salgono dal caffè) e *Incenso o sigaretta*. La
+  simulazione si **calcola una volta sulla timeline** e resta in file temporanei, ripartendo dal
+  primo fotogramma cambiato; gli oggetti animati **spostano davvero l'aria** con scia e vortici;
+  emissione con inizio e fine.
+- **Timeline (animazione)**: una timeline in stile After Effects, sempre disponibile, con le schede
+  Timeline | Console in basso o in una finestra a parte su un altro schermo. Chiavi con sei
+  interpolazioni (a scatto, lineare, morbida in entrata, in uscita, in entrata e uscita, curva
+  continua), selezionate col mouse (rettangolo, Ctrl, trascinamento di gruppo, Canc, copia e
+  incolla); modificatori aggiunti uno alla volta (tremolio, oscillazione, rampa continua, ripeti,
+  avanti e indietro, spostamento, moltiplica, limiti, a scatti); una riga per posizione e rotazione;
+  scala e opacità di oggetti, luci, camera, fumo, nebbia, foschia, polvere e ambiente; chiavi
+  registrate dal gizmo; fumo e ghiaccio secco che seguono il cursore, con inizio e fine
+  dell'emissione; barra dell'area di lavoro; riproduzione in tempo reale nella viewport, Play a
+  pochi campioni nella vista Render; salvataggio del render di ogni fotogramma o di un'anteprima
+  della viewport, dalla viewport o da una camera, in fotogrammi PNG e MP4.
+- **Cartella Rendering**: quello che salvi o esporti finisce di serie in `Rendering` accanto al
+  programma (o in Documenti\ForgeRender se la cartella del programma non è scrivibile).
 - **Stili di rendering**: fotorealistico, fumetto (cel shading) e illustrazione tecnica, a colori
   o in bianco e nero, sfondo a tinta unita, contorni a inchiostro su sagome e spigoli.
 - **Adesivi**: immagini e loghi (PNG con trasparenza) proiettati sulle superfici curve, che si
@@ -364,6 +377,8 @@ Una timeline professionale, da accendere da **Funzioni → Timeline (animazione)
   `.blend` (tramite Blender installato); STEP con Open CASCADE e SolidWorks SLDPRT/SLDASM sono
   sperimentali. Il convertitore STEP (`forgerender-step.exe`) lo compila `Build-ForgeRender.ps1`;
   serve CMake (`winget install Kitware.CMake`).
+- **Viewport**: rasterizzazione su GPU con le matrici degli oggetti sulla GPU: muovere gli oggetti
+  non ricarica la geometria, così l'animazione resta fluida.
 - **Modifica**: gizmo sposta/ruota/scala con snap (anche per le luci, con le maniglie del cono
   dello spot, e per l'emettitore della nebbia), snap a contatto per oggetto, annulla/ripeti, nascondi (H), duplica, appoggio
   esatto sul pavimento, navigatore degli assi stile Blender, albero dei componenti, assegnazione

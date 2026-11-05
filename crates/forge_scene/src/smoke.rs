@@ -81,6 +81,12 @@ pub struct SmokeSim {
     /// Sorgente a chiazze, 0–1 (solo con le particelle): il fumo esce da pochi punti che si
     /// spostano piano, in nastri separati.
     pub patchiness: f32,
+    /// Secondi simulati dopo cui la sorgente smette di emettere (0 = mai). Lo decide la fine
+    /// dell'emissione nella timeline: il fumo già uscito continua la sua vita.
+    pub emit_stop: f32,
+    /// Spostamento d'aria: gli oggetti animati sono bordi con la loro velocità, spingono la massa
+    /// d'aria e il fumo e fanno scia e vortici. Spento: il fumo si adatta attorno a loro.
+    pub air_push: bool,
 }
 
 /// Celle della simulazione sul lato più lungo per qualità 1–4.
@@ -107,6 +113,8 @@ impl Default for SmokeSim {
             edge_fade: 0.2,
             particles: false,
             patchiness: 0.0,
+            emit_stop: 0.0,
+            air_push: true,
         }
     }
 }

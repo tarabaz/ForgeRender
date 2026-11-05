@@ -13,6 +13,30 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.44.0 — 06/11/2026
+
+**Fumo calcolato una volta sulla timeline**
+- `forge_render_core::smoke_bake`: la simulazione gira una volta sulla durata e lascia nella cartella temporanea un file sparso a 8 bit per fotogramma e lo stato completo (`SimState`) una volta al secondo; ogni fotogramma ha un'impronta cumulativa (oggetti dentro il riquadro, emissione accesa o spenta) e una modifica riparte dall'ultimo stato prima del primo fotogramma diverso. Test `only_what_changed_is_computed_again`, `resuming_from_a_state_gives_the_same_smoke` (identico al bit, griglia e particelle). Su una scena di prova: 60 fotogrammi 6,3 s, un altro fotogramma 1 s, modifica dal secondo 1 ripartita dal fotogramma 25, 176 MB.
+- `simulate_bake`: passi agganciati ai fotogrammi, indipendenti dalla durata.
+- Anteprima del fumo nella viewport su tutta la durata, mostrata all'istante del cursore invece di ricalcolarla.
+
+**Spostamento d'aria**
+- `SmokeSim::air_push` (acceso di serie): gli oggetti animati si voxelizzano una volta nel loro spazio, si riportano nella griglia con la loro matrice a ogni passo e fanno da bordi in movimento (u·n = u_solido·n nella proiezione, l'aria nelle celle solide si muove con loro, il fumo viene spinto fuori dalle celle in cui entrano). Test `a_moving_solid_pushes_the_air`.
+
+**Inizio e fine dell'emissione**
+- `Timeline::stops`, `SmokeSim::emit_stop`, `FogVolume::emit_stop`: dopo lo stop la sorgente è spenta e quello che è uscito continua a vivere. Test `emission_stops_but_the_smoke_lives_on`.
+
+**Timeline**
+- Sempre attiva (menu Funzioni tolto), schede Timeline | Console; righe per posizione, rotazione, bersaglio, colore e scala per asse (`Target::rows`): una chiave va su tutti gli assi della riga, anche se registrata dal gizmo.
+- Selezione delle chiavi: clic, Ctrl/Maiusc, rettangolo, trascinamento di gruppo, Canc, Ctrl+C/V, F9, Esc (`Timeline::shift_keys`, `settle_keys`, `delete_keys`, `set_keys_interp`, `copy_keys`, `paste_keys`). Lettere X Y Z sui modificatori.
+- Barra dell'area di lavoro (`work_in`, `work_out`); Salva animazione: render di ogni fotogramma o anteprima della viewport (`ViewportRenderer::capture`), dalla viewport o da una camera, in una cartella nuova dentro Rendering, con MP4 facoltativo; Play nella vista Render con i campioni per fotogramma regolabili.
+- Comandi del tempo nascosti nel pannello del fumo (`SHOW_TIME_CONTROLS`).
+
+**Correzioni e prestazioni**
+- Viewport: vertici nello spazio dell'oggetto e matrici in uno storage buffer letto dal vertex shader; `transforms_changed` aggiorna solo le matrici (circa 185 fps in riproduzione sulla scena di prova da 100.000 triangoli).
+- "Costruzione BVH" senza fine: il Play nella vista Render inseguiva una revisione della geometria che cambiava a ogni fotogramma (ora il Play nel Render avanza quando il fotogramma è finito) e un valore limitato dalla scena (scala 0, opacità oltre il 100 %) si riscriveva a ogni fotogramma (test `a_clamped_value_settles`).
+- `prefs::rendering_dir`: `Rendering` accanto al programma, o in Documenti\ForgeRender se non è scrivibile, di serie per salvare ed esportare.
+
 ## 0.43.0 — 05/11/2026
 
 **Timeline (animazione)**

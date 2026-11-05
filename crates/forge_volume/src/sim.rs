@@ -443,6 +443,8 @@ pub struct SimInput<'a> {
     pub solid: &'a [bool],
     pub emitter: Vec3,
     pub sim_time: f32,
+    /// Secondi dopo cui la sorgente si spegne (≤ 0 = mai): la nebbia uscita continua a muoversi.
+    pub emit_stop: f32,
     pub emission_rate: f32,
     /// Raggio della sorgente (m).
     pub source_radius: f32,
@@ -672,7 +674,8 @@ pub fn simulate(inp: &SimInput) -> SimResult {
 
         clock.lap(0);
         // 1. Sorgente: gas puro appena prodotto (concentrazione 1) con una spinta verso l'alto.
-        for &i in &source {
+        let emitting = inp.emit_stop <= 0.0 || t < inp.emit_stop;
+        for &i in source.iter().filter(|_| emitting) {
             rho[i] = rho[i].max(1.0);
             heavy[i] = heavy[i].max(1.0);
             let (x, y, z) = g.coords(i);
@@ -847,7 +850,7 @@ pub fn simulate(inp: &SimInput) -> SimResult {
             (f(0, 1, 0, 0) - f(0, 0, 0, 0) + f(1, 0, 1, 0) - f(1, 0, 0, 0) + f(2, 0, 0, 1) - f(2, 0, 0, 0)) / h
         });
         // Il gas prodotto occupa volume: divergenza imposta nelle celle della sorgente.
-        for &i in &source {
+        for &i in source.iter().filter(|_| emitting) {
             let (x, y, z) = g.coords(i);
             if let Some(j) = loc.get(x, y, z) {
                 div[j] -= src_div;

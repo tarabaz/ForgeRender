@@ -209,7 +209,8 @@ pub struct SimState {
 pub fn sim_key(fog: &FogVolume) -> String {
     let f = fog.sanitized();
     format!(
-        "{:?} {:?} {:?} {} {} {} {} {} {} {} {} {} {} {}",
+        "{:?} {:?} {:?} {} {} {} {} {} {} {} {} {} {} {} {}",
+        f.emit_stop,
         f.emitter,
         f.zone_offset,
         f.size,
@@ -319,6 +320,7 @@ pub fn simulate_fog(fog: &FogVolume, solid: Option<SolidFn>, ground: Option<f32>
         solid: &sim_solid,
         emitter: f.emitter,
         sim_time: f.sim_time,
+        emit_stop: f.emit_stop,
         emission_rate: f.emission_rate,
         source_radius: f.source_radius,
         dissipation: f.dissipation,

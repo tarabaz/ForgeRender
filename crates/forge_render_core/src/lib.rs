@@ -21,6 +21,7 @@ mod render_scene;
 mod session;
 mod settings;
 pub mod smoke;
+pub mod smoke_bake;
 pub mod spectral;
 pub mod texture;
 pub mod tiltshift;

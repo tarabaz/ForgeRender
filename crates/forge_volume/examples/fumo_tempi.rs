@@ -71,6 +71,7 @@ fn main() {
             box_half: size * 0.5,
             particles: false,
             patchiness: 0.0,
+            emit_stop: 0.0,
         };
         let f = simulate_smoke(&p, None, &|_| {}, &none).unwrap();
         let mass: f32 = f.density.iter().sum();

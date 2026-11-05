@@ -532,6 +532,10 @@ pub struct Track {
     /// (gizmo, pannelli) e la timeline registra una chiave invece di rimettere il suo valore.
     #[serde(skip)]
     pub last: Option<f32>,
+    /// Ultimo valore chiesto alla scena: se la scena lo limita (scala a zero, opacità sopra il
+    /// 100 %) non si riscrive a ogni fotogramma, altrimenti la scena sembrerebbe cambiare sempre.
+    #[serde(skip)]
+    pub wanted: Option<f32>,
 }
 
 impl Default for Track {
@@ -544,6 +548,7 @@ impl Default for Track {
             modifiers: Vec::new(),
             enabled: true,
             last: None,
+            wanted: None,
         }
     }
 }
@@ -682,6 +687,9 @@ pub struct Timeline {
     /// Inizio degli effetti calcolati nel tempo (fumo, ghiaccio secco), in secondi: prima non
     /// c'è niente, poi l'effetto parte da zero.
     pub starts: Vec<(Target, f32)>,
+    /// Fine dell'emissione degli effetti nel tempo (secondi della timeline): da lì la sorgente non
+    /// emette più, ma quello che è uscito continua a vivere. Senza voce: emette sempre.
+    pub stops: Vec<(Target, f32)>,
     /// Area di lavoro: la parte che si riproduce e si salva (secondi). `work_out` ≤ 0 = fino alla
     /// fine della durata.
     pub work_in: f32,
@@ -697,6 +705,7 @@ impl Default for Timeline {
             elements: Vec::new(),
             tracks: Vec::new(),
             starts: Vec::new(),
+            stops: Vec::new(),
             work_in: 0.0,
             work_out: 0.0,
         }
@@ -773,6 +782,7 @@ impl Timeline {
         self.elements.retain(|t| t != target);
         self.tracks.retain(|t| &t.target != target);
         self.starts.retain(|(t, _)| t != target);
+        self.stops.retain(|(t, _)| t != target);
     }
 
     /// Inizio dell'effetto `target` (0 se non impostato).
@@ -784,6 +794,18 @@ impl Timeline {
         match self.starts.iter_mut().find(|(t, _)| t == target) {
             Some(s) => s.1 = start,
             None => self.starts.push((target.clone(), start)),
+        }
+    }
+
+    /// Fine dell'emissione dell'effetto (None = emette sempre).
+    pub fn stop_of(&self, target: &Target) -> Option<f32> {
+        self.stops.iter().find(|(t, _)| t == target).map(|(_, s)| *s)
+    }
+
+    pub fn set_stop(&mut self, target: &Target, stop: Option<f32>) {
+        self.stops.retain(|(t, _)| t != target);
+        if let Some(s) = stop {
+            self.stops.push((target.clone(), s));
         }
     }
 
@@ -832,7 +854,9 @@ impl Timeline {
                 continue;
             }
             let v = tr.value_at(t);
-            if (v - now).abs() > 1e-6 {
+            let same = tr.wanted.is_some_and(|w| (w - v).abs() <= 1e-6) && tr.last.is_some_and(|l| (l - now).abs() <= 1e-5);
+            if (v - now).abs() > 1e-6 && !same {
+                tr.wanted = Some(v);
                 set(scene, &tr.target, tr.prop, v);
                 if tr.prop == Prop::Visible && matches!(tr.target, Target::Object(_)) {
                     out.geometry = true;
@@ -868,6 +892,13 @@ impl Timeline {
                 scene.smokes[i].sim.time = st;
                 out.effects = true;
             }
+            let target = Target::Smoke(scene.smokes[i].n);
+            // Secondi simulati: dall'inizio dell'effetto (0 = non si ferma).
+            let stop = self.stop_of(&target).map(|s| (s - self.start_of(&target)).max(1e-3)).unwrap_or(0.0);
+            if (scene.smokes[i].sim.emit_stop - stop).abs() > 1e-4 {
+                scene.smokes[i].sim.emit_stop = stop;
+                out.effects = true;
+            }
         }
         let fogs: Vec<(usize, f32)> = scene
             .fogs
@@ -878,6 +909,12 @@ impl Timeline {
         for (i, ft) in fogs {
             if (scene.fogs[i].sim_time - ft).abs() > 1e-4 {
                 scene.fogs[i].sim_time = ft;
+                out.effects = true;
+            }
+            let target = Target::Fog(scene.fogs[i].name.clone());
+            let stop = self.stop_of(&target).map(|s| (s - self.start_of(&target)).max(1e-3)).unwrap_or(0.0);
+            if (scene.fogs[i].emit_stop - stop).abs() > 1e-4 {
+                scene.fogs[i].emit_stop = stop;
                 out.effects = true;
             }
         }
@@ -996,6 +1033,7 @@ impl Timeline {
         self.elements.retain(|t| t.exists(scene));
         self.tracks.retain(|t| t.target.exists(scene));
         self.starts.retain(|(t, _)| t.exists(scene));
+        self.stops.retain(|(t, _)| t.exists(scene));
     }
 }
 
@@ -1378,6 +1416,29 @@ mod tests {
         assert!((f[0] - 1.0).abs() < 1e-5);
         tl.duration = 2.0;
         assert_eq!(tl.work_area(), (1.0, 2.0), "la durata accorciata la taglia");
+    }
+
+    /// Un valore che la scena limita non si riscrive a ogni fotogramma: la scena non cambia più e
+    /// la geometria non si ricostruisce all'infinito.
+    #[test]
+    fn a_clamped_value_settles() {
+        let mut s = Scene::test_scene();
+        let id = s.nodes[s.roots[0]].id.clone();
+        let t = Target::Object(id);
+        let mut tl = Timeline::default();
+        tl.add_element(&s, t.clone());
+        for (prop, v) in [(Prop::Scale, 0.0), (Prop::Opacity, 1.5)] {
+            let i = tl.track(&t, prop).unwrap();
+            tl.tracks[i].keys = vec![Key {
+                t: 0.0,
+                v,
+                interp: Interp::Linear,
+            }];
+        }
+        tl.apply(&mut s);
+        for _ in 0..3 {
+            assert!(!tl.apply(&mut s).any(), "niente da rifare a tempo fermo");
+        }
     }
 
     #[test]

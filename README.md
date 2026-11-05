@@ -18,17 +18,19 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
-### What's new in 0.43.0
+### What's new in 0.44.0
 
-- **Timeline (animation):** keys with six interpolations, modifiers (wiggle, oscillation, continuous ramp, loop, ping-pong, offset, multiply, limits, stepped), position, rotation, scale and opacity of objects, lights, camera and effects; it sits at the bottom in place of the console (Console | Timeline tabs) or in its own window; animation render to PNG frames and MP4. Off by default (Features menu), it turns on by itself with an effect computed over time.
-- **Particle smoke:** thin veils and long filaments that fold instead of a puffy cloud: new *Steam from a cup* (transparent ribbons rising from the coffee) and *Incense or cigarette* presets.
-- **Glowing dust and fireflies:** some specks light up in colours you choose with +, each with its own intensity and share, with an adjustable halo around them.
-- **Object opacity:** a fading object, shadows included, on CPU and GPU.
-- **Interface:** colour picker fixed (the colour square was blank) and used by every colour button; the quick bar no longer overlaps in a narrow window and AI MCP is a double button at the far right; reopened library and material editor windows come back to the front; turning the view no longer restarts a running dry-ice or smoke simulation.
+- **Smoke computed once over the whole timeline:** every frame is kept in temporary files, so moving the playhead reads them at once. If something changes from second 5 on, the simulation resumes from the last saved state before it: what comes first stays bit-identical, so a shape you like is never lost.
+- **Real air displacement:** animated objects are moving boundaries in the fluid equations: they push the air and the smoke, leaving a wake and vortices.
+- **Start and stop of the emission:** for smoke and dry ice; after the stop the source is off, but what came out keeps moving and fading.
+- **After Effects-style timeline:** always on, one row for position and rotation, keys selected with the mouse (rectangle, Ctrl, group drag, Delete, copy and paste), work area bar, saving the render or a viewport preview from the viewport or a camera, Play in the Render view at low samples.
+- **Smooth viewport:** moving objects no longer reloads the geometry: only their matrices go to the GPU (about 185 fps on the 100,000-triangle test scene).
+- **Rendering folder:** everything you save or export goes there by default.
 
 <details>
 <summary><strong>Previous versions — complete release history</strong></summary>
 
+- **0.43.0 — Timeline, particle smoke, fireflies:** keys with six interpolations and modifiers on objects, lights, camera and effects; particle smoke with the *Steam from a cup* and *Incense or cigarette* presets; glowing dust with a firefly halo; object opacity on CPU and GPU; colour picker fixed and used by every colour button; quick bar without overlaps and double AI MCP button; detached windows that come back to the front.
 - **0.42.0–0.42.1 — Replace material, two-colour dust, fairy dust:** every object with one material switches to another without selecting them; dust in two colours with opacity, size variation and sparkling flakes; simulated smoke as a viewport-only preview; Esc deselects everything.
 - **0.41.0 — Smoke and fog computed once:** smoke and fog already computed are reused at the render when nothing has changed; the smoke simulation works only where the smoke is (up to four times faster on large boxes); smoke contrast for a light, transparent smoke that keeps its relief.
 - **0.40.0 — Smoke that does not end at the box:** soft fractal edges on the simulated smoke; a box that turns and scales with its source, growing upwards only; simulated steam from a cup; material previews at 512 px; black and white also through coloured glass.
@@ -175,6 +177,10 @@ Real volumetric smoke clouds for product shots: incense smoke next to a perfume 
 
 - **Particle smoke (veils and filaments):** with "Particle smoke" the grid computes only the motion of the air and the smoke travels on about 2.4 million particles that never blur, deposited at the end on a grid two or three times finer. The smoke keeps thin veils that fold over themselves, bright where you see them edge-on, and long compact threads, instead of the puffy cloud of grid smoke. A **patchy source** makes it rise from a few spots that drift slowly, in separate ribbons. Two presets use it: **Steam from a cup** (light, transparent ribbons rising from the whole surface of the coffee, twisting and fading within a few centimetres) and **Incense or cigarette** (a thread of a couple of millimetres that rises straight and then breaks into long filaments and curling veils).
 
+- **Computed once over the timeline:** the simulation runs once over the whole duration and leaves a file per frame in the temporary folder, plus the complete state once per second. Moving the playhead reads the file of that frame. Every frame has a cumulative fingerprint of what affects it up to there (objects inside the box, emission on or off): when something changes, the simulation resumes from the last state before the first different frame, and what comes first stays bit-identical. In a test, 60 frames took 6.3 s, another frame 1 s, and an animation changed from second 1 restarted from frame 25.
+- **Air displacement of animated objects:** with the option on (the default), animated objects are moving boundaries of the fluid: the normal air velocity on their surface is theirs, so the pressure pushes the air ahead of them and draws it in behind, and the wake and vortices come from the fluid itself. Off, the smoke just adapts around the object. It works on simulated smoke only: procedural smoke and haze are not simulated, and vortices smaller than a grid cell cannot appear.
+- **Start and stop:** on the row of the effect in the timeline you choose when it starts and when the source stops emitting; what came out does not vanish, it keeps moving and fading. The time controls in the smoke panel are hidden: time is decided by the timeline.
+
 Fire (combustion, emission, flames lighting the scene) is a separate, later step: see the [smoke and fire study](docs/studio-fumo-fuoco.md).
 
 ### 7. Floating dust — specks that shine only in a beam
@@ -258,14 +264,14 @@ A STEP file is converted to meshes once. The result is kept in a conversion cach
 
 ### 16. Timeline — animation of objects, lights, camera and effects
 
-A professional timeline, to turn on from **Features → Timeline (animation)** (off by default; it turns on by itself when the scene has an effect computed over time, such as simulated smoke or dry ice). It sits at the bottom in place of the console, with **Console | Timeline** tabs, or in its own window with "Detach from the program", to be moved to another screen.
+A professional timeline, always available: it sits at the bottom with **Timeline | Console** tabs, or in its own window with "Detach from the program", to be moved to another screen.
 
-- **Elements and properties:** "+ Element" adds the selected objects, the camera, a light, a smoke, a dry-ice fog, the haze, the dust or the environment. Each element shows its base properties (for objects position, rotation, scale and opacity; for the camera position and target; for lights position and intensity) and "+" adds the other compatible ones one by one (scale per axis, visibility, colour, target, cone angle, field of view, aperture, focus distance, density, HDRI rotation, brightness).
-- **Keys:** the diamond sets or removes a key at the playhead with the current value; moving an object with the gizmo, or changing a value in the panels, when its property already has keys records a key there. Keys are dragged along the time (snapping to frames) and the right click chooses the interpolation towards the next one: hold, linear, ease in, ease out, ease in and out, smooth curve.
-- **Modifiers:** "ƒ+" adds to each property, one at a time and in order, wiggle (amplitude, frequency, seed), oscillation, continuous ramp (for example 90°/s for a turntable), loop, ping-pong, offset, multiply, limits and stepped (stop motion); each can be switched off.
-- **Playback:** start, previous key, play/pause, next key, end, loop; duration and frames per second; zoom and scroll of the time.
-- **Effects over time:** with the timeline on, simulated smoke and dry ice follow the playhead: the simulated instant is the playhead time minus the start of the effect, set with the bar on its row; the duration chosen in the timeline decides how long they are computed.
-- **Animation render:** every frame of the timeline as PNG in a folder, then the MP4 video, with fixed samples and the denoiser at the end.
+- **Elements and properties:** "+ Element" adds the selected objects, the camera, a light, a smoke, a dry-ice fog, the haze, the dust or the environment. Each element shows its base properties (for objects position, rotation, scale and opacity; for the camera position and target; for lights position and intensity) and "+" adds the other compatible ones one by one (scale per axis, visibility, colour, target, cone angle, field of view, aperture, focus distance, density, HDRI rotation, brightness). Position, rotation, target and colour are a single row with their three values: a key is set on all of them.
+- **Keys:** the diamond sets or removes a key at the playhead with the current value; moving an object with the gizmo, or changing a value in the panels, when its property already has keys records a key there. As in After Effects, a click selects a key, Ctrl or Shift adds or removes, dragging on the empty area draws a selection rectangle and dragging a key moves all the selected ones (snapping to frames); Delete removes them, Ctrl+C and Ctrl+V copy them to the playhead, F9 applies ease in and out and the right click chooses the interpolation towards the next key: hold, linear, ease in, ease out, ease in and out, smooth curve.
+- **Modifiers:** "ƒ+" adds to each property, one at a time and in order, wiggle (amplitude, frequency, seed), oscillation, continuous ramp (for example 90°/s for a turntable), loop, ping-pong, offset, multiply, limits and stepped (stop motion); on a row with three axes the X Y Z letters choose which ones it acts on.
+- **Playback:** start, previous key, play/pause, next key, end, loop; duration and frames per second; zoom and scroll of the time. The **work area** bar above the ruler (both ends and the middle can be dragged) sets the part that is played and saved. In the viewport playback is real time; in the **Render view** Play computes each frame with few samples (20 by default, adjustable) and moves on: slower than real time, but you see the rendered animation.
+- **Effects over time:** simulated smoke and dry ice follow the playhead: the simulated instant is the playhead time minus the start of the effect, set on its row together with the stop of the emission; the duration chosen in the timeline decides how long they are computed.
+- **Save animation:** the work area, either as the render of every frame or as a **viewport preview** (a few seconds, to check the motion; smoke and fog are not in it), from the viewport or from a render camera, as PNG frames in a new folder inside **Rendering** and, if you want, an MP4 video.
 - **Object opacity:** a property of its own, rendered by letting each ray through with probability 1 − opacity, so the object fades with its shadow, the same on CPU and GPU.
 
 ## What it does today
@@ -321,15 +327,22 @@ A professional timeline, to turn on from **Features → Timeline (animation)** (
   particle preview in the viewport (also as a preview only, without the full simulation at the
   render), soft fractal edges and a box that moves, turns and scales with its source. **Particle
   smoke** keeps thin folding veils and long filaments instead of a puffy cloud: presets *Steam
-  from a cup* (transparent ribbons rising from the coffee) and *Incense or cigarette*.
-- **Timeline (animation)**: an After Effects-style timeline, off by default (Features menu) and
-  turned on by itself with an effect computed over time. Keys with six interpolations (hold,
-  linear, ease in, ease out, ease in-out, smooth curve), modifiers added one by one (wiggle,
-  oscillation, continuous ramp, loop, ping-pong, offset, multiply, limits, stepped), position,
-  rotation, scale and opacity of objects, lights, camera, smoke, fog, haze, dust and environment;
-  keys recorded by the gizmo; smoke and dry ice that follow the playhead from their start;
-  playback with loop; animation render to PNG frames and MP4. It sits at the bottom with
-  Console | Timeline tabs or in its own window on another screen.
+  from a cup* (transparent ribbons rising from the coffee) and *Incense or cigarette*. The
+  simulation is **computed once over the timeline** and kept in temporary files, resuming from the
+  first changed frame; animated objects really **displace the air** with wake and vortices;
+  emission with a start and a stop.
+- **Timeline (animation)**: an After Effects-style timeline, always available, with Timeline |
+  Console tabs at the bottom or in its own window on another screen. Keys with six interpolations
+  (hold, linear, ease in, ease out, ease in-out, smooth curve), selected with the mouse (rectangle,
+  Ctrl, group drag, Delete, copy and paste); modifiers added one by one (wiggle, oscillation,
+  continuous ramp, loop, ping-pong, offset, multiply, limits, stepped); one row for position and
+  rotation; rotation, scale and opacity of objects, lights, camera, smoke, fog, haze, dust and
+  environment; keys recorded by the gizmo; smoke and dry ice that follow the playhead, with start
+  and stop of the emission; work area bar; real-time playback in the viewport, low-sample Play in
+  the Render view; saving the render of every frame or a viewport preview, from the viewport or a
+  camera, as PNG frames and MP4.
+- **Rendering folder**: what you save or export goes by default into `Rendering` next to the
+  program (or in Documents\ForgeRender if the program folder is read-only).
 - **Render styles**: photorealistic, cartoon (cel shading) and technical illustration, in colour
   or black and white, solid background, ink outlines on silhouettes and edges.
 - **Decals**: images and logos (PNG with transparency) projected on curved surfaces, moving
@@ -345,6 +358,8 @@ A professional timeline, to turn on from **Features → Timeline (animation)** (
   `.blend` (through an installed Blender); STEP via Open CASCADE and SolidWorks SLDPRT/SLDASM
   are experimental. The STEP converter (`forgerender-step.exe`) is built by `Build-ForgeRender.ps1`;
   it needs CMake (`winget install Kitware.CMake`).
+- **Viewport**: GPU rasterization with the object matrices on the GPU: moving objects does not
+  reload the geometry, so animation stays smooth.
 - **Editing**: move/rotate/scale gizmo with snapping (also for lights, spot cone handles and fog
   emitters), per-object contact snap, undo/redo, hide (H), duplicate,
   exact drop to floor, Blender-style axis navigator, component tree, persistent material
