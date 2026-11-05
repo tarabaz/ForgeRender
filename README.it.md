@@ -133,6 +133,8 @@ Il percorso del laser viene tracciato in modo deterministico a partire dalla sor
 
 ### 4. Nebbia da ghiaccio secco — simulazione fluida e rendering volumetrico
 
+![Nebbia da ghiaccio secco — gas freddo che scende, si accumula e si diffonde attorno agli oggetti](docs/img/features/dry-ice-fog.jpg)
+
 ForgeRender genera nebbia scenografica con una simulazione fluida 3D deterministica e basata su seed. Il solver modella la discesa del gas freddo e pesante, il suo accumulo e la propagazione laterale sulle superfici, oltre agli sbuffi turbolenti che risalgono mentre la nube evolve.
 
 - **Griglia MAC 3D:** calcolo di velocità e pressione e trasporto dei campi della nebbia.
