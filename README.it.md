@@ -227,7 +227,7 @@ Per la nebbia che riempie la scena vedi [Foschia d'ambiente](#5-foschia-dambient
 
 ### 12. Camera, viste multiple e presentazione prodotto
 
-![Vista prodotto a tre quarti](docs/img/mcp/esempi/vista_tre_quarti.jpg)
+![Rendering di prodotto con effetto tilt-shift](docs/img/features/tilt-shift-product-render.jpg)
 
 Le camere di rendering offrono focale, diaframma, profondità di campo e decentramento. Le viste automatiche frontale, posteriore, laterali, superiore e a tre quarti aiutano a presentare un prodotto da più angolazioni; è possibile esportare video turntable in MP4.
 
