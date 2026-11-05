@@ -30,7 +30,8 @@ pub use backend::RenderBackend;
 pub use denoise::{mix_denoised, Denoiser, Guides};
 pub use env_map::EnvironmentMap;
 pub use render_scene::{
-    pick, EmissiveSet, MaterialTextures, Portal, Portals, RenderGeometry, RenderLight, RenderLightKind, RenderMaterial, RenderScene,
+    pick, DustLook, EmissiveSet, MaterialTextures, Portal, Portals, RenderGeometry, RenderLight, RenderLightKind, RenderMaterial,
+    RenderScene,
 };
 pub use session::{AdaptiveDiag, Frame, Progress, RenderSession, SessionState};
 pub use settings::{

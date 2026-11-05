@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Numero di parole dei parametri (uniform `array<vec4<u32>, 22>`).
-pub const PARAM_WORDS: usize = 88;
+pub const PARAM_WORDS: usize = 92;
 
 // Indici dei parametri (devono coincidere con le costanti dello shader).
 pub const P_WIDTH: usize = 0;
@@ -96,6 +96,11 @@ pub const P_STYLE: usize = 83;
 pub const P_DUST_GAIN: usize = 84;
 /// Colore dello sfondo visto dalla camera (3 parole), se il bit 5 di [`P_STYLE`] è acceso.
 pub const P_BACKGROUND: usize = 85;
+/// Aspetto dei granelli di polvere (`RenderScene::dust_look`): opacità, parte riflessa a
+/// specchio delle scaglie, ruvidità del riflesso; le scaglie accendono il bit 3 di [`P_HAS_DUST`].
+pub const P_DUST_OPACITY: usize = 88;
+pub const P_DUST_SPARKLE: usize = 89;
+pub const P_DUST_ROUGH: usize = 90;
 /// Laser: potenza(3), raggio, densità del fascio, 0, 0, 0; poi 1 + [`forge_render_core::laser::N_LAMBDA`]
 /// percorsi (RGB, poi le lunghezze d'onda) di [`LASER_PATH_WORDS`] parole.
 pub const LASER_HEADER_WORDS: usize = 8;
@@ -568,7 +573,13 @@ pub fn build(scene: &RenderScene) -> SceneBuffer {
 
     p[P_N_SELECT] = scene.lights.len() as u32 + scene.samples_environment() as u32 + scene.emissive.is_some() as u32;
     p[P_HAS_CUTOUT] = scene.has_cutout as u32;
-    p[P_HAS_DUST] = scene.has_dust as u32 | (scene.fogs.iter().any(|f| f.additive) as u32) << 1 | (scene.dust_shadows as u32) << 2;
+    p[P_HAS_DUST] = scene.has_dust as u32
+        | (scene.fogs.iter().any(|f| f.additive) as u32) << 1
+        | (scene.dust_shadows as u32) << 2
+        | (scene.dust_look.flakes as u32) << 3;
+    set_f(&mut p, P_DUST_OPACITY, scene.dust_look.opacity);
+    set_f(&mut p, P_DUST_SPARKLE, scene.dust_look.sparkle);
+    set_f(&mut p, P_DUST_ROUGH, scene.dust_look.roughness);
     set_f(&mut p, P_DUST_GAIN, scene.dust_gain);
     if w.w.is_empty() {
         w.u(0);

@@ -426,11 +426,12 @@ fn haze(app: &mut ForgeApp, ui: &mut egui::Ui) {
 
 /// Polvere aggiunta, tolta o cambiata: si rifà il suo nodo.
 pub(crate) fn dust_changed(app: &mut ForgeApp) {
-    if !app.scene.haze_dust.enabled {
-        // Il nodo della polvere sparisce: gli indici dei nodi dopo di lui cambiano.
+    let nodes = app.scene.nodes.len();
+    app.scene.sync_effects();
+    if !app.scene.haze_dust.enabled || app.scene.nodes.len() != nodes {
+        // Un nodo della polvere è sparito o nato: gli indici dei nodi dopo di lui cambiano.
         app.selection.clear();
     }
-    app.scene.sync_effects();
     app.geometry_changed();
     app.appearance_changed();
 }
@@ -524,9 +525,66 @@ fn dust(app: &mut ForgeApp, ui: &mut egui::Ui) {
                     .on_hover_text(tr("Quanto brillano i granelli nel fascio"))
                     .changed();
                 ui.end_row();
+                ui.label(tr("Variazione dimensione"));
+                changed |= ui
+                    .add(egui::Slider::new(&mut dust.size_spread, 0.0..=1.0).custom_formatter(|v, _| format!("{:.0} %", v * 100.0)))
+                    .on_hover_text(tr(
+                        "Quanto la dimensione dei granelli si scosta a caso da quella impostata: 0 = tutti uguali, 50 % = da \
+                         metà al doppio, 100 % = da piccolissimi al triplo",
+                    ))
+                    .changed();
+                ui.end_row();
+                ui.label(tr("Opacità"));
+                changed |= ui
+                    .add(egui::Slider::new(&mut dust.opacity, 0.05..=1.0).custom_formatter(|v, _| format!("{:.0} %", v * 100.0)))
+                    .on_hover_text(tr(
+                        "Granelli semitrasparenti: diffondono meno luce e, se fanno ombra, ne fermano solo una parte",
+                    ))
+                    .changed();
+                ui.end_row();
                 ui.label(tr("Colore"));
                 changed |= ui.color_edit_button_rgb(&mut dust.color).changed();
                 ui.end_row();
+                ui.label(tr("Secondo colore"));
+                ui.horizontal(|ui| {
+                    changed |= ui.color_edit_button_rgb(&mut dust.color2).changed();
+                    changed |= ui
+                        .add(egui::Slider::new(&mut dust.color2_share, 0.0..=1.0).custom_formatter(|v, _| format!("{:.0} %", v * 100.0)))
+                        .on_hover_text(tr("Parte dei granelli con il secondo colore (0 = tutti del primo)"))
+                        .changed();
+                });
+                ui.end_row();
+                ui.label(tr("Forma"));
+                ui.horizontal(|ui| {
+                    changed |= ui
+                        .selectable_value(&mut dust.shape, forge_scene::DustShape::Grains, tr("Granelli"))
+                        .on_hover_text(tr("Granelli tondi: diffondono la luce uguale da ogni lato"))
+                        .changed();
+                    changed |= ui
+                        .selectable_value(&mut dust.shape, forge_scene::DustShape::Flakes, tr("Scaglie"))
+                        .on_hover_text(tr(
+                            "Scaglie piatte orientate a caso, come polvere di fata o brillantini: riflettono come piccoli \
+                             specchi, quindi brillano solo quelle girate giuste tra luce e camera e le altre restano spente",
+                        ))
+                        .changed();
+                });
+                ui.end_row();
+                if dust.shape == forge_scene::DustShape::Flakes {
+                    ui.label(tr("Luccichio"));
+                    changed |= ui
+                        .add(egui::Slider::new(&mut dust.sparkle, 0.0..=1.0).custom_formatter(|v, _| format!("{:.0} %", v * 100.0)))
+                        .on_hover_text(tr("Parte della luce riflessa a specchio dalle scaglie (il resto è diffusa)"))
+                        .changed();
+                    ui.end_row();
+                    ui.label(tr("Ruvidità del riflesso"));
+                    changed |= ui
+                        .add(egui::Slider::new(&mut dust.flake_roughness, 0.02..=0.6).max_decimals(2))
+                        .on_hover_text(tr(
+                            "Bassa: poche scintille piccole e intense. Alta: più scaglie accese ma più tenui",
+                        ))
+                        .changed();
+                    ui.end_row();
+                }
                 ui.label(tr("Fanno ombra"));
                 changed |= ui
                     .checkbox(&mut dust.shadows, "")

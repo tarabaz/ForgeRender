@@ -569,6 +569,27 @@ impl Scene {
     }
 
     /// Indici dei nodi in ordine di visita (profondità), con livello di annidamento.
+    /// Sostituisce il materiale `from` con `to` dappertutto: in ogni assegnazione (quindi anche
+    /// nei componenti che lo ereditano dal genitore) e come predefinito della scena, se lo era.
+    /// Restituisce quante assegnazioni sono cambiate (più una per il predefinito).
+    pub fn replace_material(&mut self, from: &MaterialId, to: &MaterialId) -> usize {
+        if from == to {
+            return 0;
+        }
+        let mut n = 0;
+        for (id, m) in self.assignments.iter_mut() {
+            if m == from && !crate::effects::is_dust_id(&id.0) && !id.0.starts_with(crate::effects::DECAL_PREFIX) {
+                *m = to.clone();
+                n += 1;
+            }
+        }
+        if &self.default_material == from {
+            self.default_material = to.clone();
+            n += 1;
+        }
+        n
+    }
+
     pub fn walk(&self) -> Vec<(NodeIndex, usize)> {
         let mut out = Vec::with_capacity(self.nodes.len());
         let mut stack: Vec<(NodeIndex, usize)> = self.roots.iter().rev().map(|&r| (r, 0)).collect();
@@ -733,6 +754,28 @@ mod tests {
         s.nodes[b].visible = false;
         assert!(!s.is_visible(c));
         assert!(s.is_visible(a));
+    }
+
+    #[test]
+    fn replace_material_changes_every_user_and_the_default() {
+        let mut s = Scene::default();
+        for id in ["rame", "ottone", "vetro"] {
+            s.materials.upsert(crate::material::Material {
+                id: MaterialId::new(id),
+                ..Default::default()
+            });
+        }
+        for k in 0..100 {
+            let id = ComponentId(format!("pezzo{k}"));
+            s.add_node(None, id.clone(), "pezzo", Mat4::IDENTITY, None);
+            s.assignments.insert(id, MaterialId::new(if k % 4 == 0 { "vetro" } else { "rame" }));
+        }
+        s.default_material = MaterialId::new("rame");
+        assert_eq!(s.replace_material(&MaterialId::new("rame"), &MaterialId::new("ottone")), 76);
+        assert!(s.assignments.values().all(|m| m.0 == "ottone" || m.0 == "vetro"));
+        assert_eq!(s.assignments.values().filter(|m| m.0 == "vetro").count(), 25);
+        assert_eq!(s.default_material, MaterialId::new("ottone"));
+        assert_eq!(s.replace_material(&MaterialId::new("ottone"), &MaterialId::new("ottone")), 0);
     }
 
     #[test]

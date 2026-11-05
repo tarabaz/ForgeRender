@@ -21,6 +21,24 @@ use std::path::PathBuf;
 pub const DECAL_PREFIX: &str = "adesivo:";
 /// Id del nodo della polvere in sospensione.
 pub const DUST_ID: &str = "effetto:polvere";
+/// Id del nodo (e del materiale) dei granelli del secondo colore.
+pub const DUST_ID_2: &str = "effetto:polvere:2";
+
+/// È l'id di un nodo o di un materiale della polvere in sospensione.
+pub fn is_dust_id(id: &str) -> bool {
+    id == DUST_ID || id == DUST_ID_2
+}
+
+/// Forma dei granelli di polvere.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DustShape {
+    /// Granelli tondi: diffondono la luce uguale da ogni lato.
+    #[default]
+    Grains,
+    /// Scaglie piatte orientate a caso (polvere di fata, brillantini): riflettono come piccoli
+    /// specchi, quindi brillano solo quelle girate giuste tra luce e camera.
+    Flakes,
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -206,6 +224,23 @@ fn clip(poly: &[(Vec3, Vec3, Vec3)], dist: impl Fn(Vec3) -> f32) -> Vec<(Vec3, V
     out
 }
 
+/// Scaglia: esagono piatto di diametro 1 nel piano xy (4 triangoli), centrato nell'origine.
+fn flake() -> Mesh {
+    let positions: Vec<Vec3> = (0..6)
+        .map(|k| {
+            let a = k as f32 * std::f32::consts::TAU / 6.0;
+            Vec3::new(a.cos() * 0.5, a.sin() * 0.5, 0.0)
+        })
+        .collect();
+    Mesh {
+        name: "Scaglia".into(),
+        normals: vec![Vec3::Z; 6],
+        positions,
+        uvs: Vec::new(),
+        indices: vec![[0, 1, 2], [0, 2, 3], [0, 3, 4], [0, 4, 5]],
+    }
+}
+
 /// Granello: icosaedro di diametro 1 (20 triangoli), centrato nell'origine.
 fn grain() -> Mesh {
     let t = (1.0 + 5f32.sqrt()) * 0.5;
@@ -274,6 +309,22 @@ pub struct Dust {
     /// Riquadro in cui stanno i granelli (centro e dimensioni, m). `None` = automatico attorno
     /// alla scena (i progetti di prima); si sposta e si ridimensiona con il gizmo.
     pub region: Option<(Vec3, Vec3)>,
+    /// Secondo colore dei granelli (0–1).
+    pub color2: [f32; 3],
+    /// Parte dei granelli con il secondo colore (0 = tutti del primo).
+    pub color2_share: f32,
+    /// Opacità dei granelli (0–1): quanta luce diffondono e quanta ne fermano per l'ombra.
+    pub opacity: f32,
+    /// Quanto la dimensione dei granelli si scosta da quella impostata (0 = tutti uguali, 0,5 =
+    /// da metà al doppio come nei progetti di prima, 1 = da quasi zero al triplo).
+    pub size_spread: f32,
+    /// Granelli tondi o scaglie piatte che luccicano.
+    pub shape: DustShape,
+    /// Scaglie: quanta luce riflettono a specchio invece che diffusa (0–1).
+    pub sparkle: f32,
+    /// Scaglie: ruvidità del riflesso (bassa = scintille piccole e intense, alta = più scaglie
+    /// accese ma più tenui).
+    pub flake_roughness: f32,
 }
 
 impl Default for Dust {
@@ -287,6 +338,13 @@ impl Default for Dust {
             brightness: 12.0,
             shadows: false,
             region: None,
+            color2: [1.0, 0.82, 0.45],
+            color2_share: 0.0,
+            opacity: 1.0,
+            size_spread: 0.5,
+            shape: DustShape::Grains,
+            sparkle: 0.8,
+            flake_roughness: 0.08,
         }
     }
 }
@@ -296,17 +354,24 @@ pub const DUST_MAX: usize = 150_000;
 
 impl Dust {
     /// Granelli sparsi nel riquadro [min, max] (spazio mondo), fuori dagli oggetti grossolanamente
-    /// non controllato: sono così piccoli che dentro un oggetto non si vedono.
-    pub fn build_mesh(&self, min: Vec3, max: Vec3) -> Mesh {
+    /// non controllato: sono così piccoli che dentro un oggetto non si vedono. Restituisce i
+    /// granelli del primo colore e quelli del secondo.
+    pub fn build_meshes(&self, min: Vec3, max: Vec3) -> (Mesh, Mesh) {
         let ext = (max - min).max(Vec3::ZERO);
         let volume = ext.x * ext.y * ext.z;
         let count = ((volume * self.per_m3.max(0.0)) as usize).min(DUST_MAX);
-        let ico = grain();
-        let mut out = Mesh {
-            name: "Polvere in sospensione".into(),
-            ..Default::default()
+        let flakes = self.shape == DustShape::Flakes;
+        let shape = if flakes { flake() } else { grain() };
+        let new_mesh = |name: &str| {
+            let mut m = Mesh {
+                name: name.into(),
+                ..Default::default()
+            };
+            m.positions.reserve(count * shape.positions.len());
+            m
         };
-        out.positions.reserve(count * ico.positions.len());
+        let mut first = new_mesh("Polvere in sospensione");
+        let mut second = new_mesh("Polvere in sospensione (secondo colore)");
         let mut state = 0x9E37_79B9_7F4A_7C15u64 ^ (self.seed as u64).wrapping_mul(0xD1B5_4A32_D192_ED03);
         let mut rnd = || {
             state ^= state << 13;
@@ -314,18 +379,62 @@ impl Dust {
             state ^= state << 17;
             (state >> 40) as f32 / (1u64 << 24) as f32
         };
+        // Le scelte nuove (colore, orientamento delle scaglie) usano un generatore a parte: i
+        // granelli dei progetti di prima restano dove erano.
+        let mut extra = 0x2545_F491_4F6C_DD1Du64 ^ (self.seed as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        let mut rnd2 = || {
+            extra ^= extra << 13;
+            extra ^= extra >> 7;
+            extra ^= extra << 17;
+            (extra >> 40) as f32 / (1u64 << 24) as f32
+        };
+        let spread = self.size_spread.clamp(0.0, 1.0);
+        let share = self.color2_share.clamp(0.0, 1.0);
         for _ in 0..count {
             let c = min + Vec3::new(rnd(), rnd(), rnd()) * ext;
-            // Dimensioni tra metà e il doppio, con più granelli piccoli che grandi.
-            let d = self.size_mm.max(0.01) * 1e-3 * (0.5 + 1.5 * rnd() * rnd());
+            // Fattore tra metà e il doppio (più granelli piccoli che grandi) con variazione 0,5,
+            // stretto o allargato dalla variazione scelta.
+            let f = 0.5 + 1.5 * rnd() * rnd();
+            let f = (1.0 + (f - 1.0) * 2.0 * spread).max(0.05);
+            let d = self.size_mm.max(0.01) * 1e-3 * f;
+            let out = if share > 0.0 && rnd2() < share { &mut second } else { &mut first };
             let base = out.positions.len() as u32;
-            for (p, nrm) in ico.positions.iter().zip(&ico.normals) {
-                out.positions.push(c + *p * d);
-                out.normals.push(*nrm);
+            if flakes {
+                // Normale a caso sulla sfera e due assi nel piano della scaglia.
+                let z = 2.0 * rnd2() - 1.0;
+                let a = std::f32::consts::TAU * rnd2();
+                let r = (1.0 - z * z).max(0.0).sqrt();
+                let n = Vec3::new(r * a.cos(), r * a.sin(), z);
+                let t = if n.x.abs() < 0.9 { Vec3::X } else { Vec3::Y }.cross(n).normalize();
+                let b = n.cross(t);
+                for p in &shape.positions {
+                    out.positions.push(c + (t * p.x + b * p.y) * d);
+                    out.normals.push(n);
+                }
+            } else {
+                for (p, nrm) in shape.positions.iter().zip(&shape.normals) {
+                    out.positions.push(c + *p * d);
+                    out.normals.push(*nrm);
+                }
             }
-            out.indices.extend(ico.indices.iter().map(|t| t.map(|i| i + base)));
+            out.indices.extend(shape.indices.iter().map(|t| t.map(|i| i + base)));
         }
-        out
+        (first, second)
+    }
+
+    /// Granelli del primo colore (vedi [`Dust::build_meshes`]).
+    pub fn build_mesh(&self, min: Vec3, max: Vec3) -> Mesh {
+        self.build_meshes(min, max).0
+    }
+
+    /// Materiale dei granelli del secondo colore.
+    pub fn material2(&self) -> Material {
+        Material {
+            id: MaterialId::new(DUST_ID_2),
+            name: "Polvere (secondo colore)".into(),
+            base_color: self.color2,
+            ..self.material()
+        }
     }
 
     pub fn material(&self) -> Material {
@@ -403,26 +512,31 @@ impl Scene {
     }
 
     fn sync_dust(&mut self) -> bool {
-        let id = ComponentId(DUST_ID.into());
         let on = self.haze_dust.enabled;
-        let existing = self.find(&id);
         if !on {
-            if let Some(i) = existing {
-                self.remove_subtree(i);
-                return true;
+            let mut changed = false;
+            for id in [DUST_ID_2, DUST_ID] {
+                if let Some(i) = self.find(&ComponentId(id.into())) {
+                    self.remove_subtree(i);
+                    changed = true;
+                }
             }
-            return false;
+            return changed;
         }
         let (center, size) = match self.haze_dust.region {
             Some(r) => r,
             None => {
                 // Riquadro automatico (progetti di prima): la scena senza la polvere, la camera
                 // compresa, al massimo 6 m per lato.
-                if let Some(i) = existing {
+                let dust_nodes: Vec<NodeIndex> = [DUST_ID, DUST_ID_2]
+                    .iter()
+                    .filter_map(|id| self.find(&ComponentId((*id).into())))
+                    .collect();
+                for &i in &dust_nodes {
                     self.nodes[i].visible = false;
                 }
                 let mut b = self.bounds();
-                if let Some(i) = existing {
+                for &i in &dust_nodes {
                     self.nodes[i].visible = true;
                 }
                 if b.is_empty() {
@@ -433,10 +547,30 @@ impl Scene {
             }
         };
         let half = size.max(Vec3::splat(0.01)) * 0.5;
-        let mesh = self.haze_dust.build_mesh(center - half, center + half);
-        self.materials.upsert(self.haze_dust.material());
-        self.assignments.insert(id.clone(), MaterialId::new(DUST_ID));
-        match existing {
+        let (first, second) = self.haze_dust.build_meshes(center - half, center + half);
+        let mut changed = self.sync_dust_node(DUST_ID, "Polvere in sospensione", first, self.haze_dust.material());
+        if second.indices.is_empty() {
+            if let Some(i) = self.find(&ComponentId(DUST_ID_2.into())) {
+                self.remove_subtree(i);
+                changed = true;
+            }
+        } else {
+            changed |= self.sync_dust_node(
+                DUST_ID_2,
+                "Polvere in sospensione (secondo colore)",
+                second,
+                self.haze_dust.material2(),
+            );
+        }
+        changed
+    }
+
+    /// Crea o aggiorna un nodo della polvere: vero se la mesh è cambiata.
+    fn sync_dust_node(&mut self, id: &str, name: &str, mesh: Mesh, material: Material) -> bool {
+        let cid = ComponentId(id.into());
+        self.materials.upsert(material);
+        self.assignments.insert(cid.clone(), MaterialId::new(id));
+        match self.find(&cid) {
             Some(i) => {
                 let m = self.nodes[i].mesh.unwrap_or_else(|| self.add_mesh(Mesh::default()));
                 self.nodes[i].mesh = Some(m);
@@ -447,7 +581,7 @@ impl Scene {
             }
             None => {
                 let m = self.add_mesh(mesh);
-                self.add_node(None, id, "Polvere in sospensione", Mat4::IDENTITY, Some(m));
+                self.add_node(None, cid, name, Mat4::IDENTITY, Some(m));
             }
         }
         true
@@ -557,7 +691,7 @@ impl Scene {
     /// È un nodo creato da un effetto (adesivo, polvere): non si salva come oggetto.
     pub fn is_effect_node(&self, idx: NodeIndex) -> bool {
         let id = &self.nodes[idx].id.0;
-        id.starts_with(DECAL_PREFIX) || id == DUST_ID
+        id.starts_with(DECAL_PREFIX) || is_dust_id(id)
     }
 }
 

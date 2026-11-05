@@ -311,6 +311,25 @@ fn body(
             *source = true;
         }
         crate::ui::smoke_preview::controls(ui, preview, s.sanitized().sim.time);
+        let mut full = !s.preview_only;
+        if ui
+            .checkbox(&mut full, tr("Calcolo vero per il render"))
+            .on_hover_text(tr(
+                "Spento: il fumo resta solo come anteprima a punti nella viewport (veloce) e il render non fa la \
+                 simulazione completa. Utile per sistemare posizione, sorgente e come gira attorno agli oggetti; \
+                 poi lo riaccendi per il render vero",
+            ))
+            .changed()
+        {
+            s.preview_only = !full;
+            changed = true;
+        }
+        if s.preview_only {
+            ui.colored_label(
+                egui::Color32::from_rgb(240, 180, 80),
+                tr("Solo anteprima: nel render questo fumo non c'è finché non riaccendi il calcolo vero."),
+            );
+        }
         if let Some((cell, r)) = s.sim_warning() {
             ui.colored_label(
                 egui::Color32::from_rgb(240, 180, 80),

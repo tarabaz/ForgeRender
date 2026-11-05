@@ -754,7 +754,7 @@ fn draw_smokes(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
         // Sorgente della simulazione: una sfera (la sua grandezza vera) con un punto al centro;
         // si seleziona con un clic e il gizmo la sposta.
         if s.mode == forge_scene::SmokeMode::Simulated {
-            if selected {
+            if selected || s.preview_only {
                 crate::ui::smoke_preview::draw(app, painter, rect, i);
             }
             let sv = s.sanitized();

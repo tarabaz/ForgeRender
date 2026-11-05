@@ -131,8 +131,78 @@ impl RenderMaterial {
             abbe: m.abbe,
             volume_color: Vec3::from_array(m.volume_color),
             volume_depth: m.volume_depth_cm * 0.01,
-            dust: m.id.0 == forge_scene::effects::DUST_ID,
+            dust: forge_scene::effects::is_dust_id(&m.id.0),
         }
+    }
+}
+
+/// Aspetto dei granelli di polvere, uguale per CPU e GPU.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DustLook {
+    /// Opacità (0–1): scala la luce diffusa e la probabilità di fermare un raggio d'ombra.
+    pub opacity: f32,
+    /// Scaglie piatte invece di granelli tondi.
+    pub flakes: bool,
+    /// Scaglie: parte della luce riflessa a specchio (0–1).
+    pub sparkle: f32,
+    /// Scaglie: ruvidità del riflesso (alpha GGX = ruvidità²).
+    pub roughness: f32,
+}
+
+impl Default for DustLook {
+    fn default() -> Self {
+        Self {
+            opacity: 1.0,
+            flakes: false,
+            sparkle: 0.0,
+            roughness: 0.5,
+        }
+    }
+}
+
+impl DustLook {
+    pub fn of(d: &forge_scene::effects::Dust) -> Self {
+        let flakes = d.shape == forge_scene::effects::DustShape::Flakes;
+        Self {
+            opacity: d.opacity.clamp(0.0, 1.0),
+            flakes,
+            sparkle: if flakes { d.sparkle.clamp(0.0, 1.0) } else { 0.0 },
+            roughness: d.flake_roughness.clamp(0.02, 1.0),
+        }
+    }
+
+    /// Luce rimandata da un granello verso `wo` (verso la camera) per la luce che arriva da `wi`,
+    /// senza la brillantezza; `n` è la normale geometrica della scaglia (ignorata per i granelli).
+    /// Granelli: la diffusione in avanti di prima (`2 · HG(0,5)`). Scaglie: una parte opaca
+    /// diffusa e un riflesso GGX a due facce (la scaglia è sottile e si vede da entrambi i lati),
+    /// quindi brillano solo quelle girate giuste tra luce e camera. Come lo shader della GPU.
+    pub fn response(&self, albedo: Vec3, n: Vec3, wo: Vec3, wi: Vec3) -> Vec3 {
+        if !self.flakes {
+            let g = 0.5f32;
+            let den = 1.0 + g * g - 2.0 * g * (-wo).dot(wi);
+            let hg = (1.0 - g * g) / (4.0 * std::f32::consts::PI * den * den.max(1e-12).sqrt());
+            return albedo * (2.0 * hg * self.opacity);
+        }
+        let n = if n.dot(wo) < 0.0 { -n } else { n };
+        let cos_o = n.dot(wo).max(0.05);
+        let cos_i = n.dot(wi);
+        // Parte diffusa: il lato illuminato, o un po' di luce in trasparenza da dietro.
+        let diffuse = albedo * ((cos_i.max(0.0) + 0.25 * (-cos_i).max(0.0)) * std::f32::consts::FRAC_1_PI);
+        let mut spec = Vec3::ZERO;
+        if cos_i > 0.0 {
+            let h = (wi + wo).normalize_or_zero();
+            let nh = n.dot(h).max(0.0);
+            let a2 = (self.roughness * self.roughness).powi(2).max(1e-6);
+            let den = nh * nh * (a2 - 1.0) + 1.0;
+            let dist = a2 / (std::f32::consts::PI * den * den);
+            // Riflesso del colore della scaglia (come i brillantini metallizzati), verso il bianco
+            // a luce radente (Schlick).
+            let f = 1.0 - wo.dot(h).clamp(0.0, 1.0);
+            let f5 = f * f * f * f * f;
+            let tint = albedo + (Vec3::ONE - albedo) * f5;
+            spec = tint * (dist / (4.0 * cos_o)).min(500.0);
+        }
+        (diffuse * (1.0 - self.sparkle) + spec * self.sparkle) * self.opacity
     }
 }
 
@@ -631,6 +701,8 @@ pub struct RenderScene {
     pub dust_gain: f32,
     /// I granelli di polvere fermano i raggi d'ombra (fanno ombra).
     pub dust_shadows: bool,
+    /// Aspetto dei granelli di polvere (opacità, scaglie che luccicano).
+    pub dust_look: DustLook,
     /// Nodi di pavimenti, fondali e pareti (per i contorni che li possono saltare).
     pub backdrop_nodes: Vec<u32>,
     /// Riferimento della proiezione Box di ogni nodo (indice = nodo), secondo l'ancoraggio del
@@ -801,6 +873,7 @@ impl RenderScene {
             has_dust,
             dust_gain: scene.haze_dust.brightness.max(0.0),
             dust_shadows: has_dust && scene.haze_dust.shadows,
+            dust_look: DustLook::of(&scene.haze_dust),
             backdrop_nodes: backdrop_nodes(scene),
             node_frames: box_frames(scene),
             fogs,
@@ -845,6 +918,7 @@ impl RenderScene {
             has_dust: self.has_dust,
             dust_gain: self.dust_gain,
             dust_shadows: self.dust_shadows,
+            dust_look: self.dust_look,
             backdrop_nodes: self.backdrop_nodes.clone(),
             node_frames: self.node_frames.clone(),
             fogs: self.fogs.clone(),

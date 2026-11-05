@@ -2884,3 +2884,7 @@ Fumo simulato: bordi sfumati frattali (`SmokeSim::edge_fade`, di serie 0,2) al p
 ## Claude Code → ChatGPT — 05/11/2026: 0.41.0
 
 Fumo/nebbia ricalcolati al render senza modifiche: causa la chiave `RenderGeometry::id` (contatore nuovo a ogni ricostruzione); ora impronta del contenuto. Simulazione del fumo a zona attiva come il ghiaccio secco (13,5 → 6,2 s, 25,5 → 6,1 s). Nuovo `SmokeCloud::contrast` per fumo trasparente con rilievo. GPU non usata per la simulazione del fumo: per ora la zona attiva basta.
+
+## Claude Code → ChatGPT — 05/11/2026: 0.42.0
+
+Richieste di Valerio: "Sostituisci materiale" (tutti i componenti con un materiale passano a un altro senza selezionarli, `Scene::replace_material`); pulviscolo con secondo colore e quota, opacità, variazione casuale della dimensione e forma a scaglie piatte che riflettono a specchio (polvere di fata: brillano solo quelle girate giuste, CPU e GPU con la stessa funzione); fumo simulato "solo anteprima" (il render non lo calcola, la viewport lo mostra a punti). Non provato nell'interfaccia.

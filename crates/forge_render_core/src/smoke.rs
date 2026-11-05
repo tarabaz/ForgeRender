@@ -196,13 +196,19 @@ fn cache() -> &'static Cache {
 }
 
 fn active(scene: &Scene) -> impl Iterator<Item = SmokeCloud> + '_ {
-    scene.smokes.iter().filter(|s| s.enabled && s.density > 0.0).map(|s| s.sanitized())
+    // Un fumo simulato "solo anteprima" vive nella viewport: il render non lo calcola.
+    scene
+        .smokes
+        .iter()
+        .filter(|s| s.enabled && s.density > 0.0 && !(s.preview_only && s.mode == SmokeMode::Simulated))
+        .map(|s| s.sanitized())
 }
 
 fn key(s: &SmokeCloud, geo: &RenderGeometry) -> String {
     let k = SmokeCloud {
         name: String::new(),
         n: 0,
+        preview_only: false,
         ..s.clone()
     };
     // Con le collisioni contano gli oggetti (qualsiasi cambio di geometria: semplice e sicuro).
@@ -535,6 +541,26 @@ mod tests {
         // Fotogramma per istante: il primo all'inizio, l'ultimo alla fine.
         assert!(std::ptr::eq(p.at(0.0).unwrap(), p.frames[0].1.as_slice()));
         assert!(std::ptr::eq(p.at(1e9).unwrap(), late.as_slice()));
+    }
+
+    /// Fumo simulato "solo anteprima": il render non lo calcola (e non tocca la chiave della cache,
+    /// così riaccendendo il calcolo vero si riusa quello già fatto).
+    #[test]
+    fn preview_only_smoke_is_skipped_by_the_render() {
+        let preset = forge_scene::SMOKE_PRESETS.iter().find(|p| p.name == "Fumo caldo simulato").unwrap();
+        let mut scene = Scene::default();
+        let mut s = (preset.make)();
+        s.preview_only = true;
+        scene.smokes.push(s.clone());
+        let geo = RenderGeometry::build(&scene);
+        let t0 = std::time::Instant::now();
+        assert!(smoke_fogs(&scene, &geo).is_empty());
+        assert!(t0.elapsed().as_millis() < 50, "niente simulazione");
+        let on = SmokeCloud {
+            preview_only: false,
+            ..s.clone()
+        };
+        assert_eq!(key(&s, &geo), key(&on, &geo));
     }
 
     /// La stessa scena ricostruita dà la stessa impronta della geometria (il fumo e la nebbia già

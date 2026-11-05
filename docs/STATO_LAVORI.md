@@ -771,3 +771,12 @@ Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
 - `SmokeCloud::contrast` nel render della densità.
 - Da valutare: GPU per la simulazione del fumo (la zona attiva toglie già la parte grossa); una
   "densità delle ombre" separata nel trasporto della luce, se il contrasto non basta.
+
+### 0.42.0 (05/11/2026): sostituisci materiale, polvere a due colori e a scaglie, fumo solo anteprima
+- `Scene::replace_material` + pannello Materiali (elenco "Sostituisci … con «selezionato»", clic destro sui
+  materiali della scena, "Annulla sostituzione" con le assegnazioni di prima tenute in memoria di egui).
+- Polvere: `Dust::color2`/`color2_share` (secondo nodo `effetto:polvere:2`), `opacity` (luce scalata,
+  ombra stocastica), `size_spread`, `shape` Grains/Flakes con `sparkle` e `flake_roughness`;
+  `forge_render_core::DustLook::response` sulla CPU, `dust_response` nel WGSL (parametri 88–90).
+- `SmokeCloud::preview_only`: il render salta il fumo simulato, la viewport lo mostra anche non selezionato.
+- Non provato nell'interfaccia né con un render vero delle scaglie (solo test della risposta e della scena).

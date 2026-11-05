@@ -5,7 +5,7 @@
 // luci analitiche, HDRI ed emissivi, Russian roulette, texture.
 // Tutta la scena è in un unico buffer di parole a 32 bit (vedi layout.rs).
 
-@group(0) @binding(0) var<uniform> P: array<vec4<u32>, 22>;
+@group(0) @binding(0) var<uniform> P: array<vec4<u32>, 23>;
 @group(0) @binding(1) var<storage, read> S: array<u32>;
 @group(0) @binding(2) var<storage, read_write> OUT: array<vec4<f32>>;
 // Campionamento adattivo: un bit per riquadro di 16×16 pixel (1 = riceve ancora campioni).
@@ -112,6 +112,9 @@ const P_HAS_DUST: u32 = 82u;
 const P_STYLE: u32 = 83u;
 const P_DUST_GAIN: u32 = 84u;
 const P_BACKGROUND: u32 = 85u;
+const P_DUST_OPACITY: u32 = 88u;
+const P_DUST_SPARKLE: u32 = 89u;
+const P_DUST_ROUGH: u32 = 90u;
 fn style_id() -> u32 { return pu(P_STYLE) & 15u; }
 fn style_mono() -> bool { return (pu(P_STYLE) & 16u) != 0u; }
 fn has_background() -> bool { return (pu(P_STYLE) & 32u) != 0u; }
@@ -621,7 +624,7 @@ fn opaque_at(prim: u32, t: f32, bu: f32, bv: f32, o: vec3<f32>, d: vec3<f32>) ->
     let mb = pu(P_OFF_MATS) + S[pb + 3u] * MAT_WORDS;
     let is_dust = (S[mb + 27u] & 4u) != 0u;
     if (dust_only) { return is_dust; }
-    if (is_dust) { return shadow_ray && (pu(P_HAS_DUST) & 4u) != 0u; }
+    if (is_dust) { return shadow_ray && (pu(P_HAS_DUST) & 4u) != 0u && (pf(P_DUST_OPACITY) >= 1.0 || rnd() < pf(P_DUST_OPACITY)); }
     let top = bitcast<i32>(S[mb + 26u]);
     if (top < 0) { return true; }
     let m = load_mat(S[pb + 3u]);
@@ -1502,9 +1505,42 @@ fn dust_glints(o: vec3<f32>, d: vec3<f32>, t_end: f32) -> vec3<f32> {
         if (vis <= 0.0) { continue; }
         let pb = pu(P_OFF_PRIMS) + h.prim * PRIM_WORDS;
         let albedo = sv3(pu(P_OFF_MATS) + S[pb + 3u] * MAT_WORDS);
-        c = c + albedo * li * (vis * f32(n_lights) * 2.0 * pf(P_DUST_GAIN) * hg_pdf(0.5, dot(d, ls.wi)));
+        let resp = dust_response(albedo, sv3(pb + 12u), -d, ls.wi);
+        c = c + resp * li * (vis * f32(n_lights) * pf(P_DUST_GAIN));
     }
     return c;
+}
+
+// Luce rimandata da un granello (come forge_render_core::DustLook::response): granelli tondi
+// con la diffusione in avanti, scaglie (bit 3 di P_HAS_DUST) con una parte diffusa e un riflesso
+// GGX a due facce.
+fn dust_response(albedo: vec3<f32>, ng: vec3<f32>, wo: vec3<f32>, wi: vec3<f32>) -> vec3<f32> {
+    let opacity = pf(P_DUST_OPACITY);
+    if ((pu(P_HAS_DUST) & 8u) == 0u) {
+        return albedo * (2.0 * hg_pdf(0.5, dot(-wo, wi)) * opacity);
+    }
+    var n = ng;
+    if (dot(n, wo) < 0.0) { n = -n; }
+    let cos_o = max(dot(n, wo), 0.05);
+    let cos_i = dot(n, wi);
+    let diffuse = albedo * ((max(cos_i, 0.0) + 0.25 * max(-cos_i, 0.0)) * INV_PI);
+    var spec = vec3<f32>(0.0);
+    if (cos_i > 0.0) {
+        let hv = wi + wo;
+        var h = vec3<f32>(0.0);
+        if (dot(hv, hv) > 0.0) { h = normalize(hv); }
+        let nh = max(dot(n, h), 0.0);
+        let r = pf(P_DUST_ROUGH);
+        let a2 = max(r * r * r * r, 1e-6);
+        let den = nh * nh * (a2 - 1.0) + 1.0;
+        let dist = a2 / (PI * den * den);
+        let f = 1.0 - clamp(dot(wo, h), 0.0, 1.0);
+        let f5 = f * f * f * f * f;
+        let tint = albedo + (vec3<f32>(1.0) - albedo) * f5;
+        spec = tint * min(dist / (4.0 * cos_o), 500.0);
+    }
+    let s = pf(P_DUST_SPARKLE);
+    return (diffuse * (1.0 - s) + spec * s) * opacity;
 }
 
 // ---------------------------------------------------------------- Volumi trasparenti

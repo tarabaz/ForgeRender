@@ -571,7 +571,8 @@ pub(crate) fn dust_glints(scene: &RenderScene, o: Vec3, d: Vec3, t_end: f32, rng
             continue;
         }
         let albedo = scene.material_of(prim as usize).base_color;
-        c += albedo * li * (vis * n_lights as f32 * 2.0 * scene.dust_gain * crate::medium::hg_pdf(0.5, d.dot(ls.wi)));
+        let n = scene.geometry.geometric_normals[prim as usize];
+        c += scene.dust_look.response(albedo, n, -d, ls.wi) * li * (vis * n_lights as f32 * scene.dust_gain);
     }
     c
 }

@@ -111,6 +111,9 @@ pub struct SmokeCloud {
     pub name: String,
     pub enabled: bool,
     pub shape: SmokeShape,
+    /// Fumo simulato solo nella viewport (anteprima a punti): il render non lo calcola finché non
+    /// si riaccende il calcolo vero. Serve a sistemare posizione e sorgente senza aspettare.
+    pub preview_only: bool,
     /// Centro del riquadro (m, spazio mondo).
     pub center: Vec3,
     /// Dimensioni del riquadro (m), nei suoi assi.
@@ -171,6 +174,7 @@ impl Default for SmokeCloud {
             name: "Fumo".into(),
             enabled: true,
             shape: SmokeShape::Cloud,
+            preview_only: false,
             center: Vec3::new(0.0, 0.5, 0.0),
             size: Vec3::splat(0.6),
             rotation_deg: 0.0,

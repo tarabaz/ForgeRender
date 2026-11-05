@@ -227,6 +227,24 @@ pub fn dust_hits(scene: &RenderScene, o: Vec3, d: Vec3, t_max: f32) -> ([(f32, u
     (out, n)
 }
 
+/// Un granello semitrasparente ferma il raggio d'ombra con probabilità pari all'opacità: la
+/// scelta dipende dal raggio (origine e direzione), quindi cambia da un campione all'altro e in
+/// media l'ombra del granello è parziale.
+#[inline]
+fn dust_blocks(opacity: f32, prim: u32, o: Vec3, d: Vec3) -> bool {
+    if opacity >= 1.0 {
+        return true;
+    }
+    let mut h = prim.wrapping_mul(0x9E37_79B9) ^ o.x.to_bits() ^ o.y.to_bits().rotate_left(11) ^ o.z.to_bits().rotate_left(22);
+    h ^= d.x.to_bits().rotate_left(5) ^ d.y.to_bits().rotate_left(17) ^ d.z.to_bits().rotate_left(27);
+    h ^= h >> 16;
+    h = h.wrapping_mul(0x7FEB_352D);
+    h ^= h >> 15;
+    h = h.wrapping_mul(0x846C_A68B);
+    h ^= h >> 16;
+    ((h >> 8) as f32 / (1u32 << 24) as f32) < opacity
+}
+
 /// Raggio d'ombra: le parti ritagliate lasciano passare la luce; i granelli di polvere la
 /// fermano solo se fanno ombra.
 #[inline]
@@ -234,7 +252,10 @@ pub fn occluded(scene: &RenderScene, o: Vec3, d: Vec3, t_min: f32, t_max: f32) -
     let accel = &scene.geometry.accel;
     if scene.has_cutout {
         accel.occluded_filtered(o, d, t_min, t_max, |prim, t, u, v| {
-            (scene.dust_shadows && scene.materials[scene.material_index(prim as usize)].dust) || opaque_at(scene, prim, t, u, v, o, d)
+            if scene.materials[scene.material_index(prim as usize)].dust {
+                return scene.dust_shadows && dust_blocks(scene.dust_look.opacity, prim, o, d);
+            }
+            opaque_at(scene, prim, t, u, v, o, d)
         })
     } else {
         accel.occluded(o, d, t_min, t_max)

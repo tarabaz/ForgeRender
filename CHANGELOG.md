@@ -13,6 +13,20 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.42.0 — 05/11/2026
+
+**Sostituisci materiale**
+- `Scene::replace_material(da, a)`: ogni assegnazione di `da` (quindi anche i componenti che lo ereditano dal genitore) e il predefinito della scena passano ad `a`; i nodi di polvere e adesivi restano com'erano (test `replace_material_changes_every_user_and_the_default`, 100 oggetti). Pannello Materiali: "Sostituisci [elenco] con «selezionato» (N)" e clic destro su un materiale della scena → "Sostituisci con «selezionato»"; "Annulla sostituzione" rimette le assegnazioni di prima dell'ultima sostituzione.
+
+**Polvere: due colori, opacità, variazione della dimensione, scaglie**
+- `Dust::color2` e `color2_share`: i granelli del secondo colore vanno in un secondo nodo e materiale (`effetto:polvere:2`, `effects::is_dust_id`), scelti con un generatore a parte così i granelli dei progetti esistenti restano dov'erano (test `second_color_splits_the_grains`).
+- `Dust::size_spread` (0–1, 0,5 = da metà al doppio come prima, 0 = tutti uguali, 1 = fino al triplo) (test `size_spread_controls_the_variation`).
+- `Dust::opacity`: scala la luce diffusa dai granelli; un raggio d'ombra è fermato da un granello con probabilità pari all'opacità (per raggio sulla CPU con un hash, con `rnd()` sulla GPU), così in media l'ombra è parziale.
+- `Dust::shape` = `Grains` (icosaedri, come prima) o `Flakes` (esagoni piatti con normale a caso) con `sparkle` e `flake_roughness`: `DustLook::response` dà ai granelli la diffusione in avanti di prima e alle scaglie una parte diffusa più un riflesso GGX a due facce tinto del loro colore, così brillano solo le scaglie girate giuste tra luce e camera (test `flakes_sparkle_unevenly`). GPU: `dust_response` nello shader, parametri 88–90 (`PARAM_WORDS` 92) e bit 3 di `P_HAS_DUST` per le scaglie.
+
+**Fumo simulato solo anteprima**
+- `SmokeCloud::preview_only`: il fumo simulato resta come anteprima a punti nella viewport (disegnata anche quando non è selezionato, con la nota "solo anteprima") e il render lo salta; la chiave della cache ignora l'opzione, così riaccendendo il calcolo vero si riusa quello già simulato (test `preview_only_smoke_is_skipped_by_the_render`). Pannello: "Calcolo vero per il render".
+
 ## 0.41.0 — 05/11/2026
 
 **Fumo e nebbia non si ricalcolano per niente**

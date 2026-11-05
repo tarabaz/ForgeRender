@@ -18,15 +18,17 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
-### Novità della versione 0.41.0
+### Novità della versione 0.42.0
 
-- **Niente più attese doppie:** fumo e nebbia già calcolati si riusano al render se non cambia niente.
-- **Simulazione del fumo più veloce:** lavora solo dove c'è il fumo (fino a quattro volte più veloce nei riquadri grandi).
-- **Contrasto del fumo:** un fumo leggero e trasparente che tiene il rilievo e i dettagli di uno denso.
+- **Sostituisci materiale:** tutti gli oggetti con un materiale passano a un altro con un clic, senza selezionarli.
+- **Polvere a due colori:** un secondo colore con la sua quota, l'opacità e una variazione casuale della dimensione.
+- **Polvere di fata:** scaglie piatte che riflettono come piccoli specchi, così solo alcune luccicano, secondo come le colpisce la luce.
+- **Fumo solo anteprima:** un fumo simulato può restare come anteprima veloce a punti nella viewport mentre lo sistemi; il render fa la simulazione completa solo quando la riaccendi.
 
 <details>
 <summary><strong>Versioni precedenti — cronologia completa</strong></summary>
 
+- **0.41.0 — Fumo e nebbia calcolati una volta:** fumo e nebbia già calcolati si riusano al render se non cambia niente; la simulazione del fumo lavora solo dove c'è il fumo (fino a quattro volte più veloce nei riquadri grandi); contrasto del fumo per un fumo leggero e trasparente che tiene il rilievo.
 - **0.40.0 — Fumo che non finisce sul riquadro:** bordi sfumati frattali sul fumo simulato; un riquadro che gira e si scala con la sua sorgente, crescendo solo verso l'alto; vapore da tazza simulato; anteprime dei materiali a 512 px; bianco e nero anche attraverso i vetri colorati.
 - **0.39.0 — Fumo da posizionare, selettore colore:** la sorgente del fumo simulato è una sfera nella viewport, spostata con il gizmo; un'anteprima veloce a particelle mostra dove va il fumo e come si muove nel tempo, senza fare il render; le celle della simulazione seguono la sorgente, così nei riquadri grandi il fumo non si perde più; un selettore colore per ogni colore dei materiali con RGB, CMYK e palette (RAL Classic con valori indicativi compresa); il render parte subito con contorni a inchiostro e tilt-shift; sfocatura del tilt-shift continua; riflessi del fumetto solo dove una luce si riflette davvero; il manuale segue la lingua dell'interfaccia.
 
@@ -171,6 +173,7 @@ Nubi di fumo volumetrico vere per le foto di prodotto: il fumo d'incenso accanto
 - **Bordi sfumati:** il fumo simulato non riempie il riquadro per poi finire tagliato: in una fascia vicino alle pareti e al soffitto (non al fondo) si dissolve come se uscisse dal riquadro, e il bordo si sfilaccia in modo frattale, con lingue, buchi e filamenti, come il fumo vero che si dirada nell'aria. La larghezza della fascia si regola (0 = pieno fino al bordo).
 - **Contrasto:** aumenta la differenza tra i grumi e le parti diradate: con densità bassa e contrasto alto il fumo è trasparente ma tiene il rilievo, i grumi restano densi e fanno ombra su sé stessi.
 - **Calcolato una volta:** la simulazione lavora solo nella zona dove ci sono fumo e calore (come la nebbia da ghiaccio secco), e il render riusa il risultato finché fumo, riquadro e oggetti restano gli stessi.
+- **Solo anteprima:** spegni "Calcolo vero per il render" e il fumo simulato resta come anteprima veloce a punti nella viewport (anche quando non è selezionato), con le collisioni con gli oggetti, mentre il render salta la simulazione completa. Lo sistemi, guardi come gira attorno agli oggetti, poi riaccendi il calcolo per il render vero.
 - **Riquadro con la sua sorgente:** il gizmo segue il riquadro: Sposta muove riquadro e sorgente, Ruota li gira attorno alla verticale (anche con il campo "Rotazione"), Scala ingrandisce insieme riquadro, posizione e raggio della sorgente. Altezza e scala crescono solo verso l'alto, dal fondo del riquadro, così il fumo non va mai sotto il piano. L'anteprima in viewport mostra l'istante riprodotto e resta pronta quando clicchi altrove, quindi non si ricalcola mentre giri la camera.
 
 Il fuoco (combustione, emissione, fiamme che illuminano la scena) è un passo a parte, successivo: vedi lo [studio su fumo e fuoco](docs/studio-fumo-fuoco.md).
@@ -178,6 +181,10 @@ Il fuoco (combustione, emissione, fiamme che illuminano la scena) è un passo a 
 ### 7. Polvere in sospensione — granelli che brillano solo in un fascio
 
 Granelli veri (qualche millimetro, fino a 150 000) sparsi nell'aria, come effetto a sé. Sono invisibili tranne dentro i fasci di spot e sole: lì brillano, come la polvere nei raggi che entrano dalla finestra di una soffitta, mentre lampadine, pannelli, ambiente e luce di rimbalzo non li illuminano. Sono segnati nelle guide del denoiser, così il denoiser li tiene invece di cancellarli come rumore. I granelli stanno in un riquadro che selezioni nella viewport e sposti o ridimensioni con il gizmo; di partenza copre gli oggetti fino alle spot, così i granelli riempiono tutto il fascio fino al piano illuminato. Si regolano quantità (fino a pochi granelli isolati), dimensione (fino a 18 mm), brillantezza e colore, e i granelli possono fare ombra: piccole sagome scure nei fasci e sul piano illuminato.
+
+- **Variazione della dimensione:** quanto la dimensione di ogni granello si scosta a caso da quella impostata, da tutti uguali a da piccolissimi al triplo.
+- **Due colori e opacità:** un secondo colore con la parte di granelli che lo prende (per esempio oro e bianco), e un'opacità che li rende semitrasparenti: diffondono meno luce e, se fanno ombra, ne fermano solo una parte.
+- **Granelli o scaglie (polvere di fata):** i *granelli* sono tondi e diffondono la luce uguale da ogni lato. Le *scaglie* sono piatte e girate a caso: riflettono come piccoli specchi, quindi brillano solo quelle girate giuste tra luce e camera mentre le altre restano spente, come brillantini o polvere di fata. **Luccichio** regola quanta luce le scaglie riflettono a specchio, **ruvidità del riflesso** se le scintille sono piccole e intense (bassa) o larghe e tenui (alta). Uguale su CPU e GPU.
 
 ### 8. Adesivi (decal) — etichette e loghi su qualsiasi superficie
 
@@ -195,6 +202,7 @@ Materiali diffusi, metalli e plastiche GGX, vetro Fresnel, vetro satinato ed emi
 - **Pacchetto aggiuntivo:** altri 109 materiali con mappe a 2K (legni e cortecce, pietre e intonaci, tessuti, metalli arrugginiti e consumati, asfalti, tetti), circa 1,6 GB, da scaricare a parte e copiare come `materiali-aggiuntivi` accanto a `forgerender.exe`: al riavvio compaiono nella stessa libreria.
 - **Liberi da ridistribuire:** i materiali con texture vengono da Poly Haven e ambientCG (CC0); la fonte di ogni materiale è in `assets/materiali/LEGGIMI.md`.
 - **Anteprime nitide:** ogni anteprima dei materiali si renderizza una volta con il path tracer a 512 px e si rimpicciolisce per ogni grandezza delle schede, così resta nitida sia grande sia piccola.
+- **Sostituisci materiale:** nel pannello Materiali scegli "Sostituisci [materiale] con «selezionato»" (oppure clic destro su un materiale della scena): tutti i componenti con quel materiale, anche quelli che lo ereditano e il predefinito della scena, passano a quello selezionato, senza dover selezionare cento oggetti. "Annulla sostituzione" rimette le assegnazioni di prima.
 - **Selettore colore:** cliccando il campione di un colore del materiale (colore base, colore in volume, emissione) si apre un solo pannello con tre schede: **RGB** (ruota dei colori, R, G, B e codice esadecimale), **CMYK** (ciano, magenta, giallo e nero in percentuale, con una conversione matematica semplice, non un profilo di stampa) e **Palette** (colori con codice e nome). Il colore cambia subito; **Applica** lo tiene, **Annulla** (o Esc) rimette quello di prima. La scheda palette comprende i codici RAL Classic con nome italiano e inglese e valori RGB **indicativi** (media di fonti pubbliche, non i valori ufficiali RAL, che RAL vende come libreria digitale); in più puoi importare la libreria ufficiale RAL CLASSIC `.ase` o una tua palette `.json`/`.csv` nella cartella Colori della libreria. Un colore preso da una palette mostra il suo codice (per esempio **RAL 7016**) accanto al campione, salvato con il progetto; cambiando il colore a mano torna un normale colore RGB.
 
 ### 10. Studio fotografico e illuminazione
@@ -288,10 +296,13 @@ Un file STEP si converte in mesh una volta sola. Il risultato resta in una cache
   su CPU e GPU.
 - **Foschia e polvere**: cinque tipi di foschia procedurale (nebbia bassa, nuvole di gas, fumo
   tossico a terra, strati sospesi, riccioli di vapore) da un'altezza di partenza a una massima;
-  granelli di polvere nel loro riquadro che brillano solo nei fasci di spot e sole.
+  granelli di polvere nel loro riquadro che brillano solo nei fasci di spot e sole, a due colori,
+  con opacità e variazione della dimensione, tondi o a scaglie piatte che luccicano come polvere
+  di fata.
 - **Fumo volumetrico**: nubi, pennacchi, fili d'incenso e banchi procedurali, oppure una
   simulazione fisica (calore, galleggiamento, vortici, vento, oggetti che lo deviano) con la
-  sorgente spostabile, l'anteprima a particelle nella viewport, i bordi sfumati frattali e un
+  sorgente spostabile, l'anteprima a particelle nella viewport (anche solo anteprima, senza la
+  simulazione completa al render), i bordi sfumati frattali e un
   riquadro che si sposta, gira e si scala insieme alla sua sorgente.
 - **Stili di rendering**: fotorealistico, fumetto (cel shading) e illustrazione tecnica, a colori
   o in bianco e nero, sfondo a tinta unita, contorni a inchiostro su sagome e spigoli.

@@ -242,6 +242,13 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
     });
     let ctx = ui.ctx().clone();
     let card = 64.0;
+    let mut replace: Option<(MaterialId, MaterialId)> = None;
+    let selected_name = app
+        .scene
+        .materials
+        .get(&app.selected_material)
+        .map(|m| crate::i18n::tr_dyn(&m.name).to_string())
+        .unwrap_or_default();
     egui::ScrollArea::vertical().id_salt("scene-mats").max_height(260.0).show(ui, |ui| {
         ui.horizontal_wrapped(|ui| {
             for m in &items {
@@ -256,12 +263,105 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 let tex = app.library.preset_thumb(&ctx, m, 128);
                 let name = crate::i18n::tr_dyn(&m.name);
                 let r = crate::ui::library::thumb_card(ui, tex, egui::vec2(card, card), &name, &sub, app.selected_material == m.id);
-                if r.on_hover_text(name.clone()).clicked() {
+                let r = r.on_hover_text(name.clone());
+                if r.clicked() {
                     app.selected_material = m.id.clone();
+                }
+                if app.selected_material != m.id {
+                    r.context_menu(|ui| {
+                        if ui
+                            .button(tf("Sostituisci con «{}»", std::slice::from_ref(&selected_name)))
+                            .on_hover_text(tr(
+                                "Tutti i componenti con questo materiale passano a quello selezionato, senza selezionarli",
+                            ))
+                            .clicked()
+                        {
+                            replace = Some((m.id.clone(), app.selected_material.clone()));
+                            ui.close();
+                        }
+                    });
                 }
             }
         });
     });
+
+    // Sostituisci materiale: tutti i componenti con un materiale passano a quello selezionato.
+    let replace_id = ui.make_persistent_id("sostituisci-materiale");
+    let mut from: Option<MaterialId> = ui.data(|d| d.get_temp(replace_id)).flatten();
+    if from
+        .as_ref()
+        .is_some_and(|f| *f == app.selected_material || !items.iter().any(|m| m.id == *f))
+    {
+        from = None;
+    }
+    ui.horizontal_wrapped(|ui| {
+        ui.label(tr("Sostituisci"));
+        let label = from
+            .as_ref()
+            .and_then(|f| items.iter().find(|m| m.id == *f))
+            .map(|m| crate::i18n::tr_dyn(&m.name).to_string())
+            .unwrap_or_else(|| tr("scegli…").to_string());
+        egui::ComboBox::from_id_salt("sostituisci-da")
+            .selected_text(label)
+            .show_ui(ui, |ui| {
+                for m in items.iter().filter(|m| m.id != app.selected_material) {
+                    let usage = app.scene.assignments.values().filter(|v| **v == m.id).count();
+                    let text = format!("{} ({usage})", crate::i18n::tr_dyn(&m.name));
+                    ui.selectable_value(&mut from, Some(m.id.clone()), text);
+                }
+            });
+        ui.label(tf("con «{}»", std::slice::from_ref(&selected_name)));
+        let count = from
+            .as_ref()
+            .map(|f| app.scene.assignments.values().filter(|v| *v == f).count())
+            .unwrap_or(0);
+        if ui
+            .add_enabled(from.is_some(), egui::Button::new(tf("Sostituisci ({})", &[count.to_string()])))
+            .on_hover_text(tr(
+                "Tutti i componenti con il primo materiale (anche quelli che lo ereditano, e il predefinito della scena) \
+                 passano a quello selezionato, senza doverli selezionare",
+            ))
+            .clicked()
+        {
+            if let Some(f) = from.take() {
+                replace = Some((f, app.selected_material.clone()));
+            }
+        }
+    });
+    ui.data_mut(|d| d.insert_temp(replace_id, from));
+    // Assegnazioni di prima dell'ultima sostituzione, per tornare indietro.
+    type Before = (std::collections::BTreeMap<forge_scene::ComponentId, MaterialId>, MaterialId, String);
+    let undo_id = ui.make_persistent_id("sostituisci-materiale-prima");
+    let before: Option<Before> = ui.data(|d| d.get_temp(undo_id)).flatten();
+    if let Some((assignments, default, text)) = &before {
+        let mut undo = false;
+        ui.horizontal_wrapped(|ui| {
+            ui.label(egui::RichText::new(text).small().weak());
+            undo = ui.small_button(tr("Annulla sostituzione")).clicked();
+        });
+        if undo {
+            app.scene.assignments = assignments.clone();
+            app.scene.default_material = default.clone();
+            ui.data_mut(|d| d.insert_temp::<Option<Before>>(undo_id, None));
+            app.appearance_changed();
+        }
+    }
+    if let Some((f, t)) = replace {
+        let saved = (app.scene.assignments.clone(), app.scene.default_material.clone());
+        let n = app.scene.replace_material(&f, &t);
+        if n > 0 {
+            let name = |id: &MaterialId| {
+                app.scene
+                    .materials
+                    .get(id)
+                    .map(|m| crate::i18n::tr_dyn(&m.name).to_string())
+                    .unwrap_or_default()
+            };
+            let text = tf("«{}» sostituito con «{}» ({} componenti).", &[name(&f), name(&t), n.to_string()]);
+            ui.data_mut(|d| d.insert_temp::<Option<Before>>(undo_id, Some((saved.0, saved.1, text))));
+            app.appearance_changed();
+        }
+    }
 
     // Assegnazione.
     ui.add_space(4.0);

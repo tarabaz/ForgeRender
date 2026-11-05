@@ -148,10 +148,14 @@ pub fn draw(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect, i: usize)
     }
     // Istante mostrato: si vede che il giro ricomincia da 0 (non è un nuovo calcolo).
     let time = s.sanitized().sim.time;
+    let mut label = crate::i18n::tf("Anteprima del fumo: {} / {} s", &[format!("{t:.1}"), format!("{time:.1}")]);
+    if s.preview_only {
+        label.push_str(crate::i18n::tr(" · solo anteprima, il render non lo calcola"));
+    }
     painter.text(
         rect.left_bottom() + egui::vec2(10.0, -10.0),
         egui::Align2::LEFT_BOTTOM,
-        crate::i18n::tf("Anteprima del fumo: {} / {} s", &[format!("{t:.1}"), format!("{time:.1}")]),
+        label,
         egui::FontId::proportional(12.0),
         egui::Color32::from_rgb(225, 235, 245),
     );

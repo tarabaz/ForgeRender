@@ -18,15 +18,17 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
-### What's new in 0.41.0
+### What's new in 0.42.0
 
-- **No more waiting twice:** smoke and fog already computed are reused at the render when nothing has changed.
-- **Faster smoke simulation:** it works only where the smoke is (up to four times faster on large boxes).
-- **Smoke contrast:** a light, transparent smoke that keeps the relief and detail of a dense one.
+- **Replace material:** every object with one material switches to another in one click, without selecting them.
+- **Dust in two colours:** a second colour with its share, opacity and a random size variation.
+- **Fairy dust:** flat flakes that reflect like tiny mirrors, so only some of them sparkle, depending on how the light hits them.
+- **Smoke preview only:** a simulated smoke can stay as a quick point preview in the viewport while you place it; the render runs the full simulation only when you turn it back on.
 
 <details>
 <summary><strong>Previous versions — complete release history</strong></summary>
 
+- **0.41.0 — Smoke and fog computed once:** smoke and fog already computed are reused at the render when nothing has changed; the smoke simulation works only where the smoke is (up to four times faster on large boxes); smoke contrast for a light, transparent smoke that keeps its relief.
 - **0.40.0 — Smoke that does not end at the box:** soft fractal edges on the simulated smoke; a box that turns and scales with its source, growing upwards only; simulated steam from a cup; material previews at 512 px; black and white also through coloured glass.
 - **0.39.0 — Smoke you can place, colour picker:** the source of the simulated smoke is a sphere in the viewport, moved with the gizmo; a quick particle preview shows where the smoke goes and how it moves over time, without rendering; the simulation cells follow the source, so large boxes no longer lose the smoke; a colour picker for every material colour with RGB, CMYK and palettes (RAL Classic with indicative values included); the render starts at once with ink outlines and tilt-shift; smooth tilt-shift blur; cartoon highlights only where a light is really reflected; the manual follows the interface language.
 
@@ -160,6 +162,7 @@ Real volumetric smoke clouds for product shots: incense smoke next to a perfume 
 - **Soft edges:** the simulated smoke does not fill the box and end with a cut: in a band near the walls and the ceiling (not the bottom) it dissolves as if it left the box, and the edge frays in a fractal way, with tongues, holes and wisps, like real smoke thinning out in the air. The width of the band is adjustable (0 = full up to the edge).
 - **Contrast:** raises the difference between the clumps and the thin parts: with a low density and a high contrast the smoke is transparent but keeps its relief, the clumps stay dense and shade themselves.
 - **Computed once:** the simulation works only in the zone where the smoke and the heat are (like the dry-ice fog), and the result is reused by the render as long as smoke, box and objects stay the same.
+- **Preview only:** turn off "Full computation for the render" and the simulated smoke stays as the quick point preview in the viewport (also when it is not selected), with its collisions with the objects, while the render skips the full simulation. Place it, check how it flows around the objects, then turn the computation back on for the real render.
 - **Box with its source:** the gizmo follows the box: Move moves box and source, Rotate turns them around the vertical (also with the "Rotation" field), Scale enlarges box, source position and source radius together. Height and scale grow upwards only, from the bottom of the box, so the smoke never goes below the floor. The viewport preview shows the time being played and is kept when you click elsewhere, so it is not recomputed while you turn the camera.
 
 Fire (combustion, emission, flames lighting the scene) is a separate, later step: see the [smoke and fire study](docs/studio-fumo-fuoco.md).
@@ -167,6 +170,10 @@ Fire (combustion, emission, flames lighting the scene) is a separate, later step
 ### 7. Floating dust — specks that shine only in a beam
 
 Real specks (a few millimetres, up to 150,000) scattered in the air, as their own effect. They are invisible except inside the beams of spots and sun: there they sparkle, like the dust in the rays coming through an attic window, while bulbs, panels, environment and bounce light do not light them. They are marked in the denoiser guides, so the denoiser keeps them instead of removing them as noise. The specks live in a box that you select in the viewport and move or resize with the gizmo; by default it covers the objects up to the spots, so the specks fill the whole beam down to the lit surface. Amount (down to a few isolated specks), size (up to 18 mm), brightness and colour are adjustable, and the specks can cast shadows: small dark shapes in the beams and on the lit surface.
+
+- **Size variation:** how much the size of each speck differs at random from the set size, from all the same to tiny-to-triple.
+- **Two colours and opacity:** a second colour with the share of specks that take it (for example gold and white), and an opacity that makes them semi-transparent: they scatter less light and, if they cast shadows, block only part of it.
+- **Grains or flakes (fairy dust):** *Grains* are round and scatter the light evenly. *Flakes* are flat and face random directions: they reflect like tiny mirrors, so only those turned the right way between the light and the camera sparkle while the others stay dark, like glitter or fairy dust. **Sparkle** sets how much light the flakes reflect like a mirror, **reflection roughness** how small and intense (low) or wide and soft (high) the sparkles are. The same on CPU and GPU.
 
 ### 8. Decals — labels and logos on any surface
 
@@ -184,6 +191,7 @@ Diffuse materials, GGX metals and plastics, Fresnel glass, frosted glass and emi
 - **Additional pack:** 109 more textured materials with 2K maps (woods and barks, stones and plasters, fabrics, rusty and worn metals, asphalt, roofs), about 1.6 GB, downloaded separately and copied as `materiali-aggiuntivi` next to `forgerender.exe`: at the next start they appear in the same library.
 - **Free to redistribute:** the textured materials come from Poly Haven and ambientCG (CC0); each material's source is listed in `assets/materiali/LEGGIMI.md`.
 - **Sharp previews:** every material preview is rendered once with the path tracer at 512 px and scaled down for each card size, so it stays sharp both large and small.
+- **Replace material:** in the Materials panel choose "Replace [material] with «selected»" (or right-click a scene material): every component with that material, including those that inherit it and the scene default, switches to the selected one, without selecting a hundred objects. "Undo replacement" brings the previous assignments back.
 - **Colour picker:** clicking the swatch of a material colour (base colour, volume colour, emission) opens one panel with three tabs: **RGB** (colour wheel, R, G, B and hex code), **CMYK** (cyan, magenta, yellow and black in percent, with a simple mathematical conversion, not a print profile) and **Palette** (colours with code and name). The colour changes live; **Apply** keeps it, **Cancel** (or Esc) restores the previous one. The palette tab includes the RAL Classic codes with Italian and English names and **indicative** RGB values (an average of public sources, not the official RAL values, which RAL sells as a digital library); you can also import the official RAL CLASSIC `.ase` library or your own `.json`/`.csv` palette into the Colours folder of the library. A colour picked from a palette shows its code (for example **RAL 7016**) next to the swatch, saved with the project; changing the colour by hand turns it back into a plain RGB colour.
 
 ### 10. Product studio and lighting
@@ -275,11 +283,12 @@ A STEP file is converted to meshes once. The result is kept in a conversion cach
   medium (delta tracking, Henyey–Greenstein phase, shadows through fog) on CPU and GPU.
 - **Ambient haze and dust**: five kinds of procedural haze (low fog, gas clouds, toxic floor
   smoke, floating layers, vapour curls) from a start to a maximum height; dust specks in their
-  own box that sparkle only in the beams of spots and sun.
+  own box that sparkle only in the beams of spots and sun, in two colours, with opacity and size
+  variation, as round grains or as flat flakes that glitter like fairy dust.
 - **Volumetric smoke**: procedural clouds, plumes, incense threads and smoke banks, or a physical
   simulation (heat, buoyancy, swirls, wind, objects that deflect it) with a movable source, a
-  particle preview in the viewport, soft fractal edges and a box that moves, turns and scales
-  with its source.
+  particle preview in the viewport (also as a preview only, without the full simulation at the
+  render), soft fractal edges and a box that moves, turns and scales with its source.
 - **Render styles**: photorealistic, cartoon (cel shading) and technical illustration, in colour
   or black and white, solid background, ink outlines on silhouettes and edges.
 - **Decals**: images and logos (PNG with transparency) projected on curved surfaces, moving
