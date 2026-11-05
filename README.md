@@ -210,7 +210,7 @@ For fog that fills the whole scene see [Ambient haze](#5-ambient-haze--five-kind
 
 ### 12. Camera, multiple views and product presentation
 
-![Three-quarter product view](docs/img/mcp/esempi/vista_tre_quarti.jpg)
+![Tilt-shift product rendering](docs/img/features/tilt-shift-product-render.jpg)
 
 Render cameras provide focal length, aperture, depth of field and lens shift. Automatic front, rear, side, top and three-quarter views help present a product from multiple angles; turntable videos can be exported as MP4.
 
@@ -219,11 +219,15 @@ Render cameras provide focal length, aperture, depth of field and lens shift. Au
 
 ### 13. Render passes and post-production
 
+![Render passes for post-production](docs/img/features/render-passes-post-production.jpg)
+
 ForgeRender can export separate **Albedo, Normals, Depth, Product Mask and Component ID** passes for compositing, masking and further image editing. These are technical output buffers, not additional beauty renders.
 
 ### 14. Render styles — cartoon, technical illustration and ink outlines
 
 At the top of the Render tab you choose how the image is drawn; hovering over each choice shows a small example.
+
+![Cartoon shading and technical illustration](docs/img/features/toon-technical-illustration.jpg)
 
 - **Photorealistic:** physically based path tracing, as always.
 - **Cartoon (cel shading):** flat material colours in three sharp bands (light, half shadow, shadow) from the scene lights, with their hard shadows and a crisp highlight on shiny materials, only where a light is really reflected (the shape of a softbox for area lights) and as strong as the material reflects (faint on dark plastics, full on metals).
