@@ -128,6 +128,15 @@ fn move_selection(app: &mut ForgeApp, rect: egui::Rect, from: egui::Pos2, to: eg
 fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
     let rect = ui.available_rect_before_wrap();
     let resp = ui.allocate_rect(rect, egui::Sense::click_and_drag());
+    // Esc deseleziona tutto, se non serve ad annullare altro (trascinamento del gizmo, scelta
+    // dell'oggetto da inquadrare o del punto da mettere a fuoco, selettore colore aperto).
+    if !app.aim_pick
+        && !app.focus_pick
+        && !app.gizmo.dragging()
+        && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape))
+    {
+        app.deselect_all();
+    }
     crate::ui::navigator::tick(app, ui.ctx());
     let ppp = ui.ctx().pixels_per_point();
     let size = [

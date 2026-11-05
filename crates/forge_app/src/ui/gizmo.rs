@@ -116,6 +116,13 @@ pub struct Gizmo {
     cone_drag: Option<(bool, LightKind)>,
 }
 
+impl Gizmo {
+    /// Si sta trascinando una maniglia (gizmo o cono dello spot): Esc annulla il trascinamento.
+    pub fn dragging(&self) -> bool {
+        self.drag.is_some() || self.cone_drag.is_some()
+    }
+}
+
 impl Default for Gizmo {
     fn default() -> Self {
         Self {

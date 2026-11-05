@@ -722,6 +722,18 @@ impl ForgeApp {
         self.undo_stack.pop();
     }
 
+    /// Esc: niente più selezionato (oggetti, luci, nebbie, fumi, polvere, camere).
+    pub fn deselect_all(&mut self) {
+        self.selection.clear();
+        self.selected_light = None;
+        self.selected_fog = None;
+        self.selected_smoke = None;
+        self.selected_dust = false;
+        self.selected_camera = None;
+        self.camera_target_handle = false;
+        self.smoke_source_handle = false;
+    }
+
     /// H: nasconde la selezione. Shift+H: nasconde tutto il resto. Alt+H: mostra tutto.
     pub fn hide_selection(&mut self, others: bool) {
         if self.selection.is_empty() {
