@@ -138,6 +138,8 @@ This is a physically motivated fluid approximation for dry-ice-style effects, no
 
 ### 5. Ambient haze — five kinds of procedural fog
 
+![Ambient haze — procedural fog layers and light rays](docs/img/features/ambient-haze.jpg)
+
 A participating medium that fills the scene (or only a layer of it) and that every light crosses: spots, sun and lamps draw rays with the shadows of the objects inside it, and light is scattered several times, on CPU and GPU. It is not a texture or a uniform grey block: the density comes from a domain-warped fractal noise computed on a 3D grid, so it has banks, curls and gaps.
 
 - **Five kinds:** *Low fog* lying on the ground and thinning out going up; *Gas clouds*, almost clear air with dense clumps here and there; *Toxic smoke on the floor*, a layer a few centimetres thick that hovers over the floor gathered into filaments; *Floating layers*, horizontal veils at different heights, wavy and full of holes; *Vapour curls*, swirls inside swirls with high contrast.
@@ -148,6 +150,8 @@ A participating medium that fills the scene (or only a layer of it) and that eve
 - **Never inside the objects:** rays travelling inside glass or liquid skip it (lenses and glasses stay clear) and the solid inside of the parts is cleared, while the air of a closed room stays hazy.
 
 ### 6. Volumetric smoke — clouds, plumes and incense in a box
+
+![Volumetric smoke — clouds, plumes and incense](docs/img/features/volumetric-smoke.jpg)
 
 Real volumetric smoke clouds for product shots: incense smoke next to a perfume bottle, steam rising from a cup, a plume from a pipe or chimney, dense dark industrial smoke. Each cloud lives in a box that you select in the viewport and move or resize with the gizmo: the rendered smoke follows the box exactly, with nothing left behind where it was.
 
@@ -168,6 +172,8 @@ Real volumetric smoke clouds for product shots: incense smoke next to a perfume 
 Fire (combustion, emission, flames lighting the scene) is a separate, later step: see the [smoke and fire study](docs/studio-fumo-fuoco.md).
 
 ### 7. Floating dust — specks that shine only in a beam
+
+![Floating dust illuminated by a beam of light](docs/img/features/floating-dust.jpg)
 
 Real specks (a few millimetres, up to 150,000) scattered in the air, as their own effect. They are invisible except inside the beams of spots and sun: there they sparkle, like the dust in the rays coming through an attic window, while bulbs, panels, environment and bounce light do not light them. They are marked in the denoiser guides, so the denoiser keeps them instead of removing them as noise. The specks live in a box that you select in the viewport and move or resize with the gizmo; by default it covers the objects up to the spots, so the specks fill the whole beam down to the lit surface. Amount (down to a few isolated specks), size (up to 18 mm), brightness and colour are adjustable, and the specks can cast shadows: small dark shapes in the beams and on the lit surface.
 
