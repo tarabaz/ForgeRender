@@ -19,7 +19,7 @@ pub mod units;
 
 pub use added::{AddedKind, AddedRecord};
 pub use camera::{Camera, OrbitController, RenderCamera};
-pub use effects::{Decal, Dust, DustShape};
+pub use effects::{Decal, Dust, DustGlow, DustShape};
 pub use environment::Environment;
 pub use fog::{FogPreset, FogVolume, Haze, HazeKind, FOG_PRESETS, FOG_QUALITY};
 pub use light::{LaserSource, Light, LightKind};

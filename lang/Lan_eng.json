@@ -1585,6 +1585,13 @@
     "0 = il fumo esce da tutta la sorgente, 1 = da pochi punti che si spostano piano: nastri separati, come il vapore di una tazza": "0 = the smoke comes out of the whole source, 1 = from a few spots that drift slowly: separate ribbons, like the steam from a cup",
     "Fumo a particelle (veli e filamenti sottili)": "Particle smoke (thin veils and filaments)",
     "Il fumo viaggia su particelle che non si sfumano: veli sottili che si ripiegano e filamenti lunghi (vapore, incenso, sigaretta) invece della nuvola gonfia. Calcolo più lungo": "The smoke travels on particles that do not blur: thin veils that fold and long filaments (steam, incense, cigarette) instead of a puffy cloud. Longer to compute",
-    "Sorgente a chiazze": "Patchy source"
+    "Sorgente a chiazze": "Patchy source",
+    "Granelli luminosi": "Glowing specks",
+    "Aggiunge un colore di granelli che emettono luce propria": "Adds a colour of specks that give off their own light",
+    "Con + scegli un colore: una parte dei granelli si accende di quel colore, come lucciole o scintille, e si vede anche fuori dai fasci delle spot.": "With + choose a colour: some of the specks light up in that colour, like fireflies or sparks, and can be seen outside the spot beams too.",
+    "Colore della luce emessa": "Colour of the emitted light",
+    "Intensità della luce emessa dai granelli di questo colore": "Intensity of the light given off by the specks of this colour",
+    "Parte dei granelli che si accendono di questo colore": "Share of the specks that light up in this colour",
+    "Togli questo colore": "Remove this colour"
   }
 }

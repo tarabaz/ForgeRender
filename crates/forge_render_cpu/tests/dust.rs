@@ -176,3 +176,42 @@ fn flakes_with_second_color_compile() {
     s.sync_effects();
     assert!(s.find(&forge_scene::ComponentId(forge_scene::effects::DUST_ID_2.into())).is_none());
 }
+
+/// Granelli luminosi: ogni colore ha il suo nodo con un materiale che emette luce, con circa la
+/// parte di granelli scelta; togliendo i colori i nodi spariscono.
+#[test]
+fn glowing_dust_gets_its_own_emissive_nodes() {
+    use forge_scene::effects::dust_glow_id;
+    let mut s = forge_scene::Scene::default();
+    s.haze_dust.enabled = true;
+    s.haze_dust.per_m3 = 20000.0;
+    s.haze_dust.region = Some((forge_math::Vec3::ZERO, forge_math::Vec3::splat(1.0)));
+    s.haze_dust.glow = vec![
+        forge_scene::DustGlow {
+            color: [1.0, 0.5, 0.2],
+            intensity: 3.0,
+            share: 0.2,
+        },
+        forge_scene::DustGlow {
+            color: [0.2, 0.5, 1.0],
+            intensity: 5.0,
+            share: 0.1,
+        },
+    ];
+    s.sync_effects();
+    let tri = |s: &forge_scene::Scene, id: &str| {
+        let i = s.find(&forge_scene::ComponentId(id.into())).expect(id);
+        s.meshes[s.nodes[i].mesh.unwrap()].indices.len() as f32
+    };
+    let all = tri(&s, forge_scene::effects::DUST_ID) + tri(&s, &dust_glow_id(0)) + tri(&s, &dust_glow_id(1));
+    let a = tri(&s, &dust_glow_id(0)) / all;
+    let b = tri(&s, &dust_glow_id(1)) / all;
+    assert!((a - 0.2).abs() < 0.03 && (b - 0.1).abs() < 0.03, "parti {a} {b}");
+    let m = s.materials.get(&forge_scene::MaterialId::new(dust_glow_id(1))).expect("materiale");
+    assert_eq!(m.emission_strength, 5.0);
+    assert!(s.is_effect_node(s.find(&forge_scene::ComponentId(dust_glow_id(0))).unwrap()));
+    s.haze_dust.glow.clear();
+    s.sync_effects();
+    assert!(s.find(&forge_scene::ComponentId(dust_glow_id(0))).is_none());
+    assert!(s.materials.get(&forge_scene::MaterialId::new(dust_glow_id(1))).is_none());
+}

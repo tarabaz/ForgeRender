@@ -578,7 +578,7 @@ impl Scene {
         }
         let mut n = 0;
         for (id, m) in self.assignments.iter_mut() {
-            if m == from && !crate::effects::is_dust_id(&id.0) && !id.0.starts_with(crate::effects::DECAL_PREFIX) {
+            if m == from && !crate::effects::is_any_dust_id(&id.0) && !id.0.starts_with(crate::effects::DECAL_PREFIX) {
                 *m = to.clone();
                 n += 1;
             }

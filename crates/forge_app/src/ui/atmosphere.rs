@@ -594,6 +594,54 @@ fn dust(app: &mut ForgeApp, ui: &mut egui::Ui) {
                     .changed();
                 ui.end_row();
             });
+            // Granelli luminosi: ogni colore prende la sua parte di granelli, che emettono luce
+            // e si vedono anche fuori dai fasci.
+            ui.add_space(4.0);
+            ui.horizontal(|ui| {
+                ui.strong(tr("Granelli luminosi"));
+                if ui
+                    .small_button("+")
+                    .on_hover_text(tr("Aggiunge un colore di granelli che emettono luce propria"))
+                    .clicked()
+                {
+                    dust.glow.push(forge_scene::DustGlow::default());
+                    changed = true;
+                }
+            });
+            if dust.glow.is_empty() {
+                ui.label(
+                    egui::RichText::new(tr(
+                        "Con + scegli un colore: una parte dei granelli si accende di quel colore, come lucciole o \
+                         scintille, e si vede anche fuori dai fasci delle spot.",
+                    ))
+                    .small()
+                    .weak(),
+                );
+            }
+            let mut remove_glow = None;
+            egui::Grid::new("polvere-luminosa").num_columns(4).show(ui, |ui| {
+                for (k, g) in dust.glow.iter_mut().enumerate() {
+                    ui.push_id(("luminosa", k), |ui| {
+                        changed |= crate::ui::color_picker::rgb_edit_hint(ui, &mut g.color, tr("Colore della luce emessa"));
+                    });
+                    changed |= ui
+                        .add(egui::Slider::new(&mut g.intensity, 0.2..=200.0).logarithmic(true).max_decimals(1))
+                        .on_hover_text(tr("Intensità della luce emessa dai granelli di questo colore"))
+                        .changed();
+                    changed |= ui
+                        .add(egui::Slider::new(&mut g.share, 0.0..=1.0).custom_formatter(|v, _| format!("{:.1} %", v * 100.0)))
+                        .on_hover_text(tr("Parte dei granelli che si accendono di questo colore"))
+                        .changed();
+                    if ui.small_button(icons::DELETE).on_hover_text(tr("Togli questo colore")).clicked() {
+                        remove_glow = Some(k);
+                    }
+                    ui.end_row();
+                }
+            });
+            if let Some(k) = remove_glow {
+                dust.glow.remove(k);
+                changed = true;
+            }
         });
     if select {
         app.selected_dust = true;

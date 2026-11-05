@@ -150,6 +150,10 @@ fn apply_patch(scene: &mut Scene, settings: &mut RenderSettings, path: &std::pat
     if let Some(s) = j.get("settings") {
         *settings = patched(settings, s)?;
     }
+    if let Some(d) = j.get("dust") {
+        scene.haze_dust = patched(&scene.haze_dust, d)?;
+        scene.sync_effects();
+    }
     if let Some(serde_json::Value::Array(ls)) = j.get("lights") {
         scene.lights = ls
             .iter()

@@ -24,9 +24,46 @@ pub const DUST_ID: &str = "effetto:polvere";
 /// Id del nodo (e del materiale) dei granelli del secondo colore.
 pub const DUST_ID_2: &str = "effetto:polvere:2";
 
-/// È l'id di un nodo o di un materiale della polvere in sospensione.
+/// È l'id di un nodo o di un materiale della polvere in sospensione illuminata dai fasci (non dei
+/// granelli luminosi, che sono geometria normale che emette luce).
 pub fn is_dust_id(id: &str) -> bool {
     id == DUST_ID || id == DUST_ID_2
+}
+
+/// Prefisso degli id dei nodi (e dei materiali) dei granelli luminosi: `<prefisso><n>`, n = 1, 2...
+pub const DUST_GLOW_PREFIX: &str = "effetto:polvere:luce:";
+
+/// Id dei granelli luminosi del colore `k` (0 = il primo).
+pub fn dust_glow_id(k: usize) -> String {
+    format!("{DUST_GLOW_PREFIX}{}", k + 1)
+}
+
+/// È l'id di qualsiasi nodo o materiale della polvere (illuminata o luminosa).
+pub fn is_any_dust_id(id: &str) -> bool {
+    is_dust_id(id) || id.starts_with(DUST_GLOW_PREFIX)
+}
+
+/// Un colore di granelli luminosi: emettono luce propria, si vedono anche fuori dai fasci.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct DustGlow {
+    /// Colore della luce emessa (0–1).
+    pub color: [f32; 3],
+    /// Intensità della luce emessa (radianza, come l'emissione dei materiali).
+    pub intensity: f32,
+    /// Parte dei granelli che si accendono di questo colore (0–1).
+    pub share: f32,
+}
+
+impl Default for DustGlow {
+    fn default() -> Self {
+        Self {
+            color: [1.0, 0.78, 0.4],
+            // Più alta il colore satura al bianco (come una lampadina vista dritta).
+            intensity: 3.0,
+            share: 0.05,
+        }
+    }
 }
 
 /// Forma dei granelli di polvere.
@@ -325,6 +362,8 @@ pub struct Dust {
     /// Scaglie: ruvidità del riflesso (bassa = scintille piccole e intense, alta = più scaglie
     /// accese ma più tenui).
     pub flake_roughness: f32,
+    /// Granelli luminosi: ogni colore prende la sua parte di granelli, che emettono luce.
+    pub glow: Vec<DustGlow>,
 }
 
 impl Default for Dust {
@@ -345,6 +384,7 @@ impl Default for Dust {
             shape: DustShape::Grains,
             sparkle: 0.8,
             flake_roughness: 0.08,
+            glow: Vec::new(),
         }
     }
 }
@@ -357,6 +397,12 @@ impl Dust {
     /// non controllato: sono così piccoli che dentro un oggetto non si vedono. Restituisce i
     /// granelli del primo colore e quelli del secondo.
     pub fn build_meshes(&self, min: Vec3, max: Vec3) -> (Mesh, Mesh) {
+        let (a, b, _) = self.build_groups(min, max);
+        (a, b)
+    }
+
+    /// Come [`Dust::build_meshes`], e in più i granelli luminosi di ogni colore di [`Dust::glow`].
+    pub fn build_groups(&self, min: Vec3, max: Vec3) -> (Mesh, Mesh, Vec<Mesh>) {
         let ext = (max - min).max(Vec3::ZERO);
         let volume = ext.x * ext.y * ext.z;
         let count = ((volume * self.per_m3.max(0.0)) as usize).min(DUST_MAX);
@@ -372,6 +418,25 @@ impl Dust {
         };
         let mut first = new_mesh("Polvere in sospensione");
         let mut second = new_mesh("Polvere in sospensione (secondo colore)");
+        let mut glows: Vec<Mesh> = (0..self.glow.len())
+            .map(|k| new_mesh(&format!("Granelli luminosi {}", k + 1)))
+            .collect();
+        // Parti dei colori luminosi (se insieme superano il 100 % si riducono in proporzione).
+        let shares: Vec<f32> = self
+            .glow
+            .iter()
+            .map(|g| if g.share.is_finite() { g.share.clamp(0.0, 1.0) } else { 0.0 })
+            .collect();
+        let total: f32 = shares.iter().sum();
+        let norm = if total > 1.0 { 1.0 / total } else { 1.0 };
+        // Generatore a parte anche per i luminosi: gli altri granelli non si spostano.
+        let mut glow_state = 0x6A09_E667_F3BC_C909u64 ^ (self.seed as u64).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        let mut rnd3 = || {
+            glow_state ^= glow_state << 13;
+            glow_state ^= glow_state >> 7;
+            glow_state ^= glow_state << 17;
+            (glow_state >> 40) as f32 / (1u64 << 24) as f32
+        };
         let mut state = 0x9E37_79B9_7F4A_7C15u64 ^ (self.seed as u64).wrapping_mul(0xD1B5_4A32_D192_ED03);
         let mut rnd = || {
             state ^= state << 13;
@@ -397,7 +462,24 @@ impl Dust {
             let f = 0.5 + 1.5 * rnd() * rnd();
             let f = (1.0 + (f - 1.0) * 2.0 * spread).max(0.05);
             let d = self.size_mm.max(0.01) * 1e-3 * f;
-            let out = if share > 0.0 && rnd2() < share { &mut second } else { &mut first };
+            let second_color = share > 0.0 && rnd2() < share;
+            let mut glow_k = None;
+            if !shares.is_empty() {
+                let mut u = rnd3();
+                for (k, s) in shares.iter().enumerate() {
+                    let s = s * norm;
+                    if u < s {
+                        glow_k = Some(k);
+                        break;
+                    }
+                    u -= s;
+                }
+            }
+            let out = match glow_k {
+                Some(k) => &mut glows[k],
+                None if second_color => &mut second,
+                None => &mut first,
+            };
             let base = out.positions.len() as u32;
             if flakes {
                 // Normale a caso sulla sfera e due assi nel piano della scaglia.
@@ -419,7 +501,7 @@ impl Dust {
             }
             out.indices.extend(shape.indices.iter().map(|t| t.map(|i| i + base)));
         }
-        (first, second)
+        (first, second, glows)
     }
 
     /// Granelli del primo colore (vedi [`Dust::build_meshes`]).
@@ -434,6 +516,21 @@ impl Dust {
             name: "Polvere (secondo colore)".into(),
             base_color: self.color2,
             ..self.material()
+        }
+    }
+
+    /// Materiale dei granelli luminosi del colore `k`.
+    pub fn glow_material(&self, k: usize) -> Material {
+        let g = self.glow.get(k).cloned().unwrap_or_default();
+        Material {
+            id: MaterialId::new(dust_glow_id(k)),
+            name: format!("Polvere luminosa {}", k + 1),
+            base_color: g.color,
+            emission: g.color,
+            emission_strength: g.intensity.max(0.0),
+            roughness: 0.6,
+            category: "Effetti".into(),
+            ..Material::default()
         }
     }
 
@@ -521,6 +618,7 @@ impl Scene {
                     changed = true;
                 }
             }
+            changed |= self.remove_dust_glow_from(0);
             return changed;
         }
         let (center, size) = match self.haze_dust.region {
@@ -528,10 +626,7 @@ impl Scene {
             None => {
                 // Riquadro automatico (progetti di prima): la scena senza la polvere, la camera
                 // compresa, al massimo 6 m per lato.
-                let dust_nodes: Vec<NodeIndex> = [DUST_ID, DUST_ID_2]
-                    .iter()
-                    .filter_map(|id| self.find(&ComponentId((*id).into())))
-                    .collect();
+                let dust_nodes: Vec<NodeIndex> = (0..self.nodes.len()).filter(|&i| is_any_dust_id(&self.nodes[i].id.0)).collect();
                 for &i in &dust_nodes {
                     self.nodes[i].visible = false;
                 }
@@ -547,7 +642,7 @@ impl Scene {
             }
         };
         let half = size.max(Vec3::splat(0.01)) * 0.5;
-        let (first, second) = self.haze_dust.build_meshes(center - half, center + half);
+        let (first, second, glows) = self.haze_dust.build_groups(center - half, center + half);
         let mut changed = self.sync_dust_node(DUST_ID, "Polvere in sospensione", first, self.haze_dust.material());
         if second.indices.is_empty() {
             if let Some(i) = self.find(&ComponentId(DUST_ID_2.into())) {
@@ -561,6 +656,39 @@ impl Scene {
                 second,
                 self.haze_dust.material2(),
             );
+        }
+        // Granelli luminosi: un nodo per colore (quelli senza granelli o tolti spariscono).
+        let n_glow = glows.len();
+        for (k, mesh) in glows.into_iter().enumerate() {
+            let id = dust_glow_id(k);
+            if mesh.indices.is_empty() {
+                if let Some(i) = self.find(&ComponentId(id.clone())) {
+                    self.remove_subtree(i);
+                    changed = true;
+                }
+                continue;
+            }
+            let name = format!("Granelli luminosi {}", k + 1);
+            changed |= self.sync_dust_node(&id, &name, mesh, self.haze_dust.glow_material(k));
+        }
+        changed |= self.remove_dust_glow_from(n_glow);
+        changed
+    }
+
+    /// Toglie i nodi (e i materiali) dei granelli luminosi dal colore `from` in poi.
+    fn remove_dust_glow_from(&mut self, from: usize) -> bool {
+        let mut changed = false;
+        while let Some(i) = self.nodes.iter().position(|n| {
+            n.id.0
+                .strip_prefix(DUST_GLOW_PREFIX)
+                .and_then(|k| k.parse::<usize>().ok())
+                .is_some_and(|k| k > from)
+        }) {
+            let id = self.nodes[i].id.clone();
+            self.remove_subtree(i);
+            self.assignments.remove(&id);
+            self.materials.materials.retain(|m| m.id.0 != id.0);
+            changed = true;
         }
         changed
     }
@@ -691,7 +819,7 @@ impl Scene {
     /// È un nodo creato da un effetto (adesivo, polvere): non si salva come oggetto.
     pub fn is_effect_node(&self, idx: NodeIndex) -> bool {
         let id = &self.nodes[idx].id.0;
-        id.starts_with(DECAL_PREFIX) || is_dust_id(id)
+        id.starts_with(DECAL_PREFIX) || is_any_dust_id(id)
     }
 }
 
