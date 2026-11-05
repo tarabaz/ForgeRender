@@ -18,16 +18,16 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
-### Novità della versione 0.40.0
+### Novità della versione 0.41.0
 
-- **Fumo che non finisce sul riquadro:** con "Bordi sfumati" il fumo simulato si sfilaccia e si dissolve vicino alle pareti e al soffitto del suo riquadro, in modo frattale e naturale, invece di riempirlo e restare tagliato; il riquadro gira con il gizmo e si scala insieme alla sua sorgente, crescendo solo verso l'alto.
-- **Vapore da tazza:** un nuovo preset simulato con filamenti sottili che si arricciano e svaniscono.
-- **Anteprime dei materiali nitide:** renderizzate una volta a 512 px e rimpicciolite per ogni grandezza delle schede.
-- **Correzioni:** gli stili in bianco e nero sono grigi anche attraverso i vetri colorati; l'anteprima del fumo non si ricalcola più quando clicchi nella viewport.
+- **Niente più attese doppie:** fumo e nebbia già calcolati si riusano al render se non cambia niente.
+- **Simulazione del fumo più veloce:** lavora solo dove c'è il fumo (fino a quattro volte più veloce nei riquadri grandi).
+- **Contrasto del fumo:** un fumo leggero e trasparente che tiene il rilievo e i dettagli di uno denso.
 
 <details>
 <summary><strong>Versioni precedenti — cronologia completa</strong></summary>
 
+- **0.40.0 — Fumo che non finisce sul riquadro:** bordi sfumati frattali sul fumo simulato; un riquadro che gira e si scala con la sua sorgente, crescendo solo verso l'alto; vapore da tazza simulato; anteprime dei materiali a 512 px; bianco e nero anche attraverso i vetri colorati.
 - **0.39.0 — Fumo da posizionare, selettore colore:** la sorgente del fumo simulato è una sfera nella viewport, spostata con il gizmo; un'anteprima veloce a particelle mostra dove va il fumo e come si muove nel tempo, senza fare il render; le celle della simulazione seguono la sorgente, così nei riquadri grandi il fumo non si perde più; un selettore colore per ogni colore dei materiali con RGB, CMYK e palette (RAL Classic con valori indicativi compresa); il render parte subito con contorni a inchiostro e tilt-shift; sfocatura del tilt-shift continua; riflessi del fumetto solo dove una luce si riflette davvero; il manuale segue la lingua dell'interfaccia.
 
 - **0.38.0 — Nuova libreria dei materiali di serie:** 125 materiali in 13 categorie con nomi italiani, la dispersione giusta sui trasparenti e cinque materiali con texture per categoria; materiali BlenderKit sostituiti da materiali CC0; un pacchetto aggiuntivo di 109 materiali con texture.
@@ -169,6 +169,8 @@ Nubi di fumo volumetrico vere per le foto di prodotto: il fumo d'incenso accanto
 - **Modo simulato:** invece di una forma scelta, il fumo può nascere da una simulazione fisica dentro il riquadro (un fluido euleriano con temperatura e galleggiamento, come in Fedkiw, Stam e Jensen 2001): una sorgente emette fumo e calore, il fumo caldo sale, il gas pesante scende e si stende, il confinamento della vorticità tiene i riccioli, la turbolenza (curl noise) rompe la colonna in sbuffi, il vento la spinge e gli oggetti nel riquadro la deviano. La simulazione si congela all'istante scelto e sul bordo si aggiunge il dettaglio procedurale (sbuffi, filamenti). Comandi: posizione e raggio della sorgente, quantità, calore, spinta, peso, velocità di uscita, raffreddamento, dissolvenza, vortici, turbolenza e la sua grandezza, vento, istante e qualità della simulazione (da 48 a 136 celle per lato). Preset: fumo caldo simulato, gas pesante simulato e vapore da tazza (filamenti sottili che si arricciano e svaniscono, da una sorgente larga come la tazza).
 - **Posizionare il fumo simulato:** la sorgente è una sfera azzurra nella viewport, grande come la sorgente vera: con un clic (o "Seleziona la sorgente") il gizmo la sposta, e Scala ne cambia il raggio. L'**anteprima in viewport** fa la stessa simulazione su una griglia grossolana in circa un secondo e la mostra come una nuvola di punti che si muove da 0 all'istante scelto, in loop o ferma su un istante qualsiasi: trovi posto, sorgente e comportamento senza fare il render, poi rifinisci con il render. Le celle della simulazione seguono la sorgente: in un riquadro grande diventano più fini (entro il limite di calcolo della qualità), così il fumo non nasce più in pochi grumi né sparisce nel pavimento, e il pannello avvisa se la sorgente resta più piccola di una cella.
 - **Bordi sfumati:** il fumo simulato non riempie il riquadro per poi finire tagliato: in una fascia vicino alle pareti e al soffitto (non al fondo) si dissolve come se uscisse dal riquadro, e il bordo si sfilaccia in modo frattale, con lingue, buchi e filamenti, come il fumo vero che si dirada nell'aria. La larghezza della fascia si regola (0 = pieno fino al bordo).
+- **Contrasto:** aumenta la differenza tra i grumi e le parti diradate: con densità bassa e contrasto alto il fumo è trasparente ma tiene il rilievo, i grumi restano densi e fanno ombra su sé stessi.
+- **Calcolato una volta:** la simulazione lavora solo nella zona dove ci sono fumo e calore (come la nebbia da ghiaccio secco), e il render riusa il risultato finché fumo, riquadro e oggetti restano gli stessi.
 - **Riquadro con la sua sorgente:** il gizmo segue il riquadro: Sposta muove riquadro e sorgente, Ruota li gira attorno alla verticale (anche con il campo "Rotazione"), Scala ingrandisce insieme riquadro, posizione e raggio della sorgente. Altezza e scala crescono solo verso l'alto, dal fondo del riquadro, così il fumo non va mai sotto il piano. L'anteprima in viewport mostra l'istante riprodotto e resta pronta quando clicchi altrove, quindi non si ricalcola mentre giri la camera.
 
 Il fuoco (combustione, emissione, fiamme che illuminano la scena) è un passo a parte, successivo: vedi lo [studio su fumo e fuoco](docs/studio-fumo-fuoco.md).

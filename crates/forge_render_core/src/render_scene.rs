@@ -292,7 +292,9 @@ impl Portals {
 /// Dipende solo da mesh, trasformazioni e visibilità: cambiare materiali,
 /// luci o camera non richiede di ricostruirla.
 pub struct RenderGeometry {
-    /// Identificativo univoco (per processo): chiave delle cache che dipendono dalla geometria.
+    /// Impronta del contenuto (triangoli, normali, UV, nodi): chiave delle cache che dipendono
+    /// dalla geometria. Due geometrie uguali hanno la stessa impronta anche se ricostruite (così
+    /// fumo, nebbia e contorni già calcolati non si rifanno quando la scena non è cambiata).
     pub id: u64,
     pub accel: TriangleAccel,
     pub geometric_normals: Vec<Vec3>,
@@ -455,9 +457,9 @@ impl RenderGeometry {
             accel.bvh.nodes.len(),
             t0.elapsed().as_secs_f64() * 1e3
         );
-        static NEXT_GEO: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        let id = content_hash(&tris, &sn, &tuv, &tnode, &tflags);
         RenderGeometry {
-            id: NEXT_GEO.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            id,
             accel,
             geometric_normals: gn,
             shading_normals: sn,
@@ -469,6 +471,35 @@ impl RenderGeometry {
             bounds,
         }
     }
+}
+
+/// Impronta veloce del contenuto della geometria (mai 0).
+fn content_hash(tris: &[[Vec3; 3]], sn: &[[Vec3; 3]], uv: &[[Vec2; 3]], node: &[u32], flags: &[u32]) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    let mut mix = |v: u32| {
+        h = (h ^ v as u64).wrapping_mul(0x0100_0000_01b3);
+    };
+    mix(tris.len() as u32);
+    for t in tris.iter().chain(sn) {
+        for p in t {
+            mix(p.x.to_bits());
+            mix(p.y.to_bits());
+            mix(p.z.to_bits());
+        }
+    }
+    for t in uv {
+        for p in t {
+            mix(p.x.to_bits());
+            mix(p.y.to_bits());
+        }
+    }
+    for &n in node {
+        mix(n);
+    }
+    for &f in flags {
+        mix(f);
+    }
+    h.max(1)
 }
 
 /// Riferimento della proiezione Box di ogni nodo con mesh, secondo l'ancoraggio del materiale

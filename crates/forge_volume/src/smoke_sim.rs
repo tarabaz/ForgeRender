@@ -209,6 +209,8 @@ fn run(
             (-25.0 * t * t * dt).exp()
         })
         .collect();
+    // Celle calcolate in tutto (somma delle zone attive dei passi), per il registro.
+    let mut active_cells = 0.0f64;
     for step in 0..steps {
         if cancelled() {
             return None;
@@ -235,12 +237,54 @@ fn run(
                     }
                 }
             });
+        // Zona attiva (come per il ghiaccio secco): il riquadro di celle con fumo o calore,
+        // allargato di quanto il fluido può spostarsi in un passo più un margine. Fuori l'aria è
+        // ferma e senza fumo: lì non si calcola niente (e la pressione vale 0, bordo aperto).
+        let (alo, ahi) = (0..n)
+            .into_par_iter()
+            .filter(|&i| rho[i] > 1e-4 || temp[i] > 1e-4)
+            .map(|i| {
+                let (x, y, z) = coords(i);
+                ([x, y, z], [x, y, z])
+            })
+            .reduce(
+                || ([usize::MAX; 3], [0usize; 3]),
+                |a, b| {
+                    (
+                        [a.0[0].min(b.0[0]), a.0[1].min(b.0[1]), a.0[2].min(b.0[2])],
+                        [a.1[0].max(b.1[0]), a.1[1].max(b.1[1]), a.1[2].max(b.1[2])],
+                    )
+                },
+            );
+        let vmax = (0..n)
+            .into_par_iter()
+            .map(|i| u[i].abs().max(v[i].abs()).max(w[i].abs()))
+            .reduce(|| 0.0f32, f32::max);
+        let margin = ((vmax * dt / h).ceil() as usize * 2 + 4).min(64);
+        let res = [rx, ry, rz];
+        let (alo, ahi) = if alo[0] == usize::MAX {
+            ([1, 1, 1], [0, 0, 0]) // vuota
+        } else {
+            (
+                [0, 1, 2].map(|a| alo[a].saturating_sub(margin)),
+                [0, 1, 2].map(|a| (ahi[a] + margin).min(res[a] - 1)),
+            )
+        };
+        let act = |x: usize, y: usize, z: usize| x >= alo[0] && x <= ahi[0] && y >= alo[1] && y <= ahi[1] && z >= alo[2] && z <= ahi[2];
+        let act_i = |i: usize| {
+            let (x, y, z) = coords(i);
+            act(x, y, z)
+        };
+        active_cells += ([0, 1, 2].map(|a| (ahi[a] + 1).saturating_sub(alo[a])).iter().product::<usize>()) as f64;
         // 2. Forze: galleggiamento, turbolenza, vento (verso la sua velocità), vorticità.
         let omega: Vec<Vec3> = if p.vorticity > 0.0 {
             (0..n)
                 .into_par_iter()
                 .map(|i| {
                     let (x, y, z) = coords(i);
+                    if !act(x, y, z) {
+                        return Vec3::ZERO;
+                    }
                     let at = |f: &[f32], dx: i64, dy: i64, dz: i64| {
                         let c = |a: usize, d: i64, m: usize| (a as i64 + d).clamp(0, m as i64 - 1) as usize;
                         f[g.idx(c(x, dx, rx), c(y, dy, ry), c(z, dz, rz))]
@@ -262,7 +306,7 @@ fn run(
         let forces: Vec<Vec3> = (0..n)
             .into_par_iter()
             .map(|i| {
-                if solid[i] {
+                if solid[i] || !act_i(i) {
                     return Vec3::ZERO;
                 }
                 let (x, y, z) = coords(i);
@@ -304,7 +348,7 @@ fn run(
         let (nu, (nv, nw)): (Vec<f32>, (Vec<f32>, Vec<f32>)) = (0..n)
             .into_par_iter()
             .map(|i| {
-                if solid[i] {
+                if solid[i] || !act_i(i) {
                     return (0.0, (0.0, 0.0));
                 }
                 let q = back(i, &u, &v, &w);
@@ -318,7 +362,7 @@ fn run(
         let div: Vec<f32> = (0..n)
             .into_par_iter()
             .map(|i| {
-                if solid[i] {
+                if solid[i] || !act_i(i) {
                     return 0.0;
                 }
                 let (x, y, z) = coords(i);
@@ -342,10 +386,10 @@ fn run(
         for _ in 0..PRESSURE_ITERS {
             for color in 0..2usize {
                 let shared = SharedPtr(pres.as_mut_ptr());
-                (0..ry).into_par_iter().for_each(|y| {
+                (alo[1]..ahi[1] + 1).into_par_iter().for_each(|y| {
                     let pr = shared.get();
-                    for z in 0..rz {
-                        for x in 0..rx {
+                    for z in alo[2]..ahi[2] + 1 {
+                        for x in alo[0]..ahi[0] + 1 {
                             if (x + y + z) % 2 != color {
                                 continue;
                             }
@@ -353,9 +397,16 @@ fn run(
                             if solid[i] {
                                 continue;
                             }
-                            // Fuori dal riquadro pressione 0 (aperto); negli oggetti come la cella (Neumann).
+                            // Fuori dal riquadro e dalla zona attiva pressione 0 (aperto); negli
+                            // oggetti come la cella (Neumann).
                             let nb = |xx: i64, yy: i64, zz: i64| -> f32 {
-                                if xx < 0 || yy < 0 || zz < 0 || xx >= rx as i64 || yy >= ry as i64 || zz >= rz as i64 {
+                                if xx < alo[0] as i64
+                                    || yy < alo[1] as i64
+                                    || zz < alo[2] as i64
+                                    || xx > ahi[0] as i64
+                                    || yy > ahi[1] as i64
+                                    || zz > ahi[2] as i64
+                                {
                                     return 0.0;
                                 }
                                 let j = g.idx(xx as usize, yy as usize, zz as usize);
@@ -387,12 +438,18 @@ fn run(
         let grad: Vec<Vec3> = (0..n)
             .into_par_iter()
             .map(|i| {
-                if solid[i] {
+                if solid[i] || !act_i(i) {
                     return Vec3::ZERO;
                 }
                 let (x, y, z) = coords(i);
                 let get = |xx: i64, yy: i64, zz: i64| {
-                    if xx < 0 || yy < 0 || zz < 0 || xx >= rx as i64 || yy >= ry as i64 || zz >= rz as i64 {
+                    if xx < alo[0] as i64
+                        || yy < alo[1] as i64
+                        || zz < alo[2] as i64
+                        || xx > ahi[0] as i64
+                        || yy > ahi[1] as i64
+                        || zz > ahi[2] as i64
+                    {
                         return 0.0;
                     }
                     let j = g.idx(xx as usize, yy as usize, zz as usize);
@@ -419,7 +476,7 @@ fn run(
         let (nr, nt): (Vec<f32>, Vec<f32>) = (0..n)
             .into_par_iter()
             .map(|i| {
-                if solid[i] {
+                if solid[i] || !act_i(i) {
                     return (0.0, 0.0);
                 }
                 let q = back(i, &u, &v, &w);
@@ -440,6 +497,10 @@ fn run(
         }
     }
     progress(1.0);
+    tracing::debug!(
+        "fumo simulato: zona attiva media {:.0} % della griglia",
+        active_cells / (steps as f64 * n as f64) * 100.0
+    );
     // Riferimento: il 90° percentile delle celle con fumo (non la sorgente, sempre piena).
     let mut vals: Vec<f32> = rho.iter().copied().filter(|&v| v > 1e-4).collect();
     let max = if vals.is_empty() {

@@ -762,3 +762,12 @@ Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
   preferenza `preview_resolution`.
 - `forge_render_cpu::style_gray` (e WGSL): bianco e nero su tutto il campione.
 - Non provato nell'interfaccia: gizmo Ruota/Scala del fumo, resa del vapore da tazza (solo test).
+
+### 0.41.0 (05/11/2026): niente ricalcoli inutili, simulazione del fumo a zona attiva, contrasto
+- `RenderGeometry::id` = impronta del contenuto (`content_hash`), non più un contatore: le cache di fumo,
+  nebbia, foschia e contorni si riusano quando la geometria è identica.
+- `smoke_sim`: zona attiva (celle con fumo o calore + margine), pressione solo lì; esempio
+  `forge_volume/examples/fumo_tempi.rs` (13,5 → 6,2 s; 25,5 → 6,1 s).
+- `SmokeCloud::contrast` nel render della densità.
+- Da valutare: GPU per la simulazione del fumo (la zona attiva toglie già la parte grossa); una
+  "densità delle ombre" separata nel trasporto della luce, se il contrasto non basta.

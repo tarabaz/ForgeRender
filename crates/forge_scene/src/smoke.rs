@@ -120,6 +120,10 @@ pub struct SmokeCloud {
     pub rotation_deg: f32,
     /// Densità del fumo pieno (1/m): 5 = fumo leggero, 50 = denso, 300 = quasi opaco.
     pub density: f32,
+    /// Contrasto della densità (0,5–4, 1 = come prima): più alto, le parti diradate diventano
+    /// trasparenti mentre i grumi restano densi (e fanno ombra su sé stessi), così anche un fumo
+    /// leggero tiene il rilievo invece di diventare un velo uniforme.
+    pub contrast: f32,
     /// Colore del fumo (albedo, 0–1): bianco = vapore, grigio = fumo, scuro = fuliggine.
     pub color: [f32; 3],
     /// Anisotropia Henyey–Greenstein: alta = brilla in controluce.
@@ -171,6 +175,7 @@ impl Default for SmokeCloud {
             size: Vec3::splat(0.6),
             rotation_deg: 0.0,
             density: 40.0,
+            contrast: 1.0,
             color: [0.8, 0.8, 0.8],
             anisotropy: 0.35,
             detail_scale: 0.15,
@@ -466,6 +471,7 @@ impl SmokeCloud {
             Vec3::ONE
         };
         s.density = fin(s.density, 40.0).clamp(0.0, 5000.0);
+        s.contrast = fin(s.contrast, 1.0).clamp(0.5, 4.0);
         s.color = s.color.map(|c| fin(c, 0.8).clamp(0.0, 1.0));
         s.anisotropy = fin(s.anisotropy, 0.3).clamp(-0.95, 0.95);
         s.detail_scale = fin(s.detail_scale, 0.15).clamp(0.002, 50.0);

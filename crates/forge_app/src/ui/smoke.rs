@@ -367,6 +367,14 @@ fn body(
                 .on_hover_text(tr("Spessore di fumo pieno oltre il quale non si vede più attraverso"));
         });
         ui.end_row();
+        ui.label(tr("Contrasto"));
+        changed |= ui
+            .add(egui::Slider::new(&mut s.contrast, 0.5..=4.0).max_decimals(2))
+            .on_hover_text(tr(
+                "Più alto: le parti diradate diventano trasparenti e i grumi restano densi e fanno ombra su sé stessi, così un fumo leggero tiene il rilievo e i dettagli. Per un fumo trasparente ma con contrasto abbassa la densità e alza il contrasto (2–3). 1 = come prima",
+            ))
+            .changed();
+        ui.end_row();
         ui.label(tr("Colore"));
         changed |= ui
             .color_edit_button_rgb(&mut s.color)
