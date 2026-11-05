@@ -133,6 +133,8 @@ Il percorso del laser viene tracciato in modo deterministico a partire dalla sor
 
 ### 4. Nebbia da ghiaccio secco — simulazione fluida e rendering volumetrico
 
+![Nebbia da ghiaccio secco — gas freddo che scende, si accumula e si diffonde attorno agli oggetti](docs/img/features/dry-ice-fog.jpg)
+
 ForgeRender genera nebbia scenografica con una simulazione fluida 3D deterministica e basata su seed. Il solver modella la discesa del gas freddo e pesante, il suo accumulo e la propagazione laterale sulle superfici, oltre agli sbuffi turbolenti che risalgono mentre la nube evolve.
 
 - **Griglia MAC 3D:** calcolo di velocità e pressione e trasporto dei campi della nebbia.
@@ -149,6 +151,8 @@ ForgeRender genera nebbia scenografica con una simulazione fluida 3D determinist
 
 ### 5. Foschia d'ambiente — cinque tipi di nebbia procedurale
 
+![Foschia d'ambiente — strati di nebbia procedurale e raggi di luce](docs/img/features/ambient-haze.jpg)
+
 Un mezzo partecipante che riempie la scena (o solo uno strato) e che ogni luce attraversa: spot, sole e lampade disegnano raggi con le ombre degli oggetti, e la luce si diffonde più volte, su CPU e GPU. Non è una texture né un blocco grigio uniforme: la densità viene da un rumore frattale a dominio distorto calcolato su una griglia 3D, quindi ha banchi, riccioli e vuoti.
 
 - **Cinque tipi:** *Nebbia bassa* che si stende a terra e si dirada salendo; *Nuvole di gas*, aria quasi limpida con ammassi densi qua e là; *Fumo tossico a terra*, uno strato di pochi centimetri che aleggia sul pavimento raccolto in filamenti; *Strati sospesi*, veli orizzontali a quote diverse, ondulati e bucati; *Riccioli di vapore*, vortici dentro i vortici con contrasto alto.
@@ -159,6 +163,8 @@ Un mezzo partecipante che riempie la scena (o solo uno strato) e che ogni luce a
 - **Mai dentro gli oggetti:** i raggi che viaggiano nel vetro o nel liquido la saltano (lenti e bicchieri restano limpidi) e si toglie dall'interno pieno dei pezzi, mentre l'aria di una stanza chiusa resta velata.
 
 ### 6. Fumo volumetrico — nubi, pennacchi e incenso in un riquadro
+
+![Fumo volumetrico — nubi, pennacchi e fili d'incenso](docs/img/features/volumetric-smoke.jpg)
 
 Nubi di fumo volumetrico vere per le foto di prodotto: il fumo d'incenso accanto al flacone di profumo, il vapore che sale dalla tazza, il pennacchio da un tubo o da un camino, il fumo denso e scuro industriale. Ogni nube vive in un riquadro che selezioni nella viewport e sposti o ridimensioni con il gizmo: il fumo renderizzato segue esattamente il riquadro, senza lasciare niente dove era prima.
 
@@ -179,6 +185,8 @@ Nubi di fumo volumetrico vere per le foto di prodotto: il fumo d'incenso accanto
 Il fuoco (combustione, emissione, fiamme che illuminano la scena) è un passo a parte, successivo: vedi lo [studio su fumo e fuoco](docs/studio-fumo-fuoco.md).
 
 ### 7. Polvere in sospensione — granelli che brillano solo in un fascio
+
+![Polvere in sospensione illuminata da un fascio di luce](docs/img/features/floating-dust.jpg)
 
 Granelli veri (qualche millimetro, fino a 150 000) sparsi nell'aria, come effetto a sé. Sono invisibili tranne dentro i fasci di spot e sole: lì brillano, come la polvere nei raggi che entrano dalla finestra di una soffitta, mentre lampadine, pannelli, ambiente e luce di rimbalzo non li illuminano. Sono segnati nelle guide del denoiser, così il denoiser li tiene invece di cancellarli come rumore. I granelli stanno in un riquadro che selezioni nella viewport e sposti o ridimensioni con il gizmo; di partenza copre gli oggetti fino alle spot, così i granelli riempiono tutto il fascio fino al piano illuminato. Si regolano quantità (fino a pochi granelli isolati), dimensione (fino a 18 mm), brillantezza e colore, e i granelli possono fare ombra: piccole sagome scure nei fasci e sul piano illuminato.
 
@@ -221,7 +229,7 @@ Per la nebbia che riempie la scena vedi [Foschia d'ambiente](#5-foschia-dambient
 
 ### 12. Camera, viste multiple e presentazione prodotto
 
-![Vista prodotto a tre quarti](docs/img/mcp/esempi/vista_tre_quarti.jpg)
+![Rendering di prodotto con effetto tilt-shift](docs/img/features/tilt-shift-product-render.jpg)
 
 Le camere di rendering offrono focale, diaframma, profondità di campo e decentramento. Le viste automatiche frontale, posteriore, laterali, superiore e a tre quarti aiutano a presentare un prodotto da più angolazioni; è possibile esportare video turntable in MP4.
 
@@ -230,9 +238,13 @@ Le camere di rendering offrono focale, diaframma, profondità di campo e decentr
 
 ### 13. Render pass e workflow di post-produzione
 
+![Render pass di ForgeRender per la post-produzione](docs/img/features/render-passes-post-production.jpg)
+
 ForgeRender può esportare pass separati **Albedo, Normals, Depth, Product Mask e Component ID**, utili per compositing, mascherature e interventi successivi sull'immagine. Sono buffer tecnici di output, non ulteriori render beauty.
 
 ### 14. Stili di rendering — fumetto, illustrazione tecnica e contorni a inchiostro
+
+![Shading fumetto e illustrazione tecnica](docs/img/features/toon-technical-illustration.jpg)
 
 In cima alla scheda Render scegli come si disegna l'immagine; passando sopra a ogni scelta compare un piccolo esempio.
 
@@ -359,7 +371,7 @@ Pacchetti Windows in locale: `powershell -ExecutionPolicy Bypass -File packaging
 
 Elenco di tutte le misure che si possono fare, con a cosa serve ciascuna. I risultati veri (e i
 dati grezzi) vanno in [`reports/`](reports/README.md), una cartella per esperimento; quelli già
-fatti sono in [docs/BENCHMARK.md](docs/BENCHMARK.md). Regola: si riportano solo numeri misurati.
+fatti sono in [docs/BENCHMARK.it.md](docs/BENCHMARK.it.md). Regola: si riportano solo numeri misurati.
 
 ### Preparazione (una volta)
 
