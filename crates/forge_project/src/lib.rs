@@ -515,7 +515,12 @@ pub fn load(path: &Path) -> anyhow::Result<LoadedProject> {
     scene.haze_dust = pf.haze_dust;
     scene.decals = pf.decals;
     scene.smokes = pf.smokes;
-    scene.timeline = pf.timeline;
+    // Progetto senza animazione: il cursore va sull'istante dei suoi effetti (restano come erano).
+    let mut timeline = pf.timeline;
+    if timeline == forge_scene::Timeline::default() {
+        timeline.adopt_effects(&scene);
+    }
+    scene.timeline = timeline;
     for d in &mut scene.decals {
         if let Some(img) = &mut d.image {
             relocate_asset(img, project_dir, &["textures", "texture"], &texture_dirs, &mut report);

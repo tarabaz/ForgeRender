@@ -739,7 +739,7 @@ fn apply_drag(app: &mut ForgeApp, rect: egui::Rect, drag: &Drag, pos: egui::Pos2
                 };
                 app.scene.nodes[*i].user = u;
             }
-            app.geometry_changed();
+            app.transforms_changed();
         }
         DragStart::Light(i, st) => {
             let rotating = app.gizmo.mode == GizmoMode::Rotate;

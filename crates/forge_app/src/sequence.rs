@@ -512,10 +512,8 @@ impl ForgeApp {
             return;
         }
         let o = self.sequence.opts.clone();
-        let Some(dir) = o.out_dir.clone() else {
-            self.error = Some(tr("scegli prima la cartella in cui salvare").into());
-            return;
-        };
+        // Di serie nella cartella Rendering.
+        let dir = o.out_dir.clone().unwrap_or_else(crate::prefs::rendering_dir);
         if !crate::presets::has_product(&self.scene) {
             self.error = Some(tr("nella scena non c'è un prodotto da riprendere").into());
             return;

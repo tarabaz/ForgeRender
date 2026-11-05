@@ -49,15 +49,16 @@ impl eframe::App for ForgeApp {
         let ctx = ui.ctx().clone();
         self.tick(&ctx);
         self.handle_dropped_files(&ctx);
+        timeline::keyboard(self, &ctx);
         self.handle_shortcuts(&ctx);
         manual::begin_frame(&ctx);
 
         self.handle_close_request(&ctx);
         egui::Panel::top("menubar").show(ui, |ui| menubar::show(self, ui));
         egui::Panel::top("quickbar").show(ui, |ui| quickbar::show(self, ui));
-        egui::Panel::bottom(if self.prefs.timeline_enabled { "status-timeline" } else { "status" })
+        egui::Panel::bottom("status-timeline")
             .resizable(true)
-            .default_size(if self.prefs.timeline_enabled { 400.0 } else { 170.0 })
+            .default_size(320.0)
             .min_size(70.0)
             .show(ui, |ui| status::show(self, ui));
         // Limiti di larghezza: un contenuto largo (es. molte miniature) non può più far

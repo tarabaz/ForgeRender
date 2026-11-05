@@ -3,6 +3,11 @@
 //! Disegna la scena in una texture fuori schermo (MSAA 4×, depth buffer),
 //! che viene poi mostrata dall'interfaccia egui come un'immagine. È una vista
 //! di lavoro (shading semplice): il rendering fotorealistico è nella vista "Render".
+//!
+//! La geometria si carica una volta sola, nello spazio del suo oggetto; le matrici degli oggetti
+//! stanno in un buffer a parte che il vertex shader legge. Muovere un oggetto (gizmo, timeline)
+//! aggiorna solo quel buffer ([`ViewportRenderer::update_transforms`]): il costo non dipende dai
+//! triangoli della scena.
 
 use eframe::egui;
 use eframe::egui_wgpu::{self, wgpu};
@@ -21,6 +26,16 @@ struct Vertex {
     normal: [f32; 3],
     color: [f32; 3],
     selected: f32,
+    /// Indice dell'oggetto nel buffer delle matrici.
+    object: u32,
+}
+
+/// Matrici di un oggetto nel buffer letto dal vertex shader.
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct ObjectGpu {
+    world: [[f32; 4]; 4],
+    normal: [[f32; 4]; 4],
 }
 
 #[repr(C)]
@@ -35,11 +50,15 @@ const SHADER: &str = r#"
 struct U { view_proj: mat4x4<f32>, light_dir: vec4<f32>, cam_pos: vec4<f32> };
 @group(0) @binding(0) var<uniform> u: U;
 
+struct Obj { world: mat4x4<f32>, normal: mat4x4<f32> };
+@group(0) @binding(1) var<storage, read> objects: array<Obj>;
+
 struct VIn {
     @location(0) pos: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) color: vec3<f32>,
     @location(3) sel: f32,
+    @location(4) object: u32,
 };
 struct VOut {
     @builtin(position) clip: vec4<f32>,
@@ -51,11 +70,12 @@ struct VOut {
 
 fn shade_vertex(v: VIn) -> VOut {
     var o: VOut;
-    o.clip = u.view_proj * vec4<f32>(v.pos, 1.0);
-    o.n = v.normal;
+    let w = objects[v.object].world * vec4<f32>(v.pos, 1.0);
+    o.clip = u.view_proj * w;
+    o.n = (objects[v.object].normal * vec4<f32>(v.normal, 0.0)).xyz;
     o.color = v.color;
     o.sel = v.sel;
-    o.wpos = v.pos;
+    o.wpos = w.xyz;
     return o;
 }
 
@@ -109,7 +129,12 @@ pub struct ViewportRenderer {
     pipeline: wgpu::RenderPipeline,
     wire_pipeline: wgpu::RenderPipeline,
     uniform_buf: wgpu::Buffer,
-    bind_group: wgpu::BindGroup,
+    bind_layout: wgpu::BindGroupLayout,
+    /// Legato al buffer delle matrici: si rifà con la geometria.
+    bind_group: Option<wgpu::BindGroup>,
+    object_buf: Option<wgpu::Buffer>,
+    /// Nodi disegnati, nell'ordine del buffer delle matrici.
+    objects: Vec<usize>,
     vertex_buf: Option<wgpu::Buffer>,
     index_buf: Option<wgpu::Buffer>,
     index_count: u32,
@@ -132,23 +157,35 @@ impl ViewportRenderer {
         });
         let bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("viewport-bgl"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
                 },
-                count: None,
-            }],
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
         });
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("viewport-layout"),
             bind_group_layouts: &[Some(&bgl)],
             immediate_size: 0,
         });
-        let attrs = wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x3, 3 => Float32];
+        let attrs = wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x3, 3 => Float32, 4 => Uint32];
         // Triangoli ombreggiati, oppure (vista Mesh) i loro spigoli come linee.
         let make = |label, vs, fs, topology, depth_write, compare| {
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -216,14 +253,6 @@ impl ViewportRenderer {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("viewport-bg"),
-            layout: &bgl,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: uniform_buf.as_entire_binding(),
-            }],
-        });
         let info = rs.adapter.get_info();
         let adapter_info = format!("{} ({:?}, {:?})", info.name, info.backend, info.device_type);
         tracing::info!("GPU viewport: {adapter_info}, driver {} {}", info.driver, info.driver_info);
@@ -231,7 +260,10 @@ impl ViewportRenderer {
             pipeline,
             wire_pipeline,
             uniform_buf,
-            bind_group,
+            bind_layout: bgl,
+            bind_group: None,
+            object_buf: None,
+            objects: Vec::new(),
             vertex_buf: None,
             index_buf: None,
             index_count: 0,
@@ -244,12 +276,39 @@ impl ViewportRenderer {
         }
     }
 
+    /// Matrici dei nodi disegnati.
+    fn object_data(&self, scene: &Scene) -> Vec<ObjectGpu> {
+        self.objects
+            .iter()
+            .map(|&i| {
+                let xf = if i < scene.nodes.len() {
+                    scene.world_transform(i)
+                } else {
+                    Mat4::IDENTITY
+                };
+                let n = forge_math::Mat3::from_mat4(xf).inverse().transpose();
+                ObjectGpu {
+                    world: xf.to_cols_array_2d(),
+                    normal: Mat4::from_mat3(n).to_cols_array_2d(),
+                }
+            })
+            .collect()
+    }
+
+    /// Oggetti spostati, ruotati o scalati: aggiorna solo le loro matrici sulla GPU.
+    pub fn update_transforms(&mut self, rs: &egui_wgpu::RenderState, scene: &Scene) {
+        if let Some(buf) = &self.object_buf {
+            rs.queue.write_buffer(buf, 0, bytemuck::cast_slice(&self.object_data(scene)));
+        }
+    }
+
     /// Ricostruisce i buffer della geometria (componenti visibili, colori dei materiali, selezione).
     pub fn upload_scene(&mut self, rs: &egui_wgpu::RenderState, scene: &Scene, selection: &BTreeSet<usize>) {
         let mut verts: Vec<Vertex> = Vec::new();
         let mut indices: Vec<u32> = Vec::new();
         self.edge_buf = None;
         self.tri_indices.clear();
+        self.objects.clear();
         for (i, node) in scene.nodes.iter().enumerate() {
             let Some(mi) = node.mesh else { continue };
             if !scene.is_visible(i) {
@@ -257,8 +316,8 @@ impl ViewportRenderer {
             }
             let selected = selection.iter().any(|&s| is_descendant_or_self(scene, i, s));
             let mesh = &scene.meshes[mi];
-            let xf = scene.world_transform(i);
-            let nxf = forge_math::Mat3::from_mat4(xf).inverse().transpose();
+            let object = self.objects.len() as u32;
+            self.objects.push(i);
             let color = scene
                 .materials
                 .get(scene.resolve_material(i))
@@ -276,16 +335,13 @@ impl ViewportRenderer {
             let base = verts.len() as u32;
             let has_n = mesh.has_normals();
             for (k, p) in mesh.positions.iter().enumerate() {
-                let n = if has_n {
-                    (nxf * mesh.normals[k]).normalize_or_zero()
-                } else {
-                    Vec3::Y
-                };
+                let n = if has_n { mesh.normals[k] } else { Vec3::Y };
                 verts.push(Vertex {
-                    pos: xf.transform_point3(*p).to_array(),
+                    pos: p.to_array(),
                     normal: n.to_array(),
                     color: color.to_array(),
                     selected: if selected { 1.0 } else { 0.0 },
+                    object,
                 });
             }
             indices.extend(mesh.indices.iter().flat_map(|t| t.map(|v| v + base)));
@@ -319,6 +375,27 @@ impl ViewportRenderer {
             usage: wgpu::BufferUsages::INDEX,
         }));
         self.tri_indices = indices;
+        let objects = self.object_data(scene);
+        let buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("viewport-objects"),
+            contents: bytemuck::cast_slice(&objects),
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        });
+        self.bind_group = Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("viewport-bg"),
+            layout: &self.bind_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: self.uniform_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: buf.as_entire_binding(),
+                },
+            ],
+        }));
+        self.object_buf = Some(buf);
     }
 
     /// Spigoli dei triangoli per la vista Mesh (dall'ultimo upload; una volta sola).
@@ -392,6 +469,95 @@ impl ViewportRenderer {
         });
     }
 
+    /// Un fotogramma come quello della viewport su texture proprie, riletto dalla GPU (RGBA a 8
+    /// bit, sRGB, riga per riga): i fotogrammi dell'anteprima dell'animazione.
+    pub fn capture(
+        &mut self,
+        rs: &egui_wgpu::RenderState,
+        camera: &Camera,
+        scene_radius: f32,
+        size: [u32; 2],
+        background: Vec3,
+        mesh_view: bool,
+    ) -> Option<Vec<u8>> {
+        let device = &rs.device;
+        let extent = wgpu::Extent3d {
+            width: size[0],
+            height: size[1],
+            depth_or_array_layers: 1,
+        };
+        let mk = |format, samples, usage| {
+            device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("viewport-cattura"),
+                size: extent,
+                mip_level_count: 1,
+                sample_count: samples,
+                dimension: wgpu::TextureDimension::D2,
+                format,
+                usage,
+                view_formats: &[],
+            })
+        };
+        let color = mk(
+            COLOR_FORMAT,
+            1,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        );
+        let msaa = mk(COLOR_FORMAT, SAMPLES, wgpu::TextureUsages::RENDER_ATTACHMENT);
+        let depth = mk(DEPTH_FORMAT, SAMPLES, wgpu::TextureUsages::RENDER_ATTACHMENT);
+        let (cv, mv, dv) = (
+            color.create_view(&Default::default()),
+            msaa.create_view(&Default::default()),
+            depth.create_view(&Default::default()),
+        );
+        if mesh_view {
+            self.ensure_edges(rs);
+        }
+        self.write_uniforms(rs, camera, scene_radius, size);
+        let mut enc = rs.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("viewport-cattura"),
+        });
+        self.draw(&mut enc, &mv, &cv, &dv, background, mesh_view);
+        // Le righe nel buffer vanno allineate.
+        let row = size[0] * 4;
+        let aligned = row.div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT) * wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
+        let readback = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("viewport-lettura"),
+            size: aligned as u64 * size[1] as u64,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+        enc.copy_texture_to_buffer(
+            color.as_image_copy(),
+            wgpu::TexelCopyBufferInfo {
+                buffer: &readback,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(aligned),
+                    rows_per_image: Some(size[1]),
+                },
+            },
+            extent,
+        );
+        rs.queue.submit(Some(enc.finish()));
+        let slice = readback.slice(..);
+        let (tx, rx) = std::sync::mpsc::channel();
+        slice.map_async(wgpu::MapMode::Read, move |r| {
+            let _ = tx.send(r);
+        });
+        let _ = device.poll(wgpu::PollType::wait_indefinitely());
+        rx.recv().ok()?.ok()?;
+        let data = slice.get_mapped_range().ok()?;
+        let mut out = Vec::with_capacity((row * size[1]) as usize);
+        for y in 0..size[1] as usize {
+            let start = y * aligned as usize;
+            out.extend_from_slice(&data[start..start + row as usize]);
+        }
+        drop(data);
+        readback.unmap();
+        Some(out)
+    }
+
     /// Disegna la scena e restituisce la texture da mostrare; `mesh_view` = vista Mesh
     /// (spigoli dei triangoli sopra l'ombreggiatura).
     pub fn render(
@@ -408,7 +574,18 @@ impl ViewportRenderer {
         if mesh_view {
             self.ensure_edges(rs);
         }
+        self.write_uniforms(rs, camera, scene_radius, size);
+        let mut enc = rs
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("viewport") });
         let t = self.targets.as_ref()?;
+        self.draw(&mut enc, &t.msaa_view, &t.color_view, &t.depth_view, background, mesh_view);
+        rs.queue.submit(Some(enc.finish()));
+        self.texture_id
+    }
+
+    /// Camera e luce per il fotogramma.
+    fn write_uniforms(&self, rs: &egui_wgpu::RenderState, camera: &Camera, scene_radius: f32, size: [u32; 2]) {
         let aspect = size[0] as f32 / size[1] as f32;
         let dist = (camera.position - camera.target).length();
         let far = (dist + scene_radius * 4.0).max(1e-3);
@@ -422,17 +599,26 @@ impl ViewportRenderer {
             cam_pos: camera.position.extend(1.0).to_array(),
         };
         rs.queue.write_buffer(&self.uniform_buf, 0, bytemuck::bytes_of(&uni));
-        let mut enc = rs
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("viewport") });
+    }
+
+    /// Il passaggio di disegno sulle texture indicate.
+    fn draw(
+        &self,
+        enc: &mut wgpu::CommandEncoder,
+        msaa: &wgpu::TextureView,
+        resolve: &wgpu::TextureView,
+        depth: &wgpu::TextureView,
+        background: Vec3,
+        mesh_view: bool,
+    ) {
         {
             let bg = background.to_array().map(|c| c as f64);
             let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("viewport-pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &t.msaa_view,
+                    view: msaa,
                     depth_slice: None,
-                    resolve_target: Some(&t.color_view),
+                    resolve_target: Some(resolve),
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
                             r: bg[0],
@@ -444,7 +630,7 @@ impl ViewportRenderer {
                     },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &t.depth_view,
+                    view: depth,
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(1.0),
                         store: wgpu::StoreOp::Discard,
@@ -455,9 +641,9 @@ impl ViewportRenderer {
                 occlusion_query_set: None,
                 multiview_mask: None,
             });
-            if let (Some(vb), Some(ib)) = (&self.vertex_buf, &self.index_buf) {
+            if let (Some(vb), Some(ib), Some(bg)) = (&self.vertex_buf, &self.index_buf, &self.bind_group) {
                 pass.set_pipeline(&self.pipeline);
-                pass.set_bind_group(0, &self.bind_group, &[]);
+                pass.set_bind_group(0, bg, &[]);
                 pass.set_vertex_buffer(0, vb.slice(..));
                 pass.set_index_buffer(ib.slice(..), wgpu::IndexFormat::Uint32);
                 pass.draw_indexed(0..self.index_count, 0, 0..1);
@@ -468,8 +654,6 @@ impl ViewportRenderer {
                 }
             }
         }
-        rs.queue.submit(Some(enc.finish()));
-        self.texture_id
     }
 }
 

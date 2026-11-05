@@ -345,6 +345,7 @@ fn run_action(app: &mut ForgeApp, action: Action) {
         }
         Action::Export => {
             let Some(path) = rfd::FileDialog::new()
+                .set_directory(crate::prefs::rendering_dir())
                 .add_filter("Zip", &["zip"])
                 .set_file_name(forge_library::export::suggested_name(&m))
                 .save_file()

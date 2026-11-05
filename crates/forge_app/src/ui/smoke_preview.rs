@@ -1,8 +1,9 @@
 //! Anteprima del fumo simulato nella viewport: una simulazione grossolana e veloce
 //! ([`forge_render_core::smoke::smoke_preview`]) calcolata in un thread a parte ogni volta che
-//! cambiano le impostazioni del fumo selezionato, mostrata come una nuvola di punti che si muove
-//! da 0 all'istante scelto. Serve a trovare posizione, sorgente e comportamento di massima senza
-//! fare il render; poi si rifinisce con il render.
+//! cambiano le impostazioni del fumo selezionato, mostrata come una nuvola di punti. La simulazione
+//! copre tutta la durata della timeline e si mostra l'istante del cursore: spostandolo o
+//! riproducendo non si ricalcola niente. Serve a trovare posizione, sorgente e comportamento di
+//! massima senza fare il render; poi si rifinisce con il render.
 
 use crate::app::ForgeApp;
 use eframe::egui;
@@ -62,8 +63,10 @@ impl SmokePreviewState {
     }
 }
 
-fn key(s: &SmokeCloud, geometry_rev: u64) -> String {
-    let s = s.sanitized();
+/// Il tempo non è nella chiave: lo decide il cursore della timeline. Conta fin dove arriva.
+fn key(s: &SmokeCloud, geometry_rev: u64, horizon: f32) -> String {
+    let mut s = s.sanitized();
+    s.sim.time = horizon;
     format!(
         "{:?}|{:?}|{:?}|{}|{}|{}|{}",
         s.sim, s.center, s.size, s.rotation_deg, s.seed, s.collisions, geometry_rev
@@ -97,14 +100,21 @@ pub fn update(app: &mut ForgeApp) {
         }
         return;
     };
-    let k = key(s, app.geometry_rev);
+    // Mentre l'animazione gira non si ricalcola: si guarda l'anteprima già pronta.
+    if app.timeline_ui.playing && app.smoke_preview.data.is_some() {
+        return;
+    }
+    let tl = &app.scene.timeline;
+    let horizon = (tl.duration - tl.start_of(&forge_scene::Target::Smoke(s.n))).max(0.1);
+    let k = key(s, app.geometry_rev, horizon);
     if k == app.smoke_preview.key {
         return;
     }
     // Serve la geometria per far girare il fumo attorno agli oggetti: se non c'è ancora si
     // riprova al prossimo fotogramma.
     let Some(geo) = app.current_geometry_shared() else { return };
-    let s = s.clone();
+    let mut s = s.clone();
+    s.sim.time = horizon;
     app.smoke_preview.cancel.store(true, Ordering::SeqCst);
     let cancel = Arc::new(AtomicBool::new(false));
     app.smoke_preview.cancel = cancel.clone();
@@ -137,7 +147,12 @@ pub fn draw(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect, i: usize)
         return;
     }
     let Some(s) = app.scene.smokes.get(i) else { return };
-    let t = app.smoke_preview.shown_time(s.sanitized().sim.time);
+    let time = s.sanitized().sim.time;
+    let t = if crate::ui::smoke::SHOW_TIME_CONTROLS {
+        app.smoke_preview.shown_time(time)
+    } else {
+        time
+    };
     let Some(points) = p.at(t) else { return };
     let cam = &app.view_camera;
     let col = egui::Color32::from_rgb(225, 235, 245);
@@ -147,7 +162,6 @@ pub fn draw(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect, i: usize)
         }
     }
     // Istante mostrato: si vede che il giro ricomincia da 0 (non è un nuovo calcolo).
-    let time = s.sanitized().sim.time;
     let mut label = crate::i18n::tf("Anteprima del fumo: {} / {} s", &[format!("{t:.1}"), format!("{time:.1}")]);
     if s.preview_only {
         label.push_str(crate::i18n::tr(" · solo anteprima, il render non lo calcola"));
@@ -159,7 +173,7 @@ pub fn draw(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect, i: usize)
         egui::FontId::proportional(12.0),
         egui::Color32::from_rgb(225, 235, 245),
     );
-    if app.smoke_preview.playing {
+    if crate::ui::smoke::SHOW_TIME_CONTROLS && app.smoke_preview.playing {
         painter.ctx().request_repaint();
     }
 }
@@ -171,16 +185,19 @@ pub fn controls(ui: &mut egui::Ui, st: &mut SmokePreviewState, time: f32) {
         ui.checkbox(&mut st.enabled, tr("Anteprima in viewport")).on_hover_text(tr(
             "Mostra nella viewport, come una nuvola di punti, dove va il fumo e come si muove fino all'istante scelto (simulazione grossolana e veloce, solo per trovare posizione e impostazioni: il render la rifà fine)",
         ));
-        if st.enabled {
+        if st.enabled && crate::ui::smoke::SHOW_TIME_CONTROLS {
             let label = if st.playing { tr("Ferma") } else { tr("Riproduci") };
             if ui.small_button(label).clicked() {
                 st.playing = !st.playing;
             }
-            if st.busy {
-                ui.spinner();
-            }
+        }
+        if st.enabled && st.busy {
+            ui.spinner();
         }
     });
+    if !crate::ui::smoke::SHOW_TIME_CONTROLS {
+        return;
+    }
     if st.enabled && !st.playing {
         let mut sec = st.scrub * time;
         if ui

@@ -170,18 +170,16 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
         ui.end_row();
     });
     ui.separator();
-    if app.prefs.timeline_enabled {
-        ui.horizontal(|ui| {
-            ui.selectable_value(&mut app.bottom_tab, crate::app::BottomTab::Console, tr("Console"));
-            ui.selectable_value(&mut app.bottom_tab, crate::app::BottomTab::Timeline, tr("Timeline"));
-        });
-        if app.bottom_tab == crate::app::BottomTab::Timeline {
-            if app.prefs.timeline_detached {
-                ui.label(egui::RichText::new(tr("La timeline è in una finestra a parte.")).weak());
-            } else {
-                crate::ui::timeline::panel(app, ui);
-                return;
-            }
+    ui.horizontal(|ui| {
+        ui.selectable_value(&mut app.bottom_tab, crate::app::BottomTab::Timeline, tr("Timeline"));
+        ui.selectable_value(&mut app.bottom_tab, crate::app::BottomTab::Console, tr("Console"));
+    });
+    if app.bottom_tab == crate::app::BottomTab::Timeline {
+        if app.prefs.timeline_detached {
+            ui.label(egui::RichText::new(tr("La timeline è in una finestra a parte.")).weak());
+        } else {
+            crate::ui::timeline::panel(app, ui);
+            return;
         }
     }
     let lines = app.logs.lines();

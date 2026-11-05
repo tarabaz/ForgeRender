@@ -63,8 +63,8 @@ pub enum PackageKind {
 /// Scheda della parte bassa: console (registro) o timeline.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum BottomTab {
-    #[default]
     Console,
+    #[default]
     Timeline,
 }
 
@@ -147,10 +147,7 @@ pub struct StartupOptions {
     pub mesh: bool,
     /// Finestra "Integrazione AI" aperta all'avvio (`--integrazione-ai`).
     pub ai_setup: bool,
-    /// Timeline accesa e mostrata per questa sessione (`--timeline`, prove e screenshot; non
-    /// cambia le impostazioni salvate).
-    pub timeline: bool,
-    /// Con `--timeline-demo`: anche un'animazione di prova sul primo oggetto (screenshot).
+    /// Con `--timeline-demo`: un'animazione di prova sul primo oggetto (screenshot).
     pub timeline_demo: bool,
     /// "AI MCP" acceso all'avvio (`--controllo-ia`, prove automatiche).
     pub mcp: bool,
@@ -301,6 +298,16 @@ pub struct ForgeApp {
 
     pub viewport: Option<ViewportRenderer>,
     viewport_uploaded: Option<(u64, u64, BTreeSet<usize>)>,
+    /// Revisione degli oggetti da disegnare (quali, con che mesh): cambia con [`Self::geometry_changed`]
+    /// e non con [`Self::transforms_changed`].
+    structure_rev: u64,
+    /// Revisione delle matrici degli oggetti, e quella già sulla GPU.
+    transform_rev: u64,
+    viewport_transforms: u64,
+    /// Raggio della scena per il piano lontano della viewport (rileggere i vertici costa).
+    viewport_radius: f32,
+    /// GPU della finestra (per catturare i fotogrammi dell'anteprima della viewport).
+    pub wgpu_state: Option<eframe::egui_wgpu::RenderState>,
     /// Viewport in vista Mesh: wireframe dei triangoli sopra l'ombreggiatura.
     pub viewport_mesh: bool,
     pub render_texture: Option<egui::TextureHandle>,
@@ -398,6 +405,7 @@ impl ForgeApp {
         crate::ui::style::apply(&cc.egui_ctx);
         crate::ui::icons::install(&cc.egui_ctx);
         let viewport = cc.wgpu_render_state.as_ref().map(ViewportRenderer::new);
+        let wgpu_state = cc.wgpu_render_state.clone();
         if viewport.is_none() {
             tracing::warn!("modalità sicura: viewport 3D GPU non disponibile, il rendering CPU resta utilizzabile");
         }
@@ -464,6 +472,11 @@ impl ForgeApp {
             session: RenderSession::new(),
             viewport,
             viewport_uploaded: None,
+            wgpu_state,
+            structure_rev: 1,
+            transform_rev: 0,
+            viewport_transforms: 0,
+            viewport_radius: 1.0,
             viewport_mesh: false,
             render_texture: None,
             render_texture_key: None,
@@ -477,7 +490,7 @@ impl ForgeApp {
             material_editor: Default::default(),
             sequence: Default::default(),
             timeline_ui: Default::default(),
-            bottom_tab: BottomTab::Console,
+            bottom_tab: BottomTab::Timeline,
             prefs: Default::default(),
             prefs_open: false,
             prefs_error: None,
@@ -543,7 +556,7 @@ impl ForgeApp {
         }
         app.apply_prefs(prefs, true);
         // Avviato già comandato dall'assistente (prove automatiche): niente schermata davanti.
-        app.splash_open = app.prefs.show_splash && !startup.mcp && !startup.timeline && !startup.timeline_demo;
+        app.splash_open = app.prefs.show_splash && !startup.mcp && !startup.timeline_demo;
         // Scelta della modalità: non nelle prove automatiche (modalità già indicata, assistente,
         // sequenze, screenshot) salvo `--scelta-modalita`.
         app.mode_choice_open = startup.mode_choice
@@ -613,10 +626,6 @@ impl ForgeApp {
             app.ai_setup.open();
         }
         app.timeline_ui.demo_pending = startup.timeline_demo;
-        if startup.timeline || startup.timeline_demo {
-            app.prefs.timeline_enabled = true;
-            app.bottom_tab = BottomTab::Timeline;
-        }
         app.sequence.open = startup.sequences_window;
         if startup.prism_demo {
             app.open_demo(0);
@@ -718,7 +727,17 @@ impl ForgeApp {
     /// Geometria, visibilità o struttura modificate.
     pub fn geometry_changed(&mut self) {
         self.geometry_rev += 1;
+        self.structure_rev += 1;
         self.appearance_rev += 1;
+        self.shading_rev += 1;
+        self.unsaved = true;
+    }
+
+    /// Oggetti spostati, ruotati o scalati (gizmo, timeline): il render rifà la geometria, la
+    /// viewport aggiorna solo le matrici sulla GPU.
+    pub fn transforms_changed(&mut self) {
+        self.geometry_rev += 1;
+        self.transform_rev += 1;
         self.shading_rev += 1;
         self.unsaved = true;
     }
@@ -1763,7 +1782,9 @@ impl ForgeApp {
             self.error = Some(tr("nessuna immagine da esportare: avvia prima un rendering").into());
             return;
         };
-        let mut dialog = rfd::FileDialog::new().set_file_name(format!("render_{}spp.png", frame.samples));
+        let mut dialog = rfd::FileDialog::new()
+            .set_directory(crate::prefs::rendering_dir())
+            .set_file_name(format!("render_{}spp.png", frame.samples));
         for f in ExportFormat::ALL {
             dialog = dialog.add_filter(tr(export_format_label(f)), f.extensions());
         }
@@ -2346,7 +2367,11 @@ impl ForgeApp {
             .unwrap_or_else(|| "progetto".into());
         let result = match kind {
             PackageKind::Folder => {
-                let Some(parent) = rfd::FileDialog::new().set_title(tr("Cartella in cui salvare")).pick_folder() else {
+                let Some(parent) = rfd::FileDialog::new()
+                    .set_directory(crate::prefs::rendering_dir())
+                    .set_title(tr("Cartella in cui salvare"))
+                    .pick_folder()
+                else {
                     return;
                 };
                 let mut dir = parent.join(&name);
@@ -2363,6 +2388,7 @@ impl ForgeApp {
                     _ => (forge_project::pack::PACK_EXTENSION, tr("Pacchetto ForgeRender")),
                 };
                 let Some(p) = rfd::FileDialog::new()
+                    .set_directory(crate::prefs::rendering_dir())
                     .add_filter(label, &[ext])
                     .set_file_name(format!("{name}.{ext}"))
                     .save_file()
@@ -2482,6 +2508,7 @@ impl ForgeApp {
             (Some(p), false) => p.clone(),
             _ => {
                 let Some(p) = rfd::FileDialog::new()
+                    .set_directory(crate::prefs::rendering_dir())
                     .add_filter(tr("Progetto ForgeRender"), &[forge_project::EXTENSION])
                     .set_file_name("progetto.frproject")
                     .save_file()
@@ -2535,14 +2562,9 @@ impl ForgeApp {
     /// Prepara la viewport (upload geometria se cambiata) e restituisce la texture.
     pub fn viewport_texture(&mut self, frame: &eframe::Frame, size: [u32; 2]) -> Option<egui::TextureId> {
         let rs = frame.wgpu_render_state()?;
+        self.sync_viewport(rs)?;
+        let radius = self.viewport_radius;
         let vp = self.viewport.as_mut()?;
-        // La camera non richiede un nuovo upload: contano geometria, materiali e selezione.
-        let key = (self.geometry_rev, self.appearance_rev, self.selection.clone());
-        if self.viewport_uploaded.as_ref() != Some(&key) {
-            vp.upload_scene(rs, &self.scene, &self.selection);
-            self.viewport_uploaded = Some(key);
-        }
-        let radius = self.scene.bounds().radius().max(1e-3);
         vp.render(
             rs,
             &self.view_camera,
@@ -2551,6 +2573,40 @@ impl ForgeApp {
             forge_math::Vec3::splat(0.045),
             self.viewport_mesh,
         )
+    }
+
+    /// Un fotogramma della viewport `width`×`height` dalla camera indicata, come l'anteprima
+    /// (RGBA a 8 bit, sRGB).
+    pub fn capture_viewport(&mut self, camera: &forge_scene::Camera, width: u32, height: u32) -> Option<Vec<u8>> {
+        let rs = self.wgpu_state.clone()?;
+        self.sync_viewport(&rs)?;
+        let radius = self.viewport_radius;
+        let mesh = self.viewport_mesh;
+        let vp = self.viewport.as_mut()?;
+        vp.capture(&rs, camera, radius, [width, height], forge_math::Vec3::splat(0.045), mesh)
+    }
+
+    /// Mette d'accordo la GPU con la scena: tutta la geometria se è cambiata, se no solo le matrici.
+    fn sync_viewport(&mut self, rs: &eframe::egui_wgpu::RenderState) -> Option<()> {
+        let vp = self.viewport.as_mut()?;
+        // La camera non richiede un nuovo upload: contano oggetti, materiali e selezione. Se si
+        // sono solo mossi gli oggetti si aggiornano le matrici.
+        let key = (self.structure_rev, self.appearance_rev, self.selection.clone());
+        if self.viewport_uploaded.as_ref() != Some(&key) {
+            vp.upload_scene(rs, &self.scene, &self.selection);
+            self.viewport_uploaded = Some(key);
+            self.viewport_transforms = self.transform_rev;
+            self.viewport_radius = self.scene.bounds().radius().max(1e-3);
+        } else if self.viewport_transforms != self.transform_rev {
+            vp.update_transforms(rs, &self.scene);
+            self.viewport_transforms = self.transform_rev;
+            // Durante la riproduzione il raggio resta quello di prima: rileggere i vertici a ogni
+            // fotogramma è proprio quello che si vuole evitare.
+            if !self.timeline_ui.playing {
+                self.viewport_radius = self.scene.bounds().radius().max(1e-3);
+            }
+        }
+        Some(())
     }
 }
 

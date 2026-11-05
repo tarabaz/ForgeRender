@@ -1,29 +1,32 @@
-//! Pannello della timeline (si attiva da Funzioni → Timeline, o da solo quando nella scena c'è un
-//! effetto che si calcola nel tempo): sotto, al posto della console (scheda Console | Timeline),
-//! oppure staccato in una finestra a parte.
+//! Pannello della timeline: sempre attiva, in basso nella scheda Timeline accanto a Console, oppure
+//! staccata in una finestra a parte.
 //!
 //! - In alto: riproduzione (inizio, chiave prima, play/pausa, chiave dopo, fine, ripeti), tempo,
-//!   durata e fotogrammi al secondo, "+ Elemento", zoom, render dell'animazione, stacca.
-//! - A sinistra gli elementi con le loro proprietà: rombo per mettere o togliere la chiave
-//!   nell'istante del cursore, valore (cambiandolo con le chiavi si registra una chiave), "+" per i
-//!   modificatori. "+ Proprietà" aggiunge le proprietà compatibili non di base.
-//! - A destra il righello (clic o trascinamento = sposta il cursore) e le chiavi: trascinandole
-//!   si spostano (a scatti di fotogramma), clic destro = interpolazione o elimina. Gli effetti
-//!   calcolati nel tempo hanno una barra che parte dal loro inizio: trascinandola cambia l'inizio.
+//!   durata e fotogrammi al secondo, "+ Elemento", zoom, salvataggio, stacca.
+//! - A sinistra gli elementi con le loro righe: posizione, rotazione, bersaglio e colore sono una
+//!   riga sola con i tre valori. Rombo = chiave nell'istante del cursore su tutta la riga; cambiando
+//!   un valore con le chiavi si registra una chiave; "ƒ+" aggiunge i modificatori e "+" le righe non
+//!   di base.
+//! - A destra il righello (clic o trascinamento = sposta il cursore) e le chiavi, come in After
+//!   Effects: clic seleziona, Ctrl o Maiusc + clic aggiunge o toglie, trascinando sul vuoto si
+//!   disegna un rettangolo di selezione, trascinando una chiave si spostano tutte le selezionate,
+//!   clic destro = interpolazione o elimina, Canc elimina, Ctrl+C e Ctrl+V copiano nell'istante del
+//!   cursore, F9 = morbida in entrata e uscita, Esc toglie la selezione. Gli effetti calcolati nel
+//!   tempo hanno una barra che parte dal loro inizio: trascinandola cambia l'inizio.
 //!
-//! Spostare un oggetto con il gizmo (o cambiare un valore nei pannelli) quando la sua proprietà
-//! ha già delle chiavi registra una chiave nell'istante del cursore.
+//! Spostare un oggetto con il gizmo (o cambiare un valore nei pannelli) quando la sua riga ha già
+//! delle chiavi registra una chiave nell'istante del cursore.
 
 use crate::app::ForgeApp;
 use crate::i18n::{tf, tr};
 use crate::ui::{icons, style};
 use eframe::egui;
-use forge_scene::{Interp, ModSlot, Modifier, Prop, Target};
+use forge_scene::{Interp, Key, ModSlot, Modifier, Prop, Target};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 const ROW: f32 = 20.0;
-const LEFT: f32 = 360.0;
+const LEFT: f32 = 400.0;
 
 /// Stato del pannello e della riproduzione (non salvato nel progetto).
 pub struct TimelineUi {
@@ -33,11 +36,28 @@ pub struct TimelineUi {
     /// Zoom del tempo (1 = tutta la durata nella larghezza) e primo secondo in vista.
     zoom: f32,
     t0: f32,
-    drag_key: Option<(usize, usize)>,
+    /// Chiavi selezionate: (traccia, tempo). Le chiavi di una riga si selezionano insieme.
+    selection: Vec<(usize, f32)>,
+    /// Chiavi in trascinamento.
+    drag: Option<KeyDrag>,
+    /// Inizio del rettangolo di selezione.
+    marquee: Option<egui::Pos2>,
+    /// Chiavi copiate.
+    clipboard: Vec<(usize, Key)>,
+    /// Resto del trascinamento della barra dell'area di lavoro (sotto un fotogramma).
+    work_carry: f32,
     drag_start: Option<Target>,
-    /// Effetti nel tempo visti l'ultima volta (per accendere la timeline quando ne arriva uno).
+    /// Effetti nel tempo visti l'ultima volta (quando ne arriva uno il cursore va sul suo istante).
     seen_effects: usize,
     pub run: Option<AnimRun>,
+    /// Play nella vista Render: campioni per fotogramma, e il render corto in corso.
+    pub play_samples: u32,
+    render_play: Option<RenderPlay>,
+    /// Che cosa salva "Salva animazione".
+    pub save_kind: SaveKind,
+    /// Da dove: None = la vista della viewport, Some(i) = la camera di rendering i.
+    pub save_view: Option<usize>,
+    pub make_video: bool,
     /// Finestra staccata da riportare davanti.
     raise: bool,
     /// Animazione di prova da creare appena c'è la scena (`--timeline-demo`).
@@ -52,14 +72,51 @@ impl Default for TimelineUi {
             loop_play: true,
             zoom: 1.0,
             t0: 0.0,
-            drag_key: None,
+            selection: Vec::new(),
+            drag: None,
+            marquee: None,
+            clipboard: Vec::new(),
+            work_carry: 0.0,
             drag_start: None,
             seen_effects: 0,
             run: None,
+            play_samples: 20,
+            render_play: None,
+            save_kind: SaveKind::Render,
+            save_view: None,
+            make_video: true,
             raise: false,
             demo_pending: false,
         }
     }
+}
+
+/// Play nella vista Render: ogni fotogramma si calcola con pochi campioni e si passa al successivo
+/// (più lento del tempo reale, ma si vede l'animazione renderizzata).
+struct RenderPlay {
+    settings: forge_render_core::RenderSettings,
+    auto_restart: bool,
+    /// Render del fotogramma in corso.
+    waiting: bool,
+}
+
+/// Che cosa salva "Salva animazione".
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SaveKind {
+    /// Il render di ogni fotogramma.
+    Render,
+    /// I fotogrammi della viewport: anteprima veloce del movimento.
+    Preview,
+}
+
+/// Trascinamento delle chiavi selezionate.
+struct KeyDrag {
+    /// Tempo sotto il mouse all'inizio.
+    grab: f32,
+    /// Spostamento già fatto.
+    moved: f32,
+    /// Le chiavi com'erano (per non perderle se ne incontrano altre).
+    before: Vec<(usize, Key)>,
 }
 
 /// Render dell'animazione in corso: un'immagine per fotogramma, poi il video.
@@ -75,6 +132,12 @@ pub struct AnimRun {
     time: f32,
     started: Instant,
     waiting_denoise: Option<Instant>,
+    /// Istanti da salvare (area di lavoro).
+    times: Vec<f32>,
+    kind: SaveKind,
+    /// Da dove si salva, e la camera attiva di prima da rimettere.
+    view_cam: Option<usize>,
+    active_before: Option<usize>,
     make_video: bool,
     video: Option<std::thread::JoinHandle<anyhow::Result<&'static str>>>,
     cancelled: bool,
@@ -96,52 +159,17 @@ fn time_effects(app: &ForgeApp) -> usize {
         + app.scene.fogs.len()
 }
 
-/// Accende o spegne la funzione Timeline (resta nelle impostazioni).
-pub fn set_enabled(app: &mut ForgeApp, on: bool) {
-    if app.prefs.timeline_enabled == on {
-        return;
-    }
-    let p = crate::prefs::Preferences {
-        timeline_enabled: on,
-        ..app.prefs.clone()
-    };
-    app.apply_prefs(p, false);
-    if on {
-        app.bottom_tab = crate::app::BottomTab::Timeline;
-        // L'istante degli effetti nel tempo resta quello di prima: il cursore va lì.
-        let t = app
-            .scene
-            .smokes
-            .iter()
-            .filter(|s| s.mode == forge_scene::SmokeMode::Simulated)
-            .map(|s| s.sim.time)
-            .chain(app.scene.fogs.iter().map(|f| f.sim_time))
-            .fold(0.0f32, f32::max);
-        if t > 0.0 {
-            let tl = &mut app.scene.timeline;
-            tl.duration = tl.duration.max(t);
-            tl.time = t;
-        }
-    } else {
-        app.timeline_ui.playing = false;
-    }
-}
-
-/// A ogni fotogramma dell'interfaccia: accensione automatica, riproduzione, applicazione dei
-/// valori animati, render dell'animazione.
+/// A ogni fotogramma dell'interfaccia: riproduzione, applicazione dei valori animati, render
+/// dell'animazione.
 pub fn tick(app: &mut ForgeApp, ctx: &egui::Context) {
     let effects = time_effects(app);
-    if effects > app.timeline_ui.seen_effects && !app.prefs.timeline_enabled {
-        set_enabled(app, true);
-        app.toast(tr(
-            "Timeline attivata: nella scena c'è un effetto che si calcola nel tempo (fumo simulato, ghiaccio secco)",
-        ));
+    if effects > app.timeline_ui.seen_effects {
+        // Effetto nuovo: il cursore va sul suo istante, così non riparte vuoto.
+        let mut tl = std::mem::take(&mut app.scene.timeline);
+        tl.adopt_effects(&app.scene);
+        app.scene.timeline = tl;
     }
     app.timeline_ui.seen_effects = effects;
-    if !app.prefs.timeline_enabled {
-        app.timeline_ui.last_tick = None;
-        return;
-    }
     if app.timeline_ui.demo_pending && !app.scene.roots.is_empty() {
         app.timeline_ui.demo_pending = false;
         demo(app);
@@ -150,6 +178,15 @@ pub fn tick(app: &mut ForgeApp, ctx: &egui::Context) {
         tick_render(app);
         ctx.request_repaint_after(Duration::from_millis(50));
         return;
+    }
+    if app.timeline_ui.playing && app.view == crate::app::View::Render {
+        render_play_step(app);
+        ctx.request_repaint_after(Duration::from_millis(16));
+        return;
+    }
+    if let Some(r) = app.timeline_ui.render_play.take() {
+        app.settings = r.settings;
+        app.auto_restart = r.auto_restart;
     }
     let now = Instant::now();
     if app.timeline_ui.playing {
@@ -161,12 +198,14 @@ pub fn tick(app: &mut ForgeApp, ctx: &egui::Context) {
             .as_secs_f32()
             .min(0.25);
         let tl = &mut app.scene.timeline;
+        // Si riproduce l'area di lavoro.
+        let (a, b) = tl.work_area();
         let mut t = tl.time + dt;
-        if t > tl.duration {
+        if t > b {
             if app.timeline_ui.loop_play {
-                t = 0.0;
+                t = a;
             } else {
-                t = tl.duration;
+                t = b;
                 app.timeline_ui.playing = false;
             }
         }
@@ -175,6 +214,92 @@ pub fn tick(app: &mut ForgeApp, ctx: &egui::Context) {
     }
     app.timeline_ui.last_tick = Some(now);
     apply(app);
+}
+
+/// Un passo del Play nella vista Render: render corto del fotogramma, poi il successivo.
+fn render_play_step(app: &mut ForgeApp) {
+    if app.timeline_ui.render_play.is_none() {
+        app.timeline_ui.render_play = Some(RenderPlay {
+            settings: app.settings.clone(),
+            auto_restart: app.auto_restart,
+            waiting: false,
+        });
+        app.auto_restart = false;
+        app.settings.noise_threshold = 0.0;
+        app.settings.denoise.mode = forge_render_core::DenoiseMode::Off;
+    }
+    app.settings.target_samples = app.timeline_ui.play_samples.max(1);
+    let waiting = app.timeline_ui.render_play.as_ref().is_some_and(|r| r.waiting);
+    if waiting {
+        if app.is_preparing() {
+            return;
+        }
+        let Some(job) = app.job_id() else { return };
+        let p = app.session.progress();
+        let done = p.job_id == job && !matches!(p.state, forge_render_core::SessionState::Rendering);
+        if !done {
+            return;
+        }
+        // Fotogramma successivo nell'area di lavoro.
+        let tl = &mut app.scene.timeline;
+        let (a, b) = tl.work_area();
+        let mut t = tl.time + tl.frame();
+        if t > b {
+            if app.timeline_ui.loop_play {
+                t = a;
+            } else {
+                app.timeline_ui.playing = false;
+                return;
+            }
+        }
+        tl.time = t;
+    }
+    apply(app);
+    app.start_render();
+    if let Some(r) = &mut app.timeline_ui.render_play {
+        r.waiting = true;
+    }
+}
+
+/// Tastiera sulle chiavi selezionate (prima delle scorciatoie del programma: Canc qui toglie le
+/// chiavi, non l'oggetto selezionato).
+pub fn keyboard(app: &mut ForgeApp, ctx: &egui::Context) {
+    if ctx.egui_wants_keyboard_input() {
+        return;
+    }
+    let none = egui::Modifiers::NONE;
+    let copy = egui::Modifiers::COMMAND;
+    let has_sel = !app.timeline_ui.selection.is_empty();
+    let mut changed = false;
+    if has_sel {
+        if ctx.input_mut(|i| i.consume_key(none, egui::Key::Delete) || i.consume_key(none, egui::Key::Backspace)) {
+            let sel = std::mem::take(&mut app.timeline_ui.selection);
+            let mut tl = std::mem::take(&mut app.scene.timeline);
+            tl.delete_keys(&app.scene, &sel);
+            app.scene.timeline = tl;
+            changed = true;
+        }
+        if ctx.input_mut(|i| i.consume_key(none, egui::Key::Escape)) {
+            app.timeline_ui.selection.clear();
+        }
+        if ctx.input_mut(|i| i.consume_key(none, egui::Key::F9)) {
+            let sel = app.timeline_ui.selection.clone();
+            app.scene.timeline.set_keys_interp(&sel, Interp::EaseInOut);
+            changed = true;
+        }
+        if ctx.input_mut(|i| i.consume_key(copy, egui::Key::C)) {
+            app.timeline_ui.clipboard = app.scene.timeline.copy_keys(&app.timeline_ui.selection);
+        }
+    }
+    if !app.timeline_ui.clipboard.is_empty() && ctx.input_mut(|i| i.consume_key(copy, egui::Key::V)) {
+        let keys = app.timeline_ui.clipboard.clone();
+        let at = app.scene.timeline.time;
+        app.timeline_ui.selection = app.scene.timeline.paste_keys(&keys, at);
+        changed = true;
+    }
+    if changed {
+        refresh(app);
+    }
 }
 
 /// Animazione di prova (`--timeline-demo`): il primo oggetto con una mesh sale e gira con
@@ -203,15 +328,17 @@ fn demo(app: &mut ForgeApp) {
         modifier: Modifier::Ramp { per_second: 90.0 },
         enabled: true,
     });
-    let x = tl.track(&target, Prop::PosX).expect("traccia");
-    tl.tracks[x].modifiers.push(ModSlot {
-        modifier: Modifier::Wiggle {
-            amplitude: 0.03,
-            frequency: 2.0,
-            seed: 3,
-        },
-        enabled: true,
-    });
+    for (k, axis) in [Prop::PosX, Prop::PosY, Prop::PosZ].into_iter().enumerate() {
+        let x = tl.track(&target, axis).expect("traccia");
+        tl.tracks[x].modifiers.push(ModSlot {
+            modifier: Modifier::Wiggle {
+                amplitude: 0.03,
+                frequency: 2.0,
+                seed: 3 + k as u32,
+            },
+            enabled: true,
+        });
+    }
     let o = tl.track(&target, Prop::Opacity).expect("traccia");
     tl.tracks[o].keys = vec![
         key(0.0, 1.0, Interp::Linear),
@@ -221,6 +348,12 @@ fn demo(app: &mut ForgeApp) {
     let cz = tl.track(&Target::Camera, Prop::PosZ).expect("traccia");
     let cb = tl.tracks[cz].base;
     tl.tracks[cz].keys = vec![key(0.0, cb, Interp::EaseInOut), key(4.0, cb * 0.8, Interp::EaseInOut)];
+    let times: Vec<f32> = tl.tracks[y].keys.iter().map(|k| k.t).collect();
+    for ax in [Prop::PosX, Prop::PosZ] {
+        let i = tl.track(&target, ax).expect("traccia");
+        let v = tl.tracks[i].base;
+        tl.tracks[i].keys = times.iter().map(|&t| key(t, v, Interp::EaseInOut)).collect();
+    }
     tl.time = 1.2;
     app.scene.timeline = tl;
 }
@@ -237,9 +370,11 @@ pub fn apply(app: &mut ForgeApp) {
     }
     if a.geometry {
         app.geometry_changed();
+    } else if a.transforms {
+        app.transforms_changed();
     }
     if a.shading || a.effects {
-        app.appearance_changed();
+        app.shading_changed();
     }
     if a.camera {
         if app.scene.active_camera.is_none() {
@@ -265,16 +400,21 @@ pub fn panel(app: &mut ForgeApp, ui: &mut egui::Ui) {
     }
     let lane_w = (ui.available_width() - LEFT - 8.0).max(80.0);
     let scale = TimeScale::new(&app.scene.timeline, &app.timeline_ui, lane_w);
-    ruler(app, ui, &scale);
+    let x0 = ruler(app, ui, &scale);
+    let scale = TimeScale { x0, ..scale };
     egui::ScrollArea::vertical()
         .id_salt("timeline-righe")
+        .scroll_source(egui::scroll_area::ScrollSource {
+            drag: egui::scroll_area::DragScroll::Never,
+            ..egui::scroll_area::ScrollSource::ALL
+        })
         .auto_shrink([false, false])
         .show(ui, |ui| rows(app, ui, &scale));
 }
 
 /// Finestra staccata (se la timeline è staccata dal programma).
 pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
-    if !app.prefs.timeline_enabled || !app.prefs.timeline_detached {
+    if !app.prefs.timeline_detached {
         return;
     }
     let mut open = true;
@@ -355,8 +495,9 @@ fn toolbar(app: &mut ForgeApp, ui: &mut egui::Ui) {
             .clicked()
         {
             app.timeline_ui.playing = !app.timeline_ui.playing;
-            if app.timeline_ui.playing && app.scene.timeline.time >= app.scene.timeline.duration {
-                app.scene.timeline.time = 0.0;
+            let (a, b) = app.scene.timeline.work_area();
+            if app.timeline_ui.playing && !(a..b).contains(&app.scene.timeline.time) {
+                app.scene.timeline.time = a;
             }
         }
         if ui.button("▶▶").on_hover_text(tr("Chiave dopo")).clicked() {
@@ -369,6 +510,14 @@ fn toolbar(app: &mut ForgeApp, ui: &mut egui::Ui) {
         }
         ui.toggle_value(&mut app.timeline_ui.loop_play, "⟲")
             .on_hover_text(tr("Ripeti: arrivata alla fine la riproduzione riparte dall'inizio"));
+        ui.add(
+            egui::DragValue::new(&mut app.timeline_ui.play_samples)
+                .range(1..=512)
+                .suffix(tr(" campioni")),
+        )
+        .on_hover_text(tr(
+            "Play nella vista Render: ogni fotogramma si calcola con questi campioni e si passa al successivo. Va più lento del tempo reale, ma si vede l'animazione renderizzata",
+        ));
         ui.separator();
         let tl = &mut app.scene.timeline;
         ui.label(
@@ -421,17 +570,7 @@ fn toolbar(app: &mut ForgeApp, ui: &mut egui::Ui) {
                     }
                 }
             }
-            None => {
-                if ui
-                    .button(format!("{}  {}", icons::IMAGE, tr("Render animazione…")))
-                    .on_hover_text(tr(
-                        "Fa il render di ogni fotogramma della timeline (PNG in una cartella) e poi il video MP4, con i campioni attuali",
-                    ))
-                    .clicked()
-                {
-                    start_render(app);
-                }
-            }
+            None => save_menu(app, ui),
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let (label, hint) = if app.prefs.timeline_detached {
@@ -450,6 +589,49 @@ fn toolbar(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 set_detached(app, d);
             }
         });
+    });
+}
+
+/// "Salva animazione": che cosa (render di ogni fotogramma o anteprima della viewport) e da dove
+/// (la vista o una camera). Salva l'area di lavoro nella cartella Rendering.
+fn save_menu(app: &mut ForgeApp, ui: &mut egui::Ui) {
+    ui.menu_button(format!("{}  {}", icons::IMAGE, tr("Salva animazione")), |ui| {
+        let frames = app.scene.timeline.work_frames().len();
+        let (a, b) = app.scene.timeline.work_area();
+        ui.label(
+            egui::RichText::new(tf(
+                "Area di lavoro: da {} a {} s, {} fotogrammi",
+                &[format!("{a:.2}"), format!("{b:.2}"), frames.to_string()],
+            ))
+            .weak(),
+        );
+        ui.separator();
+        ui.radio_value(&mut app.timeline_ui.save_kind, SaveKind::Render, tr("Render di ogni fotogramma"))
+            .on_hover_text(tr("Il render fotorealistico di ogni fotogramma, con i campioni attuali"));
+        ui.radio_value(&mut app.timeline_ui.save_kind, SaveKind::Preview, tr("Anteprima (viewport)"))
+            .on_hover_text(tr(
+                "I fotogrammi come si vedono nella viewport: pochi secondi, per controllare il movimento. Fumo e nebbie non ci sono",
+            ));
+        ui.separator();
+        ui.label(tr("Vista"));
+        let cams: Vec<String> = app.scene.render_cameras.iter().map(|c| c.name.clone()).collect();
+        if app.timeline_ui.save_view.is_some_and(|i| i >= cams.len()) {
+            app.timeline_ui.save_view = None;
+        }
+        ui.radio_value(&mut app.timeline_ui.save_view, None, tr("Viewport"));
+        for (i, name) in cams.iter().enumerate() {
+            ui.radio_value(&mut app.timeline_ui.save_view, Some(i), name);
+        }
+        ui.separator();
+        ui.checkbox(&mut app.timeline_ui.make_video, tr("Anche il video MP4"));
+        if ui
+            .button(egui::RichText::new(tr("Salva")).strong())
+            .on_hover_text(tr("Salva nella cartella Rendering, in una cartella nuova per ogni animazione"))
+            .clicked()
+        {
+            start_render(app);
+            ui.close();
+        }
     });
 }
 
@@ -526,8 +708,10 @@ fn add_element_menu(app: &mut ForgeApp, ui: &mut egui::Ui) {
     }
 }
 
-/// Righello del tempo: clic o trascinamento = sposta il cursore.
-fn ruler(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale) {
+/// Righello del tempo: clic o trascinamento = sposta il cursore. Restituisce il bordo sinistro
+/// della colonna delle chiavi.
+fn ruler(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale) -> f32 {
+    work_bar(app, ui, scale);
     ui.horizontal(|ui| {
         ui.allocate_exact_size(egui::vec2(LEFT, ROW), egui::Sense::hover());
         let (rect, resp) = ui.allocate_exact_size(egui::vec2(scale.width, ROW), egui::Sense::click_and_drag());
@@ -563,16 +747,84 @@ fn ruler(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale) {
             }
             k += step;
         }
-        // Fine della durata.
-        let xe = s.x(tl.duration);
-        if xe < rect.right() {
+        // Fuori dall'area di lavoro.
+        let (wa, wb) = tl.work_area();
+        let shade = egui::Color32::from_black_alpha(90);
+        let xa = s.x(wa).clamp(rect.left(), rect.right());
+        let xb = s.x(wb).clamp(rect.left(), rect.right());
+        painter.rect_filled(egui::Rect::from_min_max(rect.min, egui::pos2(xa, rect.bottom())), 0.0, shade);
+        painter.rect_filled(egui::Rect::from_min_max(egui::pos2(xb, rect.top()), rect.max), 0.0, shade);
+        playhead(&painter, &s, tl.time, rect);
+        rect.left()
+    })
+    .inner
+}
+
+/// Barra dell'area di lavoro sopra il righello, come in After Effects: si trascinano le due
+/// estremità, o il centro per spostarla tutta. È la parte che si riproduce e si salva.
+fn work_bar(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale) {
+    ui.horizontal(|ui| {
+        ui.allocate_exact_size(egui::vec2(LEFT, 10.0), egui::Sense::hover());
+        let (rect, _) = ui.allocate_exact_size(egui::vec2(scale.width, 10.0), egui::Sense::hover());
+        let s = TimeScale { x0: rect.left(), ..*scale };
+        let tl = &app.scene.timeline;
+        let (a, b) = tl.work_area();
+        let (xa, xb) = (s.x(a), s.x(b));
+        let bar = egui::Rect::from_min_max(egui::pos2(xa, rect.top() + 1.0), egui::pos2(xb, rect.bottom() - 1.0));
+        let grip = |x: f32| egui::Rect::from_center_size(egui::pos2(x, rect.center().y), egui::vec2(10.0, 10.0));
+        let middle = ui.interact(
+            bar.shrink2(egui::vec2(6.0, 0.0)),
+            ui.make_persistent_id("area-lavoro"),
+            egui::Sense::drag(),
+        );
+        let left = ui.interact(grip(xa), ui.make_persistent_id("area-lavoro-inizio"), egui::Sense::drag());
+        let right = ui.interact(grip(xb), ui.make_persistent_id("area-lavoro-fine"), egui::Sense::drag());
+        let cursor = egui::CursorIcon::ResizeHorizontal;
+        let left = left
+            .on_hover_cursor(cursor)
+            .on_hover_text(tr("Inizio dell'area da riprodurre e salvare"));
+        let right = right
+            .on_hover_cursor(cursor)
+            .on_hover_text(tr("Fine dell'area da riprodurre e salvare"));
+        let middle = middle.on_hover_text(tr("Trascina per spostare l'area da riprodurre e salvare"));
+        let tl = &mut app.scene.timeline;
+        let frame = tl.frame();
+        let mut changed = false;
+        if left.dragged() {
+            if let Some(p) = left.interact_pointer_pos() {
+                tl.work_in = tl.snap(s.t(p.x)).clamp(0.0, b - frame);
+                tl.work_out = b;
+                changed = true;
+            }
+        }
+        if right.dragged() {
+            if let Some(p) = right.interact_pointer_pos() {
+                tl.work_out = tl.snap(s.t(p.x)).clamp(a + frame, tl.duration);
+                tl.work_in = a;
+                changed = true;
+            }
+        }
+        if middle.dragged() {
+            let dt = ((middle.drag_delta().x / s.px_per_s + app.timeline_ui.work_carry) / frame).trunc() * frame;
+            app.timeline_ui.work_carry += middle.drag_delta().x / s.px_per_s - dt;
+            let dt = dt.clamp(-a, tl.duration - b);
+            tl.work_in = a + dt;
+            tl.work_out = b + dt;
+            changed = true;
+        }
+        if changed {
+            app.unsaved = true;
+        }
+        let painter = ui.painter_at(rect);
+        painter.rect_filled(rect, 0.0, ui.visuals().extreme_bg_color);
+        painter.rect_filled(bar, 2.0, style::ACCENT.gamma_multiply(0.55));
+        for g in [xa, xb] {
             painter.rect_filled(
-                egui::Rect::from_min_max(egui::pos2(xe, rect.top()), rect.max),
-                0.0,
-                egui::Color32::from_black_alpha(90),
+                egui::Rect::from_center_size(egui::pos2(g, rect.center().y), egui::vec2(4.0, 10.0)),
+                1.0,
+                style::ACCENT,
             );
         }
-        playhead(&painter, &s, tl.time, rect);
     });
 }
 
@@ -589,24 +841,34 @@ fn playhead(painter: &egui::Painter, s: &TimeScale, t: f32, rect: egui::Rect) {
 /// Azioni raccolte durante il disegno (applicate dopo, quando la scena è libera).
 enum Action {
     RemoveElement(Target),
-    AddProp(Target, Prop),
-    RemoveTrack(usize),
-    ToggleKey(usize),
-    SetValue(usize, f32),
-    AddModifier(usize, Modifier),
-    RemoveModifier(usize, usize),
-    DeleteKey(usize, usize),
-    SetInterp(usize, usize, Interp),
-    MoveKey(usize, usize, f32),
+    AddProps(Target, Vec<Prop>),
+    RemoveTracks(Vec<usize>),
+    /// Mette o toglie la chiave nell'istante del cursore su tutte le tracce della riga.
+    ToggleKey(Vec<usize>),
+    /// Valore di una traccia: (tracce della riga, traccia, valore).
+    SetValue(Vec<usize>, usize, f32),
+    AddModifier(Vec<usize>, Modifier),
+    RemoveModifier(Vec<usize>, usize),
+    DeleteSelected,
+    SetInterp(Interp),
     SetStart(Target, f32),
+}
+
+/// Posizione di una chiave sullo schermo, per il rettangolo di selezione.
+struct KeyHit {
+    pos: egui::Pos2,
+    t: f32,
+    tracks: Vec<usize>,
 }
 
 fn rows(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale) {
     let mut actions: Vec<Action> = Vec::new();
+    let mut hits: Vec<KeyHit> = Vec::new();
     let elements = app.scene.timeline.elements.clone();
     for target in &elements {
-        element_rows(app, ui, scale, target, &mut actions);
+        element_rows(app, ui, scale, target, &mut actions, &mut hits);
     }
+    selection_gestures(app, ui, scale, &hits);
     if actions.is_empty() {
         return;
     }
@@ -616,55 +878,86 @@ fn rows(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale) {
     let mut push_scene = Vec::new();
     for a in actions {
         match a {
-            Action::RemoveElement(t) => tl.remove_element(&t),
-            Action::AddProp(t, p) => {
-                tl.add_track(&app.scene, t, p);
+            Action::RemoveElement(t) => {
+                tl.remove_element(&t);
+                app.timeline_ui.selection.clear();
             }
-            Action::RemoveTrack(i) => {
-                tl.tracks.remove(i);
+            Action::AddProps(t, ps) => {
+                for p in ps {
+                    tl.add_track(&app.scene, t.clone(), p);
+                }
             }
-            Action::ToggleKey(i) => {
-                let tr = &mut tl.tracks[i];
-                match tr.key_near(time, tol) {
-                    Some(k) => {
-                        tr.keys.remove(k);
-                        if tr.keys.is_empty() {
-                            // Senza chiavi resta il valore attuale.
-                            tr.base = forge_scene::timeline::get(&app.scene, &tr.target, tr.prop).unwrap_or(tr.base);
+            Action::RemoveTracks(mut ts) => {
+                ts.sort_unstable();
+                for i in ts.into_iter().rev() {
+                    tl.tracks.remove(i);
+                }
+                app.timeline_ui.selection.clear();
+            }
+            Action::ToggleKey(ts) => {
+                let on_key = ts.iter().any(|&i| tl.tracks[i].key_near(time, tol).is_some());
+                for i in ts {
+                    let tr = &mut tl.tracks[i];
+                    let v = forge_scene::timeline::get(&app.scene, &tr.target, tr.prop).unwrap_or(tr.base);
+                    if on_key {
+                        if let Some(k) = tr.key_near(time, tol) {
+                            tr.keys.remove(k);
                         }
-                    }
-                    None => {
-                        let v = forge_scene::timeline::get(&app.scene, &tr.target, tr.prop).unwrap_or(tr.base);
+                        if tr.keys.is_empty() {
+                            tr.base = v;
+                        }
+                    } else {
                         tr.set_key(time, v, tol);
                     }
                 }
             }
-            Action::SetValue(i, v) => {
-                let tr = &mut tl.tracks[i];
-                if tr.keys.is_empty() {
-                    tr.base = v;
-                } else {
-                    tr.set_key(time, v, tol);
+            Action::SetValue(ts, i, v) => {
+                // Con le chiavi la riga prende una chiave su tutti i suoi assi.
+                let keyed = ts.iter().any(|&k| !tl.tracks[k].keys.is_empty());
+                for k in ts {
+                    let tr = &mut tl.tracks[k];
+                    let cur = if k == i {
+                        v
+                    } else {
+                        forge_scene::timeline::get(&app.scene, &tr.target, tr.prop).unwrap_or(tr.base)
+                    };
+                    if keyed {
+                        tr.set_key(time, cur, tol);
+                    } else {
+                        tr.base = cur;
+                    }
+                    if k == i {
+                        push_scene.push((tr.target.clone(), tr.prop, v));
+                    }
                 }
-                push_scene.push((tr.target.clone(), tr.prop, v));
-                tr.last = None;
             }
-            Action::AddModifier(i, m) => tl.tracks[i].modifiers.push(ModSlot {
-                modifier: m,
-                enabled: true,
-            }),
-            Action::RemoveModifier(i, k) => {
-                tl.tracks[i].modifiers.remove(k);
+            Action::AddModifier(ts, m) => {
+                // Di serie una rampa sulla rotazione gira attorno alla verticale; gli assi si
+                // accendono e spengono dalla sua riga.
+                let only_y = matches!(m, Modifier::Ramp { .. }) && ts.len() == 3 && tl.tracks[ts[0]].prop == Prop::RotX;
+                for (n, i) in ts.into_iter().enumerate() {
+                    let mut m = m.clone();
+                    if let Modifier::Wiggle { seed, .. } = &mut m {
+                        *seed += n as u32;
+                    }
+                    tl.tracks[i].modifiers.push(ModSlot {
+                        modifier: m,
+                        enabled: !only_y || n == 1,
+                    });
+                }
             }
-            Action::DeleteKey(i, k) => {
-                tl.tracks[i].keys.remove(k);
+            Action::RemoveModifier(ts, k) => {
+                for i in ts {
+                    if k < tl.tracks[i].modifiers.len() {
+                        tl.tracks[i].modifiers.remove(k);
+                    }
+                }
             }
-            Action::SetInterp(i, k, interp) => tl.tracks[i].keys[k].interp = interp,
-            Action::MoveKey(i, k, t) => {
-                let t = tl.snap(t);
-                tl.tracks[i].keys[k].t = t;
-                tl.tracks[i].sort();
+            Action::DeleteSelected => {
+                let sel = std::mem::take(&mut app.timeline_ui.selection);
+                tl.delete_keys(&app.scene, &sel);
             }
+            Action::SetInterp(interp) => tl.set_keys_interp(&app.timeline_ui.selection, interp),
             Action::SetStart(t, s) => tl.set_start(&t, tl.snap(s.max(0.0))),
         }
     }
@@ -672,8 +965,11 @@ fn rows(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale) {
         forge_scene::timeline::set(&mut app.scene, &t, p, v);
     }
     app.scene.timeline = tl;
-    app.unsaved = true;
-    // Rimette i valori dell'istante attuale (e segnala cosa va rifatto).
+    refresh(app);
+}
+
+/// Dopo una modifica delle chiavi: rimette i valori dell'istante attuale.
+fn refresh(app: &mut ForgeApp) {
     for tr in &mut app.scene.timeline.tracks {
         tr.last = None;
     }
@@ -681,7 +977,81 @@ fn rows(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale) {
     app.unsaved = true;
 }
 
-fn element_rows(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale, target: &Target, actions: &mut Vec<Action>) {
+/// Trascinamento delle chiavi selezionate e rettangolo di selezione: continuano finché il tasto è
+/// premuto, anche fuori dalla riga da cui sono partiti.
+fn selection_gestures(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale, hits: &[KeyHit]) {
+    let (pos, down, mods) = ui.input(|i| (i.pointer.latest_pos(), i.pointer.primary_down(), i.modifiers));
+    if let Some(mut d) = app.timeline_ui.drag.take() {
+        if let Some(p) = pos {
+            let tl = &mut app.scene.timeline;
+            let frame = tl.frame();
+            let want = ((scale.t(p.x) - d.grab) / frame).round() * frame;
+            let step = want - d.moved;
+            if step.abs() > 1e-5 {
+                let mut sel = std::mem::take(&mut app.timeline_ui.selection);
+                d.moved += tl.shift_keys(&mut sel, step);
+                app.timeline_ui.selection = sel;
+            }
+        }
+        if down {
+            app.timeline_ui.drag = Some(d);
+        } else {
+            app.scene.timeline.settle_keys(&d.before);
+            refresh(app);
+        }
+        return;
+    }
+    let Some(start) = app.timeline_ui.marquee else { return };
+    let Some(p) = pos else { return };
+    let rect = egui::Rect::from_two_pos(start, p);
+    let painter = ui
+        .ctx()
+        .layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::NULL.with("riquadro-chiavi")));
+    painter.rect_filled(rect, 0.0, style::ACCENT.gamma_multiply(0.12));
+    painter.rect_stroke(rect, 0.0, egui::Stroke::new(1.0, style::ACCENT), egui::StrokeKind::Inside);
+    if down {
+        return;
+    }
+    app.timeline_ui.marquee = None;
+    if !(mods.ctrl || mods.shift || mods.command) {
+        app.timeline_ui.selection.clear();
+    }
+    for h in hits.iter().filter(|h| rect.contains(h.pos)) {
+        for &tr in &h.tracks {
+            if !is_selected(&app.timeline_ui.selection, tr, h.t) {
+                app.timeline_ui.selection.push((tr, h.t));
+            }
+        }
+    }
+}
+
+fn is_selected(sel: &[(usize, f32)], track: usize, t: f32) -> bool {
+    sel.iter().any(|&(i, k)| i == track && (k - t).abs() < 1e-4)
+}
+
+/// Colonna del tempo di una riga: il vuoto risponde al trascinamento (rettangolo di selezione) e al
+/// clic (toglie la selezione).
+fn lane(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale, sense_effect: bool) -> (egui::Rect, egui::Response) {
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(scale.width, ROW), egui::Sense::click_and_drag());
+    if !sense_effect {
+        if resp.drag_started() {
+            app.timeline_ui.marquee = resp.interact_pointer_pos();
+        }
+        if resp.clicked() && !ui.input(|i| i.modifiers.ctrl || i.modifiers.shift) {
+            app.timeline_ui.selection.clear();
+        }
+    }
+    (rect, resp)
+}
+
+fn element_rows(
+    app: &mut ForgeApp,
+    ui: &mut egui::Ui,
+    scale: &TimeScale,
+    target: &Target,
+    actions: &mut Vec<Action>,
+    hits: &mut Vec<KeyHit>,
+) {
     let name = target.name(&app.scene);
     let id = ui.make_persistent_id(("timeline-elemento", format!("{target:?}")));
     let mut open = ui.ctx().data(|d| d.get_temp::<bool>(id)).unwrap_or(true);
@@ -709,10 +1079,10 @@ fn element_rows(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale, target
         lui.label(egui::RichText::new(&name).strong());
         lui.menu_button("+", |ui| {
             ui.label(egui::RichText::new(tr("Aggiungi una proprietà")).weak());
-            for &p in target.all_props() {
-                let has = app.scene.timeline.track(target, p).is_some();
-                if ui.add_enabled(!has, egui::Button::new(tr(p.label()))).clicked() {
-                    actions.push(Action::AddProp(target.clone(), p));
+            for (label, props) in target.rows() {
+                let has = props.iter().all(|&p| app.scene.timeline.track(target, p).is_some());
+                if ui.add_enabled(!has, egui::Button::new(tr(label))).clicked() {
+                    actions.push(Action::AddProps(target.clone(), props));
                     ui.close();
                 }
             }
@@ -743,7 +1113,7 @@ fn element_rows(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale, target
             }
         }
         // Colonna del tempo: barra dell'effetto (dal suo inizio) o fascia dell'elemento.
-        let (rect, resp) = ui.allocate_exact_size(egui::vec2(scale.width, ROW), egui::Sense::click_and_drag());
+        let (rect, resp) = lane(app, ui, scale, is_effect);
         let s = TimeScale { x0: rect.left(), ..*scale };
         let painter = ui.painter_at(rect);
         painter.rect_filled(rect, 0.0, ui.visuals().faint_bg_color);
@@ -779,26 +1149,49 @@ fn element_rows(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale, target
     if !open {
         return;
     }
-    // Proprietà: prima quelle di base, poi le aggiunte, nell'ordine dell'elenco compatibile.
-    let tracks: Vec<usize> = target
-        .all_props()
-        .iter()
-        .filter_map(|&p| app.scene.timeline.track(target, p))
-        .collect();
-    for i in tracks {
-        prop_row(app, ui, scale, i, actions);
-        let mods = app.scene.timeline.tracks[i].modifiers.len();
+    // Righe: gli assi di un gruppo insieme, nell'ordine dell'elenco compatibile.
+    for (label, props) in target.rows() {
+        let tracks: Vec<usize> = props.iter().filter_map(|&p| app.scene.timeline.track(target, p)).collect();
+        if tracks.is_empty() {
+            continue;
+        }
+        prop_row(app, ui, scale, label, &tracks, actions, hits);
+        let mods = tracks
+            .iter()
+            .map(|&i| app.scene.timeline.tracks[i].modifiers.len())
+            .max()
+            .unwrap_or(0);
         for k in 0..mods {
-            modifier_row(app, ui, scale, i, k, actions);
+            modifier_row(app, ui, scale, &tracks, k, actions);
         }
     }
 }
 
-fn prop_row(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale, i: usize, actions: &mut Vec<Action>) {
+/// Chiavi di una riga: gli istanti in cui almeno una traccia ha una chiave.
+fn row_keys(app: &ForgeApp, tracks: &[usize]) -> Vec<(f32, Interp, f32)> {
+    let mut keys: Vec<(f32, Interp, f32)> = tracks
+        .iter()
+        .flat_map(|&i| app.scene.timeline.tracks[i].keys.iter().map(|k| (k.t, k.interp, k.v)))
+        .collect();
+    keys.sort_by(|a, b| a.0.total_cmp(&b.0));
+    keys.dedup_by(|a, b| (a.0 - b.0).abs() < 1e-4);
+    keys
+}
+
+fn prop_row(
+    app: &mut ForgeApp,
+    ui: &mut egui::Ui,
+    scale: &TimeScale,
+    label: &'static str,
+    tracks: &[usize],
+    actions: &mut Vec<Action>,
+    hits: &mut Vec<KeyHit>,
+) {
     let time = app.scene.timeline.time;
     let tol = app.scene.timeline.frame() * 0.5;
-    let tr_ = app.scene.timeline.tracks[i].clone();
-    let base = tr_.target.base_props().contains(&tr_.prop);
+    let first = app.scene.timeline.tracks[tracks[0]].clone();
+    let base = first.target.is_base(first.prop);
+    let keys = row_keys(app, tracks);
     ui.horizontal(|ui| {
         let (left, _) = ui.allocate_exact_size(egui::vec2(LEFT, ROW), egui::Sense::hover());
         let mut lui = ui.new_child(
@@ -807,8 +1200,8 @@ fn prop_row(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale, i: usize, 
                 .layout(egui::Layout::left_to_right(egui::Align::Center)),
         );
         lui.add_space(18.0);
-        let on_key = tr_.key_near(time, tol).is_some();
-        let color = if tr_.keys.is_empty() && !on_key {
+        let on_key = keys.iter().any(|k| (k.0 - time).abs() <= tol);
+        let color = if keys.is_empty() {
             lui.visuals().weak_text_color()
         } else {
             style::ACCENT
@@ -821,24 +1214,27 @@ fn prop_row(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale, i: usize, 
             })
             .clicked()
         {
-            actions.push(Action::ToggleKey(i));
+            actions.push(Action::ToggleKey(tracks.to_vec()));
         }
-        lui.add_sized(egui::vec2(130.0, ROW), egui::Label::new(tr(tr_.prop.label())).truncate());
-        let mut v = forge_scene::timeline::get(&app.scene, &tr_.target, tr_.prop).unwrap_or(tr_.base);
-        let r = lui.add(
-            egui::DragValue::new(&mut v)
-                .speed(tr_.prop.speed())
-                .max_decimals(3)
-                .suffix(tr_.prop.unit()),
-        );
-        if r.changed() {
-            actions.push(Action::SetValue(i, v));
+        lui.add_sized(egui::vec2(92.0, ROW), egui::Label::new(tr(label)).truncate());
+        for &i in tracks {
+            let tr_ = &app.scene.timeline.tracks[i];
+            let mut v = forge_scene::timeline::get(&app.scene, &tr_.target, tr_.prop).unwrap_or(tr_.base);
+            let r = lui.add(
+                egui::DragValue::new(&mut v)
+                    .speed(tr_.prop.speed())
+                    .max_decimals(3)
+                    .suffix(tr_.prop.unit()),
+            );
+            if r.changed() {
+                actions.push(Action::SetValue(tracks.to_vec(), i, v));
+            }
         }
         lui.menu_button("ƒ+", |ui| {
             ui.label(egui::RichText::new(tr("Aggiungi un modificatore")).weak());
             for m in Modifier::all_defaults() {
                 if ui.button(tr(m.label())).on_hover_text(tr(m.hint())).clicked() {
-                    actions.push(Action::AddModifier(i, m));
+                    actions.push(Action::AddModifier(tracks.to_vec(), m));
                     ui.close();
                 }
             }
@@ -851,10 +1247,10 @@ fn prop_row(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale, i: usize, 
                 .on_hover_text(tr("Togli questa proprietà dalla timeline"))
                 .clicked()
         {
-            actions.push(Action::RemoveTrack(i));
+            actions.push(Action::RemoveTracks(tracks.to_vec()));
         }
         // Chiavi.
-        let (rect, _) = ui.allocate_exact_size(egui::vec2(scale.width, ROW), egui::Sense::hover());
+        let (rect, _) = lane(app, ui, scale, false);
         let s = TimeScale { x0: rect.left(), ..*scale };
         let painter = ui.painter_at(rect);
         painter.line_segment(
@@ -862,9 +1258,9 @@ fn prop_row(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale, i: usize, 
             egui::Stroke::new(1.0, ui.visuals().widgets.noninteractive.bg_stroke.color),
         );
         // Tratti animati tra le chiavi.
-        for w in tr_.keys.windows(2) {
-            let (a, b) = (s.x(w[0].t), s.x(w[1].t));
-            let col = if w[0].interp == Interp::Hold {
+        for w in keys.windows(2) {
+            let (a, b) = (s.x(w[0].0), s.x(w[1].0));
+            let col = if w[0].1 == Interp::Hold {
                 ui.visuals().weak_text_color()
             } else {
                 style::ACCENT.gamma_multiply(0.5)
@@ -874,19 +1270,32 @@ fn prop_row(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale, i: usize, 
                 egui::Stroke::new(2.0, col),
             );
         }
-        for (k, key) in tr_.keys.iter().enumerate() {
-            let x = s.x(key.t);
+        for (n, &(t, interp, v)) in keys.iter().enumerate() {
+            let x = s.x(t);
             if x < rect.left() - 6.0 || x > rect.right() + 6.0 {
                 continue;
             }
-            let kr = egui::Rect::from_center_size(egui::pos2(x, rect.center().y), egui::vec2(12.0, 14.0));
-            let resp = ui.interact(kr, ui.make_persistent_id(("chiave", i, k)), egui::Sense::click_and_drag());
-            let fill = if resp.hovered() || app.timeline_ui.drag_key == Some((i, k)) {
-                egui::Color32::WHITE
+            let c = egui::pos2(x, rect.center().y);
+            let members: Vec<usize> = tracks
+                .iter()
+                .copied()
+                .filter(|&i| app.scene.timeline.tracks[i].key_near(t, 1e-4).is_some())
+                .collect();
+            hits.push(KeyHit {
+                pos: c,
+                t,
+                tracks: members.clone(),
+            });
+            let selected = members.iter().any(|&i| is_selected(&app.timeline_ui.selection, i, t));
+            let kr = egui::Rect::from_center_size(c, egui::vec2(12.0, 14.0));
+            let resp = ui.interact(kr, ui.make_persistent_id(("chiave", tracks[0], n)), egui::Sense::click_and_drag());
+            let (fill, stroke) = if selected {
+                (egui::Color32::WHITE, egui::Stroke::new(1.5, style::ACCENT))
+            } else if resp.hovered() {
+                (style::ACCENT.gamma_multiply(1.3), egui::Stroke::new(1.0, egui::Color32::WHITE))
             } else {
-                style::ACCENT
+                (style::ACCENT, egui::Stroke::new(1.0, egui::Color32::BLACK))
             };
-            let c = kr.center();
             painter.add(egui::Shape::convex_polygon(
                 vec![
                     c + egui::vec2(0.0, -6.0),
@@ -895,40 +1304,58 @@ fn prop_row(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale, i: usize, 
                     c + egui::vec2(-5.0, 0.0),
                 ],
                 fill,
-                egui::Stroke::new(1.0, egui::Color32::BLACK),
+                stroke,
             ));
-            if resp.drag_started() {
-                app.timeline_ui.drag_key = Some((i, k));
-            }
-            if app.timeline_ui.drag_key == Some((i, k)) {
-                if let Some(p) = resp.interact_pointer_pos() {
-                    if resp.dragged() {
-                        actions.push(Action::MoveKey(i, k, s.t(p.x).clamp(0.0, app.scene.timeline.duration)));
-                    }
-                }
-                if resp.drag_stopped() {
-                    app.timeline_ui.drag_key = None;
-                }
-            }
+            let add = ui.input(|i| i.modifiers.ctrl || i.modifiers.shift || i.modifiers.command);
+            let sel = &mut app.timeline_ui.selection;
+            let choose = |sel: &mut Vec<(usize, f32)>| {
+                let new: Vec<(usize, f32)> = members.iter().filter(|&&i| !is_selected(sel, i, t)).map(|&i| (i, t)).collect();
+                sel.extend(new);
+            };
             if resp.clicked() {
-                app.scene.timeline.time = key.t;
+                if add && selected {
+                    sel.retain(|&(i, k)| !(members.contains(&i) && (k - t).abs() < 1e-4));
+                } else {
+                    if !add {
+                        sel.clear();
+                    }
+                    choose(sel);
+                }
             }
-            let interp_now = key.interp;
+            if resp.secondary_clicked() && !selected {
+                sel.clear();
+                choose(sel);
+            }
+            if resp.drag_started() {
+                if !selected {
+                    if !add {
+                        sel.clear();
+                    }
+                    choose(sel);
+                }
+                if let Some(p) = resp.interact_pointer_pos() {
+                    app.timeline_ui.drag = Some(KeyDrag {
+                        grab: s.t(p.x),
+                        moved: 0.0,
+                        before: app.scene.timeline.copy_keys(&app.timeline_ui.selection),
+                    });
+                }
+            }
             let resp = resp.on_hover_text(tf(
                 "{} s · {} · {}",
-                &[format!("{:.2}", key.t), format!("{:.3}", key.v), tr(interp_now.label()).to_string()],
+                &[format!("{t:.2}"), format!("{v:.3}"), tr(interp.label()).to_string()],
             ));
             resp.context_menu(|ui| {
                 ui.label(egui::RichText::new(tr("Interpolazione verso la chiave dopo")).weak());
                 for it in Interp::ALL {
-                    if ui.add(egui::Button::selectable(interp_now == it, tr(it.label()))).clicked() {
-                        actions.push(Action::SetInterp(i, k, it));
+                    if ui.add(egui::Button::selectable(interp == it, tr(it.label()))).clicked() {
+                        actions.push(Action::SetInterp(it));
                         ui.close();
                     }
                 }
                 ui.separator();
                 if ui.button(format!("{}  {}", icons::DELETE, tr("Elimina la chiave"))).clicked() {
-                    actions.push(Action::DeleteKey(i, k));
+                    actions.push(Action::DeleteSelected);
                     ui.close();
                 }
             });
@@ -972,7 +1399,9 @@ fn key_button(ui: &mut egui::Ui, filled: bool, color: egui::Color32) -> egui::Re
     resp
 }
 
-fn modifier_row(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale, i: usize, k: usize, actions: &mut Vec<Action>) {
+/// Riga di un modificatore: vale per tutti gli assi della riga, con le lettere X Y Z per scegliere
+/// su quali agisce (ogni asse ha il suo interruttore).
+fn modifier_row(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale, tracks: &[usize], k: usize, actions: &mut Vec<Action>) {
     let time = app.scene.timeline.time;
     let mut changed = false;
     ui.horizontal(|ui| {
@@ -983,62 +1412,98 @@ fn modifier_row(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale, i: usi
                 .layout(egui::Layout::left_to_right(egui::Align::Center)),
         );
         lui.add_space(36.0);
-        let slot = &mut app.scene.timeline.tracks[i].modifiers[k];
-        changed |= lui.checkbox(&mut slot.enabled, "").on_hover_text(tr("Acceso / spento")).changed();
-        lui.label(egui::RichText::new(format!("ƒ {}", tr(slot.modifier.label()))))
-            .on_hover_text(tr(slot.modifier.hint()));
-        let dv = |ui: &mut egui::Ui, v: &mut f32, speed: f64, hint: &str| {
-            ui.add(egui::DragValue::new(v).speed(speed).max_decimals(3))
-                .on_hover_text(hint)
-                .changed()
-        };
-        match &mut slot.modifier {
-            Modifier::Wiggle {
-                amplitude,
-                frequency,
-                seed,
-            } => {
-                changed |= dv(&mut lui, amplitude, 0.01, tr("Ampiezza"));
-                changed |= dv(&mut lui, frequency, 0.05, tr("Volte al secondo"));
-                changed |= lui
-                    .add(egui::DragValue::new(seed).range(0..=9999))
-                    .on_hover_text(tr("Seme"))
-                    .changed();
+        // Interruttori degli assi (uno solo se la riga non ha assi).
+        let owners: Vec<usize> = tracks
+            .iter()
+            .copied()
+            .filter(|&i| k < app.scene.timeline.tracks[i].modifiers.len())
+            .collect();
+        for (n, &i) in owners.iter().enumerate() {
+            let slot = &mut app.scene.timeline.tracks[i].modifiers[k];
+            if owners.len() == 3 {
+                if lui
+                    .selectable_label(slot.enabled, ["X", "Y", "Z"][n])
+                    .on_hover_text(tr("Su quali assi agisce il modificatore"))
+                    .clicked()
+                {
+                    slot.enabled = !slot.enabled;
+                    changed = true;
+                }
+            } else {
+                changed |= lui.checkbox(&mut slot.enabled, "").on_hover_text(tr("Acceso / spento")).changed();
             }
-            Modifier::Oscillate {
-                amplitude,
-                frequency,
-                phase_deg,
-            } => {
-                changed |= dv(&mut lui, amplitude, 0.01, tr("Ampiezza"));
-                changed |= dv(&mut lui, frequency, 0.02, tr("Volte al secondo"));
-                changed |= dv(&mut lui, phase_deg, 1.0, tr("Fase (gradi)"));
+        }
+        let tl = &app.scene.timeline;
+        let lead = owners
+            .iter()
+            .copied()
+            .find(|&i| tl.tracks[i].modifiers[k].enabled)
+            .or(owners.first().copied());
+        if let Some(lead) = lead {
+            let mut m = tl.tracks[lead].modifiers[k].modifier.clone();
+            lui.label(egui::RichText::new(format!("ƒ {}", tr(m.label()))))
+                .on_hover_text(tr(m.hint()));
+            let dv = |ui: &mut egui::Ui, v: &mut f32, speed: f64, hint: &str| {
+                ui.add(egui::DragValue::new(v).speed(speed).max_decimals(3))
+                    .on_hover_text(hint)
+                    .changed()
+            };
+            let mut edited = false;
+            match &mut m {
+                Modifier::Wiggle {
+                    amplitude,
+                    frequency,
+                    seed,
+                } => {
+                    edited |= dv(&mut lui, amplitude, 0.01, tr("Ampiezza"));
+                    edited |= dv(&mut lui, frequency, 0.05, tr("Volte al secondo"));
+                    edited |= lui
+                        .add(egui::DragValue::new(seed).range(0..=9999))
+                        .on_hover_text(tr("Seme"))
+                        .changed();
+                }
+                Modifier::Oscillate {
+                    amplitude,
+                    frequency,
+                    phase_deg,
+                } => {
+                    edited |= dv(&mut lui, amplitude, 0.01, tr("Ampiezza"));
+                    edited |= dv(&mut lui, frequency, 0.02, tr("Volte al secondo"));
+                    edited |= dv(&mut lui, phase_deg, 1.0, tr("Fase (gradi)"));
+                }
+                Modifier::Ramp { per_second } => edited |= dv(&mut lui, per_second, 0.5, tr("Unità al secondo")),
+                Modifier::Offset { value } => edited |= dv(&mut lui, value, 0.01, tr("Valore aggiunto")),
+                Modifier::Multiply { factor } => edited |= dv(&mut lui, factor, 0.01, tr("Fattore")),
+                Modifier::Clamp { min, max } => {
+                    edited |= dv(&mut lui, min, 0.01, tr("Minimo"));
+                    edited |= dv(&mut lui, max, 0.01, tr("Massimo"));
+                }
+                Modifier::Steps { per_second } => edited |= dv(&mut lui, per_second, 0.2, tr("Scatti al secondo")),
+                Modifier::Loop | Modifier::PingPong => {}
             }
-            Modifier::Ramp { per_second } => changed |= dv(&mut lui, per_second, 0.5, tr("Unità al secondo")),
-            Modifier::Offset { value } => changed |= dv(&mut lui, value, 0.01, tr("Valore aggiunto")),
-            Modifier::Multiply { factor } => changed |= dv(&mut lui, factor, 0.01, tr("Fattore")),
-            Modifier::Clamp { min, max } => {
-                changed |= dv(&mut lui, min, 0.01, tr("Minimo"));
-                changed |= dv(&mut lui, max, 0.01, tr("Massimo"));
+            if edited {
+                // Stessi valori su tutti gli assi; il tremolio tiene un seme diverso per asse.
+                for (n, &i) in owners.iter().enumerate() {
+                    let mut m = m.clone();
+                    if let Modifier::Wiggle { seed, .. } = &mut m {
+                        *seed += n as u32;
+                    }
+                    app.scene.timeline.tracks[i].modifiers[k].modifier = m;
+                }
+                changed = true;
             }
-            Modifier::Steps { per_second } => changed |= dv(&mut lui, per_second, 0.2, tr("Scatti al secondo")),
-            Modifier::Loop | Modifier::PingPong => {}
         }
         if lui.small_button(icons::CLOSE).on_hover_text(tr("Togli il modificatore")).clicked() {
-            actions.push(Action::RemoveModifier(i, k));
+            actions.push(Action::RemoveModifier(tracks.to_vec(), k));
         }
-        let (rect, _) = ui.allocate_exact_size(egui::vec2(scale.width, ROW), egui::Sense::hover());
+        let (rect, _) = lane(app, ui, scale, false);
         let s = TimeScale { x0: rect.left(), ..*scale };
         let painter = ui.painter_at(rect);
         painter.rect_filled(rect.shrink2(egui::vec2(0.0, 6.0)), 2.0, style::ACCENT.gamma_multiply(0.12));
         playhead(&painter, &s, time, rect);
     });
     if changed {
-        for tr in &mut app.scene.timeline.tracks {
-            tr.last = None;
-        }
-        apply(app);
-        app.unsaved = true;
+        refresh(app);
     }
 }
 
@@ -1047,11 +1512,11 @@ fn modifier_row(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale, i: usi
 // ------------------------------------------------------------------------------------------
 
 fn start_render(app: &mut ForgeApp) {
-    let Some(dir) = rfd::FileDialog::new().set_title(tr("Cartella dei fotogrammi")).pick_folder() else {
-        return;
-    };
+    let kind = app.timeline_ui.save_kind;
+    let dir = crate::prefs::new_rendering_subdir(if kind == SaveKind::Preview { "anteprima" } else { "animazione" });
     let tl = &app.scene.timeline;
-    let total = ((tl.duration * tl.fps).round() as usize).max(1);
+    let times = tl.work_frames();
+    let total = times.len();
     let run = AnimRun {
         dir,
         frame: 0,
@@ -1064,13 +1529,21 @@ fn start_render(app: &mut ForgeApp) {
         time: tl.time,
         started: Instant::now(),
         waiting_denoise: None,
-        make_video: true,
+        times,
+        kind,
+        view_cam: app.timeline_ui.save_view,
+        active_before: app.scene.active_camera,
+        make_video: app.timeline_ui.make_video,
         video: None,
         cancelled: false,
     };
-    app.settings.noise_threshold = 0.0;
-    if app.settings.denoise.mode != forge_render_core::DenoiseMode::Off {
-        app.settings.denoise.mode = forge_render_core::DenoiseMode::Final;
+    // Il render guarda dalla vista scelta (l'anteprima sceglie la camera a ogni fotogramma).
+    if kind == SaveKind::Render {
+        app.scene.active_camera = app.timeline_ui.save_view;
+        app.settings.noise_threshold = 0.0;
+        if app.settings.denoise.mode != forge_render_core::DenoiseMode::Off {
+            app.settings.denoise.mode = forge_render_core::DenoiseMode::Final;
+        }
     }
     app.auto_restart = false;
     app.timeline_ui.playing = false;
@@ -1086,9 +1559,11 @@ fn tick_render(app: &mut ForgeApp) {
     if run.cancelled || run.frame >= run.total {
         return finish_render(app);
     }
+    if run.kind == SaveKind::Preview {
+        return tick_preview(app);
+    }
     if !run.rendering {
-        let fps = app.scene.timeline.fps.max(1.0);
-        app.scene.timeline.time = run.frame as f32 / fps;
+        app.scene.timeline.time = run.times[run.frame];
         apply(app);
         app.view = crate::app::View::Render;
         app.start_render();
@@ -1146,8 +1621,42 @@ fn tick_render(app: &mut ForgeApp) {
     run.rendering = false;
 }
 
+/// Un fotogramma dell'anteprima: la viewport catturata alla risoluzione del render.
+fn tick_preview(app: &mut ForgeApp) {
+    let Some(run) = &app.timeline_ui.run else { return };
+    let (t, view, frame_no, dir) = (run.times[run.frame], run.view_cam, run.frame, run.dir.clone());
+    app.scene.timeline.time = t;
+    apply(app);
+    let camera = match view.and_then(|i| app.scene.render_cameras.get(i)) {
+        Some(c) => c.camera.clone(),
+        None => app.scene.camera.clone(),
+    };
+    let (w, h) = (app.settings.width.max(2), app.settings.height.max(2));
+    let path = dir.join(format!("fotogramma_{:05}.png", frame_no + 1));
+    let saved = app
+        .capture_viewport(&camera, w, h)
+        .and_then(|rgba| image::RgbaImage::from_raw(w, h, rgba))
+        .map(|img| img.save(&path));
+    let run = app.timeline_ui.run.as_mut().expect("anteprima");
+    match saved {
+        Some(Ok(())) => {
+            run.written.push(path);
+            run.frame += 1;
+        }
+        Some(Err(e)) => {
+            tracing::error!("fotogramma non salvato: {e:#}");
+            run.cancelled = true;
+        }
+        None => {
+            tracing::error!("anteprima non disponibile: la viewport non ha la GPU");
+            run.cancelled = true;
+        }
+    }
+}
+
 fn finish_render(app: &mut ForgeApp) {
     let Some(run) = &mut app.timeline_ui.run else { return };
+    app.scene.active_camera = run.active_before;
     app.settings = run.settings.clone();
     app.auto_restart = run.auto_restart;
     app.view = run.view;

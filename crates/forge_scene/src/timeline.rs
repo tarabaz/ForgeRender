@@ -4,6 +4,9 @@
 //!   foschia, polvere, ambiente. Ognuno ha le sue **proprietà** compatibili ([`Prop`]); quelle di
 //!   base (posizione, rotazione, scala, opacità per gli oggetti) si vedono sempre, le altre si
 //!   aggiungono una alla volta.
+//! - Posizione, rotazione, bersaglio, colore e scala per asse si vedono e si animano come una riga
+//!   sola ([`Target::rows`]): le chiavi di una riga valgono per tutti i suoi assi, che restano
+//!   tracce separate (ognuno con la sua curva e i suoi modificatori).
 //! - Una **traccia** ([`Track`]) anima una proprietà di un elemento con delle **chiavi**
 //!   ([`Key`]): tempo, valore e interpolazione verso la chiave dopo ([`Interp`]: a scatto,
 //!   lineare, morbida in entrata, in uscita, in entrata e uscita, curva continua).
@@ -335,7 +338,71 @@ impl Prop {
     }
 }
 
+/// Una riga della timeline: un nome e le proprietà che comanda insieme.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Row {
+    pub label: &'static str,
+    pub props: &'static [Prop],
+}
+
+impl Prop {
+    /// Assi uniti con questa proprietà in una riga sola (None = proprietà a sé).
+    pub fn group(self) -> Option<Row> {
+        const POS: Row = Row {
+            label: "Posizione",
+            props: &[Prop::PosX, Prop::PosY, Prop::PosZ],
+        };
+        const ROT: Row = Row {
+            label: "Rotazione",
+            props: &[Prop::RotX, Prop::RotY, Prop::RotZ],
+        };
+        const SCALE: Row = Row {
+            label: "Scala per asse",
+            props: &[Prop::ScaleX, Prop::ScaleY, Prop::ScaleZ],
+        };
+        const TARGET: Row = Row {
+            label: "Bersaglio",
+            props: &[Prop::TargetX, Prop::TargetY, Prop::TargetZ],
+        };
+        const COLOR: Row = Row {
+            label: "Colore",
+            props: &[Prop::ColorR, Prop::ColorG, Prop::ColorB],
+        };
+        match self {
+            Prop::PosX | Prop::PosY | Prop::PosZ => Some(POS),
+            Prop::RotX | Prop::RotY | Prop::RotZ => Some(ROT),
+            Prop::ScaleX | Prop::ScaleY | Prop::ScaleZ => Some(SCALE),
+            Prop::TargetX | Prop::TargetY | Prop::TargetZ => Some(TARGET),
+            Prop::ColorR | Prop::ColorG | Prop::ColorB => Some(COLOR),
+            _ => None,
+        }
+    }
+}
+
 impl Target {
+    /// Righe di un elenco di proprietà: gli assi di un gruppo una volta sola.
+    fn rows_of(props: &[Prop]) -> Vec<(&'static str, Vec<Prop>)> {
+        let mut out: Vec<(&'static str, Vec<Prop>)> = Vec::new();
+        for &p in props {
+            match p.group() {
+                Some(g) if out.iter().any(|(l, _)| *l == g.label) => {}
+                Some(g) => out.push((g.label, g.props.to_vec())),
+                None => out.push((p.label(), vec![p])),
+            }
+        }
+        out
+    }
+
+    /// Righe di tutte le proprietà compatibili.
+    pub fn rows(&self) -> Vec<(&'static str, Vec<Prop>)> {
+        Self::rows_of(self.all_props())
+    }
+
+    /// La riga è tra quelle di base (sempre in vista).
+    pub fn is_base(&self, prop: Prop) -> bool {
+        self.base_props().contains(&prop)
+    }
+
     /// Proprietà di base, sempre in vista per l'elemento.
     pub fn base_props(&self) -> &'static [Prop] {
         match self {
@@ -582,8 +649,10 @@ impl Track {
 /// Cosa è cambiato applicando la timeline (cosa va rifatto).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Applied {
-    /// Oggetti spostati, ruotati, scalati, nascosti: si rifà la geometria.
+    /// Oggetti nascosti o mostrati: cambia l'elenco di quello che c'è da disegnare.
     pub geometry: bool,
+    /// Oggetti spostati, ruotati o scalati: cambiano solo le loro matrici.
+    pub transforms: bool,
     /// Materiali, luci, ambiente, effetti: si rifà l'aspetto.
     pub shading: bool,
     pub camera: bool,
@@ -593,7 +662,7 @@ pub struct Applied {
 
 impl Applied {
     pub fn any(&self) -> bool {
-        self.geometry || self.shading || self.camera || self.effects
+        self.geometry || self.transforms || self.shading || self.camera || self.effects
     }
 }
 
@@ -613,6 +682,10 @@ pub struct Timeline {
     /// Inizio degli effetti calcolati nel tempo (fumo, ghiaccio secco), in secondi: prima non
     /// c'è niente, poi l'effetto parte da zero.
     pub starts: Vec<(Target, f32)>,
+    /// Area di lavoro: la parte che si riproduce e si salva (secondi). `work_out` ≤ 0 = fino alla
+    /// fine della durata.
+    pub work_in: f32,
+    pub work_out: f32,
 }
 
 impl Default for Timeline {
@@ -624,14 +697,37 @@ impl Default for Timeline {
             elements: Vec::new(),
             tracks: Vec::new(),
             starts: Vec::new(),
+            work_in: 0.0,
+            work_out: 0.0,
         }
     }
 }
+
+/// Due chiavi più vicine di così sono la stessa.
+const KEY_TOL: f32 = 1e-4;
 
 /// Tempo minimo simulato per un effetto appena partito (un istante a zero non ha fumo).
 pub const MIN_EFFECT_TIME: f32 = 0.05;
 
 impl Timeline {
+    /// Area di lavoro (inizio, fine), dentro la durata.
+    pub fn work_area(&self) -> (f32, f32) {
+        let end = if self.work_out > 0.0 {
+            self.work_out.min(self.duration)
+        } else {
+            self.duration
+        };
+        (self.work_in.clamp(0.0, end), end)
+    }
+
+    /// Fotogrammi dell'area di lavoro: gli istanti da salvare.
+    pub fn work_frames(&self) -> Vec<f32> {
+        let (a, b) = self.work_area();
+        let f = self.frame();
+        let n = (((b - a) / f).round() as usize).max(1);
+        (0..n).map(|k| a + k as f32 * f).collect()
+    }
+
     /// Durata di un fotogramma.
     pub fn frame(&self) -> f32 {
         1.0 / self.fps.clamp(1.0, 240.0)
@@ -711,6 +807,8 @@ impl Timeline {
         let t = self.time;
         let tol = self.frame() * 0.5;
         let mut out = Applied::default();
+        // Tracce con una chiave registrata: gli altri assi della riga la prendono anche loro.
+        let mut recorded: Vec<(Target, Prop)> = Vec::new();
         for tr in &mut self.tracks {
             if !tr.enabled || !tr.target.exists(scene) {
                 continue;
@@ -723,6 +821,7 @@ impl Timeline {
                         tr.base = now;
                     } else {
                         tr.set_key(t, now, tol);
+                        recorded.push((tr.target.clone(), tr.prop));
                     }
                     tr.last = Some(now);
                     continue;
@@ -735,8 +834,10 @@ impl Timeline {
             let v = tr.value_at(t);
             if (v - now).abs() > 1e-6 {
                 set(scene, &tr.target, tr.prop, v);
-                if tr.prop.moves_geometry() && matches!(tr.target, Target::Object(_)) {
+                if tr.prop == Prop::Visible && matches!(tr.target, Target::Object(_)) {
                     out.geometry = true;
+                } else if tr.prop.moves_geometry() && matches!(tr.target, Target::Object(_)) {
+                    out.transforms = true;
                 } else if matches!(tr.target, Target::Camera) {
                     out.camera = true;
                 } else {
@@ -744,6 +845,15 @@ impl Timeline {
                 }
             }
             tr.last = get(scene, &tr.target, tr.prop);
+        }
+        for (target, prop) in recorded {
+            let Some(g) = prop.group() else { continue };
+            for &axis in g.props.iter().filter(|&&a| a != prop) {
+                if let (Some(i), Some(v)) = (self.track(&target, axis), get(scene, &target, axis)) {
+                    self.tracks[i].set_key(t, v, tol);
+                    self.tracks[i].last = Some(v);
+                }
+            }
         }
         // Effetti nel tempo: l'istante simulato segue il cursore.
         let smokes: Vec<(usize, f32)> = scene
@@ -772,6 +882,113 @@ impl Timeline {
             }
         }
         out
+    }
+
+    /// Il cursore va sull'istante degli effetti nel tempo della scena, così restano come erano
+    /// (un fumo salvato a 4 s non riparte vuoto): serve quando arriva un effetto o si apre un
+    /// progetto senza animazione.
+    pub fn adopt_effects(&mut self, scene: &Scene) {
+        let t = scene
+            .smokes
+            .iter()
+            .filter(|s| s.mode == crate::SmokeMode::Simulated)
+            .map(|s| s.sim.time)
+            .chain(scene.fogs.iter().map(|f| f.sim_time))
+            .fold(0.0f32, f32::max);
+        if t > self.time {
+            self.duration = self.duration.max(t);
+            self.time = t;
+        }
+    }
+
+    /// Indici delle chiavi selezionate ((traccia, tempo) ancora esistenti).
+    fn resolve(&self, sel: &[(usize, f32)]) -> Vec<(usize, usize)> {
+        sel.iter()
+            .filter_map(|&(i, t)| Some((i, self.tracks.get(i)?.key_near(t, KEY_TOL)?)))
+            .collect()
+    }
+
+    /// Sposta le chiavi selezionate di `dt` secondi (restano dentro la durata) e aggiorna la
+    /// selezione. Restituisce lo spostamento fatto.
+    pub fn shift_keys(&mut self, sel: &mut [(usize, f32)], dt: f32) -> f32 {
+        let keys = self.resolve(sel);
+        if keys.is_empty() {
+            return 0.0;
+        }
+        let times = keys.iter().map(|&(i, k)| self.tracks[i].keys[k].t);
+        let (lo, hi) = times.fold((f32::MAX, f32::MIN), |(a, b), t| (a.min(t), b.max(t)));
+        let dt = dt.clamp(-lo, (self.duration - hi).max(0.0));
+        for &(i, k) in &keys {
+            self.tracks[i].keys[k].t += dt;
+        }
+        for s in sel.iter_mut() {
+            s.1 += dt;
+        }
+        for &(i, _) in &keys {
+            self.tracks[i].sort();
+        }
+        dt
+    }
+
+    /// Dopo uno spostamento: due chiavi nello stesso istante di una traccia diventano una, e vale
+    /// quella spostata (`moved`: le chiavi come erano prima, vedi [`Timeline::copy_keys`]).
+    pub fn settle_keys(&mut self, moved: &[(usize, Key)]) {
+        for tr in 0..self.tracks.len() {
+            let chosen: Vec<f32> = moved.iter().filter(|m| m.0 == tr).map(|m| m.1.v).collect();
+            let keys = &mut self.tracks[tr].keys;
+            let mut k = 0;
+            while k + 1 < keys.len() {
+                if (keys[k + 1].t - keys[k].t).abs() > KEY_TOL {
+                    k += 1;
+                    continue;
+                }
+                // Stesso istante: resta quella spostata.
+                let second_moved = chosen.contains(&keys[k + 1].v);
+                keys.remove(if second_moved { k } else { k + 1 });
+            }
+        }
+    }
+
+    pub fn delete_keys(&mut self, scene: &Scene, sel: &[(usize, f32)]) {
+        let mut keys = self.resolve(sel);
+        keys.sort_unstable();
+        keys.dedup();
+        for &(i, k) in keys.iter().rev() {
+            self.tracks[i].keys.remove(k);
+            if self.tracks[i].keys.is_empty() {
+                // Senza chiavi resta il valore attuale.
+                let tr = &mut self.tracks[i];
+                tr.base = get(scene, &tr.target, tr.prop).unwrap_or(tr.base);
+            }
+        }
+    }
+
+    pub fn set_keys_interp(&mut self, sel: &[(usize, f32)], interp: Interp) {
+        for (i, k) in self.resolve(sel) {
+            self.tracks[i].keys[k].interp = interp;
+        }
+    }
+
+    /// Chiavi selezionate come (traccia, tempo, valore, interpolazione), per copiarle.
+    pub fn copy_keys(&self, sel: &[(usize, f32)]) -> Vec<(usize, Key)> {
+        self.resolve(sel).into_iter().map(|(i, k)| (i, self.tracks[i].keys[k])).collect()
+    }
+
+    /// Incolla le chiavi con la prima all'istante `at`; restituisce la nuova selezione.
+    pub fn paste_keys(&mut self, keys: &[(usize, Key)], at: f32) -> Vec<(usize, f32)> {
+        let first = keys.iter().map(|k| k.1.t).fold(f32::MAX, f32::min);
+        let tol = self.frame() * 0.5;
+        let mut sel = Vec::new();
+        for &(i, k) in keys {
+            let Some(tr) = self.tracks.get_mut(i) else { continue };
+            let t = k.t - first + at;
+            tr.set_key(t, k.v, tol);
+            if let Some(j) = tr.key_near(t, tol) {
+                tr.keys[j].interp = k.interp;
+                sel.push((i, tr.keys[j].t));
+            }
+        }
+        sel
     }
 
     /// Toglie le tracce e gli elementi di cose che non ci sono più.
@@ -1124,7 +1341,7 @@ mod tests {
         ];
         tl.time = 1.0;
         let a = tl.apply(&mut s);
-        assert!(a.geometry);
+        assert!(a.transforms && !a.geometry);
         let i = s.find(&id).unwrap();
         assert!((s.nodes[i].user.translation.x - 0.5).abs() < 1e-5);
         // L'utente sposta l'oggetto a t = 1: diventa una chiave.
@@ -1142,6 +1359,100 @@ mod tests {
         tl.apply(&mut s);
         let m = s.materials.get(s.resolve_material(i)).unwrap();
         assert!((m.opacity - 0.3).abs() < 1e-5);
+    }
+
+    #[test]
+    fn work_area_limits_the_saved_frames() {
+        let mut tl = Timeline {
+            duration: 4.0,
+            fps: 10.0,
+            ..Default::default()
+        };
+        assert_eq!(tl.work_area(), (0.0, 4.0));
+        assert_eq!(tl.work_frames().len(), 40);
+        tl.work_in = 1.0;
+        tl.work_out = 2.5;
+        assert_eq!(tl.work_area(), (1.0, 2.5));
+        let f = tl.work_frames();
+        assert_eq!(f.len(), 15);
+        assert!((f[0] - 1.0).abs() < 1e-5);
+        tl.duration = 2.0;
+        assert_eq!(tl.work_area(), (1.0, 2.0), "la durata accorciata la taglia");
+    }
+
+    #[test]
+    fn rows_join_the_axes() {
+        let rows = Target::Object(ComponentId("a".into())).rows();
+        let pos = rows.iter().find(|r| r.0 == "Posizione").expect("riga");
+        assert_eq!(pos.1, vec![Prop::PosX, Prop::PosY, Prop::PosZ]);
+        assert_eq!(rows.iter().filter(|r| r.1.contains(&Prop::PosY)).count(), 1);
+        assert!(rows.iter().any(|r| r.0 == "Rotazione"));
+        assert!(rows.iter().any(|r| r.1 == vec![Prop::Opacity]));
+    }
+
+    /// Spostando un oggetto solo in X, anche Y e Z prendono la chiave: la riga è una.
+    #[test]
+    fn a_recorded_key_goes_on_every_axis_of_the_row() {
+        let mut s = Scene::test_scene();
+        let id = s.nodes[s.roots[0]].id.clone();
+        let t = Target::Object(id.clone());
+        let mut tl = Timeline::default();
+        tl.add_element(&s, t.clone());
+        let k = |t: f32, v: f32| Key {
+            t,
+            v,
+            interp: Interp::Linear,
+        };
+        let x = tl.track(&t, Prop::PosX).unwrap();
+        let y = tl.track(&t, Prop::PosY).unwrap();
+        tl.tracks[x].keys = vec![k(0.0, 0.0), k(2.0, 1.0)];
+        tl.tracks[y].keys = vec![k(0.0, 0.0), k(2.0, 2.0)];
+        tl.time = 1.0;
+        tl.apply(&mut s);
+        let i = s.find(&id).unwrap();
+        s.nodes[i].user.translation.x = 0.9;
+        tl.apply(&mut s);
+        assert_eq!(tl.tracks[x].keys.len(), 3);
+        assert_eq!(tl.tracks[y].keys.len(), 3);
+        assert!((tl.tracks[y].keys_at(1.0) - 1.0).abs() < 1e-4, "Y resta dov'era");
+    }
+
+    #[test]
+    fn selected_keys_move_together_and_stay_inside() {
+        let s = Scene::default();
+        let mut tl = Timeline::default();
+        let k = |t: f32, v: f32| Key {
+            t,
+            v,
+            interp: Interp::Linear,
+        };
+        tl.tracks.push(Track {
+            keys: vec![k(1.0, 1.0), k(2.0, 2.0), k(3.0, 3.0)],
+            ..Default::default()
+        });
+        tl.duration = 4.0;
+        let mut sel = vec![(0, 1.0), (0, 2.0)];
+        assert!((tl.shift_keys(&mut sel, 0.5) - 0.5).abs() < 1e-5);
+        assert_eq!(sel, vec![(0, 1.5), (0, 2.5)]);
+        // Non escono dall'inizio: si fermano con la prima a zero.
+        assert!((tl.shift_keys(&mut sel, -5.0) + 1.5).abs() < 1e-5);
+        assert_eq!(tl.tracks[0].keys[0].t, 0.0);
+        // Sposta sopra la chiave a 3 s: ne resta una, quella selezionata.
+        let mut one = vec![(0, 1.0)];
+        let before = tl.copy_keys(&one);
+        tl.shift_keys(&mut one, 2.0);
+        tl.settle_keys(&before);
+        assert_eq!(tl.tracks[0].keys.len(), 2);
+        assert_eq!(tl.tracks[0].keys.last().unwrap().v, 2.0);
+        tl.set_keys_interp(&one, Interp::Hold);
+        assert_eq!(tl.tracks[0].keys[1].interp, Interp::Hold);
+        let copied = tl.copy_keys(&one);
+        let pasted = tl.paste_keys(&copied, 3.5);
+        assert_eq!(pasted.len(), 1);
+        assert_eq!(tl.tracks[0].keys.len(), 3);
+        tl.delete_keys(&s, &pasted);
+        tl.delete_keys(&s, &one);
+        assert_eq!(tl.tracks[0].keys.len(), 1);
     }
 
     #[test]

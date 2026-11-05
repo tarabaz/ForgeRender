@@ -150,7 +150,11 @@ fn options_window(app: &mut ForgeApp, ctx: &egui::Context) {
             let o = &mut app.sequence.opts;
             ui.horizontal(|ui| {
                 if ui.button(tr("Cartella…")).clicked() {
-                    if let Some(d) = rfd::FileDialog::new().set_title(tr("Cartella in cui salvare")).pick_folder() {
+                    if let Some(d) = rfd::FileDialog::new()
+                        .set_directory(crate::prefs::rendering_dir())
+                        .set_title(tr("Cartella in cui salvare"))
+                        .pick_folder()
+                    {
                         o.out_dir = Some(d);
                     }
                 }
@@ -289,6 +293,7 @@ fn passes_window(app: &mut ForgeApp, ctx: &egui::Context) {
     }
     if export {
         if let Some(p) = rfd::FileDialog::new()
+            .set_directory(crate::prefs::rendering_dir())
             .set_file_name("render.png")
             .add_filter("PNG", &["png"])
             .save_file()

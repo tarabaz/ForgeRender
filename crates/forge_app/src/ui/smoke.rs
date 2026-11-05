@@ -87,7 +87,6 @@ pub fn sections(app: &mut ForgeApp, ui: &mut egui::Ui) {
     let selected = app.selected_smoke;
     let base = base_point(app);
     let has_selection = !app.selection.is_empty();
-    let timeline_on = app.prefs.timeline_enabled;
     let preview = &mut app.smoke_preview;
     let mut select_source = false;
     for (i, s) in app.scene.smokes.iter_mut().enumerate() {
@@ -121,7 +120,6 @@ pub fn sections(app: &mut ForgeApp, ui: &mut egui::Ui) {
                     });
                 })
                 .body(|ui| {
-                    ui.ctx().data_mut(|d| d.insert_temp(timeline_flag(), timeline_on));
                     changed |= body(ui, s, base, has_selection, &mut select, i, preview, &mut select_source);
                 });
         });
@@ -144,10 +142,9 @@ pub fn sections(app: &mut ForgeApp, ui: &mut egui::Ui) {
     }
 }
 
-/// Chiave del dato temporaneo "timeline accesa" letto dai controlli della simulazione.
-fn timeline_flag() -> egui::Id {
-    egui::Id::NULL.with("fumo-timeline-accesa")
-}
+/// Comandi del tempo nelle impostazioni del fumo: il tempo lo decide la timeline (cursore, durata e
+/// inizio dell'effetto). Nascosti, non tolti: basta accendere qui per riaverli.
+pub(crate) const SHOW_TIME_CONTROLS: bool = false;
 
 /// Parametri della simulazione fisica del fumo.
 fn sim_controls(ui: &mut egui::Ui, s: &mut SmokeCloud) -> bool {
@@ -215,17 +212,14 @@ fn sim_controls(ui: &mut egui::Ui, s: &mut SmokeCloud) -> bool {
             .add(egui::Slider::new(&mut m.turbulence_scale, 0.005..=5.0).logarithmic(true).suffix(" m").max_decimals(3))
             .changed();
         ui.end_row();
-        ui.label(tr("Istante"));
-        if ui.ctx().data(|d| d.get_temp::<bool>(timeline_flag())).unwrap_or(false) {
-            ui.label(egui::RichText::new(tf("{:.2} s, segue la timeline", &[format!("{:.2}", m.time)])).weak())
-                .on_hover_text(tr("Con la timeline accesa l'istante simulato è il tempo del cursore meno l'inizio del fumo (lo scegli nella timeline)"));
-        } else {
+        if SHOW_TIME_CONTROLS {
+            ui.label(tr("Istante"));
             changed |= ui
                 .add(egui::Slider::new(&mut m.time, 0.1..=20.0).logarithmic(true).suffix(" s").max_decimals(2))
                 .on_hover_text(tr("Secondi di simulazione: l'istante che si congela per il render"))
                 .changed();
+            ui.end_row();
         }
-        ui.end_row();
         ui.label(tr("Qualità della simulazione"));
         changed |= ui
             .add(egui::Slider::new(&mut m.quality, 1..=4))

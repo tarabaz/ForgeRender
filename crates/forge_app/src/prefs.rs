@@ -59,12 +59,41 @@ pub struct Preferences {
     pub auto_restart: bool,
     /// Ultimi progetti aperti o salvati (il più recente per primo, al massimo [`MAX_RECENT`]).
     pub recent_projects: Vec<PathBuf>,
-    // --- Funzioni ---
-    /// Timeline (animazione) attiva: pannello in basso e menu. Di serie spenta; si accende da
-    /// sola quando nella scena c'è un effetto che si calcola nel tempo.
-    pub timeline_enabled: bool,
     /// Timeline in una finestra a parte invece che in basso.
     pub timeline_detached: bool,
+}
+
+/// Cartella predefinita di quello che si salva o si esporta: `Rendering` accanto al programma, o
+/// in Documenti\ForgeRender se lì non si può scrivere (programma installato). La crea se manca.
+pub fn rendering_dir() -> PathBuf {
+    if let Some(exe_dir) = std::env::current_exe().ok().and_then(|p| p.parent().map(Path::to_path_buf)) {
+        let dir = exe_dir.join("Rendering");
+        let probe = dir.join(".scrivibile");
+        if std::fs::create_dir_all(&dir).is_ok() && std::fs::write(&probe, b"").is_ok() {
+            let _ = std::fs::remove_file(&probe);
+            return dir;
+        }
+    }
+    let dir = forge_library::paths::default_root()
+        .parent()
+        .map(|p| p.join("Rendering"))
+        .unwrap_or_else(|| PathBuf::from("Rendering"));
+    let _ = std::fs::create_dir_all(&dir);
+    dir
+}
+
+/// Prima cartella libera `<nome>_001`, `<nome>_002`... dentro la cartella Rendering (creata).
+pub fn new_rendering_subdir(name: &str) -> PathBuf {
+    let root = rendering_dir();
+    let mut n = 1;
+    loop {
+        let dir = root.join(format!("{name}_{n:03}"));
+        if !dir.exists() {
+            let _ = std::fs::create_dir_all(&dir);
+            return dir;
+        }
+        n += 1;
+    }
 }
 
 /// Quanti progetti tiene File → Progetti recenti.
@@ -101,7 +130,6 @@ impl Default for Preferences {
             new_threads: r.threads,
             auto_restart: true,
             recent_projects: Vec::new(),
-            timeline_enabled: false,
             timeline_detached: false,
         }
     }
@@ -240,7 +268,6 @@ mod tests {
             new_threads: 8,
             auto_restart: false,
             recent_projects: vec![PathBuf::from("/x/a.frproject")],
-            timeline_enabled: true,
             timeline_detached: true,
         };
         custom.save_to(&p).unwrap();
