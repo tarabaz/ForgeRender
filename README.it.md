@@ -304,14 +304,17 @@ Una timeline professionale, da accendere da **Funzioni → Timeline (animazione)
 - **Materiali**: diffuso, metalli e plastiche GGX con compensazione multi-scattering, vetro con
   Fresnel esatto, vetro satinato, superfici emissive campionate come luci.
   Mappe PBR complete: colore base, rugosità/lucidità, metallicità, normal (OpenGL/DirectX),
-  height (bump), **displacement vero**, occlusione ambientale, ritaglio con opacità; mapping UV o
+  height (bump), **displacement vero**, occlusione ambientale, ritaglio con opacità e opacità
+  generale (animabile); mapping UV o
   proiezione box in metri per i modelli CAD senza UV, con dimensione della ripetizione, rotazione
   e spostamento.
 - **Libreria**: 125 materiali di serie in 13 categorie (un pacchetto aggiuntivo ne aggiunge 109 con texture), più materiali e HDRI scaricati da ambientCG e
   Poly Haven o importati da cartelle/ZIP, conservati nella cartella locale `Libreria` con anteprime a 512 px.
 - **Selettore colore**: RGB, CMYK e palette (RAL Classic con valori indicativi, o palette
   `.ase`/`.json`/`.csv` importate) per ogni colore dei materiali, con il codice della palette
-  accanto al campione.
+  accanto al campione; lo stesso selettore si apre da ogni pulsante colore (luci, ambiente,
+  foschia, fumo, polvere, stili). **Sostituisci materiale** fa passare tutti gli oggetti con un
+  materiale a un altro.
 - **Render spettrale, caustiche e laser**: trasporto della luce RGB o spettrale con dispersione,
   caustiche con il photon mapping con tutte le luci, laser da laboratorio rosso, verde, blu, viola
   e bianco con fasci visibili, prismi e lenti.
@@ -327,12 +330,24 @@ Una timeline professionale, da accendere da **Funzioni → Timeline (animazione)
   tossico a terra, strati sospesi, riccioli di vapore) da un'altezza di partenza a una massima;
   granelli di polvere nel loro riquadro che brillano solo nei fasci di spot e sole, a due colori,
   con opacità e variazione della dimensione, tondi o a scaglie piatte che luccicano come polvere
-  di fata.
+  di fata; granelli luminosi nei colori scelti con + (intensità e percentuale per ognuno) con un
+  alone da lucciola regolabile.
 - **Fumo volumetrico**: nubi, pennacchi, fili d'incenso e banchi procedurali, oppure una
   simulazione fisica (calore, galleggiamento, vortici, vento, oggetti che lo deviano) con la
   sorgente spostabile, l'anteprima a particelle nella viewport (anche solo anteprima, senza la
   simulazione completa al render), i bordi sfumati frattali e un
-  riquadro che si sposta, gira e si scala insieme alla sua sorgente.
+  riquadro che si sposta, gira e si scala insieme alla sua sorgente. Il **fumo a particelle**
+  tiene veli sottili che si ripiegano e filamenti lunghi invece della nuvola gonfia: preset
+  *Vapore da tazza* (nastri trasparenti che salgono dal caffè) e *Incenso o sigaretta*.
+- **Timeline (animazione)**: una timeline in stile After Effects, spenta di serie (menu Funzioni)
+  e accesa da sola con un effetto che si calcola nel tempo. Chiavi con sei interpolazioni (a
+  scatto, lineare, morbida in entrata, in uscita, in entrata e uscita, curva continua),
+  modificatori aggiunti uno alla volta (tremolio, oscillazione, rampa continua, ripeti, avanti e
+  indietro, spostamento, moltiplica, limiti, a scatti), posizione, rotazione, scala e opacità di
+  oggetti, luci, camera, fumo, nebbia, foschia, polvere e ambiente; chiavi registrate dal gizmo;
+  fumo e ghiaccio secco che seguono il cursore dal loro inizio; riproduzione con ripetizione;
+  render dell'animazione in fotogrammi PNG e MP4. Sta in basso con le schede Console | Timeline o
+  in una finestra a parte su un altro schermo.
 - **Stili di rendering**: fotorealistico, fumetto (cel shading) e illustrazione tecnica, a colori
   o in bianco e nero, sfondo a tinta unita, contorni a inchiostro su sagome e spigoli.
 - **Adesivi**: immagini e loghi (PNG con trasparenza) proiettati sulle superfici curve, che si

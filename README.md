@@ -293,13 +293,14 @@ A professional timeline, to turn on from **Features → Timeline (animation)** (
 - **Materials**: diffuse, GGX metals and plastics with multiple-scattering compensation, glass
   with exact Fresnel, frosted glass, emissive surfaces sampled as lights.
   Full PBR maps: base colour, roughness/gloss, metallic, normal (OpenGL/DirectX), height (bump),
-  **true displacement**, ambient occlusion, opacity cutout; UV mapping or world-space box
+  **true displacement**, ambient occlusion, opacity cutout and overall opacity (animatable); UV mapping or world-space box
   projection in metres for CAD models without UVs, with repeat size, rotation and offset.
 - **Library**: 125 built-in materials in 13 categories (an additional pack adds 109 textured ones), plus materials and HDRIs downloaded from ambientCG and
   Poly Haven or imported from folders/ZIP files, kept in a local `Library` folder with 512 px previews.
 - **Colour picker**: RGB, CMYK and palettes (RAL Classic with indicative values, or imported
   `.ase`/`.json`/`.csv` palettes) for every material colour, with the palette code next to
-  the swatch.
+  the swatch; the same picker opens from every colour button (lights, environment, haze, smoke,
+  dust, styles). **Replace material** switches every object with one material to another.
 - **Spectral render, caustics and lasers**: RGB or spectral light transport with dispersion,
   photon-mapped caustics with every light, red, green, blue, violet and white lab lasers with
   visible beams, prisms and lenses.
@@ -313,11 +314,22 @@ A professional timeline, to turn on from **Features → Timeline (animation)** (
 - **Ambient haze and dust**: five kinds of procedural haze (low fog, gas clouds, toxic floor
   smoke, floating layers, vapour curls) from a start to a maximum height; dust specks in their
   own box that sparkle only in the beams of spots and sun, in two colours, with opacity and size
-  variation, as round grains or as flat flakes that glitter like fairy dust.
+  variation, as round grains or as flat flakes that glitter like fairy dust; glowing specks in
+  colours chosen with + (intensity and share for each) with an adjustable firefly halo.
 - **Volumetric smoke**: procedural clouds, plumes, incense threads and smoke banks, or a physical
   simulation (heat, buoyancy, swirls, wind, objects that deflect it) with a movable source, a
   particle preview in the viewport (also as a preview only, without the full simulation at the
-  render), soft fractal edges and a box that moves, turns and scales with its source.
+  render), soft fractal edges and a box that moves, turns and scales with its source. **Particle
+  smoke** keeps thin folding veils and long filaments instead of a puffy cloud: presets *Steam
+  from a cup* (transparent ribbons rising from the coffee) and *Incense or cigarette*.
+- **Timeline (animation)**: an After Effects-style timeline, off by default (Features menu) and
+  turned on by itself with an effect computed over time. Keys with six interpolations (hold,
+  linear, ease in, ease out, ease in-out, smooth curve), modifiers added one by one (wiggle,
+  oscillation, continuous ramp, loop, ping-pong, offset, multiply, limits, stepped), position,
+  rotation, scale and opacity of objects, lights, camera, smoke, fog, haze, dust and environment;
+  keys recorded by the gizmo; smoke and dry ice that follow the playhead from their start;
+  playback with loop; animation render to PNG frames and MP4. It sits at the bottom with
+  Console | Timeline tabs or in its own window on another screen.
 - **Render styles**: photorealistic, cartoon (cel shading) and technical illustration, in colour
   or black and white, solid background, ink outlines on silhouettes and edges.
 - **Decals**: images and logos (PNG with transparency) projected on curved surfaces, moving
