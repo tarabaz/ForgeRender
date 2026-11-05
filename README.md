@@ -122,6 +122,8 @@ The laser path is traced deterministically from the source, rather than relying 
 
 ### 4. Dry-ice fog — fluid simulation and volumetric rendering
 
+![Dry-ice fog simulation — cold gas flowing, pooling and spreading around objects](docs/img/features/dry-ice-fog.jpg)
+
 ForgeRender creates dry-ice-style fog with a deterministic, seeded fluid simulation. It is not a static smoke texture: a 3D fluid solver models the downward flow of cold, heavy gas, its accumulation and lateral spread along surfaces, and the turbulent wisps that rise as the cloud evolves.
 
 - **3D MAC fluid grid:** the solver evolves velocity and pressure while transporting the fog fields through the simulation volume.
