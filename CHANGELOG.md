@@ -24,6 +24,9 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - `Dust::opacity`: scala la luce diffusa dai granelli; un raggio d'ombra è fermato da un granello con probabilità pari all'opacità (per raggio sulla CPU con un hash, con `rnd()` sulla GPU), così in media l'ombra è parziale.
 - `Dust::shape` = `Grains` (icosaedri, come prima) o `Flakes` (esagoni piatti con normale a caso) con `sparkle` e `flake_roughness`: `DustLook::response` dà ai granelli la diffusione in avanti di prima e alle scaglie una parte diffusa più un riflesso GGX a due facce tinto del loro colore, così brillano solo le scaglie girate giuste tra luce e camera (test `flakes_sparkle_unevenly`). GPU: `dust_response` nello shader, parametri 88–90 (`PARAM_WORDS` 92) e bit 3 di `P_HAS_DUST` per le scaglie.
 
+**Esc deseleziona tutto**
+- Nella viewport Esc toglie tutta la selezione (oggetti, luci, nebbie, fumi, polvere, camere) quando non sta annullando altro (trascinamento del gizmo o del cono dello spot, scelta dell'oggetto da inquadrare o del punto di fuoco); il selettore colore tiene il suo Esc. Aggiornati elenco delle scorciatoie e manuale.
+
 **Fumo simulato solo anteprima**
 - `SmokeCloud::preview_only`: il fumo simulato resta come anteprima a punti nella viewport (disegnata anche quando non è selezionato, con la nota "solo anteprima") e il render lo salta; la chiave della cache ignora l'opzione, così riaccendendo il calcolo vero si riusa quello già simulato (test `preview_only_smoke_is_skipped_by_the_render`). Pannello: "Calcolo vero per il render".
 

@@ -52,4 +52,4 @@ apre da **Guida → Scorciatoie da tastiera**.
 | Rotella | Avvicina o allontana |
 | Alt + trascina | Sposta la selezione invece della camera |
 | Ctrl mentre trascini il gizmo | Snap a passi fissi |
-| Esc | Annulla il trascinamento in corso |
+| Esc | Annulla il trascinamento in corso; altrimenti deseleziona tutto |

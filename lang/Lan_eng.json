@@ -1025,7 +1025,7 @@
     "ForgeRender usa componenti open source: Intel Open Image Denoise (licenza Apache 2.0, con oneTBB e oneDNN); egui, wgpu e altre librerie Rust (MIT / Apache 2.0); Open CASCADE (LGPL 2.1, solo nel convertitore STEP). Testi completi nella cartella licenze del programma.": "ForgeRender uses open source components: Intel Open Image Denoise (Apache 2.0 license, with oneTBB and oneDNN); egui, wgpu and other Rust libraries (MIT / Apache 2.0); Open CASCADE (LGPL 2.1, STEP converter only). Full texts in the program's licenze folder.",
     "Alt + trascina": "Alt + drag",
     "Ambiente e HDRI…": "Environment and HDRI…",
-    "Annulla il trascinamento in corso": "Cancels the current drag",
+    "Annulla il trascinamento in corso; altrimenti deseleziona tutto": "Cancels the current drag; otherwise deselects everything",
     "Annulla l'ultima modifica di posizione, rotazione, scala o eliminazione": "Undoes the last change of position, rotation, scale or deletion",
     "Appoggia il prodotto sul pavimento o sul fondale": "Rests the product on the floor or backdrop",
     "Appoggia il prodotto, aggiunge il fondale se manca, applica aspetto e qualità e inquadra": "Rests the product, adds the backdrop if missing, applies look and quality and frames the shot",

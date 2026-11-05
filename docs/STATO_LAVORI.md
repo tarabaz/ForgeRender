@@ -780,3 +780,5 @@ Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
   `forge_render_core::DustLook::response` sulla CPU, `dust_response` nel WGSL (parametri 88–90).
 - `SmokeCloud::preview_only`: il render salta il fumo simulato, la viewport lo mostra anche non selezionato.
 - Non provato nell'interfaccia né con un render vero delle scaglie (solo test della risposta e della scena).
+
+- Esc nella viewport deseleziona tutto (`ForgeApp::deselect_all`), salvo trascinamenti e scelte in corso; il selettore colore consuma il suo Esc.

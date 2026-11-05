@@ -52,4 +52,4 @@ Shortcuts work when you are not typing in a text field. The same list opens from
 | Wheel | Zoom in or out |
 | Alt + drag | Move the selection instead of the camera |
 | Ctrl while dragging the gizmo | Snap to fixed steps |
-| Esc | Cancel the current drag |
+| Esc | Cancel the current drag; otherwise deselect everything |

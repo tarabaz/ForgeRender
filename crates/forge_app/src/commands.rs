@@ -689,7 +689,7 @@ pub fn shortcuts_text(ctx: &egui::Context) -> String {
             tk("Sposta la camera di lato (anche tasto destro o centrale)"),
         ),
         (tk("Ctrl + trascina il gizmo"), tk("Snap a passi fissi")),
-        (tk("Esc"), tk("Annulla il trascinamento in corso")),
+        (tk("Esc"), tk("Annulla il trascinamento in corso; altrimenti deseleziona tutto")),
     ] {
         lines.push(format!("{:<16}  {}", tr(keys), tr(what)));
     }

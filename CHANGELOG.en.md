@@ -21,6 +21,9 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - `Dust::opacity`: scales the light scattered by the grains; a shadow ray is blocked by a grain with a probability equal to the opacity (per ray on CPU with a hash, with `rnd()` on GPU), so the shadow is partial on average.
 - `Dust::shape` = `Grains` (icosahedra, as before) or `Flakes` (flat hexagons with a random normal) with `sparkle` and `flake_roughness`: `DustLook::response` gives the grains the forward scattering of before and the flakes a diffuse part plus a two-sided GGX reflection tinted by their colour, so only the flakes facing the right way between light and camera sparkle (test `flakes_sparkle_unevenly`). GPU: `dust_response` in the shader, parameters 88–90 (`PARAM_WORDS` 92) and bit 3 of `P_HAS_DUST` for the flakes.
 
+**Esc deselects everything**
+- In the viewport, Esc clears the whole selection (objects, lights, fogs, smokes, dust, cameras) when it is not cancelling something else (a gizmo or spot-cone drag, the choice of the object to frame or of the focus point); the colour picker keeps its own Esc. Shortcut list and manual updated.
+
 **Simulated smoke as a preview only**
 - `SmokeCloud::preview_only`: the simulated smoke stays as the point preview in the viewport (drawn also when not selected, with a "preview only" note) and the render skips it; the cache key ignores the flag, so turning the full computation back on reuses what was already simulated (test `preview_only_smoke_is_skipped_by_the_render`). Panel: "Full computation for the render".
 
