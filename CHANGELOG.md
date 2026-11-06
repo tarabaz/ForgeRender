@@ -13,6 +13,19 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.48.0 — 6 nov 2026
+
+Dalla sezione 9 di `reports/chatgpt/2026-11-06_modifiche.md`.
+
+- **Le esportazioni non si fermano più con la finestra ridotta a icona:** il passaggio da un fotogramma all'altro stava dentro il disegno dell'interfaccia, che con la finestra ridotta non viene eseguito, quindi l'esportazione aspettava che la finestra tornasse. Ora sta nella logica del programma, che continua senza disegnare. Una finestra solo coperta non si era mai fermata.
+- **Il PC resta sveglio durante un'esportazione:** la sospensione automatica è bloccata per la durata del lavoro; lo schermo può spegnersi e uno spegnimento chiesto da te non viene impedito.
+- **Lascia il PC usabile:** una scelta nuova nelle impostazioni video abbassa la priorità del programma, ffmpeg compreso, e mette pause sulla GPU. Di partenza resta Massima velocità, e la scelta vale dal fotogramma dopo anche a esportazione in corso.
+- **Riprendere un'esportazione interrotta:** dopo un crash, un video non riuscito o un'interruzione, riavviando lo stesso lavoro si può continuare dai fotogrammi fatti o ricominciare. Una scheda nella cartella dei fotogrammi confronta progetto, impostazioni di render, intervallo e numero di fotogrammi, così fotogrammi di lavori diversi non si mescolano mai.
+- **Chiudere durante un'esportazione chiede prima:** continui a esportare oppure interrompi ed esci, anche da finestra ridotta, che torna davanti per mostrare la domanda. Anche le modifiche non salvate ora vengono chieste chiudendo da finestra ridotta.
+- **Esiti onesti:** un'animazione interrotta o fallita non viene più annunciata come finita, e un video che non si è potuto creare viene segnalato come errore.
+- **Log più chiaro:** ogni fotogramma, l'avvio della codifica, finestra nascosta e di nuovo visibile, pausa, ripresa e interruzione vengono scritti con il loro orario.
+- **Corretto:** chiudere o salvare da ridotta a icona registrava una finestra da 64 × 64, e all'avvio dopo si apriva una finestra minuscola. Ora resta l'ultima dimensione buona, e una dimensione minuscola già salvata viene riparata all'avvio.
+
 ## 0.47.0 — 6 nov 2026
 
 Il resto di `reports/chatgpt/2026-11-06_modifiche.md`.

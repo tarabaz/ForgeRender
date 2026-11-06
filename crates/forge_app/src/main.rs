@@ -18,6 +18,7 @@ mod app;
 mod commands;
 mod contact;
 mod demos;
+mod export_job;
 mod i18n;
 mod mcp;
 mod prefs;
@@ -117,6 +118,8 @@ fn parse_args() -> StartupOptions {
                 i += 1;
                 o.sequence = args.get(i).map(PathBuf::from);
             }
+            "--animazione" => o.animation = true,
+            "--riprendi" => o.resume = true,
             "--sequenza-viste" => o.sequence_views = true,
             "--sequenza-passaggi" => o.sequence_passes = true,
             "--sequenza-passo" => {

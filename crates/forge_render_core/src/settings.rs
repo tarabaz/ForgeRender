@@ -125,6 +125,10 @@ impl SamplesPreset {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct RenderSettings {
+    /// Riposo dopo ogni passata, in frazione del tempo della passata: lascia respirare la GPU
+    /// durante un'esportazione. Vale solo per il lavoro in corso, non si salva nel progetto.
+    #[serde(skip)]
+    pub pass_rest: f32,
     pub width: u32,
     pub height: u32,
     /// Campioni per pixel obiettivo. 0 = progressivo senza limite.
@@ -271,6 +275,7 @@ fn default_adaptive_min() -> u32 {
 impl Default for RenderSettings {
     fn default() -> Self {
         Self {
+            pass_rest: 0.0,
             width: 1280,
             height: 720,
             target_samples: 128,

@@ -64,7 +64,7 @@ fn video_job(app: &ForgeApp) -> Option<VideoJob> {
             });
         }
         let (done, total) = run.progress();
-        let remaining = crate::video::eta(done, total, run.started().elapsed());
+        let remaining = run.remaining();
         return Some(VideoJob {
             done,
             total,

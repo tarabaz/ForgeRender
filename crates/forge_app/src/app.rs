@@ -179,6 +179,10 @@ pub struct StartupOptions {
     pub sequence_passes: bool,
     pub sequence_step: Option<f32>,
     pub sequence_samples: Option<u32>,
+    /// Prova automatica: salva l'animazione della timeline e chiude.
+    pub animation: bool,
+    /// Prove automatiche: riprende un'esportazione interrotta invece di ricominciare.
+    pub resume: bool,
     /// Apre la scena demo "Prisma e luce" all'avvio (`--demo-prisma`).
     pub prism_demo: bool,
     /// Mostra la scelta della modalità anche nelle prove (`--scelta-modalita`).
@@ -275,6 +279,18 @@ pub struct ForgeApp {
     pub confirm_discard: Option<crate::commands::Cmd>,
     /// L'utente ha già confermato l'uscita: la chiusura della finestra non si ferma più.
     pub exit_confirmed: bool,
+    /// Chiusura chiesta durante un'esportazione: in attesa di risposta.
+    pub confirm_export_exit: bool,
+    /// Si chiude appena l'esportazione si è fermata.
+    pub exit_after_export: bool,
+    pub export_guard: crate::export_job::Guard,
+    pub window_minimized: bool,
+    /// Posizione e dimensioni salvate dell'ultima volta che la finestra era visibile.
+    pub last_window: Option<String>,
+    /// "Riprendere o ricominciare?" in attesa di risposta.
+    pub resume_prompt: Option<crate::export_job::Prompt>,
+    /// La risposta, usata dal prossimo avvio dell'esportazione.
+    pub resume_decision: Option<bool>,
     /// Avviso breve in basso nella finestra (testo, quando è comparso).
     pub toast: Option<Toast>,
     /// Finestra del manuale (Guida → Manuale, F1).
@@ -476,6 +492,13 @@ impl ForgeApp {
             unsaved: false,
             confirm_discard: None,
             exit_confirmed: false,
+            confirm_export_exit: false,
+            exit_after_export: false,
+            export_guard: Default::default(),
+            window_minimized: false,
+            last_window: cc.storage.and_then(|s| s.get_string("window")),
+            resume_prompt: None,
+            resume_decision: None,
             toast: None,
             manual: Default::default(),
             error: None,
@@ -1853,8 +1876,18 @@ impl ForgeApp {
 
     pub fn toggle_pause(&mut self) {
         match self.render_state() {
-            SessionState::Rendering => self.session.pause(),
-            SessionState::Paused | SessionState::Cancelled => self.session.resume(),
+            SessionState::Rendering => {
+                if self.export_running() {
+                    tracing::info!("esportazione: messa in pausa dall'utente");
+                }
+                self.session.pause()
+            }
+            SessionState::Paused | SessionState::Cancelled => {
+                if self.export_running() {
+                    tracing::info!("esportazione: ripresa dall'utente");
+                }
+                self.session.resume()
+            }
             _ => self.start_render(),
         }
     }
@@ -2814,6 +2847,8 @@ impl ForgeApp {
         }
     }
 
+    /// Gira in `App::logic`: anche con la finestra ridotta a icona, quando l'interfaccia non si
+    /// disegna. Le esportazioni avanzano da qui.
     pub fn tick(&mut self, ctx: &egui::Context) {
         self.frames += 1;
         // Luci e nebbie appena create (da qualunque parte) prendono il loro numero per la timeline.
@@ -2841,7 +2876,9 @@ impl ForgeApp {
         self.update_render_job();
         self.tick_sequence();
         crate::ui::timeline::tick(self, ctx);
+        self.update_export_guard();
         self.auto_sequence(ctx);
+        crate::ui::timeline::auto_animation(self, ctx);
         self.monitor.tick();
         let state = self.render_state();
         if state == SessionState::Rendering

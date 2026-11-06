@@ -52,6 +52,8 @@ pub struct TimelineUi {
     /// Effetti nel tempo visti l'ultima volta (quando ne arriva uno il cursore va sul suo istante).
     seen_effects: usize,
     pub run: Option<AnimRun>,
+    /// Prova automatica: 0 da avviare, 1 in corso, 2 finita.
+    auto: u8,
     /// Play nella vista Render: campioni per fotogramma, e il render corto in corso.
     pub play_samples: u32,
     render_play: Option<RenderPlay>,
@@ -69,6 +71,7 @@ pub struct TimelineUi {
 impl Default for TimelineUi {
     fn default() -> Self {
         Self {
+            auto: 0,
             playing: false,
             last_tick: None,
             loop_play: true,
@@ -150,6 +153,11 @@ pub struct AnimRun {
     /// Avanzamento della codifica, condiviso con il suo thread, e da quando è iniziata.
     encode: Option<(std::sync::Arc<crate::video::Progress>, Instant)>,
     cancelled: bool,
+    /// Perché si è fermata, se non è stato l'utente.
+    error: Option<String>,
+    /// Fotogrammi già pronti alla partenza (ripresa).
+    resumed: usize,
+    frame_started: Instant,
 }
 
 impl AnimRun {
@@ -157,15 +165,21 @@ impl AnimRun {
         (self.frame.min(self.total), self.total)
     }
 
-    pub fn started(&self) -> Instant {
-        self.started
+    /// Tempo che manca: i fotogrammi trovati già pronti non dicono quanto dura farne uno.
+    pub fn remaining(&self) -> Option<Duration> {
+        let (done, total) = self.progress();
+        crate::video::eta(
+            done.saturating_sub(self.resumed),
+            total.saturating_sub(self.resumed),
+            self.started.elapsed(),
+        )
     }
 
     pub fn encoding(&self) -> Option<(std::sync::Arc<crate::video::Progress>, Instant)> {
         self.encode.clone()
     }
 
-    fn stop(&mut self) {
+    pub fn stop(&mut self) {
         self.cancelled = true;
         if let Some((p, _)) = &self.encode {
             p.cancel.store(true, std::sync::atomic::Ordering::Relaxed);
@@ -1665,18 +1679,92 @@ fn modifier_row(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale, tracks
 // Render dell'animazione
 // ------------------------------------------------------------------------------------------
 
-fn start_render(app: &mut ForgeApp) {
+/// Nome del fotogramma `k` (da zero) nella cartella dell'animazione.
+fn frame_name(k: usize) -> PathBuf {
+    PathBuf::from(format!("fotogramma_{:05}.png", k + 1))
+}
+
+/// Prova automatica (`--animazione`): parte quando la scena è pronta e, finita l'esportazione,
+/// chiude il programma.
+pub fn auto_animation(app: &mut ForgeApp, ctx: &egui::Context) {
+    if !app.startup.animation {
+        return;
+    }
+    let ready = app.frames > 30 && !app.is_preparing() && (app.gpu_ready().is_some() || app.safe_mode);
+    match app.timeline_ui.auto {
+        0 if ready => {
+            if let Some(n) = app.startup.sequence_samples {
+                app.settings.target_samples = n;
+            }
+            app.timeline_ui.auto = 1;
+            app.timeline_ui.make_video = true;
+            start_render(app);
+        }
+        1 if app.timeline_ui.run.is_none() => {
+            app.timeline_ui.auto = 2;
+            if let Some(e) = &app.error {
+                tracing::error!("animazione automatica: {e}");
+            }
+            app.exit_confirmed = true;
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        }
+        _ => {}
+    }
+}
+
+pub fn start_render(app: &mut ForgeApp) {
+    use crate::export_job as job;
     let kind = app.timeline_ui.save_kind;
-    let dir = crate::prefs::new_rendering_subdir(if kind == SaveKind::Preview { "anteprima" } else { "animazione" });
-    let tl = &app.scene.timeline;
-    let times = tl.work_frames();
+    let times = app.scene.timeline.work_frames();
     let total = times.len();
+    let key = job::fingerprint(
+        &app.scene,
+        &app.meta,
+        &app.settings,
+        &format!("animazione {times:?} {:?}", app.timeline_ui.save_view),
+    );
+    let names: Vec<PathBuf> = (0..total).map(frame_name).collect();
+    // Si riprende solo il render: l'anteprima si rifà in un attimo.
+    let found = (kind == SaveKind::Render)
+        .then(|| job::find_interrupted(&crate::prefs::rendering_dir(), "animazione_", &key, &names))
+        .flatten();
+    let auto = app.startup.animation.then_some(app.startup.resume);
+    let found = match (found, app.resume_decision.take().or(auto)) {
+        (Some(f), None) => {
+            app.resume_prompt = Some(job::Prompt {
+                found: f,
+                target: job::Target::Timeline,
+            });
+            return;
+        }
+        (Some(f), Some(true)) => Some(f),
+        (Some(f), Some(false)) => {
+            job::forget(&f.dir);
+            None
+        }
+        (None, _) => None,
+    };
+    let (dir, resumed) = match found {
+        Some(f) => (f.dir, f.done),
+        None => (
+            crate::prefs::new_rendering_subdir(if kind == SaveKind::Preview { "anteprima" } else { "animazione" }),
+            0,
+        ),
+    };
+    if kind == SaveKind::Render {
+        let m = job::Manifest::new(key, total, &app.settings, app.scene.timeline.fps);
+        if let Err(e) = m.write(&dir) {
+            tracing::warn!("esportazione: scheda per la ripresa non scritta: {e:#}");
+        }
+    }
+    let tl = &app.scene.timeline;
+    let written: Vec<PathBuf> = names.iter().take(resumed).map(|n| dir.join(n)).collect();
     let run = AnimRun {
         dir,
-        frame: 0,
+        frame: resumed,
         total,
         rendering: false,
-        written: Vec::new(),
+        written,
         settings: app.settings.clone(),
         auto_restart: app.auto_restart,
         view: app.view,
@@ -1693,6 +1781,9 @@ fn start_render(app: &mut ForgeApp) {
         video: None,
         encode: None,
         cancelled: false,
+        error: None,
+        resumed,
+        frame_started: Instant::now(),
     };
     // Il render guarda dalla vista scelta (l'anteprima sceglie la camera a ogni fotogramma).
     if kind == SaveKind::Render {
@@ -1704,7 +1795,10 @@ fn start_render(app: &mut ForgeApp) {
     }
     app.auto_restart = false;
     app.timeline_ui.playing = false;
-    tracing::info!("render dell'animazione: {total} fotogrammi in {}", run.dir.display());
+    tracing::info!(
+        "render dell'animazione: {total} fotogrammi ({resumed} già fatti) in {}",
+        run.dir.display()
+    );
     app.timeline_ui.run = Some(run);
 }
 
@@ -1727,6 +1821,7 @@ fn tick_render(app: &mut ForgeApp) {
         if let Some(run) = &mut app.timeline_ui.run {
             run.rendering = true;
             run.waiting_denoise = None;
+            run.frame_started = Instant::now();
         }
         return;
     }
@@ -1743,7 +1838,14 @@ fn tick_render(app: &mut ForgeApp) {
     }
     match p.state {
         forge_render_core::SessionState::Completed => {}
-        forge_render_core::SessionState::Failed(_) | forge_render_core::SessionState::Cancelled => {
+        forge_render_core::SessionState::Failed(e) => {
+            if let Some(r) = &mut app.timeline_ui.run {
+                r.error = Some(e);
+                r.cancelled = true;
+            }
+            return;
+        }
+        forge_render_core::SessionState::Cancelled => {
             if let Some(r) = &mut app.timeline_ui.run {
                 r.cancelled = true;
             }
@@ -1765,15 +1867,22 @@ fn tick_render(app: &mut ForgeApp) {
     }
     let (tone, ev, strength) = (app.settings.tone_mapping, app.settings.exposure_ev, app.settings.denoise.strength);
     let run = app.timeline_ui.run.as_mut().expect("render dell'animazione");
-    let path = run.dir.join(format!("fotogramma_{:05}.png", run.frame + 1));
+    let path = run.dir.join(frame_name(run.frame));
     match forge_image_io::save_frame_png(&path, &frame, tone, ev, strength) {
         Ok(()) => run.written.push(path),
         Err(e) => {
             tracing::error!("fotogramma non salvato: {e:#}");
+            run.error = Some(format!("{}: {e:#}", path.display()));
             run.cancelled = true;
             return;
         }
     }
+    tracing::info!(
+        "esportazione: fotogramma {} di {} fatto in {:.2} s",
+        run.frame + 1,
+        run.total,
+        run.frame_started.elapsed().as_secs_f64()
+    );
     run.frame += 1;
     run.rendering = false;
 }
@@ -1789,7 +1898,7 @@ fn tick_preview(app: &mut ForgeApp) {
         None => app.scene.camera.clone(),
     };
     let (w, h) = (app.settings.width.max(2), app.settings.height.max(2));
-    let path = dir.join(format!("fotogramma_{:05}.png", frame_no + 1));
+    let path = dir.join(frame_name(frame_no));
     let saved = app
         .capture_viewport(&camera, w, h)
         .and_then(|rgba| image::RgbaImage::from_raw(w, h, rgba))
@@ -1813,6 +1922,7 @@ fn tick_preview(app: &mut ForgeApp) {
 
 fn finish_render(app: &mut ForgeApp) {
     let Some(run) = &mut app.timeline_ui.run else { return };
+    let cancelled = run.cancelled;
     app.scene.active_camera = run.active_before;
     app.settings = run.settings.clone();
     app.auto_restart = run.auto_restart;
@@ -1831,17 +1941,31 @@ fn finish_render(app: &mut ForgeApp) {
         run.video = Some(std::thread::spawn(move || crate::video::encode(&job, &progress)));
         return;
     }
+    if cancelled {
+        app.session.cancel();
+    }
     let run = app.timeline_ui.run.take().expect("render dell'animazione");
-    let text = tf(
-        "Animazione: {} fotogrammi in {} salvati in\n{}",
-        &[
-            run.written.len().to_string(),
-            format!("{:.0} s", run.started.elapsed().as_secs_f32()),
-            run.dir.display().to_string(),
-        ],
-    );
+    let text = if cancelled {
+        tf(
+            "Animazione interrotta: {} fotogrammi di {} salvati in\n{}",
+            &[run.written.len().to_string(), run.total.to_string(), run.dir.display().to_string()],
+        )
+    } else {
+        crate::export_job::forget(&run.dir);
+        tf(
+            "Animazione: {} fotogrammi in {} salvati in\n{}",
+            &[
+                run.written.len().to_string(),
+                format!("{:.0} s", run.started.elapsed().as_secs_f32()),
+                run.dir.display().to_string(),
+            ],
+        )
+    };
     tracing::info!("{}", text.replace('\n', " "));
-    app.notify_saved(text, Some(run.dir.clone()));
+    match run.error {
+        Some(e) => app.error = Some(format!("{text}\n\n{e}")),
+        None => app.notify_saved(text, Some(run.dir.clone())),
+    }
     apply(app);
 }
 
@@ -1862,15 +1986,25 @@ fn finish_video(app: &mut ForgeApp) {
     );
     match video {
         Some(Ok(Ok(report))) => {
+            crate::export_job::forget(&run.dir);
             text = format!(
                 "{text}\n{}",
                 tf("Video: {} ({})", &[report.path.display().to_string(), report.describe()])
-            )
+            );
+            tracing::info!("{}", text.replace('\n', " "));
+            app.notify_saved(text, Some(run.dir.clone()));
         }
-        Some(Ok(Err(e))) => text = format!("{text}\n{}", tf("video non creato: {e:#}", &[format!("{e:#}")])),
-        _ => {}
+        // Il video non c'è: non si può presentare come un lavoro finito.
+        Some(Ok(Err(e))) => {
+            text = format!("{text}\n\n{}", tf("video non creato: {e:#}", &[format!("{e:#}")]));
+            tracing::error!("{}", text.replace('\n', " "));
+            app.error = Some(text);
+        }
+        _ => {
+            text = format!("{text}\n\n{}", tr("video non creato"));
+            tracing::error!("{}", text.replace('\n', " "));
+            app.error = Some(text);
+        }
     }
-    tracing::info!("{}", text.replace('\n', " "));
-    app.notify_saved(text, Some(run.dir.clone()));
     apply(app);
 }

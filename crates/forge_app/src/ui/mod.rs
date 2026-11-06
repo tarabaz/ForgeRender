@@ -48,15 +48,39 @@ impl eframe::App for ForgeApp {
         }
     }
 
+    /// Eframe la chiama prima di `ui`, e da sola quando la finestra è ridotta a icona: qui sta
+    /// tutto quello che deve andare avanti senza disegnare niente.
+    fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.tick(ctx);
+        self.log_window_state(ctx);
+        self.repair_window_size(ctx);
+        self.handle_close_request(ctx);
+        if self.exit_after_export && !self.export_running() {
+            self.exit_after_export = false;
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        }
+    }
+
+    /// Eframe scrive la finestra appena prima di questa chiamata. Da ridotta a icona misura 0×0:
+    /// si tiene l'ultima buona, altrimenti al prossimo avvio la finestra sarebbe un quadratino.
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        const WINDOW_KEY: &str = "window";
+        if self.window_minimized {
+            if let Some(good) = &self.last_window {
+                storage.set_string(WINDOW_KEY, good.clone());
+            }
+        } else {
+            self.last_window = storage.get_string(WINDOW_KEY);
+        }
+    }
+
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
-        self.tick(&ctx);
         self.handle_dropped_files(&ctx);
         timeline::keyboard(self, &ctx);
         self.handle_shortcuts(&ctx);
         manual::begin_frame(&ctx);
 
-        self.handle_close_request(&ctx);
         egui::Panel::top("menubar").show(ui, |ui| menubar::show(self, ui));
         egui::Panel::top("quickbar").show(ui, |ui| quickbar::show(self, ui));
         // Limite d'altezza anche per quella salvata: in una finestra piccola il pannello non deve
@@ -208,9 +232,99 @@ impl ForgeApp {
 
     /// Chiusura della finestra (X, Alt+F4) con modifiche non salvate: prima si chiede.
     fn handle_close_request(&mut self, ctx: &egui::Context) {
-        if ctx.input(|i| i.viewport().close_requested()) && !self.exit_confirmed && self.unsaved {
+        if !ctx.input(|i| i.viewport().close_requested()) {
+            return;
+        }
+        if self.export_running() {
+            // Il lavoro non si perde in silenzio: si sceglie, con la finestra davanti.
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            self.confirm_export_exit = true;
+            Self::bring_to_front(ctx);
+        } else if !self.exit_confirmed && self.unsaved {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
             self.confirm_discard = Some(crate::commands::Cmd::Exit);
+            Self::bring_to_front(ctx);
+        }
+    }
+
+    /// Chiusura durante un'esportazione: continuare, o fermarla e uscire.
+    fn confirm_export_exit_window(&mut self, ctx: &egui::Context) {
+        if !self.confirm_export_exit {
+            return;
+        }
+        if !self.export_running() {
+            self.confirm_export_exit = false;
+            return;
+        }
+        let mut stop = None;
+        egui::Modal::new(egui::Id::NULL.with("conferma-uscita-esportazione")).show(ctx, |ui| {
+            ui.set_width(400.0);
+            ui.heading(tr("Esportazione in corso"));
+            ui.label(tr(
+                "Se esci ora il video non viene creato. I fotogrammi già fatti restano e la prossima volta potrai riprendere da lì.",
+            ));
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                if ui
+                    .add(egui::Button::new(egui::RichText::new(tr("Continua l'esportazione")).strong()).fill(style::ACCENT))
+                    .clicked()
+                {
+                    stop = Some(false);
+                }
+                if ui.button(tr("Interrompi ed esci")).clicked() {
+                    stop = Some(true);
+                }
+            });
+        });
+        if let Some(stop) = stop {
+            self.confirm_export_exit = false;
+            if stop {
+                self.exit_after_export = true;
+                self.stop_exports();
+            }
+        }
+    }
+
+    /// Esportazione interrotta trovata all'avvio: riprendere o ricominciare.
+    fn resume_export_window(&mut self, ctx: &egui::Context) {
+        let Some(prompt) = &self.resume_prompt else { return };
+        let (dir, done, total, target) = (prompt.found.dir.clone(), prompt.found.done, prompt.found.total, prompt.target);
+        let mut choice = None;
+        egui::Modal::new(egui::Id::NULL.with("riprendi-esportazione")).show(ctx, |ui| {
+            ui.set_width(420.0);
+            ui.heading(tr("Esportazione interrotta"));
+            ui.label(tf(
+                "Questo lavoro si era fermato: {} fotogrammi di {} sono già pronti in\n{}",
+                &[done.to_string(), total.to_string(), dir.display().to_string()],
+            ));
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                if ui
+                    .add(egui::Button::new(egui::RichText::new(tr("Riprendi da lì")).strong()).fill(style::ACCENT))
+                    .clicked()
+                {
+                    choice = Some(Some(true));
+                }
+                if ui
+                    .button(tr("Ricomincia da capo"))
+                    .on_hover_text(tr("I fotogrammi già fatti restano nella loro cartella"))
+                    .clicked()
+                {
+                    choice = Some(Some(false));
+                }
+                if ui.button(tr("Annulla")).clicked() {
+                    choice = Some(None);
+                }
+            });
+        });
+        let Some(choice) = choice else { return };
+        self.resume_prompt = None;
+        self.resume_decision = choice;
+        if choice.is_some() {
+            match target {
+                crate::export_job::Target::Timeline => timeline::start_render(self),
+                crate::export_job::Target::Sequence => self.start_sequence(),
+            }
         }
     }
 
@@ -300,6 +414,8 @@ impl ForgeApp {
 
     fn dialogs(&mut self, ctx: &egui::Context) {
         self.confirm_discard_window(ctx);
+        self.confirm_export_exit_window(ctx);
+        self.resume_export_window(ctx);
         self.toast_area(ctx);
         crate::ui::library::window(self, ctx);
         crate::ui::blend_import::window(self, ctx);

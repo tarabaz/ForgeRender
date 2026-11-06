@@ -18,6 +18,12 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
+### What's new in 0.48.0
+
+- **Exports that keep going in the background:** minimize ForgeRender and frames, encoding and the final file carry on, and the PC does not go to sleep meanwhile.
+- **Keep the PC usable:** choose between maximum speed and a lighter load while you work on something else.
+- **Resume after an interruption:** an export that stopped continues from the finished frames, and closing during an export asks first.
+
 ### What's new in 0.47.0
 
 - **Fireflies that really light the scene:** a flock with its own on/off cycle, palette and halo, with an Enchanted forest preset. Lit fireflies are real lights, stopped by objects.
@@ -420,6 +426,7 @@ A professional timeline, always available: it sits at the bottom with **Timeline
 - **Moving floating dust**: drift over time, reaction to moving objects and smoke currents, deterministic.
 - **STEP import window**: tessellation settings, 3D preview, repeatable conversion, stop.
 - **Video export**: MP4, MOV, MKV and AVI with H.264, H.265, ProRes, FFV1 or uncompressed, presets, size estimate and the real parameters at the end.
+- **Reliable long exports**: they keep going minimized or covered, block automatic sleep, can leave the PC usable and resume from the finished frames.
 - **Configurable status bar**: up to 9 counters out of 15 (viewport FPS, frames, time remaining, GPU, VRAM, RAM and more), Backend and processor fixed on the right.
 - **Light targets in the viewport**: Spot and Directional aimed by dragging their target, with undo.
 - `.frproject` projects (versioned JSON, atomic save, relative paths).

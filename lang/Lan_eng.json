@@ -1874,6 +1874,21 @@
     "{} ({} s)": "{} ({} s)",
     "{} triangoli, {} vertici, {} s": "{} triangles, {} vertices, {} s",
     "Lucciole": "Fireflies",
-    "Uno stormo che vola e si accende a intervalli: ogni lucciola accesa illumina davvero la scena": "A flock that flies and lights up at intervals: every lit firefly really lights the scene"
+    "Uno stormo che vola e si accende a intervalli: ogni lucciola accesa illumina davvero la scena": "A flock that flies and lights up at intervals: every lit firefly really lights the scene",
+    "Esportazione in corso": "Export in progress",
+    "Se esci ora il video non viene creato. I fotogrammi già fatti restano e la prossima volta potrai riprendere da lì.": "If you quit now the video is not created. The finished frames stay and next time you can resume from there.",
+    "Continua l'esportazione": "Keep exporting",
+    "Interrompi ed esci": "Stop and quit",
+    "Esportazione interrotta": "Interrupted export",
+    "Questo lavoro si era fermato: {} fotogrammi di {} sono già pronti in\n{}": "This job had stopped: {} of {} frames are already done in\n{}",
+    "Riprendi da lì": "Resume from there",
+    "Ricomincia da capo": "Start over",
+    "I fotogrammi già fatti restano nella loro cartella": "The finished frames stay in their folder",
+    "Durante l'esportazione": "While exporting",
+    "Massima velocità": "Maximum speed",
+    "Lascia il PC usabile": "Keep the PC usable",
+    "Usa tutta la potenza: il PC può rispondere più lentamente": "Uses all the power: the PC may respond more slowly",
+    "Priorità bassa e pause sulla GPU: gli altri programmi restano fluidi, il render dura di più": "Low priority and pauses on the GPU: other programs stay smooth, the render takes longer",
+    "Animazione interrotta: {} fotogrammi di {} salvati in\n{}": "Animation stopped: {} of {} frames saved in\n{}"
   }
 }

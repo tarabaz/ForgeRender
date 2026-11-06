@@ -2952,3 +2952,25 @@ Richieste di Valerio: "Sostituisci materiale" (tutti i componenti con un materia
 **Verifica visiva:** finestra STEP, lucciole in viewport, Play con polvere e lucciole, render GPU da 128 campioni con 3,1 M di triangoli di polvere in 0,93 s.
 
 **Non verificato:** luce delle lucciole a vista su GPU in una scena buia (provata su CPU con pavimento e tetto; su GPU la lista luci è la stessa), un'animazione lunga con griglia finale riletta in finestra, FPS con 150 000 granelli in Play, inglese nelle finestre nuove, confronto tra stima e tempo reale del video, scaling DPI.
+
+## Sezione 9, esportazione in background — 06/11/2026 (Claude, 0.48.0)
+
+**Causa riprodotta:** con la finestra ridotta a icona la vecchia versione faceva +0 fotogrammi in 30 s e riprendeva al ripristino. Il render del fotogramma corrente finiva, ma il passaggio al successivo stava in `App::ui`, che eframe non chiama per una finestra ridotta. Una finestra solo coperta non si fermava: +49 in 15 s.
+
+**Fatto:** logica in `App::logic`; `export_job.rs` con blocco della sospensione, priorità, scheda per la ripresa; pause GPU con `pass_rest`; domanda alla chiusura; esiti di errore per animazione e video; log per fasi. Non c'è un worker separato: la macchina a stati resta sul thread principale perché cambia la scena tra i fotogrammi. Il requisito verificato è il comportamento.
+
+**Provato con l'eseguibile vero su RTX 5070 e Ryzen 9900X:**
+
+1. 5 minuti ridotta: +545 fotogrammi, conteggio sempre in salita; prima della correzione zero.
+2. Coperta: +51 in 15 s.
+3. Dopo il ripristino: fotogramma, percentuale, trascorso e stima coerenti (immagine controllata).
+4. Log: nessuna pausa né annullamento da minimizzazione.
+5. Finestra ridotta fino al file finale: CPU in modalità sicura, sequenza da 12 fotogrammi; GPU, animazione da 120 con uccisione a 40 e ripresa. ffprobe conferma h264 1280×720 con 12 e 120 fotogrammi.
+6. Carico: 120 fotogrammi a 256 campioni, Massima velocità 124 s, Lascia il PC usabile 149 s (+20 %). Sonda CPU a priorità normale: +4,5 % di iterazioni, picco 52,7 → 37,3 ms. Priorità BelowNormal confermata.
+7. Sospensione: `ES_SYSTEM_REQUIRED` presente durante l'esportazione (0x3 contro 0x2 da fermo).
+8. Uccisione a 13 di 60: scheda presente, nessun video, ripresa senza rifare i fotogrammi, video da 60. File di uscita non scrivibile: errore esplicito, scheda conservata. Interrompi ed esci da finestra ridotta: 192 fotogrammi, nessun video, scheda conservata.
+9. F5 durante l'esportazione: +0 in 6 s, anche ridotta; dopo la ripresa +12 in 6 s.
+
+**Non verificato:** una sospensione reale di Windows al timer, reattività del desktop misurata sulla GPU (la sonda è solo CPU), ripresa dalla finestra di domanda con clic (provata con `--riprendi`), Interrompi su un'animazione dalla timeline a mano, `ffmpeg` in priorità bassa, inglese delle finestre nuove, durata oltre i 5 minuti.
+
+**Limiti:** con la finestra ridotta ogni fotogramma costa circa 0,2–0,3 s in più (1,75 contro 3,2 fotogrammi al secondo in una scena leggerissima, irrilevante su render lunghi). La ripresa vale per Render della timeline e turntable, non per l'Anteprima né per le viste singole. Il formato del video non entra nell'impronta: si codifica con le impostazioni attuali, dai fotogrammi già fatti.

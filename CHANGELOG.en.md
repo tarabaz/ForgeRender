@@ -10,6 +10,19 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.48.0 — 6 Nov 2026
+
+From section 9 of `reports/chatgpt/2026-11-06_modifiche.md`.
+
+- **Exports no longer stop when the window is minimized:** the step from one frame to the next ran inside the interface drawing, which the window toolkit skips for a minimized window, so the export waited for the window to come back. That step now runs in the program logic, which keeps going without drawing. A window that is only covered never stopped.
+- **The PC stays awake during an export:** automatic sleep is blocked for the length of the job; the screen can still turn off and a shutdown you ask for is not prevented.
+- **Keep the PC usable:** a new choice in the video settings lowers the program's priority, ffmpeg included, and adds pauses on the GPU. Maximum speed stays the default, and the choice takes effect from the next frame even during an export.
+- **Resume an interrupted export:** after a crash, a failed video or a stop, starting the same job offers to continue from the finished frames or to start over. A record in the frame folder compares project, render settings, frame range and frame count, so frames of different jobs are never mixed.
+- **Closing during an export asks first:** you keep exporting or stop and quit, even from a minimized window, which comes back to show the question. Unsaved changes are now also asked about when closing from a minimized window.
+- **Honest outcomes:** a stopped or failed animation is no longer announced as finished, and a video that could not be created is reported as an error.
+- **Clearer log:** every frame, the encoder start, window hide and show, pause, resume and stop are written with their time.
+- **Fixed:** closing or saving while minimized stored a 64 × 64 window, so the next start opened a tiny window. The last good size is kept, and a tiny saved size is repaired at start.
+
 ## 0.47.0 — 6 Nov 2026
 
 The rest of `reports/chatgpt/2026-11-06_modifiche.md`.

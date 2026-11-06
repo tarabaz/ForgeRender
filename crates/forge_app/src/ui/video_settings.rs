@@ -3,10 +3,25 @@
 //! dei fotogrammi non cambia.
 
 use crate::app::ForgeApp;
+use crate::export_job::ExportLoad;
 use crate::i18n::{tf, tr};
 use crate::ui::style;
 use crate::video::{self, Codec, Container, Preset, Rate, VideoSettings};
 use eframe::egui;
+
+fn load_label(l: ExportLoad) -> &'static str {
+    match l {
+        ExportLoad::Full => tr("Massima velocità"),
+        ExportLoad::Shared => tr("Lascia il PC usabile"),
+    }
+}
+
+fn load_hint(l: ExportLoad) -> &'static str {
+    match l {
+        ExportLoad::Full => tr("Usa tutta la potenza: il PC può rispondere più lentamente"),
+        ExportLoad::Shared => tr("Priorità bassa e pause sulla GPU: gli altri programmi restano fluidi, il render dura di più"),
+    }
+}
 
 fn preset_label(p: Preset) -> &'static str {
     match p {
@@ -262,6 +277,20 @@ fn editor(
         ],
     ));
     ui.label(size);
+    ui.separator();
+    egui::Grid::new("video-carico").num_columns(2).spacing([12.0, 6.0]).show(ui, |ui| {
+        ui.label(tr("Durante l'esportazione"));
+        egui::ComboBox::from_id_salt("carico")
+            .width(240.0)
+            .selected_text(load_label(s.load))
+            .show_ui(ui, |ui| {
+                for l in [ExportLoad::Full, ExportLoad::Shared] {
+                    ui.selectable_value(&mut s.load, l, load_label(l)).on_hover_text(load_hint(l));
+                }
+            });
+        ui.end_row();
+    });
+    ui.label(egui::RichText::new(load_hint(s.load)).weak());
     if caps.ffmpeg.is_none() {
         ui.colored_label(
             style::WARN,

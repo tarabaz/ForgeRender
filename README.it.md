@@ -18,6 +18,12 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
+### Novità della versione 0.48.0
+
+- **Esportazioni che proseguono in background:** riduci ForgeRender a icona e fotogrammi, codifica e file finale vanno avanti, e il PC intanto non va in sospensione.
+- **Lascia il PC usabile:** scegli tra massima velocità e un carico più leggero mentre lavori ad altro.
+- **Ripresa dopo un'interruzione:** un'esportazione che si è fermata continua dai fotogrammi fatti, e chiudere durante un'esportazione chiede prima.
+
 ### Novità della versione 0.47.0
 
 - **Lucciole che illuminano davvero la scena:** uno stormo con il suo ciclo di accensione, palette e alone, con il preset Bosco incantato. Le lucciole accese sono luci vere, fermate dagli oggetti.
@@ -441,6 +447,7 @@ Una timeline professionale, sempre disponibile: sta in basso con le schede **Tim
 - **Polvere in sospensione in movimento**: moto nel tempo, reazione a oggetti in movimento e correnti del fumo, deterministica.
 - **Finestra di importazione STEP**: impostazioni di tassellazione, anteprima 3D, conversione ripetibile, arresto.
 - **Esportazione video**: MP4, MOV, MKV e AVI con H.264, H.265, ProRes, FFV1 o non compresso, preset, stima della dimensione e parametri veri alla fine.
+- **Esportazioni lunghe affidabili**: proseguono da ridotte a icona o coperte, bloccano la sospensione automatica, possono lasciare il PC usabile e riprendere dai fotogrammi fatti.
 - **Barra di stato configurabile**: fino a 9 contatori su 15 (FPS viewport, fotogrammi, tempo rimanente, GPU, VRAM, RAM e altri), Backend e processore fissi a destra.
 - **Bersaglio delle luci nel viewport**: Spot e Direzionali si puntano trascinando il bersaglio, con Annulla.
 

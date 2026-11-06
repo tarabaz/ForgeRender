@@ -40,4 +40,4 @@ serde_json.workspace = true
 
 # Video MP4 (H.264) con Media Foundation, incluso in Windows: niente da installare.
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Media_MediaFoundation", "Win32_Storage_FileSystem", "Win32_System_Com"] }
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Media_MediaFoundation", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Power", "Win32_System_Threading"] }

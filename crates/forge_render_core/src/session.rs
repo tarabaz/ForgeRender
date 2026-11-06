@@ -858,6 +858,11 @@ fn worker(rx: Receiver<Cmd>, tx: Sender<Cmd>, shared: Arc<Shared>) {
                     a.last_publish = Instant::now();
                 }
                 update_progress(a, &dn, &state, dt, &shared);
+                let rest = a.job.settings.pass_rest;
+                if rest > 0.0 && !done {
+                    // Al massimo un quarto di secondo, per non far aspettare i comandi.
+                    std::thread::sleep(dt.mul_f32(rest).min(Duration::from_millis(250)));
+                }
             }
             Ok(_) => {} // interrotta: si torna a leggere i comandi
             Err(e) => {

@@ -219,11 +219,14 @@ pub struct VideoSettings {
     pub fps: Option<u32>,
     /// Risoluzione del video (`None` = quella del render).
     pub size: Option<[u32; 2]>,
+    /// Quanto può pesare l'esportazione sul PC.
+    pub load: crate::export_job::ExportLoad,
 }
 
 impl Default for VideoSettings {
     fn default() -> Self {
         Self {
+            load: Default::default(),
             preset: Preset::Standard,
             container: Container::Mp4,
             codec: Codec::H264,

@@ -12,6 +12,7 @@
 //! Alla fine (anche se si interrompe) scena, camera e impostazioni tornano come prima.
 
 use crate::app::{ForgeApp, View};
+use crate::export_job;
 use crate::i18n::{tf, tk, tr};
 use forge_math::{Mat4, Quat, Vec3};
 use forge_render_core::{DenoiseMode, RenderScene, RenderSettings, SessionState, ToneMapping};
@@ -439,6 +440,8 @@ pub struct Run {
     waiting_denoise: Option<Instant>,
     errors: Vec<String>,
     cancelled: bool,
+    /// Il lavoro si può riprendere da questa cartella (turntable).
+    resumable: bool,
 }
 
 impl Run {
@@ -543,6 +546,24 @@ impl ForgeApp {
         } else {
             dir.clone()
         };
+        // Stesso lavoro già iniziato: si può riprendere dai fotogrammi fatti.
+        let job = format!("sequenza {} {} {} {}", plan.len(), o.step_deg, o.samples, o.clockwise);
+        let key = export_job::fingerprint(&self.scene, &self.meta, &self.settings, &job);
+        let names: Vec<PathBuf> = plan.iter().map(|f| PathBuf::from(format!("{}.png", f.file))).collect();
+        let found = turntable.then(|| export_job::interrupted(&frames_dir, &key, &names)).flatten();
+        let auto = self.startup.sequence.is_some().then_some(self.startup.resume);
+        let decision = self.resume_decision.take().or(auto);
+        let found = match (found, decision) {
+            (Some(f), None) => {
+                self.resume_prompt = Some(export_job::Prompt {
+                    found: f,
+                    target: export_job::Target::Sequence,
+                });
+                return;
+            }
+            (Some(f), Some(true)) => Some(f),
+            (_, _) => None,
+        };
         if let Err(e) = std::fs::create_dir_all(&frames_dir) {
             self.error = Some(tf(
                 "impossibile creare la cartella {}: {e}",
@@ -586,20 +607,29 @@ impl ForgeApp {
             self.settings.denoise.mode = DenoiseMode::Final;
         }
         self.auto_restart = false;
+        let start = found.map_or(0, |f| f.done);
+        if turntable {
+            let m = export_job::Manifest::new(key, plan.len(), &self.settings, o.fps as f32);
+            if let Err(e) = m.write(&frames_dir) {
+                tracing::warn!("esportazione: scheda per la ripresa non scritta: {e:#}");
+            }
+        }
+        let written: Vec<PathBuf> = names.iter().take(start).map(|n| frames_dir.join(n)).collect();
         let video_path = (turntable && o.make_video).then(|| {
             let ext = self.prefs.video.container.extension();
             self.video_out.clone().unwrap_or_else(|| dir.join(format!("{name}.{ext}")))
         });
         tracing::info!(
-            "sequenza avviata: {} fotogrammi, {} campioni, cartella {}",
+            "sequenza avviata: {} fotogrammi ({start} già fatti), {} campioni, cartella {}",
             plan.len(),
             o.samples,
             frames_dir.display()
         );
+        let all_done = start >= plan.len();
         self.sequence.run = Some(Run {
             plan,
             cameras,
-            index: 0,
+            index: start,
             phase: Phase::Apply,
             frames_dir,
             video_path,
@@ -609,7 +639,7 @@ impl ForgeApp {
             groups: node_groups(self),
             center,
             saved,
-            written: Vec::new(),
+            written,
             workers: Vec::new(),
             video: None,
             encode: None,
@@ -621,15 +651,24 @@ impl ForgeApp {
             waiting_denoise: None,
             errors: Vec::new(),
             cancelled: false,
+            resumable: turntable,
         });
+        // Mancava solo il video.
+        if all_done {
+            self.finish_sequence();
+        }
     }
 
     /// Interrompe la sequenza: i fotogrammi già salvati restano, la scena torna com'era.
     pub fn cancel_sequence(&mut self) {
         let Some(run) = &mut self.sequence.run else { return };
         if run.phase == Phase::Finishing {
+            if let Some(p) = &run.encode {
+                p.cancel.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
             return;
         }
+        tracing::info!("esportazione: sequenza interrotta al fotogramma {}", run.index + 1);
         run.cancelled = true;
         self.session.cancel();
         self.finish_sequence();
@@ -788,7 +827,14 @@ impl ForgeApp {
                     .push(std::thread::spawn(move || write_passes(&rs, &settings, &groups, set, &base)));
             }
         }
-        run.frame_times.push(run.frame_started.elapsed());
+        let took = run.frame_started.elapsed();
+        tracing::info!(
+            "esportazione: fotogramma {} di {} fatto in {:.2} s",
+            run.index + 1,
+            run.plan.len(),
+            took.as_secs_f64()
+        );
+        run.frame_times.push(took);
         run.index += 1;
         if run.index >= run.plan.len() {
             self.finish_sequence();
@@ -825,6 +871,7 @@ impl ForgeApp {
                 let progress = std::sync::Arc::new(crate::video::Progress::default());
                 run.encode = Some(progress.clone());
                 run.encode_started = Some(Instant::now());
+                tracing::info!("esportazione: codifica del video avviata");
                 run.video = Some(std::thread::spawn(move || crate::video::encode(&job, &progress)));
             }
         }
@@ -885,6 +932,9 @@ impl ForgeApp {
         }
         tracing::info!("{}", text.replace('\n', " "));
         if errors.is_empty() {
+            if run.resumable && !run.cancelled {
+                export_job::forget(&run.frames_dir);
+            }
             self.notify_saved(text, Some(run.frames_dir.clone()));
         } else {
             self.error = Some(format!("{text}\n\n{}", errors.join("\n")));
