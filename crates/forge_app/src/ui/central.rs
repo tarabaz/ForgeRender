@@ -171,6 +171,7 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
     draw_fogs(app, &painter, rect);
     draw_smokes(app, &painter, rect);
     draw_dust_box(app, &painter, rect);
+    crate::ui::fireflies::draw(app, &painter, rect);
     draw_cameras(app, &painter, rect);
     draw_depth_of_field(app, &painter, rect);
     if app.aim_pick {

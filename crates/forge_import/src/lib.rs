@@ -30,6 +30,8 @@ pub struct ImportOptions {
     pub up: UpAxis,
     /// Qualità della triangolazione dei formati CAD (STEP).
     pub step_quality: StepQuality,
+    /// Deviazione lineare relativa e angolare (radianti) scelte a mano: vincono sulla qualità.
+    pub step_custom: Option<[f64; 2]>,
     /// Dopo l'importazione appoggia il modello a quota 0 (trasformazione utente, non distruttiva).
     pub drop_to_floor: bool,
 }
@@ -41,6 +43,7 @@ impl Default for ImportOptions {
             crease_angle_deg: 40.0,
             up: UpAxis::Auto,
             step_quality: StepQuality::Media,
+            step_custom: None,
             drop_to_floor: true,
         }
     }
@@ -87,6 +90,16 @@ impl StepQuality {
             StepQuality::Bassa => "bassa",
             StepQuality::Media => "media",
             StepQuality::Alta => "alta",
+        }
+    }
+
+    /// Deviazione lineare (relativa allo spigolo) e angolare (radianti) del convertitore: gli stessi
+    /// valori di `forgerender-step --quality`.
+    pub fn deflections(self) -> (f64, f64) {
+        match self {
+            StepQuality::Bassa => (0.01, 0.5),
+            StepQuality::Media => (0.004, 0.3),
+            StepQuality::Alta => (0.0015, 0.15),
         }
     }
 }

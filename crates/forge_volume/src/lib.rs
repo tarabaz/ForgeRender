@@ -118,6 +118,26 @@ impl BakedFog {
         }
     }
 
+    /// Nebbia da una griglia già calcolata (precalcolo letto da file).
+    pub fn from_data(spec: GridSpec, data: Vec<u16>, unit: f32, albedo: Vec3, anisotropy: f32, max_density: f32) -> BakedFog {
+        let (macro_res, macro_majorant) = macro_majorants(&spec, &data, unit);
+        BakedFog {
+            spec,
+            data,
+            unit,
+            macro_res,
+            macro_majorant,
+            albedo,
+            anisotropy,
+            max_density,
+            camera_only: false,
+            additive: false,
+            sim_steps: 0,
+            sim_ms: 0.0,
+            bake_ms: 0.0,
+        }
+    }
+
     pub fn bounds(&self) -> (Vec3, Vec3) {
         (self.spec.min, self.spec.max())
     }

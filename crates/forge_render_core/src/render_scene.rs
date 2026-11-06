@@ -725,6 +725,45 @@ pub struct RenderScene {
 /// Granelli luminosi della polvere: centro, diametro e luce di ognuno, dai vertici dei nodi
 /// `effetto:polvere:luce:<n>` (ogni granello ha i vertici della sua forma, uno dopo l'altro).
 fn glow_points(scene: &Scene) -> Vec<crate::glow::GlowPoint> {
+    let mut out = firefly_points(scene);
+    out.extend(dust_glow_points(scene));
+    out
+}
+
+/// Grandezza e forza dell'alone: quelli della polvere, oppure valori neutri (le lucciole portano i
+/// loro nel diametro e nella luce di ogni punto).
+fn glow_look(scene: &Scene) -> (f32, f32) {
+    let d = &scene.haze_dust;
+    if d.enabled && !d.glow.is_empty() && d.halo_strength > 0.0 && d.halo_size > 0.0 {
+        (d.halo_size, d.halo_strength)
+    } else if scene.fireflies.enabled {
+        (6.0, 1.0)
+    } else {
+        (d.halo_size.max(0.0), d.halo_strength.max(0.0))
+    }
+}
+
+/// Corpo e alone delle lucciole accese: seguono il ciclo, indipendenti dalla luce sulla scena.
+fn firefly_points(scene: &Scene) -> Vec<crate::glow::GlowPoint> {
+    let f = &scene.fireflies;
+    let (size, strength) = glow_look(scene);
+    if !f.enabled || f.halo_strength <= 0.0 || f.halo_size <= 0.0 || size <= 0.0 || strength <= 0.0 {
+        return Vec::new();
+    }
+    // Riportate alla grandezza e alla forza comuni dell'alone.
+    let diameter = f.body_mm.max(0.1) * 1e-3 * f.halo_size / size;
+    let gain = f.halo_strength / strength * 40.0;
+    f.sparks(scene.timeline.time)
+        .into_iter()
+        .map(|s| crate::glow::GlowPoint {
+            center: s.position,
+            diameter,
+            emission: Vec3::from_array(s.color) * s.power * gain,
+        })
+        .collect()
+}
+
+fn dust_glow_points(scene: &Scene) -> Vec<crate::glow::GlowPoint> {
     let d = &scene.haze_dust;
     if !d.enabled || d.glow.is_empty() || d.halo_strength <= 0.0 || d.halo_size <= 0.0 {
         return Vec::new();
@@ -830,9 +869,12 @@ impl RenderScene {
                 portals.list.push(portal);
             }
         }
+        // Le lucciole accese sono luci come le altre: illuminano e fanno ombra.
+        let firefly_lights = scene.fireflies.lights(scene.timeline.time);
         let lights = scene
             .lights
             .iter()
+            .chain(&firefly_lights)
             .filter(|l| l.enabled && l.intensity > 0.0 && !matches!(l.kind, LightKind::Portal { .. } | LightKind::Laser { .. }))
             .map(|l| {
                 let kind = match l.kind {
@@ -930,8 +972,8 @@ impl RenderScene {
             portals,
             lasers: Arc::new(Vec::new()),
             glow_points: Arc::new(glow_points(scene)),
-            glow_size: scene.haze_dust.halo_size.max(0.0),
-            glow_strength: scene.haze_dust.halo_strength.max(0.0),
+            glow_size: glow_look(scene).0,
+            glow_strength: glow_look(scene).1,
         };
         // Percorsi dei fasci laser (servono geometria e materiali già compilati).
         if scene.lights.iter().any(|l| l.enabled && matches!(l.kind, LightKind::Laser { .. })) {

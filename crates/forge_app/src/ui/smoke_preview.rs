@@ -75,12 +75,12 @@ impl SmokePreviewState {
 }
 
 /// Il tempo non è nella chiave: lo decide il cursore della timeline. Conta fin dove arriva.
-fn key(s: &SmokeCloud, geometry_rev: u64, horizon: f32) -> String {
+fn key(s: &SmokeCloud, geometry_rev: u64, horizon: f32, motion: u64) -> String {
     let mut s = s.sanitized();
     s.sim.time = horizon;
     format!(
-        "{:?}|{:?}|{:?}|{}|{}|{}|{}",
-        s.sim, s.center, s.size, s.rotation_deg, s.seed, s.collisions, geometry_rev
+        "{:?}|{:?}|{:?}|{}|{}|{}|{}|{}",
+        s.sim, s.center, s.size, s.rotation_deg, s.seed, s.collisions, geometry_rev, motion
     )
 }
 
@@ -122,7 +122,11 @@ pub fn update(app: &mut ForgeApp) {
     }
     let tl = &app.scene.timeline;
     let horizon = (tl.duration - tl.start_of(&forge_scene::Target::Smoke(s.n))).max(0.1);
-    let k = key(s, app.geometry_rev, horizon);
+    let motion = forge_render_core::smoke_bake::motion_key(&app.scene);
+    // Con oggetti animati la loro posizione sta nell'animazione: il cursore non cambia il calcolo.
+    let moving = !app.scene.moving_nodes().is_empty();
+    let rev = if moving { app.structure_rev() } else { app.geometry_rev };
+    let k = key(s, rev, horizon, motion);
     if k == app.smoke_preview.key {
         return;
     }
@@ -130,6 +134,7 @@ pub fn update(app: &mut ForgeApp) {
     // riprova al prossimo fotogramma.
     let Some(geo) = app.current_geometry_shared() else { return };
     let still = forge_render_core::smoke_bake::scene_without_movers(&app.scene);
+    let scene = moving.then(|| app.scene.clone());
     let mut s = s.clone();
     s.sim.time = horizon;
     app.smoke_preview.cancel.store(true, Ordering::SeqCst);
@@ -145,13 +150,14 @@ pub fn update(app: &mut ForgeApp) {
     let _ = std::thread::Builder::new().name("forge-anteprima-fumo".into()).spawn(move || {
         let t0 = Instant::now();
         let still = still.map(|sc| forge_render_core::RenderGeometry::build(&sc));
-        let c = forge_render_core::smoke_bake::check_source(&s, still.as_ref().unwrap_or(&geo));
+        let geo = still.as_ref().unwrap_or(&geo);
+        let c = forge_render_core::smoke_bake::check_source(&s, geo);
         let check = Some((s.n, c));
         if c.blocked {
             let _ = tx.send((None, check));
             return;
         }
-        let p = forge_render_core::smoke::smoke_preview(&s, &geo, &|| cancel.load(Ordering::SeqCst));
+        let p = forge_render_core::smoke::smoke_preview(&s, scene.as_ref(), geo, &|| cancel.load(Ordering::SeqCst));
         if let Some(p) = &p {
             tracing::debug!(
                 "anteprima del fumo: {} fotogrammi, celle di {:.1} cm, {:.0} ms",

@@ -2931,3 +2931,24 @@ Richieste di Valerio: "Sostituisci materiale" (tutti i componenti con un materia
 
 - Sezioni 1.5, 1.6, 6 e 8 di `2026-11-06_modifiche.md`. Backend video: Media Foundation (MP4 H.264 a bitrate), writer AVI interno, ffmpeg per tutto il resto (non incluso nel programma). Verificati con ffprobe MP4 standard, MP4 CRF 16 e 12, MKV FFV1, MOV ProRes, AVI su più segmenti; AVI vero da 120 fotogrammi nel programma: 331,8 MB come stimato, `rawvideo,1280,720,bgr24,24/1,120`.
 - Verifica visiva svolta: barra a 1500×800 e 900×600, bersaglio Spot con Annulla, finestra video, 9 contatori con limite e a capo, persistenza dopo riavvio. Non verificati: Direzionale nella finestra, luce animata con il bersaglio, ETA confrontata su un'esportazione lunga, scaling DPI diversi, inglese nella finestra.
+
+
+## 0.47.0 — 06/11/2026 (Claude): risposta a `2026-11-06_modifiche.md`
+
+**Causa del Particle System (osservata nel codice e provata da `the_preview_feels_moving_objects`):** l'anteprima in viewport simulava con `solid` fisso, voxelizzando gli oggetti all'istante del cursore, e non si ricalcolava durante Play; il render usava invece i solidi in movimento del precalcolo. Prima le particelle ignoravano gli oggetti animati, ora usano gli stessi `MovingSolids` sulla griglia grossolana. Viewport e render hanno gli stessi oggetti e gli stessi tempi, ma restano due calcoli: la griglia è diversa.
+
+**Griglia fine:** era già salvata (`f_<k>.bin`). Si ricostruiva per ogni frame la griglia finale del render: ora `r_<k>_<aspetto>_<impronta>.bin`, 16 bit a tratti. Formato con versione nell'impronta della cartella, lunghezza verificata, scrittura atomica, ricalcolo da zero se un frame è illeggibile, massimo 40 GB, 6 cartelle. Invalidazione: impronta cumulativa già esistente, ripresa dall'ultimo stato prima del primo frame cambiato.
+
+**Particle System, sezione 3 (precalcolo persistente):** NON fatto su disco. L'anteprima tiene i suoi fotogrammi in memoria e si rifà quando cambia l'animazione. Il precalcolo persistente è quello del fumo vero. Riapertura del progetto: rifà l'anteprima, riusa il precalcolo del render.
+
+**Polvere:** spostamento analitico (quattro correnti comuni più moto proprio del granello), zero a t = 0, quindi le scene ferme restano identiche. Oggetti: scia degli ultimi 0,6 s campionata a sfere, senza stato. Fumo: corrente stimata dai parametri, perché il campo di velocità nasce dopo la geometria di cui i granelli fanno parte (caso previsto dalla decisione approvata, punto 3). Nessun effetto sul fumo.
+
+**Lucciole:** funzioni di tempo e seme, luci puntiformi vere con ombre, raggruppate su griglia XZ oltre `max_lights` (energia conservata, testato). Il renderer pesca una luce a caso, quindi il costo per campione non cresce con le luci e cresce il rumore. Misura CPU su 3000 cammini in scena minima: da 0,7 a 0,8 ms tra 4 e 64 luci. Rumore e convergenza non misurati. Alone in post-produzione, separato dalla luce. Niente interazione con gli oggetti.
+
+**STEP:** deviazioni lineare e angolare vere; spigoli massimi e preservazione degli spigoli non esposti dal convertitore, quindi assenti. Avanzamento come messaggi del convertitore, senza percentuali. Provato con `--write-test-assembly`: 176 triangoli in Bilanciata, 344 in Alta, importazione riuscita. Nessun test su un assieme vero grande. L'immagine `demo impostazione step.jpg` non era nel repository: layout dal testo.
+
+**Comandi:** `cargo fmt --all`, clippy e test dell'intero workspace senza forge_step, `cargo clippy -p forge_step`, test con ffmpeg e ffprobe veri.
+
+**Verifica visiva:** finestra STEP, lucciole in viewport, Play con polvere e lucciole, render GPU da 128 campioni con 3,1 M di triangoli di polvere in 0,93 s.
+
+**Non verificato:** luce delle lucciole a vista su GPU in una scena buia (provata su CPU con pavimento e tetto; su GPU la lista luci è la stessa), un'animazione lunga con griglia finale riletta in finestra, FPS con 150 000 granelli in Play, inglese nelle finestre nuove, confronto tra stima e tempo reale del video, scaling DPI.

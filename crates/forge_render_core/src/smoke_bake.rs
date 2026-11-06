@@ -13,7 +13,12 @@
 //! matrice): la simulazione li usa come bordi in movimento (vedi `forge_volume::smoke_sim`).
 //!
 //! Cartella: `%TEMP%/ForgeRender/fumo/<impronta dei parametri>/`, con `manifest.txt`, `f_<k>.bin`
-//! (fumo sparso a 8 bit) e `c_<k>.bin` (stato). Restano le ultime cartelle usate.
+//! (griglia di simulazione o griglia fine delle particelle, sparsa a 8 bit), `c_<k>.bin` (stato) e
+//! `r_<k>_<aspetto>_<impronta>.bin` (griglia finale del render a 16 bit): la prima volta si calcola,
+//! poi il render dell'animazione la legge senza ricampionare niente.
+//!
+//! I file hanno versione e lunghezza controllata: un file rovinato o di un'altra versione non si
+//! usa, e il fotogramma si rifà. Restano le ultime cartelle usate, entro [`MAX_CACHE_BYTES`].
 
 use crate::fog::{interior_cells, voxelize};
 use crate::RenderGeometry;
@@ -100,6 +105,11 @@ pub fn scene_without_movers(scene: &Scene) -> Option<Scene> {
 const KEEP_DIRS: usize = 6;
 /// Limite della densità nei file: oltre il render la taglia comunque.
 const RANGE: f32 = 64.0;
+/// Versione del formato dei file: cambiandola i precalcoli vecchi non si usano più.
+const FORMAT_VERSION: u32 = 2;
+/// Spazio massimo dei precalcoli sul disco: oltre si tolgono i più vecchi, e le griglie finali
+/// della cartella in uso non si salvano più (si ricalcolano).
+const MAX_CACHE_BYTES: u64 = 40_000_000_000;
 
 /// Fotogrammi simulati in questo processo (per le prove).
 pub static SIMULATED_FRAMES: AtomicUsize = AtomicUsize::new(0);
@@ -113,22 +123,18 @@ fn root() -> PathBuf {
 
 /// Nodi con una mesh che si muovono con la timeline (con i loro discendenti).
 fn moving_nodes(scene: &Scene) -> Vec<usize> {
-    let mut out = Vec::new();
+    scene.moving_nodes()
+}
+
+/// Impronta del movimento degli oggetti: cambia solo se cambia un'animazione di un oggetto.
+pub fn motion_key(scene: &Scene) -> u64 {
+    let mut h = DefaultHasher::new();
     for tr in &scene.timeline.tracks {
-        let Target::Object(id) = &tr.target else { continue };
-        if !tr.is_animated() || !tr.prop.moves_geometry() || tr.prop == Prop::Visible {
-            continue;
-        }
-        let Some(i) = scene.find(id) else { continue };
-        let mut stack = vec![i];
-        while let Some(n) = stack.pop() {
-            if scene.nodes[n].mesh.is_some() && !out.contains(&n) {
-                out.push(n);
-            }
-            stack.extend(&scene.nodes[n].children);
+        if matches!(tr.target, Target::Object(_)) && tr.is_animated() && tr.prop.moves_geometry() && tr.prop != Prop::Visible {
+            format!("{:?}|{:?}|{:?}|{:?}|{}", tr.target, tr.prop, tr.keys, tr.modifiers, tr.enabled).hash(&mut h);
         }
     }
-    out
+    h.finish()
 }
 
 /// Parametri che decidono tutto il fumo: cambiandoli si riparte da zero. Tempo e fine
@@ -139,6 +145,7 @@ fn params_key(s: &SmokeCloud, fps: f32, start: f32) -> u64 {
     sim.emit_stop = 0.0;
     let (lo, hi) = s.bounds();
     let mut h = DefaultHasher::new();
+    FORMAT_VERSION.hash(&mut h);
     format!("{sim:?}|{lo:?}|{hi:?}|{}|{}|{}|{fps}|{start}", s.rotation_deg, s.seed, s.collisions).hash(&mut h);
     h.finish()
 }
@@ -187,6 +194,7 @@ fn frame_hashes(scene: &Scene, s: &SmokeCloud, movers: &[usize], dt: f32, start:
             }
         }
     }
+    // Stessa regola per il riquadro: un fumo fermo non vede un oggetto che resta fuori.
     let bounds: Vec<Aabb> = movers
         .iter()
         .map(|&i| scene.meshes[scene.nodes[i].mesh.unwrap()].bounds())
@@ -249,15 +257,120 @@ fn write_frame(path: &Path, f: &SmokeField) -> std::io::Result<()> {
             vals.push(q);
         }
     }
-    let mut w = std::io::BufWriter::new(std::fs::File::create(path)?);
-    let head: [u32; 3] = [f.spec.res[0] as u32, f.spec.res[1] as u32, f.spec.res[2] as u32];
-    w.write_all(bytemuck::cast_slice(&head))?;
-    let floats = [f.spec.cell, f.spec.min.x, f.spec.min.y, f.spec.min.z, f.max];
-    w.write_all(bytemuck::cast_slice(&floats))?;
-    w.write_all(bytemuck::cast_slice(&[cells.len() as u32]))?;
-    w.write_all(bytemuck::cast_slice(&cells))?;
-    w.write_all(&vals)?;
-    w.flush()
+    // Prima su un file a parte: un fotogramma con il suo nome è sempre intero.
+    let tmp = path.with_extension("tmp");
+    {
+        let mut w = std::io::BufWriter::new(std::fs::File::create(&tmp)?);
+        let head: [u32; 3] = [f.spec.res[0] as u32, f.spec.res[1] as u32, f.spec.res[2] as u32];
+        w.write_all(bytemuck::cast_slice(&head))?;
+        let floats = [f.spec.cell, f.spec.min.x, f.spec.min.y, f.spec.min.z, f.max];
+        w.write_all(bytemuck::cast_slice(&floats))?;
+        w.write_all(bytemuck::cast_slice(&[cells.len() as u32]))?;
+        w.write_all(bytemuck::cast_slice(&cells))?;
+        w.write_all(&vals)?;
+        w.flush()?;
+    }
+    std::fs::rename(tmp, path)
+}
+
+/// Griglia finale del render: tratti di zeri e tratti di valori, a 16 bit.
+fn write_render(path: &Path, f: &forge_volume::BakedFog) -> std::io::Result<()> {
+    let mut runs: Vec<u32> = Vec::new();
+    let mut vals: Vec<u16> = Vec::new();
+    let mut i = 0;
+    while i < f.data.len() {
+        let z = f.data[i..].iter().take_while(|&&v| v == 0).count();
+        let n = f.data[i + z..].iter().take_while(|&&v| v != 0).count();
+        runs.extend([z as u32, n as u32]);
+        vals.extend_from_slice(&f.data[i + z..i + z + n]);
+        i += z + n;
+    }
+    let tmp = path.with_extension("tmp");
+    {
+        let mut w = std::io::BufWriter::new(std::fs::File::create(&tmp)?);
+        let s = &f.spec;
+        w.write_all(bytemuck::cast_slice(&[s.res[0] as u32, s.res[1] as u32, s.res[2] as u32]))?;
+        w.write_all(bytemuck::cast_slice(&[s.cell, s.min.x, s.min.y, s.min.z, f.unit, f.max_density]))?;
+        w.write_all(bytemuck::cast_slice(&[runs.len() as u32, vals.len() as u32]))?;
+        w.write_all(bytemuck::cast_slice(&runs))?;
+        w.write_all(bytemuck::cast_slice(&vals))?;
+        w.flush()?;
+    }
+    std::fs::rename(tmp, path)
+}
+
+fn read_render(path: &Path, albedo: Vec3, anisotropy: f32) -> Option<forge_volume::BakedFog> {
+    let b = std::fs::read(path).ok()?;
+    let word = |o: usize| b.get(o..o + 4).map(|s| u32::from_le_bytes(s.try_into().unwrap()));
+    let float = |o: usize| word(o).map(f32::from_bits);
+    let res = [word(0)? as usize, word(4)? as usize, word(8)? as usize];
+    let (cell, min) = (float(12)?, Vec3::new(float(16)?, float(20)?, float(24)?));
+    let (unit, max_density) = (float(28)?, float(32)?);
+    let (runs, vals) = (word(36)? as usize, word(40)? as usize);
+    if b.len() != 44 + runs * 4 + vals * 2 || !runs.is_multiple_of(2) {
+        return None;
+    }
+    let spec = GridSpec { min, res, cell };
+    let mut data = vec![0u16; spec.len()];
+    let values = b[44 + runs * 4..].as_chunks::<2>().0;
+    let (mut at, mut next) = (0usize, 0usize);
+    for pair in b[44..44 + runs * 4].as_chunks::<8>().0 {
+        at += u32::from_le_bytes(pair[..4].try_into().unwrap()) as usize;
+        let n = u32::from_le_bytes(pair[4..].try_into().unwrap()) as usize;
+        for (d, v) in data.get_mut(at..at + n)?.iter_mut().zip(values.get(next..next + n)?) {
+            *d = u16::from_le_bytes(*v);
+        }
+        at += n;
+        next += n;
+    }
+    Some(forge_volume::BakedFog::from_data(spec, data, unit, albedo, anisotropy, max_density))
+}
+
+/// Un fotogramma pronto nel precalcolo.
+pub struct BakedFrame {
+    dir: PathBuf,
+    k: usize,
+    hash: u64,
+}
+
+impl BakedFrame {
+    fn render_path(&self, look: u64) -> PathBuf {
+        self.dir.join(format!("r_{:05}_{look:016x}_{:016x}.bin", self.k, self.hash))
+    }
+
+    /// Griglia finale già calcolata per questo aspetto (`look` = tutto ciò che la decide).
+    pub fn load_render(&self, look: u64, albedo: Vec3, anisotropy: f32) -> Option<forge_volume::BakedFog> {
+        read_render(&self.render_path(look), albedo, anisotropy)
+    }
+
+    /// Conserva la griglia finale, se c'è spazio: il prossimo render la legge da qui.
+    pub fn save_render(&self, look: u64, fog: &forge_volume::BakedFog) {
+        if folder_bytes(&root()) >= MAX_CACHE_BYTES {
+            return;
+        }
+        if let Err(e) = write_render(&self.render_path(look), fog) {
+            tracing::warn!("griglia del fumo non salvata: {e}");
+        }
+    }
+
+    /// Griglia del precalcolo di questo fotogramma.
+    pub fn field(&self) -> Option<Arc<SmokeField>> {
+        read_frame(&frame_path(&self.dir, self.k)).map(Arc::new)
+    }
+}
+
+/// Byte occupati dai file di una cartella e delle sue sottocartelle.
+fn folder_bytes(dir: &Path) -> u64 {
+    std::fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| match e.metadata() {
+            Ok(m) if m.is_dir() => folder_bytes(&e.path()),
+            Ok(m) => m.len(),
+            Err(_) => 0,
+        })
+        .sum()
 }
 
 fn read_frame(path: &Path) -> Option<SmokeField> {
@@ -267,6 +380,10 @@ fn read_frame(path: &Path) -> Option<SmokeField> {
     let res = [u32_at(0)? as usize, u32_at(4)? as usize, u32_at(8)? as usize];
     let (cell, min, max) = (f32_at(12)?, Vec3::new(f32_at(16)?, f32_at(20)?, f32_at(24)?), f32_at(28)?);
     let count = u32_at(32)? as usize;
+    // Un file interrotto a metà non è un fotogramma.
+    if b.len() != 36 + count * 5 {
+        return None;
+    }
     let spec = GridSpec { min, res, cell };
     let idx = b.get(36..36 + count * 4)?;
     let vals = b.get(36 + count * 4..36 + count * 5)?;
@@ -368,9 +485,8 @@ fn build_mover(scene: &Scene, node: usize, cell: f32) -> Option<Mover> {
     })
 }
 
-/// Segue la simulazione: oggetti di ogni istante, fotogrammi e stati su file.
-struct Writer {
-    dir: PathBuf,
+/// Gli oggetti di ogni istante sulla griglia della simulazione: li usano il precalcolo e l'anteprima.
+struct MovingSolids {
     spec: GridSpec,
     base: Vec<bool>,
     movers: Vec<Mover>,
@@ -380,12 +496,18 @@ struct Writer {
     air: bool,
     was_moving: bool,
     last: Vec<Mat4>,
+}
+
+/// Segue la simulazione: fotogrammi e stati su file.
+struct Writer {
+    dir: PathBuf,
+    solids: MovingSolids,
     hashes: Vec<u64>,
     every: usize,
     errors: usize,
 }
 
-impl Writer {
+impl MovingSolids {
     fn at(&mut self, time: f32) -> Vec<Mat4> {
         self.timeline.time = self.start + time;
         self.timeline.apply(&mut self.scene);
@@ -397,8 +519,8 @@ impl Writer {
 /// il primo passo vede la stessa velocità del calcolo fatto di fila).
 const VELOCITY_DT: f32 = 1.0 / 240.0;
 
-impl BakeHooks for Writer {
-    fn solid(&mut self, time: f32) -> Option<SolidFrame> {
+impl MovingSolids {
+    fn frame(&mut self, time: f32) -> Option<SolidFrame> {
         if self.movers.is_empty() {
             return None;
         }
@@ -462,6 +584,12 @@ impl BakeHooks for Writer {
             zone: (zl[0] != usize::MAX).then_some((zl, zh)),
         })
     }
+}
+
+impl BakeHooks for Writer {
+    fn solid(&mut self, time: f32) -> Option<SolidFrame> {
+        self.solids.frame(time)
+    }
 
     fn frame(&mut self, k: usize, field: &SmokeField) {
         SIMULATED_FRAMES.fetch_add(1, Ordering::Relaxed);
@@ -486,7 +614,78 @@ impl BakeHooks for Writer {
     }
 }
 
-/// Toglie le cartelle di precalcolo più vecchie.
+/// Fotogrammi dell'anteprima: tempo e densità.
+type PreviewFrames = Vec<(f32, Vec<f32>)>;
+
+/// Anteprima nella viewport: gli stessi oggetti in movimento del precalcolo, sulla sua griglia
+/// grossolana. I fotogrammi restano in memoria.
+struct PreviewSink<'a> {
+    solids: MovingSolids,
+    dt: f32,
+    frames: &'a mut PreviewFrames,
+}
+
+impl BakeHooks for PreviewSink<'_> {
+    fn solid(&mut self, time: f32) -> Option<SolidFrame> {
+        self.solids.frame(time)
+    }
+
+    fn frame(&mut self, k: usize, field: &SmokeField) {
+        self.frames.push((k as f32 * self.dt, field.density.clone()));
+    }
+
+    fn wants_state(&self, _: usize) -> bool {
+        false
+    }
+
+    fn state(&mut self, _: usize, _: SimState) {}
+}
+
+/// Simula l'anteprima con gli oggetti animati, se ce ne sono. `base` = celle degli oggetti fermi.
+/// None: niente oggetti animati, basta la simulazione semplice; Some(None): annullata.
+pub(crate) fn preview_with_movers(
+    scene: &Scene,
+    s: &SmokeCloud,
+    params: &forge_volume::smoke_sim::SmokeSimParams,
+    base: Option<&[bool]>,
+    frames: usize,
+    cancelled: &dyn Fn() -> bool,
+) -> Option<Option<PreviewFrames>> {
+    let movers = if s.collisions { moving_nodes(scene) } else { Vec::new() };
+    if movers.is_empty() {
+        return None;
+    }
+    let spec = params.spec;
+    let built: Vec<Mover> = movers.iter().filter_map(|&m| build_mover(scene, m, spec.cell)).collect();
+    let mut out = Vec::with_capacity(frames);
+    let dt = s.sim.time / frames.max(1) as f32;
+    let mut sink = PreviewSink {
+        solids: MovingSolids {
+            spec,
+            base: base.map(<[bool]>::to_vec).unwrap_or_else(|| vec![false; spec.len()]),
+            movers: built,
+            scene: scene.clone(),
+            timeline: fresh_timeline(scene),
+            start: scene.timeline.start_of(&Target::Smoke(s.n)),
+            air: s.sim.air_push,
+            was_moving: false,
+            last: Vec::new(),
+        },
+        dt,
+        frames: &mut out,
+    };
+    let run = BakeRun {
+        frame_dt: dt,
+        first: 0,
+        last: frames,
+        state: None,
+        hooks: &mut sink,
+    };
+    let done = simulate_bake(params, base, run, &|_| {}, cancelled);
+    Some(done.then_some(out))
+}
+
+/// Toglie le cartelle di precalcolo più vecchie: ne restano poche e, in tutto, entro il limite.
 fn clean_old(current: &Path) {
     let Ok(rd) = std::fs::read_dir(root()) else { return };
     let mut dirs: Vec<(std::time::SystemTime, PathBuf)> = rd
@@ -495,8 +694,14 @@ fn clean_old(current: &Path) {
         .filter_map(|e| Some((e.metadata().ok()?.modified().ok()?, e.path())))
         .collect();
     dirs.sort_by_key(|d| std::cmp::Reverse(d.0));
-    for (_, p) in dirs.into_iter().skip(KEEP_DIRS.saturating_sub(1)) {
-        let _ = std::fs::remove_dir_all(p);
+    let mut total = folder_bytes(current);
+    for (k, (_, p)) in dirs.into_iter().enumerate() {
+        let size = folder_bytes(&p);
+        total += size;
+        if k + 1 >= KEEP_DIRS || total > MAX_CACHE_BYTES {
+            let _ = std::fs::remove_dir_all(p);
+            total -= size;
+        }
     }
 }
 
@@ -518,6 +723,11 @@ fn best_state(dir: &Path, limit: usize) -> usize {
 /// Fumo all'istante della nube, dal precalcolo (fatto qui se manca, o ripreso dal primo fotogramma
 /// cambiato). `p0..p1` è la parte della barra. None se il calcolo è stato annullato.
 pub fn frame_field(scene: &Scene, s: &SmokeCloud, geo: &RenderGeometry, p0: f32, p1: f32) -> Option<Arc<SmokeField>> {
+    frame_ref(scene, s, geo, p0, p1)?.field()
+}
+
+/// Come [`frame_field`], ma senza leggere la griglia: magari serve solo quella finale, già pronta.
+pub fn frame_ref(scene: &Scene, s: &SmokeCloud, geo: &RenderGeometry, p0: f32, p1: f32) -> Option<BakedFrame> {
     let tl = &scene.timeline;
     let fps = tl.fps.clamp(1.0, 240.0);
     let dt = 1.0 / fps;
@@ -534,7 +744,19 @@ pub fn frame_field(scene: &Scene, s: &SmokeCloud, geo: &RenderGeometry, p0: f32,
     if valid < k.max(n) && !bake(scene, s, geo, &dir, &movers, &hashes, valid, dt, start, p0, p1) {
         return None;
     }
-    read_frame(&frame_path(&dir, k)).map(Arc::new)
+    // Fotogramma rovinato o mancante: si riparte da zero, una volta sola.
+    if read_frame(&frame_path(&dir, k)).is_none() {
+        tracing::warn!("fumo «{}»: precalcolo non leggibile, lo rifaccio", s.name);
+        let _ = std::fs::remove_dir_all(&dir);
+        if !bake(scene, s, geo, &dir, &movers, &hashes, 0, dt, start, p0, p1) {
+            return None;
+        }
+    }
+    Some(BakedFrame {
+        dir,
+        k,
+        hash: hashes[k - 1],
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -591,15 +813,17 @@ fn bake(
     let built: Vec<Mover> = movers.iter().filter_map(|&m| build_mover(scene, m, cell)).collect();
     let mut w = Writer {
         dir: dir.to_path_buf(),
-        spec,
-        base: base.clone().unwrap_or_else(|| vec![false; spec.len()]),
-        movers: built,
-        scene: scene.clone(),
-        timeline: fresh_timeline(scene),
-        start,
-        air: s.sim.air_push,
-        was_moving: false,
-        last: Vec::new(),
+        solids: MovingSolids {
+            spec,
+            base: base.clone().unwrap_or_else(|| vec![false; spec.len()]),
+            movers: built,
+            scene: scene.clone(),
+            timeline: fresh_timeline(scene),
+            start,
+            air: s.sim.air_push,
+            was_moving: false,
+            last: Vec::new(),
+        },
         hashes: hashes.to_vec(),
         every: ((1.0 / dt).round() as usize).max(1),
         errors: 0,
@@ -724,7 +948,69 @@ mod tests {
         let again = done() - a;
         assert!(again > 0 && again <= 15 - 10, "solo dall'ultimo stato prima dell'ingresso: {again}");
         assert_eq!(early(5), before, "il prima resta identico");
+
+        // Un fotogramma rovinato non si usa: il calcolo si rifà e il fumo torna.
+        let folder = dir.join(format!("{:016x}", params_key(&s, 10.0, 0.0)));
+        let last = frame_path(&folder, 15);
+        let bytes = std::fs::read(&last).unwrap();
+        std::fs::write(&last, &bytes[..bytes.len() / 2]).unwrap();
+        assert!(read_frame(&last).is_none());
+        let a = done();
+        let fixed = frame_field(&sc, &s, &geo, 0.0, 1.0).expect("fumo");
+        assert_eq!(done() - a, 15, "si riparte da zero");
+        assert!(fixed.density.iter().any(|&d| d > 0.0));
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// La griglia finale riletta dal file è identica a quella calcolata.
+    #[test]
+    fn the_final_grid_survives_a_file() {
+        let fog = forge_volume::BakedFog::from_fn(Vec3::ZERO, Vec3::ONE, 16, Vec3::splat(0.9), 0.2, |p| {
+            if p.x > 0.5 {
+                p.y * 3.0
+            } else {
+                0.0
+            }
+        });
+        let p = std::env::temp_dir().join(format!("forge_r_{}.bin", std::process::id()));
+        write_render(&p, &fog).unwrap();
+        let g = read_render(&p, fog.albedo, fog.anisotropy).expect("griglia");
+        assert_eq!((g.spec, &g.data, g.unit), (fog.spec, &fog.data, fog.unit));
+        assert_eq!(g.macro_majorant, fog.macro_majorant);
+        let bytes = std::fs::read(&p).unwrap();
+        std::fs::write(&p, &bytes[..bytes.len() - 2]).unwrap();
+        assert!(read_render(&p, fog.albedo, fog.anisotropy).is_none(), "file interrotto");
+        let _ = std::fs::remove_file(&p);
+    }
+
+    /// Le particelle dell'anteprima risentono dell'oggetto animato che attraversa il fumo.
+    #[test]
+    fn the_preview_feels_moving_objects() {
+        let (mut sc, mut s, target) = scene();
+        s.collisions = true;
+        s.sim.source_radius = 0.1;
+        let Target::Object(id) = &target else { unreachable!() };
+        let node = sc.find(id).unwrap();
+        // L'oggetto passa di traverso appena sopra la sorgente.
+        let b = sc.bounds_of(node);
+        let above = s.sim_source() + Vec3::Y * 0.35 - b.center();
+        let mut tl = std::mem::take(&mut sc.timeline);
+        tl.add_element(&sc, target.clone());
+        let i = tl.track(&target, Prop::PosX).unwrap();
+        let start = tl.tracks[i].base;
+        tl.tracks[i].keys = vec![key(0.0, start + above.x - 1.0), key(1.5, start + above.x + 1.0)];
+        let j = tl.track(&target, Prop::PosY).unwrap();
+        let y = tl.tracks[j].base + above.y;
+        tl.tracks[j].keys = vec![key(0.0, y), key(1.5, y)];
+        sc.timeline = tl;
+        let still = RenderGeometry::build(&scene_without_movers(&sc).unwrap());
+        let free = crate::smoke::smoke_preview(&s, None, &still, &|| false).expect("senza oggetto");
+        let felt = crate::smoke::smoke_preview(&s, Some(&sc), &still, &|| false).expect("con oggetto");
+        assert_eq!(free.frames.len(), felt.frames.len());
+        let centre = |p: &Vec<(Vec3, f32)>| p.iter().map(|q| q.0).sum::<Vec3>() / p.len().max(1) as f32;
+        let (a, b) = (&free.frames.last().unwrap().1, &felt.frames.last().unwrap().1);
+        let shift = (centre(a) - centre(b)).length();
+        assert!(shift > 0.01, "il fumo non si è accorto dell'oggetto: {shift}");
     }
 
     #[test]

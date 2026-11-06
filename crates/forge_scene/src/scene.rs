@@ -157,6 +157,10 @@ pub struct Scene {
     pub haze: crate::fog::Haze,
     /// Polvere in sospensione nella foschia.
     pub haze_dust: crate::effects::Dust,
+    /// Lucciole: calcolate dal tempo, senza nodi nella scena.
+    pub fireflies: crate::fireflies::Fireflies,
+    /// Istante a cui sono calcolati i granelli della polvere (non si salva: lo decide il cursore).
+    pub dust_time: f32,
     /// Adesivi (decal) applicati sugli oggetti.
     pub decals: Vec<crate::effects::Decal>,
     /// Nubi di fumo volumetrico.
@@ -184,6 +188,8 @@ impl Default for Scene {
             added: Vec::new(),
             haze: Default::default(),
             haze_dust: Default::default(),
+            fireflies: Default::default(),
+            dust_time: 0.0,
             decals: Vec::new(),
             smokes: Vec::new(),
             timeline: Default::default(),

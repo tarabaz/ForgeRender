@@ -18,6 +18,13 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
+### What's new in 0.47.0
+
+- **Fireflies that really light the scene:** a flock with its own on/off cycle, palette and halo, with an Enchanted forest preset. Lit fireflies are real lights, stopped by objects.
+- **Dust that floats:** specks drift along the timeline, react to moving objects and smoke currents, and stay consistent between Play, frame jumps and render.
+- **Smoke preview that feels animated objects,** and a final smoke grid saved on file, so rendering an animation again reuses it.
+- **A dedicated STEP window:** tessellation settings, 3D preview of the result and import only when you confirm.
+
 ### What's new in 0.46.0
 
 - **Choose how the video is made:** MP4, MOV, MKV or AVI, H.264, H.265, ProRes, FFV1 or uncompressed, with presets from small file to lossless and the actual parameters reported when it ends.
@@ -210,10 +217,20 @@ Fire (combustion, emission, flames lighting the scene) is a separate, later step
 
 Real specks (a few millimetres, up to 150,000) scattered in the air, as their own effect. They are invisible except inside the beams of spots and sun: there they sparkle, like the dust in the rays coming through an attic window, while bulbs, panels, environment and bounce light do not light them. They are marked in the denoiser guides, so the denoiser keeps them instead of removing them as noise. The specks live in a box that you select in the viewport and move or resize with the gizmo; by default it covers the objects up to the spots, so the specks fill the whole beam down to the lit surface. Amount (down to a few isolated specks), size (up to 18 mm), brightness and colour are adjustable, and the specks can cast shadows: small dark shapes in the beams and on the lit surface.
 
+- **Motion over time:** specks drift slowly along the timeline even with nothing animated, always from the same formula, so Play, a jump to a frame and the render show the same specks. *Air influence* sets how much moving objects (which push nearby specks and keep them out) and smoke currents shift them. It is a simplified one-way model: objects count as spheres, the smoke as a rising current estimated from its settings rather than its simulated velocity, and dust never acts on smoke.
 - **Size variation:** how much the size of each speck differs at random from the set size, from all the same to tiny-to-triple.
 - **Two colours and opacity:** a second colour with the share of specks that take it (for example gold and white), and an opacity that makes them semi-transparent: they scatter less light and, if they cast shadows, block only part of it.
 - **Glowing specks:** with **+** you choose a colour: part of the specks lights up in that colour, like fireflies or sparks, and is visible also outside the spot beams (it is ordinary geometry that emits light and lights what is around it). Each colour has its intensity and its share of specks; low intensities keep the colour, high ones turn white like a bulb seen straight on. **Halo** and **halo strength** add a soft glow around each glowing speck the camera sees, like fireflies: a bright core as wide as the speck and a faint tail three times wider, fading to nothing, of the speck's colour. It is added to the finished image (before the tilt-shift), the same on CPU and GPU; a speck hidden by an object has no halo, and the viewport does not show it.
 - **Grains or flakes (fairy dust):** *Grains* are round and scatter the light evenly. *Flakes* are flat and face random directions: they reflect like tiny mirrors, so only those turned the right way between the light and the camera sparkle while the others stay dark, like glitter or fairy dust. **Sparkle** sets how much light the flakes reflect like a mirror, **reflection roughness** how small and intense (low) or wide and soft (high) the sparkles are. The same on CPU and GPU.
+
+### Fireflies / Enchanted forest
+
+A flock that flies through a volume, mostly horizontally, and lights up at intervals, each firefly on its own: off, glow in, on, glow out. When lit they are **real lights of the scene**: surfaces take their colour, objects stop their light, on CPU and GPU. Above *Maximum lights* nearby fireflies merge into one light with the same total power, which keeps noise under control at the price of less precise shadows.
+
+- **Flight and cycle:** quantity, volume with rotation, speed, vertical share, smoothness, dispersion, and minimum and maximum durations of each phase.
+- **Colours:** a palette with percentages, each firefly keeping its colour, and a tonal variation that stays in the same family.
+- **Light and look apart:** *Light on the scene* for what objects receive, body and halo for the visible points. With the light at 0 they are points only.
+- Everything comes from time and seed, so Play, frame jumps, viewport and render agree. The *Enchanted forest* preset fills the view with slow, warm fireflies.
 
 ### 8. Decals — labels and logos on any surface
 
@@ -283,6 +300,8 @@ At the top of the Render tab you choose how the image is drawn; hovering over ea
 The styles are applied at the first surface seen by the camera, so glass and mirrors still reflect and refract; they work on CPU and GPU, also in the Spectral render.
 
 ### 15. STEP models: converted once, then reopened instantly
+
+A single STEP opens its own window: the file on the left, tessellation in the middle, and a 3D preview of the result on the right, shaded or wireframe, to rotate and zoom, with triangles, vertices, size and parts. Draft, Balanced, High quality or Custom set the converter's real linear and angular deviation; you can convert again as often as you like and the model enters the scene only with Import. The original CAD geometry is not shown because it stays in the separate converter process.
 
 A STEP file is converted to meshes once. The result is kept in a conversion cache and saved next to the project (`modelli-convertiti/`) and inside `.frpack` packages, so reopening a project does not convert the STEP again. On the optical bench demo, opening went from 27 s to 0.2 s. When the STEP changes (or the parts of a multi-file assembly change, or the quality changes), it is converted again. Packages now also include the part files that a multi-file STEP assembly refers to.
 
@@ -397,6 +416,9 @@ A professional timeline, always available: it sits at the bottom with **Timeline
   exact drop to floor, Blender-style axis navigator, component tree, persistent material
   assignment by stable id.
 - Start / pause / resume / stop / automatic restart when the scene changes, PNG export.
+- **Fireflies / Enchanted forest**: a flock with its own cycle and palette whose lit fireflies are real scene lights, with occlusion, on CPU and GPU.
+- **Moving floating dust**: drift over time, reaction to moving objects and smoke currents, deterministic.
+- **STEP import window**: tessellation settings, 3D preview, repeatable conversion, stop.
 - **Video export**: MP4, MOV, MKV and AVI with H.264, H.265, ProRes, FFV1 or uncompressed, presets, size estimate and the real parameters at the end.
 - **Configurable status bar**: up to 9 counters out of 15 (viewport FPS, frames, time remaining, GPU, VRAM, RAM and more), Backend and processor fixed on the right.
 - **Light targets in the viewport**: Spot and Directional aimed by dragging their target, with undo.

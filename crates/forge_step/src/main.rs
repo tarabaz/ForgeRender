@@ -2,6 +2,7 @@
 //!
 //! ```text
 //! forgerender-step <input.step> <output.frmesh> [--quality bassa|media|alta]
+//!                   [--deflection <relativa> --angular <radianti>]
 //! ```
 //!
 //! Gira come processo separato dall'applicazione: un crash di Open CASCADE su un
@@ -131,6 +132,14 @@ fn run() -> c_int {
         "alta" => (0.0015, 0.15),
         _ => (0.004, 0.3),
     };
+    let number = |flag: &str| {
+        args.iter()
+            .position(|a| a == flag)
+            .and_then(|i| args.get(i + 1))
+            .and_then(|v| v.parse::<f64>().ok())
+            .filter(|v| *v > 0.0)
+    };
+    let (lin, ang) = (number("--deflection").unwrap_or(lin), number("--angular").unwrap_or(ang));
     let Ok(path_c) = CString::new(input.to_string_lossy().as_bytes()) else {
         eprintln!("percorso non valido");
         return 2;

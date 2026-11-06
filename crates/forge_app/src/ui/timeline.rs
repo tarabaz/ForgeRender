@@ -30,6 +30,8 @@ const LEFT: f32 = 400.0;
 
 /// Stato del pannello e della riproduzione (non salvato nel progetto).
 pub struct TimelineUi {
+    /// Ultimo istante delle lucciole mandato al render.
+    fireflies_time: f32,
     pub playing: bool,
     last_tick: Option<Instant>,
     pub loop_play: bool,
@@ -79,6 +81,7 @@ impl Default for TimelineUi {
             work_carry: 0.0,
             drag_start: None,
             seen_effects: 0,
+            fireflies_time: 0.0,
             run: None,
             play_samples: 20,
             render_play: None,
@@ -445,6 +448,8 @@ pub fn apply(app: &mut ForgeApp) {
     let mut tl = std::mem::take(&mut app.scene.timeline);
     let a = tl.apply(&mut app.scene);
     app.scene.timeline = tl;
+    effects_follow(app);
+    app.unsaved = unsaved;
     if !a.any() {
         return;
     }
@@ -463,6 +468,37 @@ pub fn apply(app: &mut ForgeApp) {
         app.camera_changed();
     }
     app.unsaved = unsaved;
+}
+
+/// Gli effetti che dipendono solo dal tempo seguono il cursore. La polvere è geometria: nella
+/// viewport si aggiorna da dieci volte al secondo di timeline a poco più di una, in proporzione ai
+/// granelli, per non rifare tutto a ogni fotogramma (il moto è lento); nel render ogni fotogramma è
+/// esatto.
+fn effects_follow(app: &mut ForgeApp) {
+    let t = app.scene.timeline.time;
+    // Le lucciole non hanno geometria: nel render cambiano luci e alone, nella viewport i punti.
+    if app.scene.fireflies.enabled && t != app.timeline_ui.fireflies_time {
+        app.timeline_ui.fireflies_time = t;
+        if app.timeline_ui.run.is_some() || app.view == crate::app::View::Render {
+            app.shading_changed();
+        }
+    }
+    let d = &app.scene.haze_dust;
+    if !d.enabled || (d.motion <= 0.0 && d.air_response <= 0.0) {
+        return;
+    }
+    let exact = app.timeline_ui.run.is_some() || app.view == crate::app::View::Render;
+    let grains = d.region.map_or(forge_scene::effects::DUST_MAX as f32, |(_, s)| {
+        (s.x * s.y * s.z * d.per_m3).min(forge_scene::effects::DUST_MAX as f32)
+    });
+    let step = if exact { 0.0 } else { (grains / 20_000.0).clamp(1.0, 7.5) * 0.1 };
+    if t == app.scene.dust_time || (t - app.scene.dust_time).abs() < step {
+        return;
+    }
+    app.scene.dust_time = t;
+    if app.scene.sync_effects() {
+        app.geometry_changed();
+    }
 }
 
 /// Il pannello: dentro la parte bassa o in una finestra a parte.

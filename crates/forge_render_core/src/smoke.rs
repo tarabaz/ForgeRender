@@ -373,7 +373,14 @@ const PREVIEW_CELLS: f32 = 36_000.0;
 const PREVIEW_POINTS: usize = 5000;
 
 /// Calcola l'anteprima (None se annullata o se il fumo non è simulato).
-pub fn smoke_preview(s: &SmokeCloud, geo: &RenderGeometry, cancelled: &dyn Fn() -> bool) -> Option<SmokePreview> {
+/// Con `scene` e oggetti animati il fumo li sente come nel render: bordi in movimento e aria
+/// spostata (`geo` è allora la geometria senza di loro).
+pub fn smoke_preview(
+    s: &SmokeCloud,
+    scene: Option<&forge_scene::Scene>,
+    geo: &RenderGeometry,
+    cancelled: &dyn Fn() -> bool,
+) -> Option<SmokePreview> {
     let s = s.sanitized();
     if s.mode != SmokeMode::Simulated {
         return None;
@@ -414,14 +421,21 @@ pub fn smoke_preview(s: &SmokeCloud, geo: &RenderGeometry, cancelled: &dyn Fn() 
         patchiness: 0.0,
         emit_stop: m.emit_stop,
     };
-    let mut raw: Vec<(f32, Vec<f32>)> = Vec::new();
-    simulate_smoke_frames(
-        &params,
-        solid.as_deref(),
-        m.time / PREVIEW_FRAMES as f32,
-        &mut |t, rho| raw.push((t, rho.to_vec())),
-        cancelled,
-    )?;
+    let moving = scene.and_then(|sc| crate::smoke_bake::preview_with_movers(sc, &s, &params, solid.as_deref(), PREVIEW_FRAMES, cancelled));
+    let raw: Vec<(f32, Vec<f32>)> = match moving {
+        Some(frames) => frames?,
+        None => {
+            let mut raw = Vec::new();
+            simulate_smoke_frames(
+                &params,
+                solid.as_deref(),
+                m.time / PREVIEW_FRAMES as f32,
+                &mut |t, rho| raw.push((t, rho.to_vec())),
+                cancelled,
+            )?;
+            raw
+        }
+    };
     // Riferimento comune a tutti i fotogrammi: il 90° percentile dell'ultimo (come il render).
     let reference = raw
         .last()
@@ -495,10 +509,21 @@ fn bake_one(scene: &Scene, s: &SmokeCloud, geo: &RenderGeometry) -> Option<Arc<B
     progress::update(0.0);
     // Simulazione (se richiesta): la prima parte della barra.
     let simulated = s.mode == SmokeMode::Simulated;
-    let field = if simulated {
-        Some(crate::smoke_bake::frame_field(scene, s, geo, 0.0, 0.6)?)
+    let frame = if simulated {
+        Some(crate::smoke_bake::frame_ref(scene, s, geo, 0.0, 0.6)?)
     } else {
         None
+    };
+    // La griglia finale di questo fotogramma può essere già pronta: si legge e basta.
+    let albedo = Vec3::from(s.color).clamp(Vec3::ZERO, Vec3::splat(0.999));
+    let look = look_key(s, longest);
+    if let Some(fog) = frame.as_ref().and_then(|f| f.load_render(look, albedo, s.anisotropy)) {
+        tracing::debug!("fumo «{}»: griglia finale letta dal precalcolo", s.name);
+        return Some(remember(k, fog));
+    }
+    let field = match &frame {
+        Some(f) => Some(f.field()?),
+        None => None,
     };
     let p0 = if simulated { 0.6 } else { 0.0 };
     let inside = if s.collisions && !geo.accel.is_empty() {
@@ -513,7 +538,6 @@ fn bake_one(scene: &Scene, s: &SmokeCloud, geo: &RenderGeometry) -> Option<Arc<B
     let done = std::sync::atomic::AtomicUsize::new(0);
     let n = spec.len().max(1);
     let sc = s.clone();
-    let albedo = Vec3::from(s.color).clamp(Vec3::ZERO, Vec3::splat(0.999));
     let fog = BakedFog::from_fn(lo, hi, longest, albedo, s.anisotropy, |p| {
         let i = done.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         if i.is_multiple_of(32_768) {
@@ -532,13 +556,37 @@ fn bake_one(scene: &Scene, s: &SmokeCloud, geo: &RenderGeometry) -> Option<Arc<B
         return None;
     }
     tracing::info!("fumo «{}»: {:?} celle in {:.0} ms", s.name, fog.spec.res, fog.bake_ms);
+    if let Some(f) = &frame {
+        f.save_render(look, &fog);
+    }
+    Some(remember(k, fog))
+}
+
+fn remember(k: String, fog: BakedFog) -> Arc<BakedFog> {
     let b = Arc::new(fog);
     let mut c = cache().lock().unwrap();
     if c.len() > 16 {
         c.clear();
     }
     c.insert(k, b.clone());
-    Some(b)
+    b
+}
+
+/// Impronta di quello che decide la griglia finale oltre al fotogramma simulato: la sua risoluzione
+/// e l'aspetto del fumo (l'istante no, sta già nel fotogramma).
+fn look_key(s: &SmokeCloud, longest: usize) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut k = SmokeCloud {
+        name: String::new(),
+        n: 0,
+        preview_only: false,
+        ..s.clone()
+    };
+    k.sim.time = 0.0;
+    k.sim.emit_stop = 0.0;
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    format!("{k:?}|{longest}").hash(&mut h);
+    h.finish()
 }
 
 /// Calcola le nubi accese, una alla volta sulla barra degli effetti: `first` è il numero della
@@ -571,7 +619,7 @@ mod tests {
         s.center = Vec3::new(0.0, s.size.y * 0.5, 0.0);
         let geo = RenderGeometry::build(&Scene::default());
         let t0 = std::time::Instant::now();
-        let p = smoke_preview(&s, &geo, &|| false).expect("anteprima");
+        let p = smoke_preview(&s, None, &geo, &|| false).expect("anteprima");
         let ms = t0.elapsed().as_millis();
         assert!(p.frames.len() >= PREVIEW_FRAMES / 2, "{} fotogrammi", p.frames.len());
         let top = |pts: &[(Vec3, f32)]| pts.iter().map(|q| q.0.y).fold(f32::MIN, f32::max);

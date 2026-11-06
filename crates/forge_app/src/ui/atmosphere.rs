@@ -61,6 +61,18 @@ pub fn add_buttons(app: &mut ForgeApp, ui: &mut egui::Ui) {
         dust_changed(app);
     }
     if ui
+        .add_enabled(!app.scene.fireflies.enabled, egui::Button::new(tr("Lucciole")))
+        .on_hover_text(tr(
+            "Uno stormo che vola e si accende a intervalli: ogni lucciola accesa illumina davvero la scena",
+        ))
+        .on_disabled_hover_text(tr("Già nella scena: le impostazioni sono qui sotto"))
+        .clicked()
+    {
+        let (center, size) = crate::ui::fireflies::framed_volume(app);
+        app.scene.fireflies = forge_scene::Fireflies::enchanted_forest(center, size);
+        app.shading_changed();
+    }
+    if ui
         .button(tr("Adesivo (decal)"))
         .on_hover_text(tr(
             "Un'immagine (logo, etichetta, PNG con trasparenza) applicata sull'oggetto selezionato, nel \
@@ -137,6 +149,10 @@ pub fn sections(app: &mut ForgeApp, ui: &mut egui::Ui) {
     }
     if app.scene.haze_dust.enabled {
         dust(app, ui);
+        ui.separator();
+    }
+    if app.scene.fireflies.enabled {
+        crate::ui::fireflies::panel(app, ui);
         ui.separator();
     }
     if !app.scene.decals.is_empty() {
@@ -531,6 +547,18 @@ fn dust(app: &mut ForgeApp, ui: &mut egui::Ui) {
                         "Quanto la dimensione dei granelli si scosta a caso da quella impostata: 0 = tutti uguali, 50 % = da \
                          metà al doppio, 100 % = da piccolissimi al triplo",
                     ))
+                    .changed();
+                ui.end_row();
+                ui.label(tr("Moto nel tempo"));
+                changed |= ui
+                    .add(egui::Slider::new(&mut dust.motion, 0.0..=3.0).max_decimals(2))
+                    .on_hover_text(tr("Quanto i granelli fluttuano lungo la timeline: 0 = fermi, 1 = pulviscolo naturale"))
+                    .changed();
+                ui.end_row();
+                ui.label(tr("Influenza dell'aria"));
+                changed |= ui
+                    .add(egui::Slider::new(&mut dust.air_response, 0.0..=3.0).max_decimals(2))
+                    .on_hover_text(tr("Quanto oggetti in movimento e correnti del fumo spostano i granelli. La polvere non agisce sul fumo"))
                     .changed();
                 ui.end_row();
                 ui.label(tr("Opacità"));

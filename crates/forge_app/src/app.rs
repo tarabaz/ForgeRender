@@ -169,6 +169,8 @@ pub struct StartupOptions {
     pub camera_test: Option<String>,
     /// Finestra "Viste e turntable" aperta all'avvio (`--sequenze`).
     pub sequences_window: bool,
+    /// STEP da aprire nella sua finestra (prove).
+    pub step_import: Option<PathBuf>,
     /// Prova automatica: sequenza salvata in questa cartella, poi il programma si chiude
     /// (`--sequenza <cartella>`, con `--sequenza-viste`, `--sequenza-passo`, `--sequenza-campioni`,
     /// `--sequenza-passaggi`).
@@ -246,6 +248,7 @@ pub struct ForgeApp {
     /// Camera di rendering selezionata come componente (il gizmo la sposta e la fa orbitare).
     pub selected_camera: Option<usize>,
     /// Il gizmo della camera selezionata sposta il bersaglio invece della camera.
+    pub step_import: crate::ui::step_import::StepImport,
     /// Finestra "Impostazioni video" aperta.
     pub video_open: bool,
     /// File del video scelto a mano (`None` = nella cartella dei fotogrammi).
@@ -456,6 +459,7 @@ impl ForgeApp {
             selected_smoke: None,
             selected_dust: false,
             selected_camera: None,
+            step_import: Default::default(),
             video_open: false,
             video_out: None,
             viewport_fps: Default::default(),
@@ -667,6 +671,10 @@ impl ForgeApp {
             crate::video::caps();
         });
         app.sequence.open = startup.sequences_window;
+        if let Some(p) = &startup.step_import {
+            let opts = app.import_opts.clone();
+            app.step_import.open_file(p, &opts);
+        }
         if startup.prism_demo {
             app.open_demo(0);
         }
@@ -775,6 +783,10 @@ impl ForgeApp {
 
     /// Oggetti spostati, ruotati o scalati (gizmo, timeline): il render rifà la geometria, la
     /// viewport aggiorna solo le matrici sulla GPU.
+    pub fn structure_rev(&self) -> u64 {
+        self.structure_rev
+    }
+
     pub fn transforms_changed(&mut self) {
         self.geometry_rev += 1;
         self.transform_rev += 1;
@@ -2198,6 +2210,13 @@ impl ForgeApp {
 
     /// Mostra la finestra delle opzioni di importazione per i file indicati.
     pub fn ask_import(&mut self, files: Vec<PathBuf>) {
+        // Un solo STEP: la sua finestra, con tassellazione e anteprima.
+        if let [one] = files.as_slice() {
+            if Self::is_cad_format(one) {
+                self.step_import.open_file(one, &self.import_opts);
+                return;
+            }
+        }
         if !files.is_empty() {
             self.import_queue.extend(files);
             self.show_import_options = true;

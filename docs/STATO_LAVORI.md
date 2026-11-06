@@ -824,3 +824,9 @@ Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
 
 - Prima parte di `reports/chatgpt/2026-11-06_modifiche.md`: `forge_app/src/video.rs` riscritto (`VideoSettings`, `Caps`, `Job`, `Report`, `Progress`; strade: Media Foundation, AVI nostro con OpenDML, ffmpeg), finestra `ui/video_settings.rs`, contatori in `ui/status.rs` (`StatusItem` in `prefs.rs`, 9 + 2 fissi, `FpsMeter`), bersaglio luci (`light_target_handle`, `gizmo::has_target_handle`), voce `lights` in `UndoEntry`, barra in `ui/quickbar.rs` (`tool_button` unico, altezza 28).
 - Da sapere: il "compilatore Intel" citato nella richiesta non esiste nel codice: sotto Backend c'è il nome del processore, ed è quello che resta fisso. Temperatura e potenza GPU non ci sono: la telemetria non le legge.
+
+## 0.47.0 — 06/11/2026 (Claude)
+
+- Resto di `2026-11-06_modifiche.md`. Lucciole: `forge_scene/src/fireflies.rs` (funzioni di tempo e seme, `lights` con raggruppamento a griglia), iniettate in `RenderScene::compile`, punti in `firefly_points`, pannello `ui/fireflies.rs`. Polvere: `Dust::build_at`, `dust_drift`, `Scene::dust_air`, `Scene::dust_time`, `effects_follow` in `ui/timeline.rs`. Fumo: `MovingSolids` condiviso tra precalcolo e anteprima, `preview_with_movers`, `BakedFrame`, `r_*.bin`, `FORMAT_VERSION`, `MAX_CACHE_BYTES`. STEP: `ui/step_import.rs`, `convert_cancellable`, `ImportOptions::step_custom`, `--deflection` e `--angular` in `forgerender-step`.
+- Da sapere: `Scene::moving_nodes` è ora in forge_scene. La griglia fine delle particelle era già nel precalcolo: mancava la griglia finale del render.
+- Limiti: la polvere nella viewport si aggiorna a passi (0,1–0,75 s di timeline secondo i granelli); il fumo la sposta con una corrente stimata, non con il campo simulato; l'anteprima del fumo resta in memoria, non legge il precalcolo fine; con oggetti animati la sua chiave non vede lo spostamento a mano di un oggetto fermo.

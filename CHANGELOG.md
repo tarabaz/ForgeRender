@@ -13,6 +13,17 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.47.0 — 6 nov 2026
+
+Il resto di `reports/chatgpt/2026-11-06_modifiche.md`.
+
+- **Lucciole / Bosco incantato:** un effetto nuovo con uno stormo che vola soprattutto in orizzontale e si accende a intervalli, ogni lucciola per conto suo. Le lucciole accese sono luci vere della scena, fermate dagli oggetti, su CPU e GPU; oltre il massimo scelto quelle vicine si uniscono in una luce con la stessa potenza. Corpo e alone si regolano a parte dalla luce sulla scena. Palette con percentuali, variazione tonale nella stessa famiglia di colore, ciclo completo di accensione e spegnimento, volume con rotazione. Tutto si calcola da tempo e seme: Play, salto a un fotogramma, viewport e render coincidono.
+- **La polvere in sospensione si muove:** i granelli fluttuano piano lungo la timeline anche senza niente di animato, come funzione continua del tempo: niente tremolii, e il salto a un fotogramma dà gli stessi granelli della riproduzione. Gli oggetti in movimento spingono la polvere vicina e la tengono fuori, le correnti del fumo la sollevano, e la polvere non agisce mai sul fumo. Comandi nuovi: Moto nel tempo e Influenza dell'aria.
+- **L'anteprima del fumo sente gli oggetti animati:** le sue particelle li ignoravano perché l'anteprima simulava con gli oggetti fermi all'istante del cursore; ora usa gli stessi solidi in movimento del precalcolo.
+- **Griglia finale del fumo su file:** una volta calcolata, la griglia alla risoluzione del render di ogni fotogramma viene salvata e riletta: rifare il render di un'animazione non la ricostruisce né la ricampiona.
+- **Precalcolo del fumo più solido:** i file hanno una versione del formato e una lunghezza controllata, un fotogramma interrotto o rovinato si rifà invece di essere usato, la scrittura è atomica e la cartella resta sotto i 40 GB.
+- **Finestra di importazione STEP:** tre colonne per il file, la tassellazione e un'anteprima 3D. Bozza, Bilanciata, Alta qualità o Personalizzata corrispondono alle deviazioni lineare e angolare vere del convertitore; si può riconvertire senza riaprire il file, fermare una conversione, ruotare e ingrandire il risultato ombreggiato o in fil di ferro, leggere triangoli, vertici, dimensioni e pezzi, e importare solo quando va bene. Più file insieme tengono la finestra di prima.
+
 ## 0.46.0 — 6 nov 2026
 
 Da `reports/chatgpt/2026-11-06_modifiche.md`.

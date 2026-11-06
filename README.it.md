@@ -18,6 +18,13 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
+### Novità della versione 0.47.0
+
+- **Lucciole che illuminano davvero la scena:** uno stormo con il suo ciclo di accensione, palette e alone, con il preset Bosco incantato. Le lucciole accese sono luci vere, fermate dagli oggetti.
+- **Polvere che fluttua:** i granelli si muovono lungo la timeline, reagiscono agli oggetti in movimento e alle correnti del fumo e restano coerenti tra Play, salti e render.
+- **Anteprima del fumo che sente gli oggetti animati,** e griglia finale del fumo salvata su file: rifacendo il render di un'animazione viene riusata.
+- **Una finestra dedicata allo STEP:** impostazioni di tassellazione, anteprima 3D del risultato e importazione solo quando confermi.
+
 ### Novità della versione 0.46.0
 
 - **Scegli come nasce il video:** MP4, MOV, MKV o AVI, H.264, H.265, ProRes, FFV1 o non compresso, con preset dal file piccolo al senza perdita e i parametri effettivi riportati alla fine.
@@ -221,10 +228,20 @@ Il fuoco (combustione, emissione, fiamme che illuminano la scena) è un passo a 
 
 Granelli veri (qualche millimetro, fino a 150 000) sparsi nell'aria, come effetto a sé. Sono invisibili tranne dentro i fasci di spot e sole: lì brillano, come la polvere nei raggi che entrano dalla finestra di una soffitta, mentre lampadine, pannelli, ambiente e luce di rimbalzo non li illuminano. Sono segnati nelle guide del denoiser, così il denoiser li tiene invece di cancellarli come rumore. I granelli stanno in un riquadro che selezioni nella viewport e sposti o ridimensioni con il gizmo; di partenza copre gli oggetti fino alle spot, così i granelli riempiono tutto il fascio fino al piano illuminato. Si regolano quantità (fino a pochi granelli isolati), dimensione (fino a 18 mm), brillantezza e colore, e i granelli possono fare ombra: piccole sagome scure nei fasci e sul piano illuminato.
 
+- **Moto nel tempo:** i granelli fluttuano piano lungo la timeline anche senza niente di animato, sempre con la stessa formula, quindi Play, salto a un fotogramma e render mostrano gli stessi granelli. *Influenza dell'aria* regola quanto li spostano gli oggetti in movimento (che spingono i granelli vicini e li tengono fuori) e le correnti del fumo. È un modello semplificato a senso unico: gli oggetti contano come sfere, il fumo come una corrente che sale stimata dai suoi parametri e non dalla sua velocità simulata, e la polvere non agisce mai sul fumo.
 - **Variazione della dimensione:** quanto la dimensione di ogni granello si scosta a caso da quella impostata, da tutti uguali a da piccolissimi al triplo.
 - **Due colori e opacità:** un secondo colore con la parte di granelli che lo prende (per esempio oro e bianco), e un'opacità che li rende semitrasparenti: diffondono meno luce e, se fanno ombra, ne fermano solo una parte.
 - **Granelli luminosi:** con **+** scegli un colore: una parte dei granelli si accende di quel colore, come lucciole o scintille, e si vede anche fuori dai fasci delle spot (è geometria normale che emette luce e illumina quello che ha intorno). Ogni colore ha la sua intensità e la sua percentuale di granelli; con intensità basse il colore resta, con intensità alte diventa bianco come una lampadina vista dritta. **Alone** e **forza dell'alone** aggiungono un bagliore morbido attorno a ogni granello luminoso che la camera vede, come le lucciole: un nucleo luminoso largo quanto il granello e una coda tenue tre volte più larga che sfuma a zero, del colore del granello. Si aggiunge all'immagine finita (prima del tilt-shift), uguale su CPU e GPU; un granello coperto da un oggetto non fa alone, e la viewport non lo mostra.
 - **Granelli o scaglie (polvere di fata):** i *granelli* sono tondi e diffondono la luce uguale da ogni lato. Le *scaglie* sono piatte e girate a caso: riflettono come piccoli specchi, quindi brillano solo quelle girate giuste tra luce e camera mentre le altre restano spente, come brillantini o polvere di fata. **Luccichio** regola quanta luce le scaglie riflettono a specchio, **ruvidità del riflesso** se le scintille sono piccole e intense (bassa) o larghe e tenui (alta). Uguale su CPU e GPU.
+
+### Lucciole / Bosco incantato
+
+Uno stormo che vola in un volume, soprattutto in orizzontale, e si accende a intervalli, ogni lucciola per conto suo: spenta, accensione, accesa, spegnimento. Da accese sono **luci vere della scena**: le superfici prendono il loro colore e gli oggetti fermano la loro luce, su CPU e GPU. Oltre *Luci al massimo* le lucciole vicine si uniscono in una luce con la stessa potenza totale, che tiene sotto controllo il rumore al prezzo di ombre meno precise.
+
+- **Volo e ciclo:** quantità, volume con rotazione, velocità, parte verticale, fluidità, dispersione, durate minime e massime di ogni fase.
+- **Colori:** una palette con le percentuali, ogni lucciola tiene il suo colore, e una variazione tonale che resta nella stessa famiglia.
+- **Luce e aspetto separati:** *Luce sulla scena* per quello che ricevono gli oggetti, corpo e alone per i punti visibili. Con la luce a 0 restano solo i punti.
+- Tutto nasce da tempo e seme: Play, salti, viewport e render coincidono. Il preset *Bosco incantato* riempie l'inquadratura di lucciole lente e calde.
 
 ### 8. Adesivi (decal) — etichette e loghi su qualsiasi superficie
 
@@ -294,6 +311,8 @@ In cima alla scheda Render scegli come si disegna l'immagine; passando sopra a o
 Gli stili si applicano alla prima superficie vista dalla camera, quindi vetri e specchi riflettono e rifrangono come sempre; funzionano su CPU e GPU, anche nel render spettrale.
 
 ### 15. Modelli STEP: convertiti una volta, poi riaperti subito
+
+Uno STEP da solo apre la sua finestra: il file a sinistra, la tassellazione al centro e a destra un'anteprima 3D del risultato, ombreggiata o in fil di ferro, da ruotare e ingrandire, con triangoli, vertici, dimensioni e pezzi. Bozza, Bilanciata, Alta qualità o Personalizzata impostano le deviazioni lineare e angolare vere del convertitore; si può riconvertire quante volte si vuole e il modello entra nella scena solo con Importa. La geometria CAD originale non si vede perché resta nel processo separato del convertitore.
 
 Un file STEP si converte in mesh una volta sola. Il risultato resta in una cache delle conversioni e si salva accanto al progetto (`modelli-convertiti/`) e dentro i pacchetti `.frpack`, così riaprendo il progetto lo STEP non si riconverte. Sulla demo del banco ottico l'apertura è passata da 27 s a 0,2 s. Se lo STEP cambia (o cambiano i pezzi di un assieme a più file, o la qualità), si riconverte. I pacchetti ora includono anche i file dei pezzi a cui rimanda un assieme STEP a più file.
 
@@ -418,6 +437,9 @@ Una timeline professionale, sempre disponibile: sta in basso con le schede **Tim
 - Avvio / pausa / ripresa / stop / riavvio automatico quando la scena cambia, export PNG.
 - Progetti `.frproject` (JSON versionato, salvataggio atomico, percorsi relativi).
 - CLI per render senza interfaccia, benchmark e import nella libreria.
+- **Lucciole / Bosco incantato**: uno stormo con il suo ciclo e la sua palette, le cui lucciole accese sono luci vere della scena, con occlusione, su CPU e GPU.
+- **Polvere in sospensione in movimento**: moto nel tempo, reazione a oggetti in movimento e correnti del fumo, deterministica.
+- **Finestra di importazione STEP**: impostazioni di tassellazione, anteprima 3D, conversione ripetibile, arresto.
 - **Esportazione video**: MP4, MOV, MKV e AVI con H.264, H.265, ProRes, FFV1 o non compresso, preset, stima della dimensione e parametri veri alla fine.
 - **Barra di stato configurabile**: fino a 9 contatori su 15 (FPS viewport, fotogrammi, tempo rimanente, GPU, VRAM, RAM e altri), Backend e processore fissi a destra.
 - **Bersaglio delle luci nel viewport**: Spot e Direzionali si puntano trascinando il bersaglio, con Annulla.

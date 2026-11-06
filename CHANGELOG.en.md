@@ -10,6 +10,17 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.47.0 — 6 Nov 2026
+
+The rest of `reports/chatgpt/2026-11-06_modifiche.md`.
+
+- **Fireflies / Enchanted forest:** a new effect with a flock that flies mostly horizontally and lights up at intervals, each firefly on its own. Lit fireflies are real lights of the scene, stopped by objects, on CPU and GPU; beyond the chosen maximum, nearby ones merge into one light with the same power. Body and halo are set separately from the light on the scene. Palette with percentages, tonal variation within the same colour family, full on/off cycle, volume with rotation. Everything is computed from time and seed, so Play, jumping to a frame, viewport and render agree.
+- **Floating dust moves:** specks drift slowly and organically along the timeline, even with nothing animated, as a continuous function of time: no jitter, and jumping to a frame gives the same specks as playing. Moving objects push nearby dust and keep it out, smoke currents lift it, and dust never acts back on smoke. New controls: Motion over time and Air influence.
+- **The smoke preview feels animated objects:** its particles ignored them because the preview simulated with objects standing still at the playhead; it now uses the same moving solids as the bake.
+- **Final smoke grid on file:** once computed, the render-resolution grid of each frame is saved and read back, so rendering an animation again no longer rebuilds or resamples it.
+- **Sturdier smoke bake:** files have a format version and a checked length, an interrupted or damaged frame is redone instead of used, frames are written atomically, and the bake folder stays under 40 GB.
+- **STEP import window:** three columns for the file, the tessellation and a 3D preview. Draft, Balanced, High quality or Custom map to the converter's real linear and angular deviation; you can convert again without reopening the file, stop a conversion, rotate and zoom the result in shaded or wireframe view, read triangles, vertices, size and parts, and import only when satisfied. Several files at once keep the previous window.
+
 ## 0.46.0 — 6 Nov 2026
 
 From `reports/chatgpt/2026-11-06_modifiche.md`.

@@ -107,6 +107,10 @@ fn parse_args() -> StartupOptions {
                 o.camera_test = args.get(i).cloned();
             }
             "--sequenze" => o.sequences_window = true,
+            "--importa-step" => {
+                i += 1;
+                o.step_import = args.get(i).map(PathBuf::from);
+            }
             "--demo-prisma" => o.prism_demo = true,
             "--scelta-modalita" => o.mode_choice = true,
             "--sequenza" => {

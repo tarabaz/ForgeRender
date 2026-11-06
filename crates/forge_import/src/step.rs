@@ -104,6 +104,9 @@ pub fn fingerprint(path: &Path, opts: &ImportOptions) -> Option<String> {
         }
     }
     eat(opts.step_quality.arg().as_bytes());
+    if let Some([l, a]) = opts.step_custom {
+        eat(format!("{l}|{a}").as_bytes());
+    }
     Some(format!("{h:016x}"))
 }
 
@@ -129,7 +132,17 @@ pub fn cached_conversion(key: &str) -> PathBuf {
 /// Converte un file STEP (o SolidWorks) nel modello intermedio. Operazione lenta:
 /// va eseguita fuori dal thread dell'interfaccia. `progress` riceve messaggi testuali.
 /// Una conversione già fatta (stesso contenuto, stessa qualità) si rilegge dalla cache.
-pub fn convert(path: &Path, opts: &ImportOptions, mut progress: impl FnMut(String)) -> Result<FrMesh, ImportError> {
+pub fn convert(path: &Path, opts: &ImportOptions, progress: impl FnMut(String)) -> Result<FrMesh, ImportError> {
+    convert_cancellable(path, opts, &std::sync::atomic::AtomicBool::new(false), progress)
+}
+
+/// Come [`convert`], e `cancel` ferma il convertitore.
+pub fn convert_cancellable(
+    path: &Path,
+    opts: &ImportOptions,
+    cancel: &std::sync::atomic::AtomicBool,
+    mut progress: impl FnMut(String),
+) -> Result<FrMesh, ImportError> {
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
     if !path.is_file() {
         return Err(ImportError::Converter(format!("file non trovato: {}", path.display())));
@@ -148,7 +161,7 @@ pub fn convert(path: &Path, opts: &ImportOptions, mut progress: impl FnMut(Strin
             return Ok(model);
         }
     }
-    let model = convert_uncached(path, &ext, opts, &mut progress)?;
+    let model = convert_uncached(path, &ext, opts, cancel, &mut progress)?;
     if let Some(k) = &key {
         let c = cached_conversion(k);
         let _ = std::fs::create_dir_all(cache_dir());
@@ -160,7 +173,13 @@ pub fn convert(path: &Path, opts: &ImportOptions, mut progress: impl FnMut(Strin
     Ok(model)
 }
 
-fn convert_uncached(path: &Path, ext: &str, opts: &ImportOptions, progress: &mut impl FnMut(String)) -> Result<FrMesh, ImportError> {
+fn convert_uncached(
+    path: &Path,
+    ext: &str,
+    opts: &ImportOptions,
+    cancel: &std::sync::atomic::AtomicBool,
+    progress: &mut impl FnMut(String),
+) -> Result<FrMesh, ImportError> {
     let (step_path, cleanup) = if ext == "sldprt" || ext == "sldasm" {
         progress("esportazione STEP da SolidWorks…".into());
         let out = temp_path("solidworks", "step");
@@ -169,7 +188,7 @@ fn convert_uncached(path: &Path, ext: &str, opts: &ImportOptions, progress: &mut
     } else {
         (path.to_path_buf(), None)
     };
-    let result = run_converter(&step_path, opts, progress);
+    let result = run_converter(&step_path, opts, cancel, progress);
     if let Some(p) = cleanup {
         let _ = std::fs::remove_file(p);
     }
@@ -178,7 +197,20 @@ fn convert_uncached(path: &Path, ext: &str, opts: &ImportOptions, progress: &mut
     Ok(model)
 }
 
-fn run_converter(step: &Path, opts: &ImportOptions, progress: &mut impl FnMut(String)) -> Result<FrMesh, ImportError> {
+/// Argomenti della qualità per il convertitore.
+fn quality_args(opts: &ImportOptions) -> Vec<String> {
+    match opts.step_custom {
+        Some([l, a]) => vec!["--deflection".into(), l.to_string(), "--angular".into(), a.to_string()],
+        None => vec!["--quality".into(), opts.step_quality.arg().into()],
+    }
+}
+
+fn run_converter(
+    step: &Path,
+    opts: &ImportOptions,
+    cancel: &std::sync::atomic::AtomicBool,
+    progress: &mut impl FnMut(String),
+) -> Result<FrMesh, ImportError> {
     let conv = converter_path().ok_or_else(|| {
         ImportError::Converter(format!(
             "convertitore STEP non incluso in questa versione ({CONVERTER} deve trovarsi accanto a ForgeRender).\n\
@@ -189,16 +221,32 @@ fn run_converter(step: &Path, opts: &ImportOptions, progress: &mut impl FnMut(St
     let mut cmd = Command::new(&conv);
     cmd.arg(step)
         .arg(&out)
-        .arg("--quality")
-        .arg(opts.step_quality.arg())
+        .args(quality_args(opts))
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     let mut child = hide_console(&mut cmd)
         .spawn()
         .map_err(|e| ImportError::Converter(format!("avvio di {} fallito: {e}", conv.display())))?;
+    // Le righe arrivano da un thread: intanto si guarda se la conversione va fermata.
     if let Some(stdout) = child.stdout.take() {
-        for line in std::io::BufReader::new(stdout).lines().map_while(Result::ok) {
-            progress(line.trim_start_matches("progresso: ").to_string());
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            for line in std::io::BufReader::new(stdout).lines().map_while(Result::ok) {
+                let _ = tx.send(line);
+            }
+        });
+        loop {
+            match rx.recv_timeout(std::time::Duration::from_millis(100)) {
+                Ok(line) => progress(line.trim_start_matches("progresso: ").to_string()),
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+            if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = std::fs::remove_file(&out);
+                return Err(ImportError::Converter("conversione fermata".into()));
+            }
         }
     }
     let output = child
@@ -335,6 +383,23 @@ pub fn insert(scene: &mut Scene, file_name: &str, model: FrMesh, opts: &ImportOp
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Ogni parametro della finestra arriva davvero al convertitore e a una conversione sua.
+    #[test]
+    fn custom_tessellation_reaches_the_converter() {
+        let preset = ImportOptions::default();
+        assert_eq!(quality_args(&preset), ["--quality", "media"]);
+        let custom = ImportOptions {
+            step_custom: Some([0.002, 0.25]),
+            ..Default::default()
+        };
+        assert_eq!(quality_args(&custom), ["--deflection", "0.002", "--angular", "0.25"]);
+        let dir = std::env::temp_dir().join(format!("forge_step_key_{}.step", std::process::id()));
+        std::fs::write(&dir, b"ISO-10303-21;").unwrap();
+        let (a, b) = (fingerprint(&dir, &preset), fingerprint(&dir, &custom));
+        let _ = std::fs::remove_file(&dir);
+        assert_ne!(a, b, "parametri diversi, conversione diversa");
+    }
     use crate::frmesh::{Header, MeshData, NodeRecord};
 
     fn mat(t: [f64; 3]) -> [f64; 16] {

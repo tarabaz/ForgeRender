@@ -138,6 +138,8 @@ pub struct ProjectFile {
     pub haze: forge_scene::Haze,
     #[serde(default)]
     pub haze_dust: forge_scene::Dust,
+    #[serde(default)]
+    pub fireflies: forge_scene::Fireflies,
     /// Adesivi (decal), ricreati all'apertura sugli oggetti.
     #[serde(default)]
     pub decals: Vec<forge_scene::Decal>,
@@ -257,6 +259,7 @@ pub fn to_project_file(scene: &Scene, meta: &ProjectMeta, settings: &RenderSetti
         fogs: scene.fogs.clone(),
         haze: scene.haze.clone(),
         haze_dust: scene.haze_dust.clone(),
+        fireflies: scene.fireflies.clone(),
         decals: scene.decals.clone(),
         smokes: scene.smokes.clone(),
         timeline: scene.timeline.clone(),
@@ -513,6 +516,7 @@ pub fn load(path: &Path) -> anyhow::Result<LoadedProject> {
     scene.fogs = pf.fogs;
     scene.haze = pf.haze;
     scene.haze_dust = pf.haze_dust;
+    scene.fireflies = pf.fireflies;
     scene.decals = pf.decals;
     scene.smokes = pf.smokes;
     // Progetto senza animazione: il cursore va sull'istante dei suoi effetti (restano come erano).

@@ -368,6 +368,10 @@ pub struct Dust {
     pub halo_size: f32,
     /// Forza dell'alone (0 = niente, 1 = normale).
     pub halo_strength: f32,
+    /// Quanto i granelli fluttuano nel tempo (0 = fermi, 1 = pulviscolo naturale).
+    pub motion: f32,
+    /// Quanto risentono dell'aria: oggetti in movimento e correnti del fumo (0 = niente).
+    pub air_response: f32,
 }
 
 impl Default for Dust {
@@ -391,8 +395,85 @@ impl Default for Dust {
             glow: Vec::new(),
             halo_size: 6.0,
             halo_strength: 1.0,
+            motion: 1.0,
+            air_response: 1.0,
         }
     }
+}
+
+/// Aria che sposta la polvere in un istante, ricavata dalla timeline: nessuno stato, quindi Play,
+/// salto a un fotogramma e render danno gli stessi granelli. La polvere non agisce sul resto.
+#[derive(Clone, Debug, Default)]
+pub struct DustAir {
+    /// Scia di un oggetto in movimento: centro, raggio d'influenza e spostamento al centro.
+    pushes: Vec<(Vec3, f32, Vec3)>,
+    /// Oggetti in movimento come sfere: i granelli restano fuori.
+    solids: Vec<(Vec3, f32)>,
+    /// Corrente di un fumo acceso: base, raggio, altezza e sollevamento.
+    rises: Vec<(Vec3, f32, f32, f32)>,
+}
+
+impl DustAir {
+    fn is_empty(&self) -> bool {
+        self.pushes.is_empty() && self.solids.is_empty() && self.rises.is_empty()
+    }
+
+    fn apply(&self, p: Vec3, response: f32) -> Vec3 {
+        let bell = |x: f32| {
+            let x = (1.0 - x).clamp(0.0, 1.0);
+            x * x * (3.0 - 2.0 * x)
+        };
+        let mut q = p;
+        for (c, r, shift) in &self.pushes {
+            q += *shift * bell((p - *c).length() / r) * response;
+        }
+        for (base, r, h, lift) in &self.rises {
+            let d = p - *base;
+            let side = Vec3::new(d.x, 0.0, d.z).length();
+            if d.y > -0.1 * h && d.y < *h {
+                q.y += lift * bell(side / r) * response;
+            }
+        }
+        for (c, r) in &self.solids {
+            let d = q - *c;
+            let l = d.length();
+            if l < *r && l > 1e-5 {
+                q = *c + d * (r / l);
+            }
+        }
+        q
+    }
+}
+
+/// Quanto dura la scia di un oggetto: passi di campionamento all'indietro e loro distanza (s).
+const WAKE_STEPS: usize = 6;
+const WAKE_DT: f32 = 0.1;
+
+/// Correnti lente comuni a tutti i granelli: vicini si muovono insieme, come nell'aria vera.
+/// (vettore d'onda in 1/m, pulsazione in rad/s, direzione)
+const AIR_MODES: [([f32; 3], f32, [f32; 3]); 4] = [
+    ([1.3, 0.4, 0.7], 0.47, [0.8, 0.15, -0.55]),
+    ([-0.6, 0.9, 1.1], 0.33, [-0.35, 0.3, 0.85]),
+    ([0.8, -1.2, 0.5], 0.61, [0.6, 0.25, 0.7]),
+    ([-1.5, 0.3, -0.9], 0.21, [0.5, -0.1, -0.85]),
+];
+
+/// Spostamento di un granello a riposo in `home` all'istante `t`, zero a `t` = 0: funzione continua
+/// del tempo e del granello, senza rumore per fotogramma. `g` sono i suoi numeri casuali fissi.
+fn dust_drift(home: Vec3, g: [f32; 4], t: f32, motion: f32) -> Vec3 {
+    const COMMON: f32 = 0.05;
+    const OWN: f32 = 0.022;
+    let mut d = Vec3::ZERO;
+    for (k, w, dir) in AIR_MODES {
+        let phase = Vec3::from(k).dot(home);
+        d += Vec3::from(dir) * ((w * t + phase).sin() - phase.sin()) * COMMON;
+    }
+    // Il moto proprio: frequenza e fase sue, i granelli grandi più pigri (`g[3]`).
+    let tau = std::f32::consts::TAU;
+    let w = 0.35 + 0.5 * g[3];
+    let own = |a: f32, b: f32| ((w * b * t + a * tau).sin() - (a * tau).sin()) * OWN;
+    d += Vec3::new(own(g[0], 1.0), own(g[1], 0.7) * 0.6, own(g[2], 1.3));
+    d * motion
 }
 
 /// Numero massimo di granelli (≈ 20 triangoli l'uno): oltre la polvere si dirada.
@@ -409,6 +490,12 @@ impl Dust {
 
     /// Come [`Dust::build_meshes`], e in più i granelli luminosi di ogni colore di [`Dust::glow`].
     pub fn build_groups(&self, min: Vec3, max: Vec3) -> (Mesh, Mesh, Vec<Mesh>) {
+        self.build_at(min, max, 0.0, &DustAir::default())
+    }
+
+    /// I granelli all'istante `t`, con l'aria di quell'istante. A `t` = 0 senza aria stanno dove
+    /// stavano nei progetti di prima: le scene ferme non cambiano.
+    pub fn build_at(&self, min: Vec3, max: Vec3, t: f32, air: &DustAir) -> (Mesh, Mesh, Vec<Mesh>) {
         let ext = (max - min).max(Vec3::ZERO);
         let volume = ext.x * ext.y * ext.z;
         let count = ((volume * self.per_m3.max(0.0)) as usize).min(DUST_MAX);
@@ -459,10 +546,27 @@ impl Dust {
             extra ^= extra << 17;
             (extra >> 40) as f32 / (1u64 << 24) as f32
         };
+        // Generatore a parte anche per il moto: la distribuzione resta quella di sempre.
+        let mut drift_state = 0xA076_1D64_78BD_642Fu64 ^ (self.seed as u64).wrapping_mul(0xE703_7ED1_A0B4_28DB);
+        let mut rnd4 = || {
+            drift_state ^= drift_state << 13;
+            drift_state ^= drift_state >> 7;
+            drift_state ^= drift_state << 17;
+            (drift_state >> 40) as f32 / (1u64 << 24) as f32
+        };
+        let motion = self.motion.max(0.0);
+        let moved = (motion > 0.0 && t != 0.0) || (self.air_response > 0.0 && !air.is_empty());
         let spread = self.size_spread.clamp(0.0, 1.0);
         let share = self.color2_share.clamp(0.0, 1.0);
         for _ in 0..count {
-            let c = min + Vec3::new(rnd(), rnd(), rnd()) * ext;
+            let home = min + Vec3::new(rnd(), rnd(), rnd()) * ext;
+            let g = [rnd4(), rnd4(), rnd4(), rnd4()];
+            let c = if moved {
+                let p = home + dust_drift(home, g, t, motion);
+                air.apply(p, self.air_response.max(0.0) * (0.6 + 0.4 * g[3]))
+            } else {
+                home
+            };
             // Fattore tra metà e il doppio (più granelli piccoli che grandi) con variazione 0,5,
             // stretto o allargato dalla variazione scelta.
             let f = 0.5 + 1.5 * rnd() * rnd();
@@ -648,7 +752,8 @@ impl Scene {
             }
         };
         let half = size.max(Vec3::splat(0.01)) * 0.5;
-        let (first, second, glows) = self.haze_dust.build_groups(center - half, center + half);
+        let air = self.dust_air(self.dust_time);
+        let (first, second, glows) = self.haze_dust.build_at(center - half, center + half, self.dust_time, &air);
         let mut changed = self.sync_dust_node(DUST_ID, "Polvere in sospensione", first, self.haze_dust.material());
         if second.indices.is_empty() {
             if let Some(i) = self.find(&ComponentId(DUST_ID_2.into())) {
@@ -679,6 +784,94 @@ impl Scene {
         }
         changed |= self.remove_dust_glow_from(n_glow);
         changed
+    }
+
+    /// Nodi con una mesh che si muovono con la timeline (con i loro discendenti).
+    pub fn moving_nodes(&self) -> Vec<NodeIndex> {
+        let mut out = Vec::new();
+        for tr in &self.timeline.tracks {
+            let crate::Target::Object(id) = &tr.target else { continue };
+            if !tr.is_animated() || !tr.prop.moves_geometry() || tr.prop == crate::Prop::Visible {
+                continue;
+            }
+            let Some(i) = self.find(id) else { continue };
+            let mut stack = vec![i];
+            while let Some(n) = stack.pop() {
+                if self.nodes[n].mesh.is_some() && !out.contains(&n) {
+                    out.push(n);
+                }
+                stack.extend(&self.nodes[n].children);
+            }
+        }
+        out
+    }
+
+    /// L'aria all'istante `t`, ricavata dall'animazione. Gli oggetti sono sfere e la loro scia guarda
+    /// solo l'ultimo mezzo secondo: basta per un disturbo credibile a un costo fisso. Il fumo è una
+    /// corrente che sale da una stima dei suoi parametri, non il campo di velocità simulato: quello
+    /// nasce dopo la geometria, di cui i granelli fanno parte.
+    pub fn dust_air(&self, t: f32) -> DustAir {
+        let mut air = DustAir::default();
+        if self.haze_dust.air_response <= 0.0 {
+            return air;
+        }
+        let movers = self.moving_nodes();
+        if !movers.is_empty() {
+            let mut sc = self.clone();
+            let mut tl = self.timeline.clone();
+            for tr in &mut tl.tracks {
+                tr.last = None;
+                tr.wanted = None;
+            }
+            let spheres: Vec<_> = movers
+                .iter()
+                .filter_map(|&i| self.nodes[i].mesh.map(|m| (i, self.meshes[m].bounds())))
+                .collect();
+            let mut path: Vec<Vec<(Vec3, f32)>> = Vec::with_capacity(WAKE_STEPS + 1);
+            for j in 0..=WAKE_STEPS {
+                tl.time = (t - j as f32 * WAKE_DT).max(0.0);
+                tl.apply(&mut sc);
+                path.push(
+                    spheres
+                        .iter()
+                        .map(|(i, b)| {
+                            let w = b.transformed(&sc.world_transform(*i));
+                            ((w.min + w.max) * 0.5, (w.max - w.min).length() * 0.5)
+                        })
+                        .collect(),
+                );
+            }
+            for (k, &(now, radius)) in path[0].iter().enumerate() {
+                air.solids.push((now, radius * 0.75));
+                for j in 0..WAKE_STEPS {
+                    let shift = path[j][k].0 - path[j + 1][k].0;
+                    if shift.length() > 1e-5 {
+                        let decay = (-(j as f32) / 2.5).exp();
+                        air.pushes.push((path[j][k].0, radius * 2.5, shift * 0.7 * decay));
+                    }
+                }
+            }
+        }
+        for s in &self.smokes {
+            if !s.enabled || s.mode != crate::SmokeMode::Simulated {
+                continue;
+            }
+            let s = s.sanitized();
+            let start = self.timeline.start_of(&crate::Target::Smoke(s.n));
+            let on = (t - start).clamp(0.0, 1.5) / 1.5;
+            if on <= 0.0 {
+                continue;
+            }
+            let speed = (s.sim.buoyancy * s.sim.temperature)
+                .max(0.0)
+                .sqrt()
+                .max(s.sim.exit_speed.abs())
+                .min(2.0);
+            let half = s.half();
+            air.rises
+                .push((s.sim_source(), half.x.min(half.z), half.y * 2.0, speed * 0.12 * on));
+        }
+        air
     }
 
     /// Toglie i nodi (e i materiali) dei granelli luminosi dal colore `from` in poi.
@@ -832,6 +1025,70 @@ impl Scene {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn dust() -> Dust {
+        Dust {
+            enabled: true,
+            per_m3: 2000.0,
+            ..Default::default()
+        }
+    }
+
+    fn at(d: &Dust, t: f32, air: &DustAir) -> Vec<Vec3> {
+        let (a, ..) = d.build_at(Vec3::splat(-1.0), Vec3::ONE, t, air);
+        a.positions
+    }
+
+    /// Al tempo zero i granelli stanno dove stavano; poi si muovono piano, senza salti, e lo stesso
+    /// istante dà sempre gli stessi granelli (è una funzione del tempo, non uno stato).
+    #[test]
+    fn dust_floats_smoothly_and_is_repeatable() {
+        let d = dust();
+        let none = DustAir::default();
+        let base = d.build_groups(Vec3::splat(-1.0), Vec3::ONE).0.positions;
+        assert_eq!(at(&d, 0.0, &none), base);
+        let (a, b) = (at(&d, 5.0, &none), at(&d, 5.0 + 1.0 / 24.0, &none));
+        assert_eq!(a, at(&d, 5.0, &none));
+        let moved = a.iter().zip(&base).map(|(p, q)| (*p - *q).length()).fold(0.0, f32::max);
+        let step = a.iter().zip(&b).map(|(p, q)| (*p - *q).length()).fold(0.0, f32::max);
+        assert!(moved > 0.01 && moved < 0.5, "spostamento {moved}");
+        assert!(step < 0.01, "salto tra due fotogrammi: {step}");
+        let still = Dust { motion: 0.0, ..dust() };
+        assert_eq!(at(&still, 5.0, &none), base);
+    }
+
+    /// Un oggetto che passa sposta i granelli vicini e li tiene fuori; fermo non fa niente.
+    #[test]
+    fn a_moving_object_disturbs_the_dust() {
+        use crate::{Interp, Key, Prop, Target};
+        let mut s = Scene::test_scene();
+        s.haze_dust = dust();
+        let id = s.nodes[s.roots[0]].children.first().map(|&c| s.nodes[c].id.clone()).unwrap();
+        let target = Target::Object(id);
+        let mut tl = std::mem::take(&mut s.timeline);
+        tl.add_element(&s, target.clone());
+        let key = |t: f32, v: f32| Key {
+            t,
+            v,
+            interp: Interp::Linear,
+        };
+        let i = tl.track(&target, Prop::PosX).unwrap();
+        tl.tracks[i].keys = vec![key(0.0, 0.0), key(1.0, 2.0), key(2.0, 2.0)];
+        s.timeline = tl;
+        assert!(!s.moving_nodes().is_empty());
+        let moving = s.dust_air(0.8);
+        assert!(!moving.pushes.is_empty() && !moving.solids.is_empty());
+        // Fermo da più della scia: nessuna spinta, restano le sfere.
+        let after = s.dust_air(1.9);
+        assert!(after.pushes.is_empty() && !after.solids.is_empty());
+        let d = dust();
+        assert_ne!(at(&d, 0.8, &moving), at(&d, 0.8, &DustAir::default()));
+        // Niente granelli dentro la sfera dell'oggetto.
+        let (c, r) = moving.solids[0];
+        let (first, ..) = d.build_at(Vec3::splat(-2.0), Vec3::splat(2.0), 0.8, &moving);
+        let grain = first.positions.iter().step_by(12);
+        assert!(grain.into_iter().all(|p| (*p - c).length() > r * 0.9));
+    }
     use crate::primitives;
 
     /// Adesivo sul lato di un cubo: copre solo la faccia davanti, con le UV da 0 a 1.

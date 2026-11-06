@@ -10,6 +10,7 @@ pub(crate) mod blend_import;
 pub mod central;
 pub(crate) mod color_picker;
 mod demo_info;
+mod fireflies;
 pub mod gizmo;
 pub mod icons;
 pub(crate) mod inspector;
@@ -27,6 +28,7 @@ pub(crate) mod smoke;
 pub(crate) mod smoke_preview;
 mod splash;
 pub(crate) mod status;
+pub(crate) mod step_import;
 pub mod style;
 pub(crate) mod styles;
 pub(crate) mod timeline;
@@ -88,6 +90,7 @@ impl eframe::App for ForgeApp {
         egui::CentralPanel::default().show(ui, |ui| central::show(self, ui, frame));
 
         self.dialogs(&ctx);
+        step_import::window(self, &ctx);
         timeline::window(self, &ctx);
     }
 }
