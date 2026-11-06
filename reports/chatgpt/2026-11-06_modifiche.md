@@ -619,3 +619,78 @@ Per le luci di tipo **Spot** e **Direzionale**, il bersaglio (*target*) deve pot
 - Non modificare o rimuovere i file immagine originali.
 
 **Verifica richiesta:** controllare che entrambi i percorsi immagine esistano nel branch e che i README non contengano più il vecchio collegamento PNG.
+
+
+## 8. Contatori di stato configurabili, FPS viewport e stima del completamento video — 06/11/2026
+
+**Richiesta di Valerio:** riorganizzare la zona dei contatori in tempo reale e renderla configurabile dalle Opzioni/Impostazioni del programma. Quando si crea un video, mostrare anche una stima del tempo totale e il tempo rimanente.
+
+### A. Stima dei tempi durante la creazione di un video
+
+- Durante il render dell'animazione/video, mostrare sotto **Tempo** una voce **Tempo rimanente** e una stima del completamento.
+- La stima deve basarsi sui fotogrammi effettivamente completati e sul tempo trascorso, aggiornandosi mentre il lavoro procede. Se possibile, distinguere la fase di rendering dei fotogrammi dalla successiva codifica MP4, oppure fornire una stima complessiva che includa entrambe.
+- Non mostrare una falsa precisione all'inizio: finché non ci sono abbastanza dati, mostrare "Calcolo stima…" o un'indicazione equivalente. Gestire correttamente pausa, annullamento, cambio di fase e completamento.
+- Anche durante la codifica MP4, se tecnicamente possibile, esporre progresso/fotogrammi elaborati e aggiornare il tempo rimanente: oggi `video::encode_mp4` riceve l'intero elenco dei frame e restituisce soltanto il nome dell'encoder, quindi Claude deve verificare come introdurre un canale di progresso senza bloccare la UI.
+- Visualizzare il tempo rimanente sotto il tempo trascorso, non sostituirlo.
+
+### B. Contatori selezionabili nelle Opzioni del programma
+
+Aggiungere una sezione dedicata nelle **Impostazioni/Opzioni** (preferibilmente Rendering o una nuova sezione "Barra di stato") con caselle di spunta per scegliere quali contatori mostrare in tempo reale.
+
+- Massimo **11 indicatori visibili complessivi**.
+- Gli ultimi due sono **fissi, non disattivabili e sempre all'estrema destra**, nell'ordine e con le diciture tecniche già usate dall'app:
+  1. `Backend: GPU - …` (o la dicitura backend effettiva già presente).
+  2. `INTEL(R) C++ Compiler …` / indicatore del compilatore Intel già presente sotto il backend.
+- Di conseguenza, massimo **9 indicatori configurabili** oltre ai due fissi.
+- I contatori selezionati devono partire da sinistra e disporsi in modo fluido: inizialmente due righe come nell'attuale barra; aggiungendo altri indicatori, la barra può espandersi a tre righe o più, senza sovrapposizioni, troncamenti illeggibili o spostamento dei due indicatori fissi dalla posizione all'estrema destra.
+- La selezione va salvata in `impostazioni.json` e mantenuta tra riavvii. Nuovi campi retrocompatibili con impostazioni già esistenti (`serde(default)`).
+- Se il numero massimo è raggiunto, impedire di selezionare altri indicatori e spiegare che il limite è 9 configurabili + 2 fissi.
+- Prevedere un comando rapido per ripristinare i contatori predefiniti.
+
+### C. Contatori da valutare e rendere selezionabili
+
+Il codice attuale in `crates/forge_app/src/ui/status.rs` mostra già tempo trascorso, campioni/s, CPU, utilizzo GPU/VRAM, media e ultima passata, risoluzione, backend, RAM processo/sistema e denoiser. Prima di aggiungere duplicati, riutilizzare le misure già disponibili e verificare quali dati sono realmente aggiornati.
+
+Proposta di elenco (selezionare fino a 9):
+- **Tempo trascorso** (render corrente).
+- **Tempo rimanente** (render/video, solo quando stimabile).
+- **FPS viewport** (frame al secondo effettivi, misurati su una finestra mobile; non confonderli con gli FPS impostati per il video).
+- **FPS video** (frequenza di fotogrammi impostata per l'esportazione, se utile).
+- **Fotogrammi** (completati / totali, durante animazione e codifica).
+- **Velocità render** (Mcampioni/s).
+- **CPU** (utilizzo percentuale).
+- **GPU** (utilizzo percentuale).
+- **VRAM** (usata / totale, con disponibilità solo quando il driver fornisce il dato).
+- **RAM processo** (memoria usata da ForgeRender).
+- **RAM sistema** (usata / totale).
+- **Temperatura GPU** e **potenza GPU**, solo se già esposte in modo affidabile dal provider telemetry e senza dipendenze obbligatorie da NVML per hardware non NVIDIA.
+- **Denoiser** e **risoluzione** come indicatori opzionali secondari, se restano utili nello spazio disponibile.
+
+Non è necessario implementare ogni voce proposta se il dato non esiste o richiede una dipendenza fragile. Preferire indicatori affidabili e spiegare in tooltip unità, frequenza di aggiornamento e disponibilità hardware.
+
+### D. FPS viewport: misurazione corretta
+
+- Misurare gli FPS reali della viewport tramite delta temporale tra frame consecutivi, con media mobile o EMA per evitare oscillazioni eccessive.
+- Non usare gli FPS del monitor né il frame rate configurato per il video come sostituti.
+- Evitare di includere il tempo di finestre modali/minimizzate o schermate non attive, se il dato può essere distinto.
+- Aggiornare il contatore senza introdurre repaint continui costosi o rallentare la viewport stessa.
+
+### E. Verifiche richieste
+
+1. Verificare la barra con 1, 2, 9 indicatori selezionabili e con tutti e 9 attivi: wrapping ordinato, massimo 11 totali, due indicatori fissi sempre a destra.
+2. Chiudere e riaprire ForgeRender: le selezioni devono essere conservate.
+3. Verificare il limite massimo e il ripristino dei valori predefiniti.
+4. Durante un render video, verificare fotogrammi completati, tempo trascorso, stima e tempo rimanente; confrontare la stima finale con il tempo reale.
+5. Verificare separatamente la fase di codifica MP4, se viene mostrata una stima dedicata.
+6. Misurare FPS viewport in una scena semplice e in una scena pesante; verificare che il contatore non causi cali apprezzabili.
+7. Verificare traduzioni IT/EN e tooltip, nonché il comportamento con CPU, GPU NVIDIA e dati telemetry non disponibili.
+
+### F. File di partenza già individuati (da verificare nel codice completo)
+
+- `crates/forge_app/src/ui/status.rs`: barra attuale, contatori e griglia dettagliata.
+- `crates/forge_app/src/prefs.rs`: preferenze persistenti.
+- `crates/forge_app/src/ui/settings.rs`: finestra Impostazioni e sezioni.
+- `crates/forge_app/src/video.rs`: encoder MP4; oggi la funzione pubblica restituisce il nome dell'encoder, non un progresso per frame.
+- Individuare inoltre il punto in cui vengono renderizzati i frame della viewport e l'indicatore `INTEL(R) C++ Compiler`, per mantenerli correttamente nella barra.
+
+**Indicazione a Claude:** prima mappare i dati già disponibili e il punto in cui il video viene esportato; proporre una struttura dati unica per gli indicatori e il wrapping responsive, senza duplicare monitoraggi. Implementare in modo incrementale, con test per persistenza, limite 9+2, layout e calcolo ETA. Non dichiarare verificata la stima video finché non è stata confrontata con un'esportazione reale.
