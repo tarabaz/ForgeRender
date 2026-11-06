@@ -233,7 +233,7 @@ Prepare a product scene with a backdrop and studio lights, then choose a light, 
 
 ### 11. Volumetric lighting and visible beams
 
-![ForgeRender volumetric light beam](reports/fascio-volumetrico/dopo_fascio_solo_camera.png)
+![ForgeRender volumetric light beam](docs/img/features/dopo_fascio_solo_camera.jpg)
 
 Spotlights can create visible beams with adjustable density and length. Volumetric fog is a participating medium with scattering and shadows: light interacts with the volume and becomes visible in space, not only on surfaces.
 
@@ -277,6 +277,8 @@ A STEP file is converted to meshes once. The result is kept in a conversion cach
 ### 16. Timeline — animation of objects, lights, camera and effects
 
 A professional timeline, always available: it sits at the bottom with **Timeline | Console** tabs, or in its own window with "Detach from the program", to be moved to another screen.
+
+![ForgeRender animation timeline](docs/img/features/timeline-animation.jpg)
 
 - **Elements and properties:** "+ Element" adds the selected objects, the camera, a light, a smoke, a dry-ice fog, the haze, the dust or the environment. Each element shows its base properties (for objects position, rotation, scale and opacity; for the camera position and target; for lights position and intensity) and "+" adds the other compatible ones one by one (scale per axis, visibility, colour, target, cone angle, field of view, aperture, focus distance, density, HDRI rotation, brightness). Position, rotation, target and colour are a single row with their three values: a key is set on all of them.
 - **Keys:** the diamond sets or removes a key at the playhead with the current value; moving an object with the gizmo, or changing a value in the panels, when its property already has keys records a key there. As in After Effects, a click selects a key, Ctrl or Shift adds or removes, dragging on the empty area draws a selection rectangle and dragging a key moves all the selected ones (snapping to frames); Delete removes them, Ctrl+C and Ctrl+V copy them to the playhead, F9 applies ease in and out and the right click chooses the interpolation towards the next key: hold, linear, ease in, ease out, ease in and out, smooth curve.
