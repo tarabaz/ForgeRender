@@ -580,3 +580,30 @@ Usare lo screenshot allegato da Valerio, **demo impostazione step.jpg**, come ri
 - Evitare regressioni e mantenere la compatibilità dei progetti esistenti.
 - Nel normale handoff riportare commit, file modificati, test e comandi effettivamente eseguiti, verifiche visive, misure e attività residue.
 - Aggiungere eventuali aggiornamenti a questo documento, senza creare altri file separati per le richieste del 06/11, a meno che Valerio lo chieda esplicitamente.
+
+
+## 6. Manipolazione del bersaglio delle luci Spot e Direzionali dal viewport
+
+**Richiesta di Valerio — 06/11/2026**
+
+Per le luci di tipo **Spot** e **Direzionale**, il bersaglio (*target*) deve poter essere spostato direttamente nel viewport con un manipolatore/cursore 3D, senza dover modificare manualmente le coordinate numeriche nei pannelli.
+
+### Comportamento desiderato
+
+- Quando si seleziona una luce Spot o Direzionale, rendere visibile nel viewport anche il punto/indicatore del suo bersaglio.
+- Consentire di selezionare e trascinare il bersaglio con il normale gizmo di traslazione 3D, sugli assi e nei piani, con feedback visivo immediato.
+- Il gizmo della posizione della luce e quello del bersaglio devono essere distinguibili e selezionabili separatamente: spostare il target non deve spostare accidentalmente la sorgente luminosa.
+- Durante il trascinamento aggiornare in tempo reale direzione e orientamento del fascio/cono, così che la luce punti sempre al target corrente.
+- Lasciare disponibili i campi numerici esistenti come modalità alternativa e per regolazioni precise; viewport e valori numerici devono restare sincronizzati.
+- La modifica deve essere registrata correttamente nell'Undo/Redo e, se la luce è animata, rispettare il sistema di keyframe e la semantica di modifica della timeline già adottata dall'applicazione.
+- Mostrare il manipolatore del target solo quando è pertinente e la luce è selezionata, evitando di appesantire o affollare il viewport.
+
+### Verifiche richieste
+
+1. Selezionare una Spot e spostarne il target in viewport: verificare che la sorgente resti ferma e il cono ruoti verso il nuovo punto.
+2. Ripetere con una luce Direzionale e verificare l'aggiornamento della direzione.
+3. Verificare trascinamento sugli assi e sui piani, sincronizzazione con i campi numerici e Undo/Redo.
+4. Verificare il comportamento con luci animate e keyframe, senza introdurre modifiche involontarie ai frame non interessati.
+5. Verificare che le altre tipologie di luce e gli strumenti di manipolazione esistenti non subiscano regressioni.
+
+**Risultato atteso:** poter puntare e orientare Spot e Direzionali trascinando il loro bersaglio direttamente nella scena, con un'interazione chiara e coerente con gli altri gizmo di ForgeRender.
