@@ -26,7 +26,24 @@ use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+
+/// Nubi con la sorgente chiusa dentro un oggetto, trovate dall'ultimo calcolo.
+static BLOCKED: Mutex<Vec<u32>> = Mutex::new(Vec::new());
+
+/// La sorgente della nube `n` è dentro un oggetto: il fumo resta chiuso lì e non si vede.
+pub fn source_blocked(n: u32) -> bool {
+    BLOCKED.lock().unwrap().contains(&n)
+}
+
+fn set_source_blocked(s: &SmokeCloud, blocked: bool) {
+    let mut b = BLOCKED.lock().unwrap();
+    b.retain(|&n| n != s.n);
+    if blocked {
+        tracing::warn!("fumo «{}»: la sorgente è dentro un oggetto, il fumo resta chiuso lì", s.name);
+        b.push(s.n);
+    }
+}
 
 /// Cartelle di precalcolo tenute.
 const KEEP_DIRS: usize = 6;
@@ -516,6 +533,8 @@ fn bake(
             base = Some(solid_cells(g, &spec));
         }
     }
+    let at_source = spec.cell_of(s.sim_source()).map(|(x, y, z)| spec.index(x, y, z));
+    set_source_blocked(s, matches!((&base, at_source), (Some(b), Some(i)) if b[i]));
     let cell = s.sim_cell();
     let built: Vec<Mover> = movers.iter().filter_map(|&m| build_mover(scene, m, cell)).collect();
     let mut w = Writer {

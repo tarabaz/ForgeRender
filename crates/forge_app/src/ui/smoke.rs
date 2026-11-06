@@ -357,6 +357,12 @@ fn body(
                 tr("Solo anteprima: nel render questo fumo non c'è finché non riaccendi il calcolo vero."),
             );
         }
+        if forge_render_core::smoke_bake::source_blocked(s.n) {
+            ui.colored_label(
+                egui::Color32::from_rgb(240, 180, 80),
+                tr("La sorgente è dentro un oggetto: il fumo resta chiuso lì e nel render non si vede. Sposta la sorgente o spegni le collisioni."),
+            );
+        }
         if let Some((cell, r)) = s.sim_warning() {
             ui.colored_label(
                 egui::Color32::from_rgb(240, 180, 80),

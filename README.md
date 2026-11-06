@@ -18,6 +18,10 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
+### What's new in 0.44.1
+
+- **Fixes from a full beta test:** Undo no longer carries over to another project, copy and paste of timeline keys work, a warning explains when a smoke source is trapped inside an object, Play in the Render view shows finished frames only, and the panels and the toolbar adapt to small windows.
+
 ### What's new in 0.44.0
 
 - **Smoke computed once over the whole timeline:** every frame is kept in temporary files, so moving the playhead reads them at once. If something changes from second 5 on, the simulation resumes from the last saved state before it: what comes first stays bit-identical, so a shape you like is never lost.
@@ -270,7 +274,7 @@ A professional timeline, always available: it sits at the bottom with **Timeline
 - **Keys:** the diamond sets or removes a key at the playhead with the current value; moving an object with the gizmo, or changing a value in the panels, when its property already has keys records a key there. As in After Effects, a click selects a key, Ctrl or Shift adds or removes, dragging on the empty area draws a selection rectangle and dragging a key moves all the selected ones (snapping to frames); Delete removes them, Ctrl+C and Ctrl+V copy them to the playhead, F9 applies ease in and out and the right click chooses the interpolation towards the next key: hold, linear, ease in, ease out, ease in and out, smooth curve.
 - **Modifiers:** "ƒ+" adds to each property, one at a time and in order, wiggle (amplitude, frequency, seed), oscillation, continuous ramp (for example 90°/s for a turntable), loop, ping-pong, offset, multiply, limits and stepped (stop motion); on a row with three axes the X Y Z letters choose which ones it acts on.
 - **Playback:** start, previous key, play/pause, next key, end, loop; duration and frames per second; zoom and scroll of the time. The **work area** bar above the ruler (both ends and the middle can be dragged) sets the part that is played and saved. In the viewport playback is real time; in the **Render view** Play computes each frame with few samples (20 by default, adjustable) and moves on: slower than real time, but you see the rendered animation.
-- **Effects over time:** simulated smoke and dry ice follow the playhead: the simulated instant is the playhead time minus the start of the effect, set on its row together with the stop of the emission; the duration chosen in the timeline decides how long they are computed.
+- **Effects over time:** simulated smoke and dry ice get their own row as soon as they are created and follow the playhead: the simulated instant is the playhead time minus the start of the effect, set on its row together with the stop of the emission; the duration chosen in the timeline decides how long they are computed.
 - **Save animation:** the work area, either as the render of every frame or as a **viewport preview** (a few seconds, to check the motion; smoke and fog are not in it), from the viewport or from a render camera, as PNG frames in a new folder inside **Rendering** and, if you want, an MP4 video.
 - **Object opacity:** a property of its own, rendered by letting each ray through with probability 1 − opacity, so the object fades with its shadow, the same on CPU and GPU.
 

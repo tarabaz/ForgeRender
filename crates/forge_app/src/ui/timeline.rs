@@ -98,6 +98,8 @@ struct RenderPlay {
     auto_restart: bool,
     /// Render del fotogramma in corso.
     waiting: bool,
+    /// Il fotogramma finito è già passato per lo schermo.
+    shown: bool,
 }
 
 /// Che cosa salva "Salva animazione".
@@ -164,10 +166,18 @@ fn time_effects(app: &ForgeApp) -> usize {
 pub fn tick(app: &mut ForgeApp, ctx: &egui::Context) {
     let effects = time_effects(app);
     if effects > app.timeline_ui.seen_effects {
-        // Effetto nuovo: il cursore va sul suo istante, così non riparte vuoto.
+        // Effetto nuovo: compare nella timeline e, se non c'è ancora un'animazione, il cursore va
+        // sul suo istante, così non riparte vuoto.
         let mut tl = std::mem::take(&mut app.scene.timeline);
         tl.adopt_effects(&app.scene);
         app.scene.timeline = tl;
+    }
+    if effects < app.timeline_ui.seen_effects {
+        // Effetto tolto: le sue righe non servono più.
+        let mut tl = std::mem::take(&mut app.scene.timeline);
+        tl.prune(&app.scene);
+        app.scene.timeline = tl;
+        app.timeline_ui.selection.clear();
     }
     app.timeline_ui.seen_effects = effects;
     if app.timeline_ui.demo_pending && !app.scene.roots.is_empty() {
@@ -184,10 +194,7 @@ pub fn tick(app: &mut ForgeApp, ctx: &egui::Context) {
         ctx.request_repaint_after(Duration::from_millis(16));
         return;
     }
-    if let Some(r) = app.timeline_ui.render_play.take() {
-        app.settings = r.settings;
-        app.auto_restart = r.auto_restart;
-    }
+    restore_render_play(app);
     let now = Instant::now();
     if app.timeline_ui.playing {
         let dt = app
@@ -217,12 +224,39 @@ pub fn tick(app: &mut ForgeApp, ctx: &egui::Context) {
 }
 
 /// Un passo del Play nella vista Render: render corto del fotogramma, poi il successivo.
+/// Finito il Play nella vista Render tornano le impostazioni di prima.
+pub fn restore_render_play(app: &mut ForgeApp) {
+    if let Some(r) = app.timeline_ui.render_play.take() {
+        app.settings = r.settings;
+        app.auto_restart = r.auto_restart;
+    }
+}
+
+/// Il Play nella vista Render è in corso: l'immagine si aggiorna solo a fotogramma finito.
+pub fn render_play_running(app: &ForgeApp) -> bool {
+    app.timeline_ui.render_play.is_some()
+}
+
+/// Scena sostituita: stato legato a quella vecchia via, Play nel Render compreso.
+pub fn scene_replaced(app: &mut ForgeApp) {
+    let effects = time_effects(app);
+    let ui = &mut app.timeline_ui;
+    ui.playing = false;
+    ui.selection.clear();
+    ui.clipboard.clear();
+    ui.drag = None;
+    ui.marquee = None;
+    ui.drag_start = None;
+    ui.seen_effects = effects;
+}
+
 fn render_play_step(app: &mut ForgeApp) {
     if app.timeline_ui.render_play.is_none() {
         app.timeline_ui.render_play = Some(RenderPlay {
             settings: app.settings.clone(),
             auto_restart: app.auto_restart,
             waiting: false,
+            shown: false,
         });
         app.auto_restart = false;
         app.settings.noise_threshold = 0.0;
@@ -239,6 +273,14 @@ fn render_play_step(app: &mut ForgeApp) {
         let done = p.job_id == job && !matches!(p.state, forge_render_core::SessionState::Rendering);
         if !done {
             return;
+        }
+        // Un giro dell'interfaccia per mostrare il fotogramma finito, prima del prossimo render.
+        if let Some(r) = &mut app.timeline_ui.render_play {
+            if !r.shown {
+                r.shown = true;
+                return;
+            }
+            r.shown = false;
         }
         // Fotogramma successivo nell'area di lavoro.
         let tl = &mut app.scene.timeline;
@@ -268,7 +310,6 @@ pub fn keyboard(app: &mut ForgeApp, ctx: &egui::Context) {
         return;
     }
     let none = egui::Modifiers::NONE;
-    let copy = egui::Modifiers::COMMAND;
     let has_sel = !app.timeline_ui.selection.is_empty();
     let mut changed = false;
     if has_sel {
@@ -287,11 +328,15 @@ pub fn keyboard(app: &mut ForgeApp, ctx: &egui::Context) {
             app.scene.timeline.set_keys_interp(&sel, Interp::EaseInOut);
             changed = true;
         }
-        if ctx.input_mut(|i| i.consume_key(copy, egui::Key::C)) {
+        // Ctrl+C e Ctrl+V non arrivano come tasti: egui li trasforma negli eventi Copy e Paste.
+        if ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Copy))) {
             app.timeline_ui.clipboard = app.scene.timeline.copy_keys(&app.timeline_ui.selection);
+            // Paste arriva solo se negli appunti di sistema c'è qualcosa.
+            ctx.copy_text(format!("ForgeRender: {} keyframe", app.timeline_ui.clipboard.len()));
         }
     }
-    if !app.timeline_ui.clipboard.is_empty() && ctx.input_mut(|i| i.consume_key(copy, egui::Key::V)) {
+    let paste = |e: &egui::Event| matches!(e, egui::Event::Paste(_) | egui::Event::PasteImage(_));
+    if !app.timeline_ui.clipboard.is_empty() && ctx.input(|i| i.events.iter().any(paste)) {
         let keys = app.timeline_ui.clipboard.clone();
         let at = app.scene.timeline.time;
         app.timeline_ui.selection = app.scene.timeline.paste_keys(&keys, at);
@@ -595,7 +640,10 @@ fn toolbar(app: &mut ForgeApp, ui: &mut egui::Ui) {
 /// "Salva animazione": che cosa (render di ogni fotogramma o anteprima della viewport) e da dove
 /// (la vista o una camera). Salva l'area di lavoro nella cartella Rendering.
 fn save_menu(app: &mut ForgeApp, ui: &mut egui::Ui) {
-    ui.menu_button(format!("{}  {}", icons::IMAGE, tr("Salva animazione")), |ui| {
+    // Il menu resta aperto mentre si scelgono le opzioni: si chiude con Salva o cliccando fuori.
+    let config = egui::containers::menu::MenuConfig::new().close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
+    let button = egui::containers::menu::MenuButton::new(format!("{}  {}", icons::IMAGE, tr("Salva animazione"))).config(config);
+    button.ui(ui, |ui| {
         let frames = app.scene.timeline.work_frames().len();
         let (a, b) = app.scene.timeline.work_area();
         ui.label(
@@ -625,7 +673,7 @@ fn save_menu(app: &mut ForgeApp, ui: &mut egui::Ui) {
         ui.separator();
         ui.checkbox(&mut app.timeline_ui.make_video, tr("Anche il video MP4"));
         if ui
-            .button(egui::RichText::new(tr("Salva")).strong())
+            .add(egui::Button::new(egui::RichText::new(tr("Salva")).strong().color(egui::Color32::WHITE)).fill(style::ACCENT))
             .on_hover_text(tr("Salva nella cartella Rendering, in una cartella nuova per ogni animazione"))
             .clicked()
         {
@@ -740,7 +788,8 @@ fn ruler(app: &mut ForgeApp, ui: &mut egui::Ui, scale: &TimeScale) -> f32 {
                 painter.text(
                     egui::pos2(x + 2.0, rect.top() + 1.0),
                     egui::Align2::LEFT_TOP,
-                    format!("{k:.1}s"),
+                    // Con le tacche da 0.25 s una cifra sola darebbe 0.2, 0.5, 0.8.
+                    if step < 0.5 { format!("{k:.2}s") } else { format!("{k:.1}s") },
                     egui::FontId::proportional(10.0),
                     ui.visuals().weak_text_color(),
                 );

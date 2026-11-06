@@ -1,8 +1,8 @@
 //! Toolbar delle azioni rapide (seconda riga in alto): i comandi più usati, icona sopra e
 //! testo sotto, a gruppi. Tutto il resto sta nei menu. A destra: Viewport | Render, Riavvio
 //! automatico e, in fondo, AI MCP (interruttore grande e ingranaggio piccolo sotto). Con la
-//! finestra stretta i comandi di sinistra che non entrano restano nascosti (sono anche nei menu)
-//! invece di finire sotto quelli di destra.
+//! finestra stretta i gruppi di sinistra che non entrano si tolgono (sono anche nei menu), a
+//! partire dai comandi dei file: quelli del render restano sempre interi.
 
 use crate::app::{ForgeApp, InspectorTab, View};
 use crate::commands::{self, Cmd};
@@ -11,6 +11,9 @@ use crate::ui::{icons, menubar, style};
 use eframe::egui;
 
 const HEIGHT: f32 = 46.0;
+/// Larghezza dei gruppi di sinistra: tutti e tre, e senza i comandi dei file.
+const LEFT_FULL: f32 = 990.0;
+const LEFT_NO_FILES: f32 = 725.0;
 
 pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
     // Gruppo di destra misurato al fotogramma prima: il gruppo di sinistra prende solo lo spazio
@@ -27,7 +30,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 .layout(egui::Layout::left_to_right(egui::Align::Center)),
         );
         left.set_clip_rect(rect.intersect(ui.clip_rect()));
-        left_group(app, &mut left);
+        left_group(app, &mut left, left_w);
         let used = ui
             .with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let start = ui.cursor().max.x;
@@ -65,11 +68,25 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
 }
 
 /// Comandi a sinistra: file, aggiunte, materiale, render.
-fn left_group(app: &mut ForgeApp, ui: &mut egui::Ui) {
-    for cmd in [Cmd::NewEmpty, Cmd::Open, Cmd::Save, Cmd::Import] {
-        cmd_button(app, ui, cmd, short_label(cmd));
+fn left_group(app: &mut ForgeApp, ui: &mut egui::Ui, width: f32) {
+    if width >= LEFT_FULL {
+        for cmd in [Cmd::NewEmpty, Cmd::Open, Cmd::Save, Cmd::Import] {
+            cmd_button(app, ui, cmd, short_label(cmd));
+        }
+        ui.separator();
     }
-    ui.separator();
+    if width >= LEFT_NO_FILES {
+        add_group(app, ui);
+        ui.separator();
+    }
+    render_button(app, ui);
+    cmd_button(app, ui, Cmd::Stop, tr("Stop"));
+    cmd_button(app, ui, Cmd::Restart, tr("Riavvia"));
+    cmd_button(app, ui, Cmd::Export, tr("Esporta"));
+}
+
+/// Aggiunte alla scena e materiale.
+fn add_group(app: &mut ForgeApp, ui: &mut egui::Ui) {
     dropdown(ui, icons::ADD, tr("Aggiungi"), |ui| {
         for (label, kind) in crate::app::ADD_MENU {
             if ui.button(tr(label)).clicked() {
@@ -133,11 +150,6 @@ fn left_group(app: &mut ForgeApp, ui: &mut egui::Ui) {
     {
         run(app, ui, Cmd::LibraryMine);
     }
-    ui.separator();
-    render_button(app, ui);
-    cmd_button(app, ui, Cmd::Stop, tr("Stop"));
-    cmd_button(app, ui, Cmd::Restart, tr("Riavvia"));
-    cmd_button(app, ui, Cmd::Export, tr("Esporta"));
 }
 
 /// AI MCP in fondo a destra: due pulsanti della stessa larghezza, uno sopra l'altro, alti

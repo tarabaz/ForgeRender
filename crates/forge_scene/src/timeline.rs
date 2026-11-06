@@ -925,6 +925,17 @@ impl Timeline {
     /// (un fumo salvato a 4 s non riparte vuoto): serve quando arriva un effetto o si apre un
     /// progetto senza animazione.
     pub fn adopt_effects(&mut self, scene: &Scene) {
+        // Ogni effetto nel tempo ha la sua riga, con inizio e fine a portata di mano.
+        let simulated = scene.smokes.iter().filter(|s| s.mode == crate::SmokeMode::Simulated);
+        let targets: Vec<Target> = simulated
+            .map(|s| Target::Smoke(s.n))
+            .chain(scene.fogs.iter().map(|f| Target::Fog(f.name.clone())))
+            .collect();
+        for target in targets {
+            if !self.elements.contains(&target) {
+                self.elements.push(target);
+            }
+        }
         let t = scene
             .smokes
             .iter()
@@ -932,8 +943,9 @@ impl Timeline {
             .map(|s| s.sim.time)
             .chain(scene.fogs.iter().map(|f| f.sim_time))
             .fold(0.0f32, f32::max);
-        if t > self.time {
-            self.duration = self.duration.max(t);
+        self.duration = self.duration.max(t);
+        // Con un'animazione già fatta il cursore resta dov'è.
+        if t > self.time && self.tracks.iter().all(|tr| !tr.is_animated()) {
             self.time = t;
         }
     }
@@ -1531,5 +1543,36 @@ mod tests {
         tl.time = 0.5;
         tl.apply(&mut s);
         assert_eq!(s.smokes[0].sim.time, MIN_EFFECT_TIME);
+    }
+
+    #[test]
+    fn a_new_effect_gets_its_row_and_respects_the_animation() {
+        let mut s = Scene::default();
+        s.smokes.push(crate::SmokeCloud {
+            mode: crate::SmokeMode::Simulated,
+            ..Default::default()
+        });
+        s.smokes[0].sim.time = 3.0;
+        let target = Target::Smoke(s.smokes[0].n);
+        // Senza animazione il cursore va sull'istante dell'effetto.
+        let mut tl = Timeline::default();
+        tl.adopt_effects(&s);
+        assert!(tl.elements.contains(&target));
+        assert_eq!(tl.time, 3.0);
+        tl.adopt_effects(&s);
+        assert_eq!(tl.elements.iter().filter(|e| **e == target).count(), 1);
+        // Con un'animazione il cursore resta dov'è.
+        let mut tl = Timeline::default();
+        tl.tracks.push(Track {
+            keys: vec![Key {
+                t: 1.0,
+                v: 1.0,
+                interp: Interp::Linear,
+            }],
+            ..Default::default()
+        });
+        tl.time = 1.0;
+        tl.adopt_effects(&s);
+        assert_eq!(tl.time, 1.0);
     }
 }

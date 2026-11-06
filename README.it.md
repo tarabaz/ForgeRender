@@ -18,6 +18,10 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
+### Novità della versione 0.44.1
+
+- **Correzioni da un beta test completo:** Annulla non passa più a un altro progetto, copia e incolla delle chiavi della timeline funzionano, un avviso spiega quando la sorgente del fumo è chiusa dentro un oggetto, il Play nella vista Render mostra solo fotogrammi finiti, e pannelli e barra si adattano alle finestre piccole.
+
 ### Novità della versione 0.44.0
 
 - **Fumo calcolato una volta su tutta la timeline:** ogni fotogramma resta in file temporanei, così spostare il cursore li legge subito. Se cambia qualcosa dal secondo 5 in poi, la simulazione riparte dall'ultimo stato salvato prima di lì: quello che viene prima resta identico al bit, quindi una forma che ti piace non si perde.
@@ -281,7 +285,7 @@ Una timeline professionale, sempre disponibile: sta in basso con le schede **Tim
 - **Chiavi:** il rombo mette o toglie una chiave nell'istante del cursore con il valore attuale; spostare un oggetto con il gizmo, o cambiare un valore nei pannelli, quando la sua proprietà ha già delle chiavi registra lì una chiave. Come in After Effects, un clic seleziona una chiave, Ctrl o Maiusc aggiunge o toglie, trascinando sul vuoto si disegna un rettangolo di selezione e trascinando una chiave si spostano tutte le selezionate (a scatti di fotogramma); Canc le toglie, Ctrl+C e Ctrl+V le copiano nell'istante del cursore, F9 mette la morbida in entrata e uscita e il clic destro sceglie l'interpolazione verso la chiave dopo: a scatto, lineare, morbida in entrata, in uscita, in entrata e uscita, curva continua.
 - **Modificatori:** "ƒ+" aggiunge a ogni proprietà, uno alla volta e in ordine, tremolio (ampiezza, frequenza, seme), oscillazione, rampa continua (per esempio 90°/s per una piattaforma girevole), ripeti, avanti e indietro, spostamento, moltiplica, limiti e a scatti (stop motion); su una riga a tre assi le lettere X Y Z scelgono su quali agisce.
 - **Riproduzione:** inizio, chiave prima, play/pausa, chiave dopo, fine, ripeti; durata e fotogrammi al secondo; zoom e scorrimento del tempo. La barra dell'**area di lavoro** sopra il righello (si trascinano le due estremità e il centro) sceglie la parte che si riproduce e si salva. Nella viewport la riproduzione è in tempo reale; nella **vista Render** il Play calcola ogni fotogramma con pochi campioni (20 di serie, regolabili) e passa al successivo: più lento del tempo reale, ma si vede l'animazione renderizzata.
-- **Effetti nel tempo:** fumo simulato e ghiaccio secco seguono il cursore: l'istante simulato è il tempo del cursore meno l'inizio dell'effetto, che si sceglie sulla sua riga insieme alla fine dell'emissione; la durata scelta nella timeline decide fino a quando si calcolano.
+- **Effetti nel tempo:** fumo simulato e ghiaccio secco hanno la loro riga appena creati e seguono il cursore: l'istante simulato è il tempo del cursore meno l'inizio dell'effetto, che si sceglie sulla sua riga insieme alla fine dell'emissione; la durata scelta nella timeline decide fino a quando si calcolano.
 - **Salva animazione:** l'area di lavoro, come render di ogni fotogramma o come **anteprima della viewport** (pochi secondi, per controllare il movimento; fumo e nebbie non ci sono), dalla viewport o da una camera di rendering, in fotogrammi PNG in una cartella nuova dentro **Rendering** e, se vuoi, in un video MP4.
 - **Opacità degli oggetti:** una proprietà a sé, resa lasciando passare ogni raggio con probabilità 1 − opacità, così l'oggetto sfuma con la sua ombra, uguale su CPU e GPU.
 

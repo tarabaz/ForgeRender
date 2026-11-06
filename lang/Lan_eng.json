@@ -1693,6 +1693,8 @@
     "Quanto è luminoso il bagliore (0 = niente, 1 = normale)": "How bright the glow is (0 = none, 1 = normal)",
     "Anche il video MP4": "Also the MP4 video",
     "Anteprima (viewport)": "Preview (viewport)",
+  "La sorgente è dentro un oggetto: il fumo resta chiuso lì e nel render non si vede. Sposta la sorgente o spegni le collisioni.": "The source is inside an object: the smoke stays trapped there and does not show in the render. Move the source or turn collisions off.",
+  "1 componente eliminato dal progetto (il file importato non viene modificato). Ctrl+Z o \"Eliminati\" in fondo all'albero per ripristinarlo.": "1 component removed from the project (the imported file is not changed). Ctrl+Z or \"Removed\" at the bottom of the tree to restore it.",
     "Area di lavoro: da {} a {} s, {} fotogrammi": "Work area: from {} to {} s, {} frames",
     "Fine dell'area da riprodurre e salvare": "End of the area to play and save",
     "I fotogrammi come si vedono nella viewport: pochi secondi, per controllare il movimento. Fumo e nebbie non ci sono": "The frames as seen in the viewport: a few seconds, to check the motion. Smoke and fog are not included",

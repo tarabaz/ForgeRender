@@ -13,6 +13,19 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.44.1 — 06/11/2026
+
+Correzioni dal beta test; report completo in `reports/chatgpt/2026-11-06_betatest-0.44.md`.
+
+- Annulla e Ripeti si svuotano quando si apre un altro progetto: le voci usano gli indici dei nodi e, su una scena con lo stesso numero di nodi, avrebbero toccato i pezzi sbagliati.
+- Copia e incolla delle chiavi della timeline funzionano (egui trasforma Ctrl+C e Ctrl+V negli eventi Copy e Paste; Copy scrive anche un breve testo negli appunti di sistema, perché Paste arriva solo se negli appunti c'è qualcosa).
+- Avviso nel pannello del fumo e in console quando la sorgente è dentro un oggetto con le collisioni accese: il fumo resta chiuso lì e nel render non si vede.
+- Fumo simulato e ghiaccio secco hanno la loro riga nella timeline appena creati. Un effetto nuovo sposta il cursore solo se non c'è ancora un'animazione; togliendo un effetto si tolgono le sue righe.
+- Il Play nella vista Render mostra solo fotogrammi finiti.
+- Righello della timeline con due decimali sotto il mezzo secondo. Il menu Salva animazione resta aperto mentre si sceglie e Salva si distingue.
+- Pannello in basso limitato al 60 % dell'altezza, anche quella salvata. Con la finestra stretta la barra toglie prima i comandi dei file, poi quelli per aggiungere, e tiene interi quelli del render.
+- Testi: singolare per un componente eliminato, etichetta dell'anteprima del fumo non più sopra la riga del backend.
+
 ## 0.44.0 — 06/11/2026
 
 **Fumo calcolato una volta sulla timeline**

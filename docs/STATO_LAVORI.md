@@ -807,3 +807,9 @@ Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
 - Timeline sempre attiva, righe unite, selezione delle chiavi, area di lavoro, Salva animazione (render o anteprima viewport, da viewport o camera), Play nel Render a pochi campioni.
 - Viewport: matrici in uno storage buffer, `transforms_changed` non ricarica la geometria. Cartella Rendering (`prefs::rendering_dir`).
 - Da sapere: il ghiaccio secco ha lo stop ma non ha ancora precalcolo né spostamento d'aria (si ricalcola da zero per istante). Una nube spostata con la timeline (centro animato) rifà il precalcolo a ogni posizione. Non provati a mano: selezione col mouse, trascinamento dell'area di lavoro, cattura dell'anteprima.
+
+## 0.44.1 — 06/11/2026 (Claude)
+
+- Beta test del programma: report in `reports/chatgpt/2026-11-06_betatest-0.44.md`, con misure, difetti aperti, soluzioni e domande per l'analisi comune.
+- Corretti: Annulla tra progetti, Ctrl+C/V sulle chiavi, avviso per la sorgente del fumo dentro un oggetto, riga automatica degli effetti, Play nel Render con fotogrammi finiti, righello, menu Salva animazione, altezza del pannello basso, barra in finestra stretta, `prune`.
+- Da sapere: restano aperti soprattutto gli id delle luci (tracce per nome), Annulla per la timeline, precalcolo del ghiaccio secco e strumenti MCP per timeline ed effetti. La crescita della RAM col fumo (da 567 a 938 MB in circa 10 minuti) non è stata approfondita.

@@ -1035,11 +1035,17 @@ impl ForgeApp {
             for &i in &originals {
                 self.scene.nodes[i].removed = true;
             }
-            self.info = Some(tf(
-                "{} componenti eliminati dal progetto (il file importato non viene modificato). \
-                 Ctrl+Z o \"Eliminati\" in fondo all'albero per ripristinarli.",
-                &[format!("{}", originals.len())],
-            ));
+            self.info = Some(if originals.len() == 1 {
+                tr("1 componente eliminato dal progetto (il file importato non viene modificato). \
+                    Ctrl+Z o \"Eliminati\" in fondo all'albero per ripristinarlo.")
+                .to_string()
+            } else {
+                tf(
+                    "{} componenti eliminati dal progetto (il file importato non viene modificato). \
+                     Ctrl+Z o \"Eliminati\" in fondo all'albero per ripristinarli.",
+                    &[format!("{}", originals.len())],
+                )
+            });
         }
         if deleted > 0 || !originals.is_empty() {
             self.selection.clear();
@@ -1735,6 +1741,11 @@ impl ForgeApp {
 
     /// Aggiorna la texture del render se è arrivato un nuovo frame o se è cambiato il tone mapping.
     pub fn render_texture(&mut self, ctx: &egui::Context) -> Option<&egui::TextureHandle> {
+        // Play nella vista Render: si tiene l'ultimo fotogramma finito finché non è pronto il
+        // prossimo, altrimenti si vedrebbero soprattutto i primi campioni pieni di rumore.
+        if crate::ui::timeline::render_play_running(self) && self.is_rendering_now() && self.render_texture.is_some() {
+            return self.render_texture.as_ref();
+        }
         let version = self.session.frame_version();
         let strength = self.settings.denoise.strength;
         let key = (
@@ -1819,10 +1830,21 @@ impl ForgeApp {
     // Scena e progetto
     // ------------------------------------------------------------------
 
+    /// Un render è in corso (o in preparazione).
+    fn is_rendering_now(&self) -> bool {
+        self.is_preparing() || matches!(self.session.progress().state, forge_render_core::SessionState::Rendering)
+    }
+
     pub fn replace_scene(&mut self, scene: Scene, meta: ProjectMeta, settings: Option<RenderSettings>) {
         self.session.cancel();
         self.job = None;
+        crate::ui::timeline::restore_render_play(self);
         self.scene = scene;
+        // Annulla e ripeti valgono per un progetto solo: le voci usano gli indici dei nodi e su
+        // una scena con lo stesso numero di nodi toccherebbero i pezzi sbagliati.
+        self.undo_stack.clear();
+        self.redo_stack.clear();
+        crate::ui::timeline::scene_replaced(self);
         self.meta = meta;
         if let Some(s) = settings {
             self.settings = s;

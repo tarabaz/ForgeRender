@@ -167,7 +167,8 @@ pub fn draw(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect, i: usize)
         label.push_str(crate::i18n::tr(" · solo anteprima, il render non lo calcola"));
     }
     painter.text(
-        rect.left_bottom() + egui::vec2(10.0, -10.0),
+        // Sopra la riga del backend, in basso a sinistra.
+        rect.left_bottom() + egui::vec2(10.0, -30.0),
         egui::Align2::LEFT_BOTTOM,
         label,
         egui::FontId::proportional(12.0),

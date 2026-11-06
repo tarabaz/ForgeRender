@@ -10,6 +10,19 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.44.1 — 6 Nov 2026
+
+Fixes from the beta test; full report in `reports/chatgpt/2026-11-06_betatest-0.44.md`.
+
+- Undo and Redo are cleared when another project is opened: the entries use node indices and, on a scene with the same node count, would have touched the wrong parts.
+- Copy and paste of timeline keys work (egui turns Ctrl+C and Ctrl+V into the Copy and Paste events; Copy also writes a short text to the system clipboard, because Paste only arrives when the clipboard holds something).
+- Warning in the smoke panel and in the console when the source is inside an object with collisions on: the smoke stays trapped there and does not show in the render.
+- Simulated smoke and dry ice get their timeline row as soon as they are created. A new effect moves the playhead only when there is no animation yet; removing an effect removes its rows.
+- Play in the Render view shows finished frames only.
+- Timeline ruler with two decimals below half a second. The Save animation menu stays open while choosing and Save stands out.
+- Bottom panel limited to 60% of the height, including a saved height. In a narrow window the toolbar drops the file commands first, then the add commands, and keeps the render commands whole.
+- Text fixes: singular for one removed component, smoke preview label no longer over the backend line.
+
 ## 0.44.0 — 6 Nov 2026
 
 **Smoke computed once over the timeline**
