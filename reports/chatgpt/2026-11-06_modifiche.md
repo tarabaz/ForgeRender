@@ -607,3 +607,15 @@ Per le luci di tipo **Spot** e **Direzionale**, il bersaglio (*target*) deve pot
 5. Verificare che le altre tipologie di luce e gli strumenti di manipolazione esistenti non subiscano regressioni.
 
 **Risultato atteso:** poter puntare e orientare Spot e Direzionali trascinando il loro bersaglio direttamente nella scena, con un'interazione chiara e coerente con gli altri gizmo di ForgeRender.
+
+
+## 7. Aggiornamento immagini e README — 06/11/2026
+
+**Richiesta di Valerio:** integrare nel README le due immagini appena aggiunte al repository.
+
+- `docs/img/features/dopo_fascio_solo_camera.jpg`: sostituire nei README il vecchio collegamento a `reports/fascio-volumetrico/dopo_fascio_solo_camera.png` con il nuovo file JPG.
+- `docs/img/features/timeline-animation.jpg`: inserirla nella sezione 16 dedicata alla Timeline, subito dopo il paragrafo introduttivo.
+- Applicare entrambe le modifiche a `README.md` (inglese) e `README.it.md` (italiano), mantenendo le descrizioni coerenti.
+- Non modificare o rimuovere i file immagine originali.
+
+**Verifica richiesta:** controllare che entrambi i percorsi immagine esistano nel branch e che i README non contengano più il vecchio collegamento PNG.
