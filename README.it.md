@@ -181,6 +181,8 @@ Un mezzo partecipante che riempie la scena (o solo uno strato) e che ogni luce a
 
 ![Fumo volumetrico — nubi, pennacchi e fili d'incenso](docs/img/features/volumetric-smoke.jpg)
 
+[▶ Guarda il video: illuminazione e fumo volumetrico](docs/img/features/forgerender-demo-volumetric-lighe-smoke.mp4)
+
 Nubi di fumo volumetrico vere per le foto di prodotto: il fumo d'incenso accanto al flacone di profumo, il vapore che sale dalla tazza, il pennacchio da un tubo o da un camino, il fumo denso e scuro industriale. Ogni nube vive in un riquadro che selezioni nella viewport e sposti o ridimensioni con il gizmo: il fumo renderizzato segue esattamente il riquadro, senza lasciare niente dove era prima.
 
 - **Quattro forme e sei preset:** *Nube* (un ammasso tondeggiante a mezz'aria), *Pennacchio* (stretto in fondo al riquadro, si allarga e si dissolve salendo), *Filo d'incenso* (liscio in basso, poi si rompe in riccioli) e *Banco* (riempie tutto il riquadro con i bordi sfilacciati). Preset: nube sospesa, incenso, vapore da tazza, pennacchio da tubo, fumo denso industriale e banco di fumo. Ogni preset aggiunge una nube nuova sopra la selezione, non ne sostituisce nessuna.
@@ -245,6 +247,8 @@ Prepara una scena prodotto con fondale e luci da studio, quindi scegli sfondo ch
 ### 11. Illuminazione volumetrica e fasci visibili
 
 ![ForgeRender: fascio di luce volumetrico](docs/img/features/dopo_fascio_solo_camera.jpg)
+
+[▶ Guarda il video: illuminazione e fumo volumetrico](docs/img/features/forgerender-demo-volumetric-lighe-smoke.mp4)
 
 Le luci spot possono generare fasci visibili con densità e lunghezza regolabili. La nebbia volumetrica è un mezzo partecipante simulato, con scattering e ombre: la luce interagisce con il volume e diventa visibile nello spazio, non soltanto sulle superfici.
 
