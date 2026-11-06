@@ -2925,3 +2925,9 @@ Richieste di Valerio: "Sostituisci materiale" (tutti i componenti con un materia
 
 - Corretti i difetti aperti del beta test: `Target::Light` e `Target::Fog` per numero (`Light::id`, `FogVolume::id`, `Scene::assign_element_ids`, `Timeline::resolve_names`, variante `Target::Named` per leggere i progetti vecchi), Annulla per la timeline (`UndoEntry`, `watch_timeline` in `app.rs`), avvisi con Apri cartella (`Toast`, `notify_saved`), `check_source` e `point_inside` per la sorgente del fumo, pannelli.
 - Da sapere: restano aperti precalcolo del ghiaccio secco, griglia fine del fumo nel precalcolo, nube con centro animato e strumenti MCP per timeline ed effetti (sono funzioni nuove, non difetti).
+
+
+## 0.46.0 — 06/11/2026 (Claude)
+
+- Sezioni 1.5, 1.6, 6 e 8 di `2026-11-06_modifiche.md`. Backend video: Media Foundation (MP4 H.264 a bitrate), writer AVI interno, ffmpeg per tutto il resto (non incluso nel programma). Verificati con ffprobe MP4 standard, MP4 CRF 16 e 12, MKV FFV1, MOV ProRes, AVI su più segmenti; AVI vero da 120 fotogrammi nel programma: 331,8 MB come stimato, `rawvideo,1280,720,bgr24,24/1,120`.
+- Verifica visiva svolta: barra a 1500×800 e 900×600, bersaglio Spot con Annulla, finestra video, 9 contatori con limite e a capo, persistenza dopo riavvio. Non verificati: Direzionale nella finestra, luce animata con il bersaglio, ETA confrontata su un'esportazione lunga, scaling DPI diversi, inglese nella finestra.

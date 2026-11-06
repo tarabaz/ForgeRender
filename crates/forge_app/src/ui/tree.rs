@@ -281,6 +281,7 @@ fn cameras(app: &mut ForgeApp, ui: &mut egui::Ui) {
         app.selected_dust = false;
         app.selected_camera = Some(i);
         app.camera_target_handle = false;
+        app.light_target_handle = false;
         app.tab = InspectorTab::Camera;
     }
 }

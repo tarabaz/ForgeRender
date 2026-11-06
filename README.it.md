@@ -18,6 +18,13 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
+### Novità della versione 0.46.0
+
+- **Scegli come nasce il video:** MP4, MOV, MKV o AVI, H.264, H.265, ProRes, FFV1 o non compresso, con preset dal file piccolo al senza perdita e i parametri effettivi riportati alla fine.
+- **La tua barra di stato:** fino a 9 contatori su 15, tra cui gli FPS veri della viewport, i fotogrammi fatti e il tempo rimanente per fotogrammi e codifica.
+- **Punta le luci nel viewport:** trascini il bersaglio di Spot e Direzionali e la sorgente resta ferma.
+- **Barra superiore uniforme:** tutti i controlli con la stessa altezza e lo stesso allineamento.
+
 ### Novità della versione 0.45.0
 
 - **Annulla per la timeline:** chiavi, modificatori, area di lavoro e tempi degli effetti si annullano un gesto alla volta, insieme all'oggetto spostato.
@@ -244,6 +251,8 @@ Materiali diffusi, metalli e plastiche GGX, vetro Fresnel, vetro satinato ed emi
 
 Prepara una scena prodotto con fondale e luci da studio, quindi scegli sfondo chiaro, scuro o scenografico. Le luci possono essere regolate singolarmente; la scena può essere adattata alle dimensioni del prodotto senza perdere il controllo sui componenti.
 
+Le luci Spot e Direzionali si puntano dal viewport: selezioni la luce, clicchi il rombo del suo bersaglio e lo trascini. La sorgente resta ferma, il cono gira dal vivo, i campi numerici restano allineati e lo spostamento si annulla; se la luce è animata, la timeline lo registra come chiave.
+
 ### 11. Illuminazione volumetrica e fasci visibili
 
 ![ForgeRender: fascio di luce volumetrico](docs/img/features/dopo_fascio_solo_camera.jpg)
@@ -303,6 +312,8 @@ Una timeline professionale, sempre disponibile: sta in basso con le schede **Tim
 - **Annulla e Ripeti:** chiavi, modificatori, area di lavoro, durata e tempi degli effetti si annullano con Ctrl+Z, un gesto alla volta, insieme all'oggetto spostato in quel gesto.
 - **Riferimenti stabili:** luci e ghiaccio secco si seguono per numero, non per nome: puoi rinominarli, o tenerne due con lo stesso nome, senza perdere l'animazione. I progetti delle versioni precedenti si convertono all'apertura.
 - **Salva animazione:** l'area di lavoro, come render di ogni fotogramma o come **anteprima della viewport** (pochi secondi, per controllare il movimento; fumo e nebbie non ci sono), dalla viewport o da una camera di rendering, in fotogrammi PNG in una cartella nuova dentro **Rendering** e, se vuoi, in un video MP4.
+- **Impostazioni video:** l'ingranaggio in Salva animazione apre contenitore, codec, CRF o bitrate, formato dei pixel, frequenza, risoluzione e file di destinazione, con i preset Standard, Alta qualità, Molto alta, Per il montaggio (ProRes), Senza perdita (FFV1) e Non compresso (AVI). MP4 H.264 e AVI non compresso funzionano subito; gli altri formati richiedono ffmpeg accanto al programma o nel PATH e senza restano disattivati. Il file compare solo a lavoro finito, la codifica si può interrompere e l'avviso riporta i parametri veri.
+- **Tempo rimanente:** la barra di stato conta i fotogrammi e stima quanto manca per il render e poi per la codifica, solo quando ci sono dati veri.
 - **Opacità degli oggetti:** una proprietà a sé, resa lasciando passare ogni raggio con probabilità 1 − opacità, così l'oggetto sfuma con la sua ombra, uguale su CPU e GPU.
 
 ## Cosa fa oggi
@@ -407,6 +418,9 @@ Una timeline professionale, sempre disponibile: sta in basso con le schede **Tim
 - Avvio / pausa / ripresa / stop / riavvio automatico quando la scena cambia, export PNG.
 - Progetti `.frproject` (JSON versionato, salvataggio atomico, percorsi relativi).
 - CLI per render senza interfaccia, benchmark e import nella libreria.
+- **Esportazione video**: MP4, MOV, MKV e AVI con H.264, H.265, ProRes, FFV1 o non compresso, preset, stima della dimensione e parametri veri alla fine.
+- **Barra di stato configurabile**: fino a 9 contatori su 15 (FPS viewport, fotogrammi, tempo rimanente, GPU, VRAM, RAM e altri), Backend e processore fissi a destra.
+- **Bersaglio delle luci nel viewport**: Spot e Direzionali si puntano trascinando il bersaglio, con Annulla.
 
 ## Scaricare la versione Windows
 

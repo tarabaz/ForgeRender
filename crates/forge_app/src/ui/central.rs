@@ -126,6 +126,7 @@ fn move_selection(app: &mut ForgeApp, rect: egui::Rect, from: egui::Pos2, to: eg
 }
 
 fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
+    app.viewport_fps.frame(std::time::Instant::now());
     let rect = ui.available_rect_before_wrap();
     let resp = ui.allocate_rect(rect, egui::Sense::click_and_drag());
     // Esc deseleziona tutto, se non serve ad annullare altro (trascinamento del gizmo, scelta
@@ -310,6 +311,16 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
                     }
                 }
             }
+            // Bersaglio della luce selezionata (7), distinto dalla sorgente.
+            if let Some(i) = app.selected_light {
+                if let Some(l) = app.scene.lights.get(i).filter(|l| crate::ui::gizmo::has_target_handle(l)) {
+                    if let Some(d) = near(l.target) {
+                        if best.is_none_or(|b| d < b.0) {
+                            best = Some((d, 7, i));
+                        }
+                    }
+                }
+            }
             if let Some((_, kind, i)) = best {
                 app.selection.clear();
                 app.selected_light = None;
@@ -318,10 +329,12 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
                 app.selected_dust = false;
                 app.selected_camera = None;
                 app.camera_target_handle = false;
+                app.light_target_handle = false;
                 app.smoke_source_handle = false;
                 match kind {
-                    0 => {
+                    0 | 7 => {
                         app.selected_light = Some(i);
+                        app.light_target_handle = kind == 7;
                         app.tab = crate::app::InspectorTab::Lights;
                     }
                     1 => {
@@ -821,6 +834,23 @@ fn draw_lights(app: &ForgeApp, painter: &egui::Painter, rect: egui::Rect) {
         let Some(p) = project(cam, rect, l.position) else { continue };
         if l.has_range() && l.range > 0.0 {
             draw_range_bubble(cam, painter, rect, l, color, selected);
+        }
+        // Bersaglio: visibile solo con la luce selezionata, a rombo come quello della camera.
+        if selected && crate::ui::gizmo::has_target_handle(l) {
+            if let Some(t) = project(cam, rect, l.target) {
+                let r = if app.light_target_handle { 7.0 } else { 5.0 };
+                let pts = vec![
+                    t + egui::vec2(0.0, -r),
+                    t + egui::vec2(r, 0.0),
+                    t + egui::vec2(0.0, r),
+                    t + egui::vec2(-r, 0.0),
+                ];
+                painter.add(egui::Shape::convex_polygon(
+                    pts,
+                    color.gamma_multiply(0.35),
+                    egui::Stroke::new(1.5, color),
+                ));
+            }
         }
         match l.kind {
             LightKind::Area { width, height } | LightKind::Portal { width, height } => {

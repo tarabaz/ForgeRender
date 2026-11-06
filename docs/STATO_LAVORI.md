@@ -819,3 +819,8 @@ Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
 
 - Corretti i difetti aperti del beta test: `Target::Light` e `Target::Fog` per numero (`Light::id`, `FogVolume::id`, `Scene::assign_element_ids`, `Timeline::resolve_names`, variante `Target::Named` per leggere i progetti vecchi), Annulla per la timeline (`UndoEntry`, `watch_timeline` in `app.rs`), avvisi con Apri cartella (`Toast`, `notify_saved`), `check_source` e `point_inside` per la sorgente del fumo, pannelli.
 - Da sapere: restano aperti precalcolo del ghiaccio secco, griglia fine del fumo nel precalcolo, nube con centro animato e strumenti MCP per timeline ed effetti (sono funzioni nuove, non difetti).
+
+## 0.46.0 — 06/11/2026 (Claude)
+
+- Prima parte di `reports/chatgpt/2026-11-06_modifiche.md`: `forge_app/src/video.rs` riscritto (`VideoSettings`, `Caps`, `Job`, `Report`, `Progress`; strade: Media Foundation, AVI nostro con OpenDML, ffmpeg), finestra `ui/video_settings.rs`, contatori in `ui/status.rs` (`StatusItem` in `prefs.rs`, 9 + 2 fissi, `FpsMeter`), bersaglio luci (`light_target_handle`, `gizmo::has_target_handle`), voce `lights` in `UndoEntry`, barra in `ui/quickbar.rs` (`tool_button` unico, altezza 28).
+- Da sapere: il "compilatore Intel" citato nella richiesta non esiste nel codice: sotto Backend c'è il nome del processore, ed è quello che resta fisso. Temperatura e potenza GPU non ci sono: la telemetria non le legge.

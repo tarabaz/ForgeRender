@@ -10,6 +10,19 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.46.0 — 6 Nov 2026
+
+From `reports/chatgpt/2026-11-06_modifiche.md`.
+
+- **Video export settings:** a new window chooses container (MP4, MOV, MKV, AVI), codec (H.264, H.265, ProRes, FFV1, uncompressed RGB), CRF or bitrate, pixel format, frame rate, resolution and destination file, with six presets and a size estimate. Without ffmpeg next to the program or in the PATH, MP4 H.264 and uncompressed AVI remain and the other choices are disabled. The last configuration is remembered.
+- **Uncompressed AVI needs no external tool:** ForgeRender writes it itself, with OpenDML indexes so it does not stop at the old 2 GB limit.
+- **Honest video files:** the file gets its final name only when finished, so an error, a full disk or an interruption leaves nothing half-written; encoding can be interrupted; the notice reports the actual container, codec, pixel format, resolution, frame rate, size and bitrate.
+- **Status bar counters:** Settings → Status bar chooses up to 9 counters out of 15; Backend and processor always stay on the far right, and the row wraps when needed. New: viewport FPS (really measured), video FPS, frames done, separate RAM, GPU and VRAM.
+- **Time remaining:** while creating a video the bar shows the estimate for frames and then for encoding, "Calculating estimate…" until there is real data; for a single image it comes from the samples.
+- **Aim Spot and Directional lights from the viewport:** the target has its own handle (the diamond), the source stays still, and the numeric fields stay in sync.
+- **Undo for light gizmos:** dragging a light with the gizmo can now be undone, together with any key it records.
+- **Uniform top toolbar:** every control shares the same height, radius and alignment, with icon and text on one line; the accent colour marks the main action, not its size. Which groups fit is now measured on the real texts, so it holds for every language and scale.
+
 ## 0.45.0 — 6 Nov 2026
 
 Fixes for what the beta test left open; details in `reports/chatgpt/2026-11-06_betatest-0.44.md`, section 8.

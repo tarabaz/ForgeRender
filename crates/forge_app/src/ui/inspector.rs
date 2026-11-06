@@ -1436,6 +1436,22 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
         changed |= vec3_edit(ui, tr("Posizione"), &mut l.position, (radius * 0.01) as f64);
         if !matches!(l.kind, LightKind::Point) {
             changed |= vec3_edit(ui, tr("Bersaglio"), &mut l.target, (radius * 0.01) as f64);
+            if crate::ui::gizmo::has_target_handle(l) {
+                ui.horizontal(|ui| {
+                    ui.label(tr("Gizmo"));
+                    for (target, name) in [(false, tr("Sorgente")), (true, tr("Bersaglio"))] {
+                        if ui
+                            .selectable_label(app.light_target_handle == target, name)
+                            .on_hover_text(tr(
+                                "Sul bersaglio si punta la luce trascinandolo nel viewport: la sorgente resta ferma",
+                            ))
+                            .clicked()
+                        {
+                            app.light_target_handle = target;
+                        }
+                    }
+                });
+            }
             if ui.small_button(tr("Punta al centro della scena")).clicked() {
                 l.target = center;
                 changed = true;

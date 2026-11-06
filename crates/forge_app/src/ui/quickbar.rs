@@ -1,8 +1,9 @@
-//! Toolbar delle azioni rapide (seconda riga in alto): i comandi più usati, icona sopra e
-//! testo sotto, a gruppi. Tutto il resto sta nei menu. A destra: Viewport | Render, Riavvio
-//! automatico e, in fondo, AI MCP (interruttore grande e ingranaggio piccolo sotto). Con la
-//! finestra stretta i gruppi di sinistra che non entrano si tolgono (sono anche nei menu), a
-//! partire dai comandi dei file: quelli del render restano sempre interi.
+//! Toolbar delle azioni rapide (seconda riga in alto): i comandi più usati, a gruppi. Tutti i
+//! controlli passano da `Control`: stessa altezza, stessi bordi, icona e testo sulla stessa riga;
+//! il colore distingue l'azione principale, non la misura. A destra: Viewport | Render, Riavvio
+//! automatico e, in fondo, AI MCP con il suo ingranaggio. Con la finestra stretta i gruppi di
+//! sinistra che non entrano si tolgono (sono anche nei menu), a partire dai comandi dei file:
+//! quelli del render restano sempre interi.
 
 use crate::app::{ForgeApp, InspectorTab, View};
 use crate::commands::{self, Cmd};
@@ -10,10 +11,16 @@ use crate::i18n::{tf, tr};
 use crate::ui::{icons, menubar, style};
 use eframe::egui;
 
-const HEIGHT: f32 = 46.0;
-/// Larghezza dei gruppi di sinistra: tutti e tre, e senza i comandi dei file.
-const LEFT_FULL: f32 = 990.0;
-const LEFT_NO_FILES: f32 = 725.0;
+/// Altezza di tutti i controlli della barra.
+const HEIGHT: f32 = 28.0;
+const RADIUS: f32 = 4.0;
+const ICON_SIZE: f32 = 15.0;
+const TEXT_SIZE: f32 = 12.5;
+/// Margine interno ai lati e spazio tra icona e testo.
+const PAD_X: f32 = 8.0;
+const ICON_GAP: f32 = 5.0;
+/// Spazio occupato da un separatore tra due gruppi.
+const SEPARATOR: f32 = 16.0;
 
 pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
     // Gruppo di destra misurato al fotogramma prima: il gruppo di sinistra prende solo lo spazio
@@ -40,20 +47,18 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 ui.separator();
                 let mut auto = app.auto_restart;
                 let sp = commands::spec(Cmd::AutoRestart);
-                // Su due righe per risparmiare spazio.
-                let label = tr(sp.label).replacen(' ', "\n", 1);
-                if ui.checkbox(&mut auto, label).on_hover_text(tr(sp.hint)).clicked() {
+                let label = tr(sp.label);
+                let w = text_width(ui, label) + ui.spacing().icon_width + ui.spacing().icon_spacing + PAD_X;
+                let check = egui::Checkbox::new(&mut auto, label);
+                if ui.add_sized([w, HEIGHT], check).on_hover_text(tr(sp.hint)).clicked() {
                     run(app, ui, Cmd::AutoRestart);
                 }
                 ui.separator();
                 // Da destra a sinistra: prima Render, poi Viewport.
                 for (v, cmd) in [(View::Render, Cmd::ShowRender), (View::Viewport, Cmd::ShowViewport)] {
                     let sp = commands::spec(cmd);
-                    if ui
-                        .selectable_label(app.view == v, tr(sp.label))
-                        .on_hover_text(tr(sp.hint))
-                        .clicked()
-                    {
+                    let look = if app.view == v { Look::Selected } else { Look::Plain };
+                    if tool_button(ui, "", tr(sp.label), true, look).on_hover_text(tr(sp.hint)).clicked() {
                         app.view = v;
                     }
                 }
@@ -69,13 +74,31 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
 
 /// Comandi a sinistra: file, aggiunte, materiale, render.
 fn left_group(app: &mut ForgeApp, ui: &mut egui::Ui, width: f32) {
-    if width >= LEFT_FULL {
-        for cmd in [Cmd::NewEmpty, Cmd::Open, Cmd::Save, Cmd::Import] {
+    const FILES: [Cmd; 4] = [Cmd::NewEmpty, Cmd::Open, Cmd::Save, Cmd::Import];
+    // Larghezze misurate sui testi veri: valgono per ogni lingua e ogni scala.
+    let gap = ui.spacing().item_spacing.x;
+    let sum = |ui: &egui::Ui, items: &[(&str, &str)]| -> f32 { items.iter().map(|(i, l)| control_width(ui, i, l) + gap).sum() };
+    let file_items: Vec<_> = FILES.iter().map(|c| (commands::spec(*c).icon, short_label(*c))).collect();
+    let files = sum(ui, &file_items) + SEPARATOR;
+    let add_labels = add_items();
+    let add_refs: Vec<(&str, &str)> = add_labels.iter().map(|(i, l)| (*i, l.as_str())).collect();
+    let add = sum(ui, &add_refs) + SEPARATOR;
+    let render = sum(
+        ui,
+        &[
+            (icons::RENDER, tr(commands::render_label(app))),
+            (commands::spec(Cmd::Stop).icon, tr("Stop")),
+            (commands::spec(Cmd::Restart).icon, tr("Riavvia")),
+            (commands::spec(Cmd::Export).icon, tr("Esporta")),
+        ],
+    );
+    if width >= files + add + render {
+        for cmd in FILES {
             cmd_button(app, ui, cmd, short_label(cmd));
         }
         ui.separator();
     }
-    if width >= LEFT_NO_FILES {
+    if width >= add + render {
         add_group(app, ui);
         ui.separator();
     }
@@ -83,6 +106,18 @@ fn left_group(app: &mut ForgeApp, ui: &mut egui::Ui, width: f32) {
     cmd_button(app, ui, Cmd::Stop, tr("Stop"));
     cmd_button(app, ui, Cmd::Restart, tr("Riavvia"));
     cmd_button(app, ui, Cmd::Export, tr("Esporta"));
+}
+
+/// Icone e testi del gruppo delle aggiunte (quelli a tendina hanno anche la freccia).
+fn add_items() -> [(&'static str, String); 5] {
+    let menu = |label: &'static str| format!("{} \u{E136}", tr(label));
+    [
+        (icons::ADD, menu("Aggiungi")),
+        (icons::LIGHT, menu("Luci")),
+        (icons::CAMERA, menu("Camera")),
+        (icons::ENVIRONMENT, menu("Ambiente")),
+        (icons::MATERIAL, tr("Materiale").to_string()),
+    ]
 }
 
 /// Aggiunte alla scena e materiale.
@@ -144,7 +179,7 @@ fn add_group(app: &mut ForgeApp, ui: &mut egui::Ui) {
         }
     });
     // Materiale: un clic e si apre la libreria (niente menu).
-    if tool_button(ui, icons::MATERIAL, tr("Materiale"), true, None)
+    if tool_button(ui, icons::MATERIAL, tr("Materiale"), true, Look::Plain)
         .on_hover_text(tr("Apri la libreria materiali"))
         .clicked()
     {
@@ -152,27 +187,23 @@ fn add_group(app: &mut ForgeApp, ui: &mut egui::Ui) {
     }
 }
 
-/// AI MCP in fondo a destra: due pulsanti della stessa larghezza, uno sopra l'altro, alti
-/// insieme quanto la barra. Sopra (grande) l'interruttore, icona sopra e testo sotto con lo
-/// stato; sotto (piccolo) l'ingranaggio delle impostazioni dell'integrazione.
+/// AI MCP in fondo a destra: interruttore con lo stato e ingranaggio delle impostazioni, alti come
+/// gli altri controlli. Il layout va da destra a sinistra: si parte dall'ingranaggio.
 fn ai_block(app: &mut ForgeApp, ui: &mut egui::Ui) {
     let on = app.mcp.is_some();
     let connected = app.mcp.as_ref().is_some_and(|s| s.connected());
-    let state_color = if on { style::OK } else { ui.visuals().weak_text_color() };
-    let label = format!("AI MCP {}", if on { "ON" } else { "OFF" });
-    let text_font = egui::FontId::proportional(11.5);
-    let text_w = ui.painter().layout_no_wrap(label.clone(), text_font.clone(), state_color).size().x;
-    let w = text_w.max(40.0) + 14.0;
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(w, HEIGHT), egui::Sense::hover());
-    let gear_h = 13.0;
-    let big = egui::Rect::from_min_max(rect.min, egui::pos2(rect.max.x, rect.max.y - gear_h - 1.0));
-    let small = egui::Rect::from_min_max(egui::pos2(rect.min.x, rect.max.y - gear_h), rect.max);
+    // Ingranaggio: collegare o scollegare gli assistenti (Claude Desktop, Claude Code, Codex).
+    let g = tool_button(ui, icons::SETTINGS, "", true, Look::Plain).on_hover_text(tr(
+        "Impostazioni dell'integrazione AI: collega o scollega Claude Desktop, Claude Code e Codex",
+    ));
+    if g.clicked() {
+        run(app, ui, Cmd::AiSetup);
+    }
     let hint = if on {
         tr("Acceso: Claude può comandare questa finestra (tramite forgerender-mcp). Clic per spegnere.")
     } else {
         tr("Spento: nessun assistente può comandare ForgeRender. Clic per permettere a Claude di collegarsi.")
     };
-    let r = ui.interact(big, ui.make_persistent_id("barra-ai-mcp"), egui::Sense::click());
     let mut hint = hint.to_string();
     if let Some(s) = app.mcp.as_ref().filter(|s| s.connected()) {
         hint.push_str(&format!(
@@ -183,67 +214,20 @@ fn ai_block(app: &mut ForgeApp, ui: &mut egui::Ui) {
             )
         ));
     }
-    let r = r.on_hover_text(hint);
-    if ui.is_rect_visible(rect) {
-        let vis = ui.style().interact(&r);
-        let bg = if r.hovered() || r.is_pointer_button_down_on() {
-            vis.bg_fill
-        } else if on {
-            style::OK.gamma_multiply(0.18)
-        } else {
-            egui::Color32::TRANSPARENT
-        };
-        ui.painter().rect_filled(big, 4.0, bg);
-        // Collegato: bordo arancione (un assistente sta comandando).
-        if connected {
-            ui.painter()
-                .rect_stroke(big, 4.0, egui::Stroke::new(1.5, style::ACCENT), egui::StrokeKind::Inside);
-        }
-        let icon_g = ui
-            .painter()
-            .layout_no_wrap(icons::AI.to_string(), egui::FontId::proportional(16.0), state_color);
-        let text_g = ui.painter().layout_no_wrap(label, text_font, state_color);
-        let total = icon_g.size().y + 1.0 + text_g.size().y;
-        let top = big.center().y - total / 2.0;
+    let label = format!("AI MCP {}", if on { "ON" } else { "OFF" });
+    let look = if on { Look::Active } else { Look::Off };
+    let r = tool_button(ui, icons::AI, &label, true, look).on_hover_text(hint);
+    // Collegato: bordo arancione (un assistente sta comandando).
+    if connected {
         ui.painter()
-            .galley(egui::pos2(big.center().x - icon_g.size().x / 2.0, top), icon_g.clone(), state_color);
-        ui.painter().galley(
-            egui::pos2(big.center().x - text_g.size().x / 2.0, top + icon_g.size().y + 1.0),
-            text_g,
-            state_color,
-        );
+            .rect_stroke(r.rect, RADIUS, egui::Stroke::new(1.5, style::ACCENT), egui::StrokeKind::Inside);
     }
     if r.clicked() {
         run(app, ui, Cmd::AiControl);
     }
-    // Ingranaggio: collegare o scollegare gli assistenti (Claude Desktop, Claude Code, Codex).
-    let g = ui
-        .interact(small, ui.make_persistent_id("barra-ai-mcp-impostazioni"), egui::Sense::click())
-        .on_hover_text(tr(
-            "Impostazioni dell'integrazione AI: collega o scollega Claude Desktop, Claude Code e Codex",
-        ));
-    if ui.is_rect_visible(small) {
-        let vis = ui.style().interact(&g);
-        let bg = if g.hovered() || g.is_pointer_button_down_on() {
-            vis.bg_fill
-        } else {
-            ui.visuals().faint_bg_color
-        };
-        ui.painter().rect_filled(small, 3.0, bg);
-        ui.painter().text(
-            small.center(),
-            egui::Align2::CENTER_CENTER,
-            icons::SETTINGS,
-            egui::FontId::proportional(11.0),
-            vis.text_color(),
-        );
-    }
-    if g.clicked() {
-        run(app, ui, Cmd::AiSetup);
-    }
 }
 
-/// Testi brevi sotto le icone (il testo intero è nel suggerimento).
+/// Testi brevi nei pulsanti (il testo intero è nel suggerimento).
 fn short_label(cmd: Cmd) -> &'static str {
     match cmd {
         Cmd::NewEmpty => tr("Nuovo"),
@@ -276,19 +260,19 @@ fn hint(ui: &egui::Ui, cmd: Cmd) -> String {
 fn cmd_button(app: &mut ForgeApp, ui: &mut egui::Ui, cmd: Cmd, label: &str) {
     let sp = commands::spec(cmd);
     let enabled = commands::enabled(app, cmd);
-    let r = tool_button(ui, sp.icon, label, enabled, None);
+    let r = tool_button(ui, sp.icon, label, enabled, Look::Plain);
     let r = r.on_hover_text(hint(ui, cmd));
     if r.clicked() {
         run(app, ui, cmd);
     }
 }
 
-/// Avvia render: il pulsante più evidente (arancione), il testo segue lo stato.
+/// Avvia render: l'azione principale (arancione, alta come gli altri), il testo segue lo stato.
 fn render_button(app: &mut ForgeApp, ui: &mut egui::Ui) {
     let active = app.render_state() == forge_render_core::SessionState::Rendering;
     let icon = if active { icons::PAUSE } else { icons::RENDER };
     let enabled = commands::enabled(app, Cmd::RenderToggle);
-    let r = tool_button(ui, icon, tr(commands::render_label(app)), enabled, Some(style::ACCENT));
+    let r = tool_button(ui, icon, tr(commands::render_label(app)), enabled, Look::Primary);
     let r = r.on_hover_text(hint(ui, Cmd::RenderToggle));
     if r.clicked() {
         run(app, ui, Cmd::RenderToggle);
@@ -297,19 +281,48 @@ fn render_button(app: &mut ForgeApp, ui: &mut egui::Ui) {
 
 /// Pulsante con menu a tendina (icona, testo e ▾).
 fn dropdown(ui: &mut egui::Ui, icon: &str, label: &str, content: impl FnOnce(&mut egui::Ui)) {
-    let r = tool_button(ui, icon, &format!("{label} \u{E136}"), true, None);
+    let r = tool_button(ui, icon, &format!("{label} \u{E136}"), true, Look::Plain);
     egui::Popup::menu(&r).show(content);
 }
 
-/// Pulsante della toolbar: icona grande sopra, testo piccolo sotto. `fill` = pulsante pieno
-/// (solo "Avvia render").
-fn tool_button(ui: &mut egui::Ui, icon: &str, label: &str, enabled: bool, fill: Option<egui::Color32>) -> egui::Response {
-    let icon_font = egui::FontId::proportional(19.0);
-    let text_font = egui::FontId::proportional(12.0);
-    let text_color = ui.visuals().text_color();
-    let icon_g = ui.painter().layout_no_wrap(icon.to_string(), icon_font, text_color);
-    let text_g = ui.painter().layout_no_wrap(label.to_string(), text_font, text_color);
-    let w = text_g.size().x.max(icon_g.size().x).max(if fill.is_some() { 92.0 } else { 40.0 }) + 14.0;
+/// Aspetto di un controllo: cambia il colore, mai la misura.
+#[derive(Clone, Copy, PartialEq)]
+enum Look {
+    Plain,
+    /// Azione principale (solo "Avvia render").
+    Primary,
+    /// Scheda scelta.
+    Selected,
+    /// Acceso (verde).
+    Active,
+    /// Spento (testo attenuato).
+    Off,
+}
+
+fn icon_font() -> egui::FontId {
+    egui::FontId::proportional(ICON_SIZE)
+}
+
+fn text_font() -> egui::FontId {
+    egui::FontId::proportional(TEXT_SIZE)
+}
+
+fn text_width(ui: &egui::Ui, text: &str) -> f32 {
+    let color = ui.visuals().text_color();
+    ui.painter().layout_no_wrap(text.to_string(), text_font(), color).size().x
+}
+
+/// Larghezza di un controllo con questa icona e questo testo.
+fn control_width(ui: &egui::Ui, icon: &str, label: &str) -> f32 {
+    let color = ui.visuals().text_color();
+    let icon_w = ui.painter().layout_no_wrap(icon.to_string(), icon_font(), color).size().x;
+    let gap = if icon.is_empty() || label.is_empty() { 0.0 } else { ICON_GAP };
+    (icon_w + gap + text_width(ui, label) + PAD_X * 2.0).max(HEIGHT)
+}
+
+/// Il controllo della barra: unico punto che decide misure, bordi e allineamento.
+fn tool_button(ui: &mut egui::Ui, icon: &str, label: &str, enabled: bool, look: Look) -> egui::Response {
+    let w = control_width(ui, icon, label);
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(w, HEIGHT), egui::Sense::click());
     let resp = if enabled {
         resp
@@ -318,33 +331,34 @@ fn tool_button(ui: &mut egui::Ui, icon: &str, label: &str, enabled: bool, fill: 
     };
     if ui.is_rect_visible(rect) {
         let vis = ui.style().interact(&resp);
-        let bg = match fill {
-            Some(c) if enabled => {
-                if resp.hovered() {
-                    c
-                } else {
-                    c.gamma_multiply(0.85)
-                }
-            }
-            _ if enabled && (resp.hovered() || resp.is_pointer_button_down_on()) => vis.bg_fill,
-            _ => egui::Color32::TRANSPARENT,
+        let hot = enabled && (resp.hovered() || resp.is_pointer_button_down_on());
+        let visuals = ui.visuals();
+        let plain = if hot { vis.bg_fill } else { visuals.widgets.inactive.weak_bg_fill };
+        let bg = match look {
+            Look::Primary if enabled => style::ACCENT.gamma_multiply(if hot { 1.0 } else { 0.85 }),
+            Look::Selected => visuals.selection.bg_fill,
+            Look::Active if !hot => style::OK.gamma_multiply(0.18),
+            _ => plain,
         };
-        ui.painter().rect_filled(rect, 4.0, bg);
-        let color = match (enabled, fill.is_some()) {
-            (false, _) => ui.visuals().weak_text_color(),
-            (true, true) => egui::Color32::WHITE,
-            (true, false) => vis.text_color(),
+        ui.painter().rect_filled(rect, RADIUS, bg);
+        let color = match look {
+            _ if !enabled => visuals.weak_text_color(),
+            Look::Primary | Look::Selected => egui::Color32::WHITE,
+            Look::Active => style::OK,
+            Look::Off => visuals.weak_text_color(),
+            Look::Plain => vis.text_color(),
         };
-        let gap = 3.0;
-        let total = icon_g.size().y + gap + text_g.size().y;
-        let top = rect.center().y - total / 2.0;
+        let icon_g = ui.painter().layout_no_wrap(icon.to_string(), icon_font(), color);
+        let text_g = ui.painter().layout_no_wrap(label.to_string(), text_font(), color);
+        let gap = if icon.is_empty() || label.is_empty() { 0.0 } else { ICON_GAP };
+        let mut x = rect.center().x - (icon_g.size().x + gap + text_g.size().x) / 2.0;
+        // Icona e testo centrati in altezza, sulla stessa linea in tutti i controlli.
+        let icon_w = icon_g.size().x;
         ui.painter()
-            .galley_with_override_text_color(egui::pos2(rect.center().x - icon_g.size().x / 2.0, top), icon_g.clone(), color);
-        ui.painter().galley_with_override_text_color(
-            egui::pos2(rect.center().x - text_g.size().x / 2.0, top + icon_g.size().y + gap),
-            text_g,
-            color,
-        );
+            .galley(egui::pos2(x, rect.center().y - icon_g.size().y / 2.0), icon_g, color);
+        x += icon_w + gap;
+        ui.painter()
+            .galley(egui::pos2(x, rect.center().y - text_g.size().y / 2.0), text_g, color);
     }
     if enabled {
         resp

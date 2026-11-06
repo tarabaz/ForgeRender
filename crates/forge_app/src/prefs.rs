@@ -61,6 +61,75 @@ pub struct Preferences {
     pub recent_projects: Vec<PathBuf>,
     /// Timeline in una finestra a parte invece che in basso.
     pub timeline_detached: bool,
+    /// Formato e qualità del video (l'ultima configurazione).
+    pub video: crate::video::VideoSettings,
+    /// Contatori scelti per la barra di stato, al massimo [`MAX_STATUS_ITEMS`].
+    pub status_items: Vec<StatusItem>,
+}
+
+/// Contatori che si possono scegliere; Backend e processore restano sempre a destra.
+pub const MAX_STATUS_ITEMS: usize = 9;
+
+/// Un contatore della barra di stato.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum StatusItem {
+    Elapsed,
+    Remaining,
+    Frames,
+    ViewportFps,
+    VideoFps,
+    RenderSpeed,
+    Cpu,
+    Gpu,
+    Vram,
+    RamProcess,
+    RamSystem,
+    AveragePass,
+    LastPass,
+    Resolution,
+    Denoiser,
+}
+
+impl StatusItem {
+    pub const ALL: [StatusItem; 15] = [
+        StatusItem::Elapsed,
+        StatusItem::Remaining,
+        StatusItem::Frames,
+        StatusItem::ViewportFps,
+        StatusItem::VideoFps,
+        StatusItem::RenderSpeed,
+        StatusItem::Cpu,
+        StatusItem::Gpu,
+        StatusItem::Vram,
+        StatusItem::RamProcess,
+        StatusItem::RamSystem,
+        StatusItem::AveragePass,
+        StatusItem::LastPass,
+        StatusItem::Resolution,
+        StatusItem::Denoiser,
+    ];
+
+    pub fn defaults() -> Vec<StatusItem> {
+        vec![
+            StatusItem::Elapsed,
+            StatusItem::Remaining,
+            StatusItem::RenderSpeed,
+            StatusItem::Cpu,
+            StatusItem::Gpu,
+            StatusItem::Vram,
+        ]
+    }
+}
+
+/// Elenco utilizzabile: niente doppioni e non oltre il limite, anche con un file scritto a mano.
+pub fn clean_status_items(items: &mut Vec<StatusItem>) {
+    let mut seen = Vec::new();
+    items.retain(|i| {
+        let new = !seen.contains(i);
+        seen.push(*i);
+        new
+    });
+    items.truncate(MAX_STATUS_ITEMS);
 }
 
 /// Cartella predefinita di quello che si salva o si esporta: `Rendering` accanto al programma, o
@@ -131,6 +200,8 @@ impl Default for Preferences {
             auto_restart: true,
             recent_projects: Vec::new(),
             timeline_detached: false,
+            video: Default::default(),
+            status_items: StatusItem::defaults(),
         }
     }
 }
@@ -138,6 +209,7 @@ impl Default for Preferences {
 impl Preferences {
     /// Valori fuori intervallo riportati a quelli validi.
     pub fn sanitized(mut self) -> Self {
+        clean_status_items(&mut self.status_items);
         if self.language.trim().is_empty() {
             self.language = crate::i18n::SOURCE_CODE.into();
         }
@@ -253,6 +325,11 @@ mod tests {
         assert!(err.is_none(), "file mancante: nessun errore");
         let custom = Preferences {
             ui_mode: UiMode::Advanced,
+            status_items: vec![StatusItem::Frames, StatusItem::ViewportFps],
+            video: crate::video::VideoSettings {
+                crf: 20,
+                ..Default::default()
+            },
             language: "en".into(),
             show_splash: false,
             ask_ui_mode: false,

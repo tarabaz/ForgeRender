@@ -198,6 +198,8 @@ pub struct UndoEntry {
     count: usize,
     nodes: Vec<(usize, NodeState)>,
     timeline: Option<Box<forge_scene::Timeline>>,
+    /// Tutte le luci di prima (poche e leggere); la voce vale finché il loro numero non cambia.
+    lights: Option<Vec<forge_scene::Light>>,
 }
 
 /// Avviso che scompare da solo; con `folder` offre di aprire la cartella.
@@ -244,7 +246,15 @@ pub struct ForgeApp {
     /// Camera di rendering selezionata come componente (il gizmo la sposta e la fa orbitare).
     pub selected_camera: Option<usize>,
     /// Il gizmo della camera selezionata sposta il bersaglio invece della camera.
+    /// Finestra "Impostazioni video" aperta.
+    pub video_open: bool,
+    /// File del video scelto a mano (`None` = nella cartella dei fotogrammi).
+    pub video_out: Option<std::path::PathBuf>,
+    /// FPS reali della viewport.
+    pub viewport_fps: crate::ui::status::FpsMeter,
     pub camera_target_handle: bool,
+    /// Maniglia del bersaglio della luce selezionata (Spot e Direzionale): la sorgente resta ferma.
+    pub light_target_handle: bool,
     /// Il gizmo del fumo selezionato sposta la sorgente della simulazione invece del riquadro
     /// (Scala cambia il raggio della sorgente).
     pub smoke_source_handle: bool,
@@ -446,7 +456,11 @@ impl ForgeApp {
             selected_smoke: None,
             selected_dust: false,
             selected_camera: None,
+            video_open: false,
+            video_out: None,
+            viewport_fps: Default::default(),
             camera_target_handle: false,
+            light_target_handle: false,
             smoke_source_handle: false,
             smoke_preview: Default::default(),
             fog_gizmo_zone: false,
@@ -648,6 +662,10 @@ impl ForgeApp {
             app.ai_setup.open();
         }
         app.timeline_ui.demo_pending = startup.timeline_demo;
+        // ffmpeg si interroga una volta, in sottofondo: la finestra del video si apre subito.
+        std::thread::spawn(|| {
+            crate::video::caps();
+        });
         app.sequence.open = startup.sequences_window;
         if startup.prism_demo {
             app.open_demo(0);
@@ -780,6 +798,18 @@ impl ForgeApp {
             count: self.scene.nodes.len(),
             nodes: before,
             timeline: None,
+            lights: None,
+        });
+        self.undo_fresh = true;
+    }
+
+    /// Registra le luci prima di un trascinamento (annulla).
+    pub fn push_light_undo(&mut self) {
+        self.record_undo(UndoEntry {
+            count: self.scene.nodes.len(),
+            nodes: Vec::new(),
+            timeline: None,
+            lights: Some(self.scene.lights.clone()),
         });
         self.undo_fresh = true;
     }
@@ -811,6 +841,7 @@ impl ForgeApp {
                 count: self.scene.nodes.len(),
                 nodes: Vec::new(),
                 timeline: Some(before),
+                lights: None,
             }),
         }
     }
@@ -834,6 +865,7 @@ impl ForgeApp {
         self.selected_dust = false;
         self.selected_camera = None;
         self.camera_target_handle = false;
+        self.light_target_handle = false;
         self.smoke_source_handle = false;
     }
 
@@ -1157,10 +1189,14 @@ impl ForgeApp {
             if !entry.nodes.is_empty() && entry.count != n {
                 continue; // la struttura della scena è cambiata: voce non più applicabile
             }
+            if entry.lights.as_ref().is_some_and(|l| l.len() != self.scene.lights.len()) {
+                continue; // luci aggiunte o tolte nel frattempo
+            }
             let opposite = UndoEntry {
                 count: n,
                 nodes: entry.nodes.iter().map(|(i, _)| (*i, self.node_state(*i))).collect(),
                 timeline: entry.timeline.as_ref().map(|_| Box::new(self.scene.timeline.clone())),
+                lights: entry.lights.as_ref().map(|_| self.scene.lights.clone()),
             };
             if from_undo {
                 self.redo_stack.push(opposite);
@@ -1181,6 +1217,10 @@ impl ForgeApp {
                 self.scene.timeline.forget_written();
                 self.timeline_settled();
                 crate::ui::timeline::restored(self);
+            }
+            if let Some(lights) = entry.lights {
+                self.scene.lights = lights;
+                self.shading_changed();
             }
             if moved {
                 self.geometry_changed();

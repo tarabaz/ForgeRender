@@ -141,13 +141,32 @@ pub struct AnimRun {
     view_cam: Option<usize>,
     active_before: Option<usize>,
     make_video: bool,
-    video: Option<std::thread::JoinHandle<anyhow::Result<&'static str>>>,
+    video_settings: crate::video::VideoSettings,
+    video_out: Option<PathBuf>,
+    video: Option<std::thread::JoinHandle<anyhow::Result<crate::video::Report>>>,
+    /// Avanzamento della codifica, condiviso con il suo thread, e da quando è iniziata.
+    encode: Option<(std::sync::Arc<crate::video::Progress>, Instant)>,
     cancelled: bool,
 }
 
 impl AnimRun {
     pub fn progress(&self) -> (usize, usize) {
         (self.frame.min(self.total), self.total)
+    }
+
+    pub fn started(&self) -> Instant {
+        self.started
+    }
+
+    pub fn encoding(&self) -> Option<(std::sync::Arc<crate::video::Progress>, Instant)> {
+        self.encode.clone()
+    }
+
+    fn stop(&mut self) {
+        self.cancelled = true;
+        if let Some((p, _)) = &self.encode {
+            p.cancel.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
     }
 }
 
@@ -622,13 +641,16 @@ fn toolbar(app: &mut ForgeApp, ui: &mut egui::Ui) {
         match &app.timeline_ui.run {
             Some(r) => {
                 let (f, n) = r.progress();
-                ui.label(tf(
-                    "Render animazione: fotogramma {} di {}",
-                    &[(f + 1).min(n).to_string(), n.to_string()],
-                ));
+                match r.encoding().map(|(p, _)| p.get()) {
+                    Some((f, n)) => ui.label(tf("Codifica del video: fotogramma {} di {}", &[f.to_string(), n.to_string()])),
+                    None => ui.label(tf(
+                        "Render animazione: fotogramma {} di {}",
+                        &[(f + 1).min(n).to_string(), n.to_string()],
+                    )),
+                };
                 if ui.button(tr("Interrompi")).clicked() {
                     if let Some(r) = &mut app.timeline_ui.run {
-                        r.cancelled = true;
+                        r.stop();
                     }
                 }
             }
@@ -686,7 +708,13 @@ fn save_menu(app: &mut ForgeApp, ui: &mut egui::Ui) {
             ui.radio_value(&mut app.timeline_ui.save_view, Some(i), name);
         }
         ui.separator();
-        ui.checkbox(&mut app.timeline_ui.make_video, tr("Anche il video MP4"));
+        ui.checkbox(&mut app.timeline_ui.make_video, tr("Anche il video"));
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new(crate::ui::video_settings::summary(&app.prefs.video)).weak());
+            if ui.small_button(icons::SETTINGS).on_hover_text(tr("Impostazioni video…")).clicked() {
+                app.video_open = true;
+            }
+        });
         if ui
             .add(egui::Button::new(egui::RichText::new(tr("Salva")).strong().color(egui::Color32::WHITE)).fill(style::ACCENT))
             .on_hover_text(tr("Salva nella cartella Rendering, in una cartella nuova per ogni animazione"))
@@ -1624,7 +1652,10 @@ fn start_render(app: &mut ForgeApp) {
         view_cam: app.timeline_ui.save_view,
         active_before: app.scene.active_camera,
         make_video: app.timeline_ui.make_video,
+        video_settings: app.prefs.video.clone(),
+        video_out: app.video_out.clone(),
         video: None,
+        encode: None,
         cancelled: false,
     };
     // Il render guarda dalla vista scelta (l'anteprima sceglie la camera a ogni fotogramma).
@@ -1752,10 +1783,16 @@ fn finish_render(app: &mut ForgeApp) {
     app.view = run.view;
     app.scene.timeline.time = run.time;
     if !run.cancelled && run.make_video && run.written.len() > 1 {
-        let frames = run.written.clone();
-        let out = run.dir.join("animazione.mp4");
-        let fps = app.scene.timeline.fps.round().max(1.0) as u32;
-        run.video = Some(std::thread::spawn(move || crate::video::encode_mp4(&frames, &out, fps, 1)));
+        let job = crate::video::Job {
+            frames: run.written.clone(),
+            out: run.video_out.clone().unwrap_or_else(|| run.dir.join("animazione.mp4")),
+            settings: run.video_settings.clone(),
+            fps: app.scene.timeline.fps.round().max(1.0) as u32,
+            loops: 1,
+        };
+        let progress = std::sync::Arc::new(crate::video::Progress::default());
+        run.encode = Some((progress.clone(), Instant::now()));
+        run.video = Some(std::thread::spawn(move || crate::video::encode(&job, &progress)));
         return;
     }
     let run = app.timeline_ui.run.take().expect("render dell'animazione");
@@ -1788,13 +1825,10 @@ fn finish_video(app: &mut ForgeApp) {
         ],
     );
     match video {
-        Some(Ok(Ok(enc))) => {
+        Some(Ok(Ok(report))) => {
             text = format!(
                 "{text}\n{}",
-                tf(
-                    "Video: {} ({})",
-                    &[run.dir.join("animazione.mp4").display().to_string(), enc.to_string()]
-                )
+                tf("Video: {} ({})", &[report.path.display().to_string(), report.describe()])
             )
         }
         Some(Ok(Err(e))) => text = format!("{text}\n{}", tf("video non creato: {e:#}", &[format!("{e:#}")])),

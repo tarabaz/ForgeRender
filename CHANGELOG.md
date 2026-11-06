@@ -13,6 +13,19 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.46.0 — 6 nov 2026
+
+Da `reports/chatgpt/2026-11-06_modifiche.md`.
+
+- **Impostazioni di esportazione video:** una finestra nuova sceglie contenitore (MP4, MOV, MKV, AVI), codec (H.264, H.265, ProRes, FFV1, RGB non compresso), CRF o bitrate, formato dei pixel, frequenza, risoluzione e file di destinazione, con sei preset e una stima della dimensione. Senza ffmpeg accanto al programma o nel PATH restano MP4 H.264 e AVI non compresso, e le altre scelte sono disattivate. L'ultima configurazione viene ricordata.
+- **AVI non compresso senza strumenti esterni:** lo scrive ForgeRender, con gli indici OpenDML, così non si ferma al vecchio limite dei 2 GB.
+- **File video affidabili:** il file prende il nome finale solo a lavoro finito, quindi un errore, il disco pieno o un'interruzione non lasciano niente a metà; la codifica si può interrompere; l'avviso riporta contenitore, codec, formato dei pixel, risoluzione, frequenza, dimensione e bitrate effettivi.
+- **Contatori della barra di stato:** Impostazioni → Barra di stato sceglie fino a 9 contatori su 15; Backend e processore restano sempre all'estrema destra e la riga va a capo se serve. Nuovi: FPS viewport (misurati davvero), FPS video, fotogrammi fatti, RAM, GPU e VRAM separate.
+- **Tempo rimanente:** mentre si crea un video la barra mostra la stima dei fotogrammi e poi della codifica, con "Calcolo stima…" finché non ci sono dati veri; per un'immagine sola viene dai campioni.
+- **Puntare Spot e Direzionali dal viewport:** il bersaglio ha la sua maniglia (il rombo), la sorgente resta ferma e i campi numerici restano allineati.
+- **Annulla per il gizmo delle luci:** ora si annulla anche il trascinamento di una luce, insieme all'eventuale chiave registrata.
+- **Barra superiore uniforme:** tutti i controlli hanno la stessa altezza, gli stessi bordi e lo stesso allineamento, con icona e testo su una riga; il colore d'accento distingue l'azione principale, non la misura. I gruppi che entrano si misurano sui testi veri: vale per ogni lingua e scala.
+
 ## 0.45.0 — 6 nov 2026
 
 Correzioni di quello che il beta test aveva lasciato aperto; dettagli in `reports/chatgpt/2026-11-06_betatest-0.44.md`, sezione 8.

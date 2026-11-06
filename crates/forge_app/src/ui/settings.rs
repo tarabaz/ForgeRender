@@ -17,6 +17,7 @@ enum Section {
     Library,
     Paths,
     Rendering,
+    Status,
     About,
 }
 
@@ -54,6 +55,7 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
                         (Section::Library, tr("Libreria e import")),
                         (Section::Paths, tr("Percorsi")),
                         (Section::Rendering, tr("Rendering")),
+                        (Section::Status, tr("Barra di stato")),
                         (Section::About, tr("Informazioni")),
                     ] {
                         ui.selectable_value(&mut section, s, label);
@@ -73,6 +75,7 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
                     Section::Library => library(ui, &mut p, &mut clear_cache),
                     Section::Paths => paths(ui, &mut p),
                     Section::Rendering => rendering(ui, &mut p),
+                    Section::Status => crate::ui::status::settings(ui, &mut p),
                     Section::About => about(ui, &mut p),
                 });
             });

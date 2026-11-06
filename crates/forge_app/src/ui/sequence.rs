@@ -14,11 +14,14 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
         options_window(app, ctx);
     }
     passes_window(app, ctx);
+    crate::ui::video_settings::window(app, ctx);
 }
 
 fn options_window(app: &mut ForgeApp, ctx: &egui::Context) {
     let mut open = true;
     let mut start = false;
+    let mut video_open = false;
+    let summary = app.prefs.video.clone();
     egui::Window::new(tr("Viste e turntable"))
         .open(&mut open)
         .resizable(false)
@@ -103,7 +106,13 @@ fn options_window(app: &mut ForgeApp, ctx: &egui::Context) {
                         ))
                         .strong(),
                     );
-                    ui.checkbox(&mut o.make_video, tr("Crea il video MP4 (H.264)"));
+                    ui.horizontal(|ui| {
+                        ui.checkbox(&mut o.make_video, tr("Crea il video"));
+                        if ui.button(tr("Impostazioni video…")).clicked() {
+                            video_open = true;
+                        }
+                    });
+                    ui.label(egui::RichText::new(crate::ui::video_settings::summary(&summary)).weak());
                 }
             }
             ui.separator();
@@ -203,6 +212,9 @@ fn options_window(app: &mut ForgeApp, ctx: &egui::Context) {
     if !open {
         app.sequence.open = false;
     }
+    if video_open {
+        app.video_open = true;
+    }
     if start {
         app.start_sequence();
     }
@@ -219,6 +231,7 @@ fn pass_checkboxes(ui: &mut egui::Ui, p: &mut PassSet) {
 fn progress_modal(app: &mut ForgeApp, ctx: &egui::Context) {
     let mut stop = false;
     let Some(run) = &app.sequence.run else { return };
+    let encode = run.encoding();
     let render = app.session.progress();
     egui::Modal::new(egui::Id::NULL.with("sequenza")).show(ctx, |ui| {
         ui.set_width(380.0);
@@ -226,8 +239,14 @@ fn progress_modal(app: &mut ForgeApp, ctx: &egui::Context) {
         if run.is_finishing() {
             ui.horizontal(|ui| {
                 ui.spinner();
-                ui.label(tr("Ultimi salvataggi e creazione del video…"));
+                match encode.as_ref().map(|p| p.get()).filter(|(_, n)| *n > 0) {
+                    Some((f, n)) => ui.label(tf("Codifica del video: fotogramma {} di {}", &[f.to_string(), n.to_string()])),
+                    None => ui.label(tr("Ultimi salvataggi e creazione del video…")),
+                };
             });
+            if let Some(p) = encode.as_ref().filter(|_| ui.button(tr("Interrompi")).clicked()) {
+                p.cancel.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
             return;
         }
         let (done, total) = (run.done(), run.total());

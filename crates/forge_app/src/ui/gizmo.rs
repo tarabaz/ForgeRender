@@ -277,6 +277,16 @@ fn inside_quad(p: egui::Pos2, q: &[egui::Pos2; 4]) -> bool {
     true
 }
 
+/// Luci che si puntano trascinando il bersaglio nel viewport.
+pub fn has_target_handle(l: &Light) -> bool {
+    matches!(l.kind, LightKind::Spot { .. } | LightKind::Directional)
+}
+
+/// Il gizmo sta sul bersaglio di questa luce, non sulla sorgente.
+fn on_light_target(app: &ForgeApp, l: &Light) -> bool {
+    app.light_target_handle && has_target_handle(l)
+}
+
 /// Bersaglio del gizmo: i componenti selezionati, altrimenti la luce o la nebbia selezionata.
 pub fn target(app: &ForgeApp) -> Option<Target> {
     if !app.selection.is_empty() {
@@ -323,7 +333,7 @@ fn frame_for(app: &ForgeApp, rect: egui::Rect, t: Target, sel: &[usize]) -> Opti
             } else {
                 [Vec3::X, Vec3::Y, Vec3::Z]
             };
-            (l.position, axes)
+            (if on_light_target(app, l) { l.target } else { l.position }, axes)
         }
         Target::Fog(i) => {
             let f = &app.scene.fogs[i];
@@ -477,8 +487,10 @@ pub fn update(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::
     // scalare una luce che non sia ad area.
     let pointless = match tgt {
         Some(Target::Light(i)) => {
-            let k = &app.scene.lights[i].kind;
-            (app.gizmo.mode == GizmoMode::Rotate && matches!(k, LightKind::Point))
+            let l = &app.scene.lights[i];
+            let k = &l.kind;
+            // Il bersaglio è un punto: si sposta soltanto.
+            (app.gizmo.mode == GizmoMode::Rotate && (matches!(k, LightKind::Point) || on_light_target(app, l)))
                 || (app.gizmo.mode == GizmoMode::Scale && !matches!(k, LightKind::Area { .. } | LightKind::Portal { .. }))
         }
         // Il riquadro del fumo gira attorno alla verticale; la sorgente (una sfera) no.
@@ -519,7 +531,10 @@ pub fn update(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::
                         app.push_undo(&sel);
                         DragStart::Nodes(sel.iter().map(|&i| (i, app.scene.nodes[i].user)).collect())
                     }
-                    Target::Light(i) => DragStart::Light(i, app.scene.lights[i].clone()),
+                    Target::Light(i) => {
+                        app.push_light_undo();
+                        DragStart::Light(i, app.scene.lights[i].clone())
+                    }
                     Target::Fog(i) => {
                         let f = &app.scene.fogs[i];
                         DragStart::Fog(i, f.emitter, f.size, f.zone_offset)
@@ -567,6 +582,7 @@ pub fn update(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &egui::
                 }
                 DragStart::Light(i, l) => {
                     app.scene.lights[*i] = l.clone();
+                    app.discard_last_undo();
                     app.shading_changed();
                 }
                 DragStart::Fog(i, e, size, off) => {
@@ -743,8 +759,15 @@ fn apply_drag(app: &mut ForgeApp, rect: egui::Rect, drag: &Drag, pos: egui::Pos2
         }
         DragStart::Light(i, st) => {
             let rotating = app.gizmo.mode == GizmoMode::Rotate;
+            let target_only = on_light_target(app, st);
             let l = &mut app.scene.lights[*i];
             match &op {
+                // Maniglia del bersaglio: la sorgente resta ferma e il fascio gira verso il punto
+                // nuovo. Un bersaglio agganciato a un oggetto si sgancia, come per la camera.
+                Op::World(m) if target_only => {
+                    l.target = m.transform_point3(st.target);
+                    l.aim = None;
+                }
                 // Luce agganciata a un oggetto: resta puntata su di lui. Spostandola cambia solo la
                 // posizione; ruotandola gira attorno all'oggetto (orbita), come si cerca l'angolo
                 // giusto in studio.
@@ -1021,6 +1044,11 @@ pub fn cone_handles(app: &mut ForgeApp, ui: &egui::Ui, rect: egui::Rect, resp: &
         app.gizmo.cone_drag = None;
         return false;
     };
+    // Sul bersaglio il gizmo sta dentro il cono: le maniglie del cono si tolgono di mezzo.
+    if app.light_target_handle {
+        app.gizmo.cone_drag = None;
+        return false;
+    }
     let cone = SpotCone::of(l);
     let cam = &app.view_camera;
     let az = cone.front_az(cam.position);

@@ -18,6 +18,13 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
+### What's new in 0.46.0
+
+- **Choose how the video is made:** MP4, MOV, MKV or AVI, H.264, H.265, ProRes, FFV1 or uncompressed, with presets from small file to lossless and the actual parameters reported when it ends.
+- **Your status bar:** up to 9 counters out of 15, including real viewport FPS, frames done and time remaining for frames and encoding.
+- **Aim lights in the viewport:** drag the target of a Spot or Directional light while the source stays still.
+- **A uniform top toolbar:** every control with the same height and alignment.
+
 ### What's new in 0.45.0
 
 - **Undo for the timeline:** keys, modifiers, work area and effect times are undone one gesture at a time, together with the object you moved.
@@ -233,6 +240,8 @@ Diffuse materials, GGX metals and plastics, Fresnel glass, frosted glass and emi
 
 Prepare a product scene with a backdrop and studio lights, then choose a light, dark or dramatic background. Lights remain individually adjustable, and the studio can be fitted to the product dimensions without taking control away from the user.
 
+Spot and Directional lights are aimed from the viewport: select the light, click the diamond of its target and drag it. The source stays still, the cone turns live, the numeric fields stay in sync and the move can be undone; if the light is animated, the timeline records it as a key.
+
 ### 11. Volumetric lighting and visible beams
 
 ![ForgeRender volumetric light beam](docs/img/features/dopo_fascio_solo_camera.jpg)
@@ -292,6 +301,8 @@ A professional timeline, always available: it sits at the bottom with **Timeline
 - **Undo and Redo:** keys, modifiers, work area, duration and effect times are undone with Ctrl+Z, one gesture at a time, together with the object moved in that gesture.
 - **Stable references:** lights and dry ice are followed by number, not by name: you can rename them, or keep two with the same name, without losing the animation. Projects from earlier versions convert on opening.
 - **Save animation:** the work area, either as the render of every frame or as a **viewport preview** (a few seconds, to check the motion; smoke and fog are not in it), from the viewport or from a render camera, as PNG frames in a new folder inside **Rendering** and, if you want, an MP4 video.
+- **Video settings:** the gear in Save animation opens container, codec, CRF or bitrate, pixel format, frame rate, resolution and destination file, with the Standard, High quality, Very high, For editing (ProRes), Lossless (FFV1) and Uncompressed (AVI) presets. MP4 H.264 and uncompressed AVI work out of the box; the other formats need ffmpeg next to the program or in the PATH and are disabled without it. The file appears only when finished, encoding can be interrupted and the notice reports the real parameters.
+- **Time remaining:** the status bar counts frames and estimates what is left for rendering and then for encoding, starting only when there is real data.
 - **Object opacity:** a property of its own, rendered by letting each ray through with probability 1 − opacity, so the object fades with its shadow, the same on CPU and GPU.
 
 ## What it does today
@@ -386,6 +397,9 @@ A professional timeline, always available: it sits at the bottom with **Timeline
   exact drop to floor, Blender-style axis navigator, component tree, persistent material
   assignment by stable id.
 - Start / pause / resume / stop / automatic restart when the scene changes, PNG export.
+- **Video export**: MP4, MOV, MKV and AVI with H.264, H.265, ProRes, FFV1 or uncompressed, presets, size estimate and the real parameters at the end.
+- **Configurable status bar**: up to 9 counters out of 15 (viewport FPS, frames, time remaining, GPU, VRAM, RAM and more), Backend and processor fixed on the right.
+- **Light targets in the viewport**: Spot and Directional aimed by dragging their target, with undo.
 - `.frproject` projects (versioned JSON, atomic save, relative paths).
 - CLI for headless rendering, benchmarks and library import.
 

@@ -26,12 +26,13 @@ mod simple;
 pub(crate) mod smoke;
 pub(crate) mod smoke_preview;
 mod splash;
-mod status;
+pub(crate) mod status;
 pub mod style;
 pub(crate) mod styles;
 pub(crate) mod timeline;
 mod transform;
 pub mod tree;
+mod video_settings;
 
 use crate::app::ForgeApp;
 use crate::i18n::{tf, tr};

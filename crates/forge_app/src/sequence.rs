@@ -427,10 +427,14 @@ pub struct Run {
     saved: Saved,
     written: Vec<PathBuf>,
     workers: Vec<JoinHandle<anyhow::Result<()>>>,
-    video: Option<JoinHandle<anyhow::Result<&'static str>>>,
+    video: Option<JoinHandle<anyhow::Result<crate::video::Report>>>,
+    /// Avanzamento della codifica, condiviso con il suo thread.
+    encode: Option<std::sync::Arc<crate::video::Progress>>,
+    video_settings: crate::video::VideoSettings,
     started: Instant,
     frame_started: Instant,
     frame_times: Vec<Duration>,
+    encode_started: Option<Instant>,
     /// Render completato ma ancora senza immagine ripulita: da quando.
     waiting_denoise: Option<Instant>,
     errors: Vec<String>,
@@ -456,6 +460,15 @@ impl Run {
 
     pub fn elapsed(&self) -> Duration {
         self.started.elapsed()
+    }
+
+    pub fn encoding(&self) -> Option<std::sync::Arc<crate::video::Progress>> {
+        self.encode.clone()
+    }
+
+    /// Da quando è iniziata la codifica.
+    pub fn encode_started(&self) -> Option<Instant> {
+        self.encode_started
     }
 
     /// Tempo che manca, dalla media dei fotogrammi già fatti.
@@ -573,7 +586,10 @@ impl ForgeApp {
             self.settings.denoise.mode = DenoiseMode::Final;
         }
         self.auto_restart = false;
-        let video_path = (turntable && o.make_video).then(|| dir.join(format!("{name}.mp4")));
+        let video_path = (turntable && o.make_video).then(|| {
+            let ext = self.prefs.video.container.extension();
+            self.video_out.clone().unwrap_or_else(|| dir.join(format!("{name}.{ext}")))
+        });
         tracing::info!(
             "sequenza avviata: {} fotogrammi, {} campioni, cartella {}",
             plan.len(),
@@ -596,9 +612,12 @@ impl ForgeApp {
             written: Vec::new(),
             workers: Vec::new(),
             video: None,
+            encode: None,
+            video_settings: self.prefs.video.clone(),
             started: Instant::now(),
             frame_started: Instant::now(),
             frame_times: Vec::new(),
+            encode_started: None,
             waiting_denoise: None,
             errors: Vec::new(),
             cancelled: false,
@@ -796,8 +815,17 @@ impl ForgeApp {
         let (unsaved, view) = (run.saved.unsaved, run.saved.view);
         if !run.cancelled && !run.written.is_empty() {
             if let Some(out) = run.video_path.clone() {
-                let (frames, fps, turns) = (run.written.clone(), run.fps, run.turns);
-                run.video = Some(std::thread::spawn(move || crate::video::encode_mp4(&frames, &out, fps, turns)));
+                let job = crate::video::Job {
+                    frames: run.written.clone(),
+                    out,
+                    settings: run.video_settings.clone(),
+                    fps: run.fps,
+                    loops: run.turns,
+                };
+                let progress = std::sync::Arc::new(crate::video::Progress::default());
+                run.encode = Some(progress.clone());
+                run.encode_started = Some(Instant::now());
+                run.video = Some(std::thread::spawn(move || crate::video::encode(&job, &progress)));
             }
         }
         self.sync_orbit_from_camera();
@@ -823,9 +851,10 @@ impl ForgeApp {
         let mut video_msg = None;
         if let Some(v) = run.video.take() {
             match v.join() {
-                Ok(Ok(enc)) => {
-                    let p = run.video_path.as_ref().map(|p| p.display().to_string()).unwrap_or_default();
-                    video_msg = Some(tf("Video: {} ({})", &[p, enc.to_string()]));
+                Ok(Ok(report)) => {
+                    let p = report.path.display().to_string();
+                    tracing::info!("video: {p}: {}", report.describe());
+                    video_msg = Some(tf("Video: {} ({})", &[p, report.describe()]));
                 }
                 Ok(Err(e)) => errors.push(tf("video non creato: {e:#}", &[format!("{e:#}")])),
                 Err(_) => errors.push(tr("video non creato").into()),
