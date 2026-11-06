@@ -244,7 +244,7 @@ Prepara una scena prodotto con fondale e luci da studio, quindi scegli sfondo ch
 
 ### 11. Illuminazione volumetrica e fasci visibili
 
-![Confronto del fascio volumetrico](reports/fascio-volumetrico/dopo_fascio_solo_camera.png)
+![ForgeRender: fascio di luce volumetrico](docs/img/features/dopo_fascio_solo_camera.jpg)
 
 Le luci spot possono generare fasci visibili con densità e lunghezza regolabili. La nebbia volumetrica è un mezzo partecipante simulato, con scattering e ombre: la luce interagisce con il volume e diventa visibile nello spazio, non soltanto sulle superfici.
 
@@ -288,6 +288,8 @@ Un file STEP si converte in mesh una volta sola. Il risultato resta in una cache
 ### 16. Timeline — animazione di oggetti, luci, camera ed effetti
 
 Una timeline professionale, sempre disponibile: sta in basso con le schede **Timeline | Console**, oppure in una finestra a parte con "Stacca dal programma", da spostare su un altro schermo.
+
+![Timeline di animazione di ForgeRender](docs/img/features/timeline-animation.jpg)
 
 - **Elementi e proprietà:** "+ Elemento" aggiunge gli oggetti selezionati, la camera, una luce, un fumo, una nebbia di ghiaccio secco, la foschia, la polvere o l'ambiente. Ogni elemento mostra le sue proprietà di base (per gli oggetti posizione, rotazione, scala e opacità; per la camera posizione e bersaglio; per le luci posizione e intensità) e con "+" si aggiungono una alla volta le altre compatibili (scala per asse, visibilità, colore, bersaglio, apertura del cono, campo visivo, diaframma, distanza di fuoco, densità, rotazione dell'HDRI, brillantezza). Posizione, rotazione, bersaglio e colore sono una riga sola con i tre valori: una chiave vale per tutti.
 - **Chiavi:** il rombo mette o toglie una chiave nell'istante del cursore con il valore attuale; spostare un oggetto con il gizmo, o cambiare un valore nei pannelli, quando la sua proprietà ha già delle chiavi registra lì una chiave. Come in After Effects, un clic seleziona una chiave, Ctrl o Maiusc aggiunge o toglie, trascinando sul vuoto si disegna un rettangolo di selezione e trascinando una chiave si spostano tutte le selezionate (a scatti di fotogramma); Canc le toglie, Ctrl+C e Ctrl+V le copiano nell'istante del cursore, F9 mette la morbida in entrata e uscita e il clic destro sceglie l'interpolazione verso la chiave dopo: a scatto, lineare, morbida in entrata, in uscita, in entrata e uscita, curva continua.
