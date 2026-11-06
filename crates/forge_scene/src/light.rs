@@ -114,6 +114,10 @@ impl LightKind {
 /// (per la luce direzionale conta solo la direzione).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Light {
+    /// Numero stabile nella scena (0 = non ancora assegnato): la timeline trova la luce con questo,
+    /// quindi due luci con lo stesso nome restano distinte e rinominarla non perde l'animazione.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub id: u32,
     pub name: String,
     pub kind: LightKind,
     pub position: Vec3,
@@ -151,6 +155,10 @@ pub struct Light {
     pub from_look: bool,
 }
 
+fn is_zero(n: &u32) -> bool {
+    *n == 0
+}
+
 fn default_range_softness() -> f32 {
     0.5
 }
@@ -176,6 +184,7 @@ impl Light {
 
     pub fn point(name: &str, position: Vec3, intensity: f32) -> Self {
         Self {
+            id: 0,
             name: name.into(),
             kind: LightKind::Point,
             position,
@@ -205,6 +214,7 @@ impl Light {
 
     pub fn area(name: &str, position: Vec3, target: Vec3, width: f32, height: f32, radiance: f32) -> Self {
         Self {
+            id: 0,
             name: name.into(),
             kind: LightKind::Area { width, height },
             position,

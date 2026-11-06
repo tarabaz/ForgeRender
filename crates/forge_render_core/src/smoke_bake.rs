@@ -45,6 +45,57 @@ fn set_source_blocked(s: &SmokeCloud, blocked: bool) {
     }
 }
 
+/// Controllo della sorgente sulla griglia del calcolo vero.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SourceCheck {
+    /// La sorgente è dentro un oggetto: il fumo resta chiuso lì.
+    pub blocked: bool,
+    /// Di quanto alzarla (metri) perché il fumo esca, se dentro il riquadro c'è posto.
+    pub lift: Option<f32>,
+}
+
+/// Guarda se la sorgente del fumo `s` è dentro un oggetto, come farà il calcolo vero, senza
+/// simulare niente. Con la sorgente chiusa cerca il primo punto libero sopra di lei.
+pub fn check_source(s: &SmokeCloud, geo: &RenderGeometry) -> SourceCheck {
+    let free = SourceCheck {
+        blocked: false,
+        lift: None,
+    };
+    if !s.collisions || geo.accel.is_empty() {
+        return free;
+    }
+    let spec = GridSpec::covering(s.bounds().0, s.bounds().1, s.sim_cells());
+    let at = s.sim_source();
+    let Some((x, y0, z)) = spec.cell_of(at) else { return free };
+    let solid = solid_cells(geo, &spec);
+    // Anche un oggetto tagliato dal riquadro chiude il fumo: per le celle è una zona aperta, ma
+    // da lì il fumo può solo uscire dal bordo, dove sparisce.
+    if !solid[spec.index(x, y0, z)] && !crate::fog::point_inside(geo, at) {
+        return free;
+    }
+    // Sopra l'oggetto serve aria per tutta la sorgente, non solo per il suo centro.
+    let clear = (s.sanitized().sim.source_radius / spec.cell).ceil() as usize + 2;
+    let air = |y: usize| !solid[spec.index(x, y, z)] && !crate::fog::point_inside(geo, spec.center(x, y, z));
+    let lift = (y0 + 1..spec.res[1].saturating_sub(clear))
+        .find(|&y| (y..=y + clear).all(air))
+        .map(|y| spec.center(x, y + clear / 2, z).y - at.y);
+    SourceCheck { blocked: true, lift }
+}
+
+/// Scena da usare per il controllo se ci sono oggetti animati: senza di loro, che passano e vanno
+/// via, come fa il calcolo vero. None: basta la geometria attuale.
+pub fn scene_without_movers(scene: &Scene) -> Option<Scene> {
+    let movers = moving_nodes(scene);
+    if movers.is_empty() {
+        return None;
+    }
+    let mut sc = scene.clone();
+    for m in movers {
+        sc.nodes[m].visible = false;
+    }
+    Some(sc)
+}
+
 /// Cartelle di precalcolo tenute.
 const KEEP_DIRS: usize = 6;
 /// Limite della densità nei file: oltre il render la taglia comunque.
@@ -519,6 +570,7 @@ fn bake(
     let spec = GridSpec::covering(s.bounds().0, s.bounds().1, s.sim_cells());
     let mut sc = scene.clone();
     let mut base: Option<Vec<bool>> = None;
+    let mut blocked = false;
     if s.collisions {
         let static_geo = if movers.is_empty() {
             None
@@ -532,9 +584,9 @@ fn bake(
         if !g.accel.is_empty() {
             base = Some(solid_cells(g, &spec));
         }
+        blocked = check_source(s, g).blocked;
     }
-    let at_source = spec.cell_of(s.sim_source()).map(|(x, y, z)| spec.index(x, y, z));
-    set_source_blocked(s, matches!((&base, at_source), (Some(b), Some(i)) if b[i]));
+    set_source_blocked(s, blocked);
     let cell = s.sim_cell();
     let built: Vec<Mover> = movers.iter().filter_map(|&m| build_mover(scene, m, cell)).collect();
     let mut w = Writer {
@@ -609,6 +661,39 @@ mod tests {
 
     /// La seconda volta non si simula niente; se un oggetto entra nel riquadro solo alla fine si
     /// rifà solo da lì, e i fotogrammi prima restano identici.
+    #[test]
+    fn a_source_inside_an_object_is_found_and_can_be_lifted_out() {
+        let mut sc = Scene::test_scene();
+        let glass = sc.nodes.iter().position(|n| n.name.contains("vetro")).expect("sfera di vetro");
+        let b = sc.bounds_of(glass);
+        let geo = RenderGeometry::build(&sc);
+        sc.lights.clear();
+        let mut s = SmokeCloud {
+            mode: SmokeMode::Simulated,
+            size: Vec3::new(1.6, 2.4, 1.6),
+            collisions: true,
+            center: Vec3::new(b.center().x, b.center().y + 0.5, b.center().z),
+            ..Default::default()
+        };
+        s.sim.source_radius = 0.02;
+        s.sim.source_offset = Vec3::ZERO;
+        s.sim.source_offset.y = b.center().y - s.sim_source().y;
+        let inside = check_source(&s, &geo);
+        assert!(inside.blocked, "{inside:?}");
+        let lift = inside.lift.expect("sopra la sfera c'è posto");
+        s.sim.source_offset.y += lift;
+        assert!(s.sim_source().y > b.max.y, "{} > {}", s.sim_source().y, b.max.y);
+        assert!(!check_source(&s, &geo).blocked);
+        // Riquadro stretto che taglia la sfera: la sorgente è chiusa lo stesso.
+        s.size = Vec3::new(0.7, 2.4, 0.7);
+        s.sim.source_offset.y -= lift;
+        assert!(check_source(&s, &geo).blocked);
+        s.size = Vec3::new(1.6, 2.4, 1.6);
+        s.collisions = false;
+        s.sim.source_offset.y = b.center().y - (s.center.y - s.half().y);
+        assert!(!check_source(&s, &geo).blocked, "senza collisioni non blocca niente");
+    }
+
     #[test]
     fn only_what_changed_is_computed_again() {
         let dir = std::env::temp_dir().join(format!("forge_fumo_prova_{}", std::process::id()));

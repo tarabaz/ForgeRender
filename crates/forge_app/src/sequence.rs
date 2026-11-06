@@ -856,7 +856,7 @@ impl ForgeApp {
         }
         tracing::info!("{}", text.replace('\n', " "));
         if errors.is_empty() {
-            self.info = Some(text);
+            self.notify_saved(text, Some(run.frames_dir.clone()));
         } else {
             self.error = Some(format!("{text}\n\n{}", errors.join("\n")));
         }
@@ -905,7 +905,8 @@ impl ForgeApp {
         }
         match self.sequence.passes_job.take().expect("job").join() {
             Ok(Ok(stem)) => {
-                self.info = Some(tf("Passaggi di render salvati accanto a\n{}", &[stem.display().to_string()]));
+                let text = tf("Passaggi di render salvati accanto a\n{}", &[stem.display().to_string()]);
+                self.notify_saved(text, stem.parent().map(std::path::Path::to_path_buf));
             }
             Ok(Err(e)) => self.error = Some(tf("passaggi non salvati: {e:#}", &[format!("{e:#}")])),
             Err(_) => self.error = Some(tr("passaggi non salvati").into()),

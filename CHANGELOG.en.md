@@ -10,6 +10,18 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.45.0 — 6 Nov 2026
+
+Fixes for what the beta test left open; details in `reports/chatgpt/2026-11-06_betatest-0.44.md`, section 8.
+
+- **Lights and dry ice have a stable number** in the timeline instead of their name: two lights with the same name stay separate and renaming one no longer loses its animation. Projects from earlier versions are converted when opened (with two lights of the same name, the animation stays on the first, the one it moved before). Duplicated lights get a number of their own, and a new light never takes over the animation of a deleted one. Changing look keeps the number of the lights with the same name.
+- **Undo and Redo cover the timeline:** keys, modifiers, work area, duration, start and stop of effects. Dragging a key is one step, and moving an animated object with its new key is one step too.
+- **Notices instead of windows:** after saving an image, an animation or render passes, a notice appears at the top with **Open folder**, and it no longer blocks the toolbar. It stays while the mouse is over it and goes away on its own. The notice about a removed part disappears with Undo. Windows remain for import warnings, errors and questions.
+- **Smoke source inside an object:** the check is now done on the real grid as soon as the smoke changes, with the object even cut by the box, and it no longer needs a calculation to have run, so the warning also appears after a restart. Dots of the viewport preview disappear when the render would show nothing. New smoke born inside an object moves its source above it by itself; on smoke you already placed, a **Move the source above the object** button does it with one click.
+- **Panels:** the timeline toolbar wraps onto a second line in a narrow window, so no command leaves it. The render measures take one line with a + for all of them, leaving more rows for the timeline. The scene tree always keeps its title and a few rows, even with tall Lights and Cameras panels. A long row in the side panel scrolls instead of widening the panel.
+- **Materials list:** the copies made for animated opacity are hidden when the original material is in the list, and they no longer have "(opacità animata)" in their name.
+- Checked and not a defect: memory with smoke stays between 920 and 1,004 MB in 5 minutes of continuous Play in the Render view (the growth seen in the beta test was the cache filling up, limited to 17 clouds). A removed floor in the test scene stays removed after saving and reopening: not reproduced, a test now guards it.
+
 ## 0.44.1 — 6 Nov 2026
 
 Fixes from the beta test; full report in `reports/chatgpt/2026-11-06_betatest-0.44.md`.

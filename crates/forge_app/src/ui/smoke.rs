@@ -59,6 +59,7 @@ pub fn add_button(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 let lift = if s.shape == SmokeShape::Cloud { s.size.y * 0.25 } else { 0.0 };
                 s.center = base + Vec3::new(0.0, s.size.y * 0.5 + lift, 0.0);
                 app.scene.smokes.push(s);
+                app.smoke_preview.just_added = Some(n);
                 app.selected_smoke = Some(app.scene.smokes.len() - 1);
                 app.selected_fog = None;
                 app.selected_light = None;
@@ -357,11 +358,22 @@ fn body(
                 tr("Solo anteprima: nel render questo fumo non c'è finché non riaccendi il calcolo vero."),
             );
         }
-        if forge_render_core::smoke_bake::source_blocked(s.n) {
+        let (blocked, lift) = crate::ui::smoke_preview::source_state(preview, s);
+        if blocked {
             ui.colored_label(
                 egui::Color32::from_rgb(240, 180, 80),
                 tr("La sorgente è dentro un oggetto: il fumo resta chiuso lì e nel render non si vede. Sposta la sorgente o spegni le collisioni."),
             );
+            if let Some(lift) = lift {
+                if ui
+                    .button(tr("Sposta la sorgente sopra l'oggetto"))
+                    .on_hover_text(tf("Alza la sorgente di {} cm", &[format!("{:.1}", lift * 100.0)]))
+                    .clicked()
+                {
+                    s.sim.source_offset.y += lift;
+                    changed = true;
+                }
+            }
         }
         if let Some((cell, r)) = s.sim_warning() {
             ui.colored_label(

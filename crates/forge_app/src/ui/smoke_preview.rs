@@ -8,11 +8,15 @@
 use crate::app::ForgeApp;
 use eframe::egui;
 use forge_render_core::smoke::SmokePreview;
+use forge_render_core::smoke_bake::SourceCheck;
 use forge_scene::{SmokeCloud, SmokeMode};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Receiver;
 use std::sync::Arc;
 use std::time::Instant;
+
+/// Quello che torna dal calcolo: i punti e il controllo della sorgente del fumo numero tale.
+type PreviewResult = (Option<SmokePreview>, Option<(u32, SourceCheck)>);
 
 /// Stato dell'anteprima (non salvato con il progetto).
 pub struct SmokePreviewState {
@@ -26,11 +30,16 @@ pub struct SmokePreviewState {
     key: String,
     /// Indice del fumo e anteprima pronta.
     pub data: Option<(usize, Arc<SmokePreview>)>,
-    rx: Option<Receiver<Option<SmokePreview>>>,
+    rx: Option<Receiver<PreviewResult>>,
     cancel: Arc<AtomicBool>,
     /// In calcolo.
     pub busy: bool,
     clock: Instant,
+    /// Numero del fumo e controllo della sua sorgente, sulla griglia del calcolo vero.
+    pub source: Option<(u32, SourceCheck)>,
+    /// Fumo appena creato: se è nato con la sorgente dentro un oggetto si alza da sola, perché
+    /// nessuno l'ha ancora scelta.
+    pub just_added: Option<u32>,
 }
 
 impl Default for SmokePreviewState {
@@ -45,6 +54,8 @@ impl Default for SmokePreviewState {
             cancel: Arc::new(AtomicBool::new(false)),
             busy: false,
             clock: Instant::now(),
+            source: None,
+            just_added: None,
         }
     }
 }
@@ -76,12 +87,17 @@ fn key(s: &SmokeCloud, geometry_rev: u64, horizon: f32) -> String {
 /// Tiene aggiornata l'anteprima del fumo selezionato (da chiamare a ogni fotogramma).
 pub fn update(app: &mut ForgeApp) {
     if let Some(rx) = &app.smoke_preview.rx {
-        if let Ok(r) = rx.try_recv() {
+        if let Ok((preview, check)) = rx.try_recv() {
             app.smoke_preview.rx = None;
             app.smoke_preview.busy = false;
-            if let (Some(p), Some(i)) = (r, app.selected_smoke) {
+            app.smoke_preview.source = check;
+            if check.is_some_and(|(_, c)| c.blocked) {
+                // Il render non mostrerà fumo, quindi nemmeno i punti.
+                app.smoke_preview.data = None;
+            } else if let (Some(p), Some(i)) = (preview, app.selected_smoke) {
                 app.smoke_preview.data = Some((i, Arc::new(p)));
             }
+            free_new_smoke(app, check);
         }
     }
     let target = app
@@ -113,6 +129,7 @@ pub fn update(app: &mut ForgeApp) {
     // Serve la geometria per far girare il fumo attorno agli oggetti: se non c'è ancora si
     // riprova al prossimo fotogramma.
     let Some(geo) = app.current_geometry_shared() else { return };
+    let still = forge_render_core::smoke_bake::scene_without_movers(&app.scene);
     let mut s = s.clone();
     s.sim.time = horizon;
     app.smoke_preview.cancel.store(true, Ordering::SeqCst);
@@ -127,6 +144,13 @@ pub fn update(app: &mut ForgeApp) {
     app.smoke_preview.rx = Some(rx);
     let _ = std::thread::Builder::new().name("forge-anteprima-fumo".into()).spawn(move || {
         let t0 = Instant::now();
+        let still = still.map(|sc| forge_render_core::RenderGeometry::build(&sc));
+        let c = forge_render_core::smoke_bake::check_source(&s, still.as_ref().unwrap_or(&geo));
+        let check = Some((s.n, c));
+        if c.blocked {
+            let _ = tx.send((None, check));
+            return;
+        }
         let p = forge_render_core::smoke::smoke_preview(&s, &geo, &|| cancel.load(Ordering::SeqCst));
         if let Some(p) = &p {
             tracing::debug!(
@@ -136,8 +160,34 @@ pub fn update(app: &mut ForgeApp) {
                 t0.elapsed().as_secs_f64() * 1e3
             );
         }
-        let _ = tx.send(p);
+        let _ = tx.send((p, check));
     });
+}
+
+/// Fumo appena creato con la sorgente dentro un oggetto: si alza finché il fumo può uscire.
+fn free_new_smoke(app: &mut ForgeApp, check: Option<(u32, SourceCheck)>) {
+    let Some(n) = app.smoke_preview.just_added.take() else { return };
+    let Some((checked, c)) = check.filter(|(m, _)| *m == n) else {
+        return;
+    };
+    let (true, Some(lift)) = (c.blocked, c.lift) else { return };
+    let Some(s) = app.scene.smokes.iter_mut().find(|s| s.n == checked) else {
+        return;
+    };
+    s.sim.source_offset.y += lift;
+    app.toast(crate::i18n::tr(
+        "La sorgente del fumo era dentro un oggetto: spostata sopra, così il fumo può uscire.",
+    ));
+    app.shading_changed();
+}
+
+/// La sorgente del fumo `s` è chiusa in un oggetto? Vale il controllo più recente: quello
+/// dell'anteprima se c'è, altrimenti l'ultimo calcolo vero. Con il secondo valore: di quanto alzarla.
+pub fn source_state(st: &SmokePreviewState, s: &SmokeCloud) -> (bool, Option<f32>) {
+    match st.source {
+        Some((n, c)) if n == s.n => (c.blocked, c.lift),
+        _ => (forge_render_core::smoke_bake::source_blocked(s.n), None),
+    }
 }
 
 /// Disegna i punti dell'anteprima del fumo `i` (se pronta) e chiede il prossimo fotogramma.

@@ -252,22 +252,45 @@ impl ForgeApp {
         }
     }
 
-    /// Avviso breve in basso al centro, per 4 secondi.
+    /// Avviso breve in alto al centro: non blocca niente e sparisce da solo (si ferma finché ci
+    /// si passa sopra con il mouse, così c'è tempo per il pulsante).
     fn toast_area(&mut self, ctx: &egui::Context) {
-        let Some((text, at)) = &self.toast else { return };
-        let age = at.elapsed().as_secs_f32();
-        if age > 4.0 {
+        let Some(toast) = &self.toast else { return };
+        let life = if toast.folder.is_some() { 8.0 } else { 5.0 };
+        if toast.at.elapsed().as_secs_f32() > life {
             self.toast = None;
             return;
         }
-        egui::Area::new(egui::Id::NULL.with("avviso"))
-            .anchor(egui::Align2::CENTER_BOTTOM, [0.0, -210.0])
-            .interactable(false)
+        let (mut open_dir, mut close) = (false, false);
+        let area = egui::Area::new(egui::Id::NULL.with("avviso"))
+            .anchor(egui::Align2::CENTER_TOP, [0.0, 92.0])
+            .order(egui::Order::Foreground)
             .show(ctx, |ui| {
                 egui::Frame::popup(ui.style()).show(ui, |ui| {
-                    ui.label(egui::RichText::new(text).color(style::ACCENT));
+                    ui.set_max_width(620.0);
+                    ui.horizontal(|ui| {
+                        ui.label(egui::RichText::new(&toast.text).color(style::ACCENT));
+                        if toast.folder.is_some() {
+                            open_dir = ui.button(tr("Apri cartella")).clicked();
+                        }
+                        close = ui.small_button(crate::ui::icons::CLOSE).clicked();
+                    });
                 });
             });
+        if area.response.contains_pointer() {
+            let now = std::time::Instant::now();
+            if let Some(t) = &mut self.toast {
+                t.at = now;
+            }
+        }
+        if open_dir {
+            if let Some(dir) = self.toast.as_ref().and_then(|t| t.folder.as_deref()) {
+                crate::ui::library::open_folder(dir);
+            }
+        }
+        if close || open_dir {
+            self.toast = None;
+        }
         ctx.request_repaint_after(std::time::Duration::from_millis(250));
     }
 

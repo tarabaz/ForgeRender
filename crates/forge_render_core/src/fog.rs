@@ -115,26 +115,30 @@ pub fn interior_cells(geo: &RenderGeometry, spec: &GridSpec, shell: &[bool]) -> 
             continue;
         }
         let (x, y, z) = spec.coords(comp[comp.len() / 2]);
-        let p = spec.center(x, y, z);
-        let mut back = 0;
-        for axis in 0..3 {
-            for s in [-1.0f32, 1.0] {
-                let mut d = Vec3::ZERO;
-                d[axis] = s;
-                if let Some(h) = geo.accel.intersect(p, d, 0.0, f32::INFINITY) {
-                    if geo.geometric_normals[h.prim as usize].dot(d) > 0.0 {
-                        back += 1;
-                    }
-                }
-            }
-        }
-        if back >= 4 {
+        if point_inside(geo, spec.center(x, y, z)) {
             for &i in &comp {
                 inside[i] = true;
             }
         }
     }
     inside
+}
+
+/// Il punto è dentro un oggetto? In quasi tutte le direzioni si vede il retro di una superficie.
+pub fn point_inside(geo: &RenderGeometry, p: Vec3) -> bool {
+    let mut back = 0;
+    for axis in 0..3 {
+        for s in [-1.0f32, 1.0] {
+            let mut d = Vec3::ZERO;
+            d[axis] = s;
+            if let Some(h) = geo.accel.intersect(p, d, 0.0, f32::INFINITY) {
+                if geo.geometric_normals[h.prim as usize].dot(d) > 0.0 {
+                    back += 1;
+                }
+            }
+        }
+    }
+    back >= 4
 }
 
 type Cache<T> = Mutex<HashMap<(String, u64), Arc<T>>>;

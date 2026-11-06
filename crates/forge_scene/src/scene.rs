@@ -680,6 +680,29 @@ impl Scene {
         self.meshes = new_meshes;
     }
 
+    /// Dà un numero stabile alle luci e alle nebbie che non l'hanno (nuove, o duplicate: la copia
+    /// ne prende uno suo). Vero se ha assegnato qualcosa.
+    pub fn assign_element_ids(&mut self) -> bool {
+        fn assign(ids: Vec<&mut u32>, highest: u32) -> bool {
+            let mut seen = std::collections::HashSet::new();
+            let mut next = ids.iter().map(|n| **n).max().unwrap_or(0).max(highest) + 1;
+            let mut changed = false;
+            for id in ids {
+                if *id == 0 || !seen.insert(*id) {
+                    *id = next;
+                    seen.insert(next);
+                    next += 1;
+                    changed = true;
+                }
+            }
+            changed
+        }
+        let (lights, fogs) = self.timeline.highest_ids();
+        let a = assign(self.lights.iter_mut().map(|l| &mut l.id).collect(), lights);
+        let b = assign(self.fogs.iter_mut().map(|f| &mut f.id).collect(), fogs);
+        a || b
+    }
+
     /// Scena dimostrativa costruita con primitive procedurali: pavimento,
     /// sfera metallica, sfera di vetro, box in plastica, toro in rame, luci da studio.
     pub fn test_scene() -> Scene {
@@ -924,6 +947,27 @@ mod tests {
         s.center_on_origin(t);
         let c = s.exact_bounds_of(t).center();
         assert!(c.x.abs() < 1e-5 && c.z.abs() < 1e-5 && (c.y - c0.y).abs() < 1e-5, "{c}");
+    }
+
+    #[test]
+    fn every_light_gets_its_own_number_and_new_ones_do_not_take_an_animated_one() {
+        let mut s = Scene::default();
+        s.lights.push(Light::point("A", Vec3::ZERO, 1.0));
+        s.lights.push(Light::point("A", Vec3::X, 1.0));
+        assert!(s.assign_element_ids());
+        assert_eq!((s.lights[0].id, s.lights[1].id), (1, 2));
+        assert!(!s.assign_element_ids(), "già assegnati: niente da fare");
+        // Una copia prende un numero suo, l'originale tiene il suo.
+        let copy = s.lights[1].clone();
+        s.lights.push(copy);
+        s.assign_element_ids();
+        assert_eq!((s.lights[1].id, s.lights[2].id), (2, 3));
+        // Il numero 3 è ancora nell'animazione anche se la luce non c'è più.
+        s.timeline.elements.push(crate::Target::Light(3));
+        s.lights.pop();
+        s.lights.push(Light::point("B", Vec3::Y, 1.0));
+        s.assign_element_ids();
+        assert_eq!(s.lights[2].id, 4);
     }
 
     #[test]

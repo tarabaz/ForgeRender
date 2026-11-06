@@ -813,3 +813,9 @@ Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
 - Beta test del programma: report in `reports/chatgpt/2026-11-06_betatest-0.44.md`, con misure, difetti aperti, soluzioni e domande per l'analisi comune.
 - Corretti: Annulla tra progetti, Ctrl+C/V sulle chiavi, avviso per la sorgente del fumo dentro un oggetto, riga automatica degli effetti, Play nel Render con fotogrammi finiti, righello, menu Salva animazione, altezza del pannello basso, barra in finestra stretta, `prune`.
 - Da sapere: restano aperti soprattutto gli id delle luci (tracce per nome), Annulla per la timeline, precalcolo del ghiaccio secco e strumenti MCP per timeline ed effetti. La crescita della RAM col fumo (da 567 a 938 MB in circa 10 minuti) non è stata approfondita.
+
+
+## 0.45.0 — 06/11/2026 (Claude)
+
+- Corretti i difetti aperti del beta test: `Target::Light` e `Target::Fog` per numero (`Light::id`, `FogVolume::id`, `Scene::assign_element_ids`, `Timeline::resolve_names`, variante `Target::Named` per leggere i progetti vecchi), Annulla per la timeline (`UndoEntry`, `watch_timeline` in `app.rs`), avvisi con Apri cartella (`Toast`, `notify_saved`), `check_source` e `point_inside` per la sorgente del fumo, pannelli.
+- Da sapere: restano aperti precalcolo del ghiaccio secco, griglia fine del fumo nel precalcolo, nube con centro animato e strumenti MCP per timeline ed effetti (sono funzioni nuove, non difetti).

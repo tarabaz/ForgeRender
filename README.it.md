@@ -18,6 +18,13 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
+### Novità della versione 0.45.0
+
+- **Annulla per la timeline:** chiavi, modificatori, area di lavoro e tempi degli effetti si annullano un gesto alla volta, insieme all'oggetto spostato.
+- **Luci e ghiaccio secco tengono l'animazione** se li rinomini o se due hanno lo stesso nome: la timeline segue un numero stabile. I progetti vecchi si convertono all'apertura.
+- **Fumo che esce sempre:** una sorgente dentro un oggetto si trova subito, un fumo nuovo alza la sorgente sopra l'oggetto e con un clic lo fai su quello già sistemato.
+- **Avvisi al posto delle finestre dopo i salvataggi,** con **Apri cartella**; barra della timeline su due righe nelle finestre strette, misure del render in una riga.
+
 ### Novità della versione 0.44.1
 
 - **Correzioni da un beta test completo:** Annulla non passa più a un altro progetto, copia e incolla delle chiavi della timeline funzionano, un avviso spiega quando la sorgente del fumo è chiusa dentro un oggetto, il Play nella vista Render mostra solo fotogrammi finiti, e pannelli e barra si adattano alle finestre piccole.
@@ -195,6 +202,7 @@ Nubi di fumo volumetrico vere per le foto di prodotto: il fumo d'incenso accanto
 - **Calcolato una volta sulla timeline:** la simulazione gira una volta su tutta la durata e lascia nella cartella temporanea un file per fotogramma e, una volta al secondo, lo stato completo. Spostare il cursore legge il file di quel fotogramma. Ogni fotogramma ha un'impronta cumulativa di quello che lo influenza fino a lì (oggetti dentro il riquadro, emissione accesa o spenta): quando cambia qualcosa, la simulazione riparte dall'ultimo stato prima del primo fotogramma diverso, e quello che viene prima resta identico al bit. In una prova 60 fotogrammi hanno richiesto 6,3 s, un altro fotogramma 1 s, e un'animazione cambiata dal secondo 1 è ripartita dal fotogramma 25.
 - **Spostamento d'aria degli oggetti animati:** con l'opzione accesa (di serie) gli oggetti animati sono bordi in movimento del fluido: la velocità normale dell'aria sulla loro superficie è la loro, quindi la pressione spinge l'aria davanti e la richiama dietro, e scia e vortici nascono dal fluido stesso. Spenta, il fumo si adatta soltanto attorno all'oggetto. Vale solo per il fumo simulato: fumo procedurale e foschia non sono simulati, e i vortici più piccoli di una cella della griglia non possono comparire.
 - **Inizio e fine:** sulla riga dell'effetto nella timeline scegli quando parte e quando la sorgente smette di emettere; quello che è uscito non sparisce, continua a muoversi e a dissolversi. I comandi del tempo nel pannello del fumo sono nascosti: il tempo lo decide la timeline.
+- **Sorgente dentro un oggetto:** il pannello avvisa appena la sorgente finisce dentro un oggetto, anche tagliato dal riquadro, perché il fumo resterebbe chiuso lì e il render non ne mostrerebbe. Un fumo nuovo alza da solo la sorgente sopra l'oggetto; su un fumo già sistemato lo fa con un clic **Sposta la sorgente sopra l'oggetto**.
 
 Il fuoco (combustione, emissione, fiamme che illuminano la scena) è un passo a parte, successivo: vedi lo [studio su fumo e fuoco](docs/studio-fumo-fuoco.md).
 
@@ -286,6 +294,8 @@ Una timeline professionale, sempre disponibile: sta in basso con le schede **Tim
 - **Modificatori:** "ƒ+" aggiunge a ogni proprietà, uno alla volta e in ordine, tremolio (ampiezza, frequenza, seme), oscillazione, rampa continua (per esempio 90°/s per una piattaforma girevole), ripeti, avanti e indietro, spostamento, moltiplica, limiti e a scatti (stop motion); su una riga a tre assi le lettere X Y Z scelgono su quali agisce.
 - **Riproduzione:** inizio, chiave prima, play/pausa, chiave dopo, fine, ripeti; durata e fotogrammi al secondo; zoom e scorrimento del tempo. La barra dell'**area di lavoro** sopra il righello (si trascinano le due estremità e il centro) sceglie la parte che si riproduce e si salva. Nella viewport la riproduzione è in tempo reale; nella **vista Render** il Play calcola ogni fotogramma con pochi campioni (20 di serie, regolabili) e passa al successivo: più lento del tempo reale, ma si vede l'animazione renderizzata.
 - **Effetti nel tempo:** fumo simulato e ghiaccio secco hanno la loro riga appena creati e seguono il cursore: l'istante simulato è il tempo del cursore meno l'inizio dell'effetto, che si sceglie sulla sua riga insieme alla fine dell'emissione; la durata scelta nella timeline decide fino a quando si calcolano.
+- **Annulla e Ripeti:** chiavi, modificatori, area di lavoro, durata e tempi degli effetti si annullano con Ctrl+Z, un gesto alla volta, insieme all'oggetto spostato in quel gesto.
+- **Riferimenti stabili:** luci e ghiaccio secco si seguono per numero, non per nome: puoi rinominarli, o tenerne due con lo stesso nome, senza perdere l'animazione. I progetti delle versioni precedenti si convertono all'apertura.
 - **Salva animazione:** l'area di lavoro, come render di ogni fotogramma o come **anteprima della viewport** (pochi secondi, per controllare il movimento; fumo e nebbie non ci sono), dalla viewport o da una camera di rendering, in fotogrammi PNG in una cartella nuova dentro **Rendering** e, se vuoi, in un video MP4.
 - **Opacità degli oggetti:** una proprietà a sé, resa lasciando passare ogni raggio con probabilità 1 − opacità, così l'oggetto sfuma con la sua ombra, uguale su CPU e GPU.
 
@@ -351,7 +361,7 @@ Una timeline professionale, sempre disponibile: sta in basso con le schede **Tim
   *Vapore da tazza* (nastri trasparenti che salgono dal caffè) e *Incenso o sigaretta*. La
   simulazione si **calcola una volta sulla timeline** e resta in file temporanei, ripartendo dal
   primo fotogramma cambiato; gli oggetti animati **spostano davvero l'aria** con scia e vortici;
-  emissione con inizio e fine.
+  emissione con inizio e fine; una sorgente dentro un oggetto si trova subito e si sposta fuori.
 - **Timeline (animazione)**: una timeline in stile After Effects, sempre disponibile, con le schede
   Timeline | Console in basso o in una finestra a parte su un altro schermo. Chiavi con sei
   interpolazioni (a scatto, lineare, morbida in entrata, in uscita, in entrata e uscita, curva
@@ -359,8 +369,9 @@ Una timeline professionale, sempre disponibile: sta in basso con le schede **Tim
   incolla); modificatori aggiunti uno alla volta (tremolio, oscillazione, rampa continua, ripeti,
   avanti e indietro, spostamento, moltiplica, limiti, a scatti); una riga per posizione e rotazione;
   scala e opacità di oggetti, luci, camera, fumo, nebbia, foschia, polvere e ambiente; chiavi
-  registrate dal gizmo; fumo e ghiaccio secco che seguono il cursore, con inizio e fine
-  dell'emissione; barra dell'area di lavoro; riproduzione in tempo reale nella viewport, Play a
+  registrate dal gizmo, con Annulla per ogni modifica; luci e ghiaccio secco seguiti da un numero
+  stabile, così rinominarli non perde niente; fumo e ghiaccio secco che seguono il cursore, con
+  inizio e fine dell'emissione; barra dell'area di lavoro; riproduzione in tempo reale nella viewport, Play a
   pochi campioni nella vista Render; salvataggio del render di ogni fotogramma o di un'anteprima
   della viewport, dalla viewport o da una camera, in fotogrammi PNG e MP4.
 - **Cartella Rendering**: quello che salvi o esporti finisce di serie in `Rendering` accanto al

@@ -2,6 +2,11 @@
   "code": "en",
   "name": "English",
   "strings": {
+    "Meno dettagli": "Fewer details",
+    "Tutte le misure: passate, risoluzione, backend, memoria, processore": "All the measures: passes, resolution, backend, memory, processor",
+    "La sorgente del fumo era dentro un oggetto: spostata sopra, così il fumo può uscire.": "The smoke source was inside an object: moved above it, so the smoke can get out.",
+    "Sposta la sorgente sopra l'oggetto": "Move the source above the object",
+    "Alza la sorgente di {} cm": "Raises the source by {} cm",
     "Finale": "Final",
     "Grezza": "Raw",
     "Albedo": "Albedo",

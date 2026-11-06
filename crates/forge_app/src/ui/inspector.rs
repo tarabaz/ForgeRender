@@ -22,7 +22,9 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
         }
     });
     ui.separator();
-    egui::ScrollArea::vertical()
+    // Anche in orizzontale: una riga troppo lunga scorre invece di allargare il pannello, che
+    // resta largo come l'ha messo l'utente.
+    egui::ScrollArea::both()
         .id_salt("inspector-scroll")
         .auto_shrink([false, false])
         .show(ui, |ui| match app.tab {
@@ -34,6 +36,10 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             InspectorTab::Camera => camera(app, ui),
             InspectorTab::Render => render(app, ui),
         });
+}
+
+fn is_opacity_copy(m: &Material) -> bool {
+    m.id.0.starts_with(forge_scene::timeline::OPACITY_PREFIX)
 }
 
 pub(crate) fn vec3_edit(ui: &mut egui::Ui, label: &str, v: &mut Vec3, speed: f64) -> bool {
@@ -230,6 +236,10 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
     used.dedup();
     let mut items: Vec<Material> = used.iter().filter_map(|id| app.scene.materials.get(id).cloned()).collect();
     items.sort_by_key(|m| crate::i18n::tr_dyn(&m.name).to_lowercase());
+    // Le copie per l'opacità animata sono un dettaglio della timeline: basta il materiale di cui
+    // sono copia, se è nell'elenco.
+    let names: Vec<String> = items.iter().filter(|m| !is_opacity_copy(m)).map(|m| m.name.clone()).collect();
+    items.retain(|m| !is_opacity_copy(m) || !names.contains(&m.name));
     ui.horizontal(|ui| {
         ui.strong(tf("Materiali della scena ({})", &[format!("{}", items.len())]));
         if ui
@@ -1453,7 +1463,8 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
         changed = true;
     }
     if delete {
-        app.scene.lights.remove(i);
+        let gone = app.scene.lights.remove(i);
+        app.scene.timeline.remove_element(&forge_scene::Target::Light(gone.id));
         app.selected_light = None;
         changed = true;
     }
@@ -1853,7 +1864,8 @@ fn effects(app: &mut ForgeApp, ui: &mut egui::Ui) {
         app.selection.clear();
     }
     if let Some(i) = remove {
-        app.scene.fogs.remove(i);
+        let gone = app.scene.fogs.remove(i);
+        app.scene.timeline.remove_element(&forge_scene::Target::Fog(gone.id));
         app.selected_fog = None;
         changed = true;
     }

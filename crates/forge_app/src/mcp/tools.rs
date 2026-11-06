@@ -39,6 +39,7 @@ fn done(v: Value) -> R {
 pub fn call(app: &mut ForgeApp, name: &str, args: &Value) -> Step {
     app.error = None;
     app.info = None;
+    app.toast = None;
     match dispatch(app, name, args) {
         Ok(Step::Done(out)) => Step::Done(with_messages(app, out)),
         Ok(Step::Wait(mut w)) => {
@@ -55,7 +56,8 @@ fn with_messages(app: &mut ForgeApp, mut out: ToolOutput) -> ToolOutput {
         out.is_error = true;
         out.text = format!("{e}\n\n{}", out.text);
     }
-    if let Some(i) = app.info.take() {
+    let toast = app.toast.take().map(|t| t.text);
+    for i in app.info.take().into_iter().chain(toast) {
         out.text = format!("{}\n\nAvviso di ForgeRender: {i}", out.text);
     }
     out
@@ -635,6 +637,7 @@ fn remove_light(app: &mut ForgeApp, a: &Args) -> R {
     }
     let i = ops::find_light(&app.scene, v)?;
     let l = app.scene.lights.remove(i);
+    app.scene.timeline.remove_element(&forge_scene::Target::Light(l.id));
     app.selected_light = None;
     app.shading_changed();
     done(json!({"eliminata": l.name, "luci_rimaste": app.scene.lights.len()}))

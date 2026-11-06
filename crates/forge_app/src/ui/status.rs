@@ -123,6 +123,37 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             }
         });
     });
+    // Una riga sola: alla timeline resta l'altezza. Il resto delle misure si apre a richiesta.
+    let open_id = egui::Id::NULL.with("statistiche-aperte");
+    let mut open = ui.ctx().data_mut(|d| *d.get_persisted_mut_or(open_id, false));
+    ui.horizontal(|ui| {
+        let (icon, hint) = if open {
+            ("−", tr("Meno dettagli"))
+        } else {
+            ("+", tr("Tutte le misure: passate, risoluzione, backend, memoria, processore"))
+        };
+        if ui.small_button(icon).on_hover_text(hint).clicked() {
+            open = !open;
+            ui.ctx().data_mut(|d| d.insert_persisted(open_id, open));
+        }
+        if !open {
+            ui.label(tf("Tempo: {}", &[fmt_dur(p.elapsed).to_string()]));
+            ui.separator();
+            ui.label(tf("{:.2} Mcampioni/s", &[format!("{:.2}", p.msamples_per_sec())]));
+            ui.separator();
+            ui.label(tf("CPU: {:.0}%", &[format!("{:.0}", app.monitor.cpu_usage_percent)]));
+            ui.separator();
+            gpu_label(app, ui, &p);
+        }
+    });
+    if open {
+        stats_grid(app, ui, &p);
+    }
+    tabs_and_log(app, ui);
+}
+
+/// Tutte le misure del render e della macchina.
+fn stats_grid(app: &ForgeApp, ui: &mut egui::Ui, p: &forge_render_core::Progress) {
     egui::Grid::new("stats").num_columns(6).spacing([18.0, 2.0]).show(ui, |ui| {
         ui.label(tf("Tempo: {}", &[fmt_dur(p.elapsed).to_string()]));
         ui.label(tf("Media/passata: {}", &[fmt_dur(p.avg_pass()).to_string()]));
@@ -154,7 +185,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 format!("{:.1}", forge_telemetry::gib(app.system.total_ram_bytes)),
             ],
         ));
-        gpu_label(app, ui, &p);
+        gpu_label(app, ui, p);
         match (&app.denoiser_info, p.denoiser.is_empty()) {
             (Err(_), _) => ui.label(tr("Denoiser: OIDN non trovato")),
             (Ok(_), true) => ui.label(tr("Denoiser: inattivo")),
@@ -169,6 +200,10 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
         );
         ui.end_row();
     });
+}
+
+/// Schede Timeline e Console.
+fn tabs_and_log(app: &mut ForgeApp, ui: &mut egui::Ui) {
     ui.separator();
     ui.horizontal(|ui| {
         ui.selectable_value(&mut app.bottom_tab, crate::app::BottomTab::Timeline, tr("Timeline"));

@@ -213,20 +213,31 @@ pub struct ModSlot {
 pub enum Target {
     /// Oggetto (componente) della scena.
     Object(ComponentId),
-    /// Luce, per nome.
-    Light(String),
+    /// Luce, per numero (`Light::id`).
+    Light(u32),
     /// Camera che fa il render (quella attiva, o la vista).
     Camera,
     /// Nube di fumo, per numero.
     Smoke(u32),
-    /// Nebbia di ghiaccio secco, per nome.
-    Fog(String),
+    /// Nebbia di ghiaccio secco, per numero (`FogVolume::id`).
+    Fog(u32),
     /// Foschia d'ambiente.
     Haze,
     /// Polvere in sospensione.
     Dust,
     /// Ambiente (cielo, HDRI).
     Environment,
+    /// Riferimento per nome di un progetto salvato prima della 0.45: all'apertura diventa un
+    /// numero ([`Timeline::resolve_names`]); resta così solo se l'elemento non c'è più.
+    #[serde(untagged)]
+    Named(NamedTarget),
+}
+
+/// Luce o nebbia indicate per nome, come nei progetti di prima della 0.45.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum NamedTarget {
+    Light(String),
+    Fog(String),
 }
 
 /// Proprietà animabile (le unità sono quelle dei pannelli: metri, gradi, 0–1...).
@@ -423,6 +434,7 @@ impl Target {
             Target::Haze => &[Prop::Density],
             Target::Dust => &[Prop::Brightness],
             Target::Environment => &[Prop::Intensity, Prop::HdriRotation],
+            Target::Named(_) => &[],
         }
     }
 
@@ -482,6 +494,7 @@ impl Target {
             Target::Haze => &[Prop::Density, Prop::ColorR, Prop::ColorG, Prop::ColorB],
             Target::Dust => &[Prop::Brightness],
             Target::Environment => &[Prop::Intensity, Prop::HdriRotation],
+            Target::Named(_) => &[],
         }
     }
 
@@ -489,7 +502,12 @@ impl Target {
     pub fn name(&self, scene: &Scene) -> String {
         match self {
             Target::Object(id) => scene.find(id).map(|i| scene.nodes[i].name.clone()).unwrap_or_else(|| id.0.clone()),
-            Target::Light(n) => n.clone(),
+            Target::Light(n) => scene
+                .lights
+                .iter()
+                .find(|l| l.id == *n)
+                .map(|l| l.name.clone())
+                .unwrap_or_else(|| format!("Luce {n}")),
             Target::Camera => "Camera".into(),
             Target::Smoke(n) => scene
                 .smokes
@@ -497,7 +515,13 @@ impl Target {
                 .find(|s| s.n == *n)
                 .map(|s| s.name.clone())
                 .unwrap_or_else(|| format!("Fumo {n}")),
-            Target::Fog(n) => n.clone(),
+            Target::Fog(n) => scene
+                .fogs
+                .iter()
+                .find(|f| f.id == *n)
+                .map(|f| f.name.clone())
+                .unwrap_or_else(|| format!("Ghiaccio secco {n}")),
+            Target::Named(NamedTarget::Light(n) | NamedTarget::Fog(n)) => n.clone(),
             Target::Haze => "Foschia d'ambiente".into(),
             Target::Dust => "Polvere in sospensione".into(),
             Target::Environment => "Ambiente".into(),
@@ -508,9 +532,10 @@ impl Target {
     pub fn exists(&self, scene: &Scene) -> bool {
         match self {
             Target::Object(id) => scene.find(id).is_some(),
-            Target::Light(n) => scene.lights.iter().any(|l| &l.name == n),
+            Target::Light(n) => scene.lights.iter().any(|l| l.id == *n),
             Target::Smoke(n) => scene.smokes.iter().any(|s| s.n == *n),
-            Target::Fog(n) => scene.fogs.iter().any(|f| &f.name == n),
+            Target::Fog(n) => scene.fogs.iter().any(|f| f.id == *n),
+            Target::Named(_) => false,
             _ => true,
         }
     }
@@ -904,14 +929,14 @@ impl Timeline {
             .fogs
             .iter()
             .enumerate()
-            .map(|(i, f)| (i, self.effect_time(&Target::Fog(f.name.clone()), t)))
+            .map(|(i, f)| (i, self.effect_time(&Target::Fog(f.id), t)))
             .collect();
         for (i, ft) in fogs {
             if (scene.fogs[i].sim_time - ft).abs() > 1e-4 {
                 scene.fogs[i].sim_time = ft;
                 out.effects = true;
             }
-            let target = Target::Fog(scene.fogs[i].name.clone());
+            let target = Target::Fog(scene.fogs[i].id);
             let stop = self.stop_of(&target).map(|s| (s - self.start_of(&target)).max(1e-3)).unwrap_or(0.0);
             if (scene.fogs[i].emit_stop - stop).abs() > 1e-4 {
                 scene.fogs[i].emit_stop = stop;
@@ -929,7 +954,7 @@ impl Timeline {
         let simulated = scene.smokes.iter().filter(|s| s.mode == crate::SmokeMode::Simulated);
         let targets: Vec<Target> = simulated
             .map(|s| Target::Smoke(s.n))
-            .chain(scene.fogs.iter().map(|f| Target::Fog(f.name.clone())))
+            .chain(scene.fogs.iter().map(|f| Target::Fog(f.id)))
             .collect();
         for target in targets {
             if !self.elements.contains(&target) {
@@ -1041,6 +1066,63 @@ impl Timeline {
     }
 
     /// Toglie le tracce e gli elementi di cose che non ci sono più.
+    /// Stessa animazione, a parte il cursore e i valori di lavoro delle tracce: serve ad Annulla.
+    pub fn same_content(&self, o: &Timeline) -> bool {
+        self.duration == o.duration
+            && self.fps == o.fps
+            && self.work_in == o.work_in
+            && self.work_out == o.work_out
+            && self.elements == o.elements
+            && self.starts == o.starts
+            && self.stops == o.stops
+            && self.tracks.len() == o.tracks.len()
+            && self.tracks.iter().zip(&o.tracks).all(|(a, b)| {
+                a.target == b.target && a.prop == b.prop && a.enabled == b.enabled && a.keys == b.keys && a.modifiers == b.modifiers
+            })
+    }
+
+    /// Dopo aver rimesso un'animazione salvata: i valori ricordati non valgono più, altrimenti la
+    /// differenza con la scena sembrerebbe una modifica dell'utente e diventerebbe una chiave.
+    pub fn forget_written(&mut self) {
+        for tr in &mut self.tracks {
+            tr.last = None;
+            tr.wanted = None;
+        }
+    }
+
+    /// Numeri più alti di luci e nebbie usati dalle righe: i nuovi elementi non li riprendono,
+    /// così una luce nuova non eredita l'animazione di una tolta.
+    pub fn highest_ids(&self) -> (u32, u32) {
+        let targets = self.elements.iter().chain(self.tracks.iter().map(|t| &t.target));
+        let targets = targets.chain(self.starts.iter().chain(&self.stops).map(|(t, _)| t));
+        targets.fold((0, 0), |(l, f), t| match t {
+            Target::Light(n) => (l.max(*n), f),
+            Target::Fog(n) => (l, f.max(*n)),
+            _ => (l, f),
+        })
+    }
+
+    /// Progetti di prima della 0.45: i riferimenti per nome diventano numeri. Con più elementi
+    /// omonimi vale il primo, che è quello che l'animazione muoveva allora.
+    pub fn resolve_names(&mut self, scene: &Scene) {
+        let resolve = |t: &mut Target| {
+            let found = match t {
+                Target::Named(NamedTarget::Light(n)) => scene.lights.iter().find(|l| l.name == *n).map(|l| Target::Light(l.id)),
+                Target::Named(NamedTarget::Fog(n)) => scene.fogs.iter().find(|f| f.name == *n).map(|f| Target::Fog(f.id)),
+                _ => None,
+            };
+            if let Some(found) = found {
+                *t = found;
+            }
+        };
+        self.elements.iter_mut().for_each(resolve);
+        self.tracks.iter_mut().for_each(|t| resolve(&mut t.target));
+        self.starts.iter_mut().chain(&mut self.stops).for_each(|(t, _)| resolve(t));
+        // Due nomi uguali danno lo stesso elemento: una riga sola.
+        let mut seen = std::collections::HashSet::new();
+        self.elements.retain(|t| seen.insert(t.clone()));
+    }
+
     pub fn prune(&mut self, scene: &Scene) {
         self.elements.retain(|t| t.exists(scene));
         self.tracks.retain(|t| t.target.exists(scene));
@@ -1102,8 +1184,8 @@ pub fn get(scene: &Scene, target: &Target, prop: Prop) -> Option<f32> {
                 _ => return None,
             })
         }
-        Target::Light(name) => {
-            let l = scene.lights.iter().find(|l| &l.name == name)?;
+        Target::Light(n) => {
+            let l = scene.lights.iter().find(|l| l.id == *n)?;
             Some(match prop {
                 PosX | PosY | PosZ => axis(l.position, prop),
                 TargetX | TargetY | TargetZ => axis(l.target, prop),
@@ -1138,8 +1220,8 @@ pub fn get(scene: &Scene, target: &Target, prop: Prop) -> Option<f32> {
                 _ => return None,
             })
         }
-        Target::Fog(name) => {
-            let f = scene.fogs.iter().find(|f| &f.name == name)?;
+        Target::Fog(n) => {
+            let f = scene.fogs.iter().find(|f| f.id == *n)?;
             Some(match prop {
                 Density => f.density,
                 Visible => f.enabled as u8 as f32,
@@ -1155,6 +1237,7 @@ pub fn get(scene: &Scene, target: &Target, prop: Prop) -> Option<f32> {
             Brightness => scene.haze_dust.brightness,
             _ => return None,
         }),
+        Target::Named(_) => None,
         Target::Environment => {
             use crate::Environment::*;
             Some(match (prop, &scene.environment) {
@@ -1187,8 +1270,8 @@ pub fn set(scene: &mut Scene, target: &Target, prop: Prop, v: f32) {
                 _ => {}
             }
         }
-        Target::Light(name) => {
-            let Some(l) = scene.lights.iter_mut().find(|l| &l.name == name) else {
+        Target::Light(n) => {
+            let Some(l) = scene.lights.iter_mut().find(|l| l.id == *n) else {
                 return;
             };
             match prop {
@@ -1246,8 +1329,8 @@ pub fn set(scene: &mut Scene, target: &Target, prop: Prop, v: f32) {
                 _ => {}
             }
         }
-        Target::Fog(name) => {
-            let Some(f) = scene.fogs.iter_mut().find(|f| &f.name == name) else {
+        Target::Fog(n) => {
+            let Some(f) = scene.fogs.iter_mut().find(|f| f.id == *n) else {
                 return;
             };
             match prop {
@@ -1270,6 +1353,7 @@ pub fn set(scene: &mut Scene, target: &Target, prop: Prop, v: f32) {
                 scene.haze_dust.brightness = v.max(0.0);
             }
         }
+        Target::Named(_) => {}
         Target::Environment => {
             use crate::Environment::*;
             match (prop, &mut scene.environment) {
@@ -1291,6 +1375,10 @@ fn set_object_opacity(scene: &mut Scene, node: usize, v: f32) {
     if current == own {
         if let Some(m) = scene.materials.materials.iter_mut().find(|m| m.id == own) {
             m.opacity = v;
+            // Progetti di prima: il nome aveva una coda che si vedeva negli elenchi.
+            if let Some(name) = m.name.strip_suffix(" (opacità animata)") {
+                m.name = name.to_string();
+            }
         }
         return;
     }
@@ -1302,7 +1390,6 @@ fn set_object_opacity(scene: &mut Scene, node: usize, v: f32) {
     };
     let mut m = src;
     m.id = own.clone();
-    m.name = format!("{} (opacità animata)", m.name);
     m.opacity = v;
     scene.materials.upsert(m);
     // Il materiale di prima resta come origine: la copia tiene i suoi parametri.
@@ -1312,6 +1399,18 @@ fn set_object_opacity(scene: &mut Scene, node: usize, v: f32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_cursor_is_not_a_change_of_the_animation() {
+        let mut a = Timeline::default();
+        a.tracks.push(track(&[(0.0, 1.0)], Interp::Linear));
+        let mut b = a.clone();
+        b.time = 2.0;
+        b.tracks[0].last = Some(3.0);
+        assert!(a.same_content(&b));
+        b.tracks[0].keys[0].v = 2.0;
+        assert!(!a.same_content(&b));
+    }
 
     fn track(keys: &[(f32, f32)], interp: Interp) -> Track {
         Track {

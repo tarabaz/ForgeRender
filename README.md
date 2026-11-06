@@ -18,6 +18,13 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
+### What's new in 0.45.0
+
+- **Undo for the timeline:** keys, modifiers, work area and effect times are undone one gesture at a time, together with the object you moved.
+- **Lights and dry ice keep their animation** when renamed or when two have the same name: the timeline follows a stable number. Older projects convert on opening.
+- **Smoke that always comes out:** a source inside an object is found at once, new smoke lifts its source above the object, and one click does it for smoke you already placed.
+- **Notices instead of windows after saving,** with **Open folder**; timeline toolbar on two lines in narrow windows, render measures on a single line.
+
 ### What's new in 0.44.1
 
 - **Fixes from a full beta test:** Undo no longer carries over to another project, copy and paste of timeline keys work, a warning explains when a smoke source is trapped inside an object, Play in the Render view shows finished frames only, and the panels and the toolbar adapt to small windows.
@@ -184,6 +191,7 @@ Real volumetric smoke clouds for product shots: incense smoke next to a perfume 
 - **Computed once over the timeline:** the simulation runs once over the whole duration and leaves a file per frame in the temporary folder, plus the complete state once per second. Moving the playhead reads the file of that frame. Every frame has a cumulative fingerprint of what affects it up to there (objects inside the box, emission on or off): when something changes, the simulation resumes from the last state before the first different frame, and what comes first stays bit-identical. In a test, 60 frames took 6.3 s, another frame 1 s, and an animation changed from second 1 restarted from frame 25.
 - **Air displacement of animated objects:** with the option on (the default), animated objects are moving boundaries of the fluid: the normal air velocity on their surface is theirs, so the pressure pushes the air ahead of them and draws it in behind, and the wake and vortices come from the fluid itself. Off, the smoke just adapts around the object. It works on simulated smoke only: procedural smoke and haze are not simulated, and vortices smaller than a grid cell cannot appear.
 - **Start and stop:** on the row of the effect in the timeline you choose when it starts and when the source stops emitting; what came out does not vanish, it keeps moving and fading. The time controls in the smoke panel are hidden: time is decided by the timeline.
+- **Source inside an object:** the panel warns as soon as the source ends up inside an object, even one cut by the box, because the smoke would stay trapped and the render would show none. New smoke moves its source above the object by itself; on smoke you placed, **Move the source above the object** does it with one click.
 
 Fire (combustion, emission, flames lighting the scene) is a separate, later step: see the [smoke and fire study](docs/studio-fumo-fuoco.md).
 
@@ -275,6 +283,8 @@ A professional timeline, always available: it sits at the bottom with **Timeline
 - **Modifiers:** "ƒ+" adds to each property, one at a time and in order, wiggle (amplitude, frequency, seed), oscillation, continuous ramp (for example 90°/s for a turntable), loop, ping-pong, offset, multiply, limits and stepped (stop motion); on a row with three axes the X Y Z letters choose which ones it acts on.
 - **Playback:** start, previous key, play/pause, next key, end, loop; duration and frames per second; zoom and scroll of the time. The **work area** bar above the ruler (both ends and the middle can be dragged) sets the part that is played and saved. In the viewport playback is real time; in the **Render view** Play computes each frame with few samples (20 by default, adjustable) and moves on: slower than real time, but you see the rendered animation.
 - **Effects over time:** simulated smoke and dry ice get their own row as soon as they are created and follow the playhead: the simulated instant is the playhead time minus the start of the effect, set on its row together with the stop of the emission; the duration chosen in the timeline decides how long they are computed.
+- **Undo and Redo:** keys, modifiers, work area, duration and effect times are undone with Ctrl+Z, one gesture at a time, together with the object moved in that gesture.
+- **Stable references:** lights and dry ice are followed by number, not by name: you can rename them, or keep two with the same name, without losing the animation. Projects from earlier versions convert on opening.
 - **Save animation:** the work area, either as the render of every frame or as a **viewport preview** (a few seconds, to check the motion; smoke and fog are not in it), from the viewport or from a render camera, as PNG frames in a new folder inside **Rendering** and, if you want, an MP4 video.
 - **Object opacity:** a property of its own, rendered by letting each ray through with probability 1 − opacity, so the object fades with its shadow, the same on CPU and GPU.
 
@@ -334,14 +344,15 @@ A professional timeline, always available: it sits at the bottom with **Timeline
   from a cup* (transparent ribbons rising from the coffee) and *Incense or cigarette*. The
   simulation is **computed once over the timeline** and kept in temporary files, resuming from the
   first changed frame; animated objects really **displace the air** with wake and vortices;
-  emission with a start and a stop.
+  emission with a start and a stop; a source inside an object is found at once and moved out.
 - **Timeline (animation)**: an After Effects-style timeline, always available, with Timeline |
   Console tabs at the bottom or in its own window on another screen. Keys with six interpolations
   (hold, linear, ease in, ease out, ease in-out, smooth curve), selected with the mouse (rectangle,
   Ctrl, group drag, Delete, copy and paste); modifiers added one by one (wiggle, oscillation,
   continuous ramp, loop, ping-pong, offset, multiply, limits, stepped); one row for position and
   rotation; rotation, scale and opacity of objects, lights, camera, smoke, fog, haze, dust and
-  environment; keys recorded by the gizmo; smoke and dry ice that follow the playhead, with start
+  environment; keys recorded by the gizmo, with undo for every change; lights and dry ice followed by a stable
+  number, so renaming them loses nothing; smoke and dry ice that follow the playhead, with start
   and stop of the emission; work area bar; real-time playback in the viewport, low-sample Play in
   the Render view; saving the render of every frame or a viewport preview, from the viewport or a
   camera, as PNG frames and MP4.

@@ -191,6 +191,22 @@ pub struct NodeState {
     removed: bool,
 }
 
+/// Voce di annulla/ripeti: lo stato di prima dei componenti toccati (con il numero di nodi della
+/// scena, per scartare voci non più valide) e/o dell'animazione. Un gesto che muove un oggetto e
+/// mette una chiave è una voce sola.
+pub struct UndoEntry {
+    count: usize,
+    nodes: Vec<(usize, NodeState)>,
+    timeline: Option<Box<forge_scene::Timeline>>,
+}
+
+/// Avviso che scompare da solo; con `folder` offre di aprire la cartella.
+pub struct Toast {
+    pub text: String,
+    pub at: std::time::Instant,
+    pub folder: Option<std::path::PathBuf>,
+}
+
 /// Contenuto della vista Render.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RenderView {
@@ -247,7 +263,7 @@ pub struct ForgeApp {
     /// L'utente ha già confermato l'uscita: la chiusura della finestra non si ferma più.
     pub exit_confirmed: bool,
     /// Avviso breve in basso nella finestra (testo, quando è comparso).
-    pub toast: Option<(String, std::time::Instant)>,
+    pub toast: Option<Toast>,
     /// Finestra del manuale (Guida → Manuale, F1).
     pub manual: crate::ui::manual::ManualUi,
     pub error: Option<String>,
@@ -378,10 +394,14 @@ pub struct ForgeApp {
     pub aim_lock: Option<forge_scene::ComponentId>,
     /// Centro dell'oggetto agganciato nel suo sistema locale (segue i suoi spostamenti).
     aim_local: forge_math::Vec3,
-    /// Annulla/ripeti delle trasformazioni: stato precedente dei componenti toccati
-    /// (con il numero di nodi della scena, per scartare voci non più valide).
-    undo_stack: Vec<(usize, Vec<(usize, NodeState)>)>,
-    redo_stack: Vec<(usize, Vec<(usize, NodeState)>)>,
+    /// Annulla/ripeti di trasformazioni e animazione.
+    undo_stack: Vec<UndoEntry>,
+    redo_stack: Vec<UndoEntry>,
+    /// Animazione com'era all'ultimo controllo: le modifiche diventano voci di annulla quando il
+    /// gesto finisce, così trascinare una chiave è un passo solo.
+    timeline_saved: forge_scene::Timeline,
+    /// Una voce di annulla è appena stata aperta: le chiavi nate dallo stesso gesto vanno lì.
+    undo_fresh: bool,
 
     pub logs: LogBuffer,
     pub system: SystemInfo,
@@ -518,6 +538,8 @@ impl ForgeApp {
             aim_lock: None,
             aim_local: forge_math::Vec3::ZERO,
             undo_stack: Vec::new(),
+            timeline_saved: forge_scene::Timeline::default(),
+            undo_fresh: false,
             redo_stack: Vec::new(),
             logs,
             system,
@@ -754,11 +776,48 @@ impl ForgeApp {
     /// Registra lo stato dei componenti indicati prima di una modifica (annulla).
     pub fn push_undo(&mut self, nodes: &[usize]) {
         let before = nodes.iter().map(|&i| (i, self.node_state(i))).collect();
-        self.undo_stack.push((self.scene.nodes.len(), before));
+        self.record_undo(UndoEntry {
+            count: self.scene.nodes.len(),
+            nodes: before,
+            timeline: None,
+        });
+        self.undo_fresh = true;
+    }
+
+    fn record_undo(&mut self, entry: UndoEntry) {
+        self.undo_stack.push(entry);
         if self.undo_stack.len() > 200 {
             self.undo_stack.remove(0);
         }
         self.redo_stack.clear();
+    }
+
+    /// A gesto finito, una modifica dell'animazione diventa una voce di annulla.
+    fn watch_timeline(&mut self, ctx: &egui::Context) {
+        if ctx.input(|i| i.pointer.any_down()) || crate::ui::timeline::dragging(self) {
+            return;
+        }
+        let fresh = std::mem::take(&mut self.undo_fresh);
+        if self.scene.timeline.same_content(&self.timeline_saved) {
+            return;
+        }
+        let before = Box::new(std::mem::replace(&mut self.timeline_saved, self.scene.timeline.clone()));
+        match self.undo_stack.last_mut() {
+            Some(e) if fresh && e.timeline.is_none() => {
+                e.timeline = Some(before);
+                self.redo_stack.clear();
+            }
+            _ => self.record_undo(UndoEntry {
+                count: self.scene.nodes.len(),
+                nodes: Vec::new(),
+                timeline: Some(before),
+            }),
+        }
+    }
+
+    /// L'animazione è cambiata da sola (effetto nuovo, scena nuova): niente da annullare.
+    pub fn timeline_settled(&mut self) {
+        self.timeline_saved = self.scene.timeline.clone();
     }
 
     /// Scarta l'ultima voce (modifica annullata con Esc prima di essere applicata).
@@ -1035,7 +1094,7 @@ impl ForgeApp {
             for &i in &originals {
                 self.scene.nodes[i].removed = true;
             }
-            self.info = Some(if originals.len() == 1 {
+            self.toast(if originals.len() == 1 {
                 tr("1 componente eliminato dal progetto (il file importato non viene modificato). \
                     Ctrl+Z o \"Eliminati\" in fondo all'albero per ripristinarlo.")
                 .to_string()
@@ -1089,37 +1148,46 @@ impl ForgeApp {
     }
 
     fn swap_transforms(&mut self, from_undo: bool) {
+        // Una modifica dell'animazione ancora da registrare va in pila prima di tornare indietro.
+        self.undo_fresh = false;
         let n = self.scene.nodes.len();
-        let (src, dst) = if from_undo {
-            (&mut self.undo_stack, &mut self.redo_stack)
-        } else {
-            (&mut self.redo_stack, &mut self.undo_stack)
-        };
-        while let Some((count, entry)) = src.pop() {
-            if count != n {
+        loop {
+            let popped = if from_undo { self.undo_stack.pop() } else { self.redo_stack.pop() };
+            let Some(entry) = popped else { return };
+            if !entry.nodes.is_empty() && entry.count != n {
                 continue; // la struttura della scena è cambiata: voce non più applicabile
             }
-            let current = entry
-                .iter()
-                .map(|(i, _)| {
-                    let n = &self.scene.nodes[*i];
-                    (
-                        *i,
-                        NodeState {
-                            user: n.user,
-                            visible: n.visible,
-                            removed: n.removed,
-                        },
-                    )
-                })
-                .collect();
-            for (i, st) in entry {
+            let opposite = UndoEntry {
+                count: n,
+                nodes: entry.nodes.iter().map(|(i, _)| (*i, self.node_state(*i))).collect(),
+                timeline: entry.timeline.as_ref().map(|_| Box::new(self.scene.timeline.clone())),
+            };
+            if from_undo {
+                self.redo_stack.push(opposite);
+            } else {
+                self.undo_stack.push(opposite);
+            }
+            let moved = !entry.nodes.is_empty();
+            for (i, st) in entry.nodes {
                 self.scene.nodes[i].user = st.user;
                 self.scene.nodes[i].visible = st.visible;
                 self.scene.nodes[i].removed = st.removed;
             }
-            dst.push((n, current));
-            self.geometry_changed();
+            if let Some(tl) = entry.timeline {
+                // Il cursore resta dov'è.
+                let time = self.scene.timeline.time;
+                self.scene.timeline = *tl;
+                self.scene.timeline.time = time.min(self.scene.timeline.duration);
+                self.scene.timeline.forget_written();
+                self.timeline_settled();
+                crate::ui::timeline::restored(self);
+            }
+            if moved {
+                self.geometry_changed();
+            }
+            self.unsaved = true;
+            // L'avviso di ciò che si è appena annullato non serve più.
+            self.toast = None;
             return;
         }
     }
@@ -1601,7 +1669,7 @@ impl ForgeApp {
             forge_render_core::BackendKind::Gpu => match self.gpu_backend() {
                 Ok(g) => Box::new(g),
                 Err(e) => {
-                    self.info = Some(tf(
+                    self.toast(tf(
                         "GPU non disponibile, il rendering prosegue sulla CPU.\n\n{e}",
                         std::slice::from_ref(&e),
                     ));
@@ -1817,10 +1885,11 @@ impl ForgeApp {
         ) {
             Ok(()) => {
                 tracing::info!("immagine esportata: {} ({} campioni)", path.display(), frame.samples);
-                self.info = Some(tf(
+                let text = tf(
                     "Immagine esportata ({} campioni):\n{}",
                     &[format!("{}", frame.samples), format!("{}", path.display())],
-                ));
+                );
+                self.notify_saved(text, path.parent().map(Path::to_path_buf));
             }
             Err(e) => self.error = Some(tf("esportazione fallita: {e:#}", &[format!("{:#}", e)])),
         }
@@ -1845,6 +1914,8 @@ impl ForgeApp {
         self.undo_stack.clear();
         self.redo_stack.clear();
         crate::ui::timeline::scene_replaced(self);
+        self.timeline_settled();
+        self.undo_fresh = false;
         self.meta = meta;
         if let Some(s) = settings {
             self.settings = s;
@@ -2552,7 +2623,16 @@ impl ForgeApp {
 
     /// Mostra un avviso breve in basso (scompare da solo dopo qualche secondo).
     pub fn toast(&mut self, text: impl Into<String>) {
-        self.toast = Some((text.into(), std::time::Instant::now()));
+        self.notify_saved(text, None);
+    }
+
+    /// Come [`Self::toast`], con il pulsante per aprire la cartella di quello che si è salvato.
+    pub fn notify_saved(&mut self, text: impl Into<String>, folder: Option<std::path::PathBuf>) {
+        self.toast = Some(Toast {
+            text: text.into(),
+            at: std::time::Instant::now(),
+            folder,
+        });
     }
 
     /// Aggiunge il progetto a File → Progetti recenti (salvato in `impostazioni.json`).
@@ -2677,6 +2757,9 @@ impl ForgeApp {
 
     pub fn tick(&mut self, ctx: &egui::Context) {
         self.frames += 1;
+        // Luci e nebbie appena create (da qualunque parte) prendono il loro numero per la timeline.
+        self.scene.assign_element_ids();
+        self.watch_timeline(ctx);
         self.poll_geometry();
         self.poll_fog();
         crate::ui::smoke_preview::update(self);

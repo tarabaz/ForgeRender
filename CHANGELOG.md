@@ -13,6 +13,18 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.45.0 — 6 nov 2026
+
+Correzioni di quello che il beta test aveva lasciato aperto; dettagli in `reports/chatgpt/2026-11-06_betatest-0.44.md`, sezione 8.
+
+- **Luci e ghiaccio secco hanno un numero stabile** nella timeline al posto del nome: due luci con lo stesso nome restano distinte e rinominarne una non perde più l'animazione. I progetti delle versioni precedenti si convertono all'apertura (con due luci omonime l'animazione resta sulla prima, quella che muoveva prima). Le luci duplicate prendono un numero loro e una luce nuova non eredita mai l'animazione di una eliminata. Cambiando aspetto, le luci con lo stesso nome tengono il numero.
+- **Annulla e Ripeti coprono la timeline:** chiavi, modificatori, area di lavoro, durata, inizio e fine degli effetti. Trascinare una chiave è un passo solo, e spostare un oggetto animato con la sua chiave nuova è un passo solo anche quello.
+- **Avvisi al posto delle finestre:** dopo il salvataggio di un'immagine, di un'animazione o dei passaggi di render compare un avviso in alto con **Apri cartella**, che non blocca più la barra. Resta finché ci si passa sopra con il mouse e sparisce da solo. L'avviso di un pezzo eliminato sparisce con Annulla. Le finestre restano per gli avvisi di importazione, gli errori e le domande.
+- **Sorgente del fumo dentro un oggetto:** il controllo si fa ora sulla griglia vera appena il fumo cambia, anche con l'oggetto tagliato dal riquadro, e non serve più che sia partito un calcolo, quindi l'avviso compare anche dopo un riavvio. I punti dell'anteprima spariscono quando il render non mostrerebbe niente. Un fumo nuovo nato dentro un oggetto alza da solo la sorgente sopra di esso; su un fumo già sistemato lo fa con un clic il pulsante **Sposta la sorgente sopra l'oggetto**.
+- **Pannelli:** la barra della timeline va a capo in una finestra stretta, così nessun comando esce. Le misure del render stanno in una riga con un + per vederle tutte, e alla timeline restano più righe. L'albero della scena tiene sempre titolo e qualche riga, anche con i pannelli Luci e Camere alti. Una riga lunga nel pannello laterale scorre invece di allargare il pannello.
+- **Elenco materiali:** le copie fatte per l'opacità animata non si vedono se c'è il materiale originale, e non hanno più "(opacità animata)" nel nome.
+- Controllato e non è un difetto: la memoria col fumo resta tra 920 e 1.004 MB in 5 minuti di Play continuo nel Render (la crescita vista nel beta test era la cache che si riempie, limitata a 17 nubi). Un pavimento eliminato nella scena di prova resta eliminato dopo salvataggio e riapertura: non riprodotto, ora lo controlla un test.
+
 ## 0.44.1 — 06/11/2026
 
 Correzioni dal beta test; report completo in `reports/chatgpt/2026-11-06_betatest-0.44.md`.

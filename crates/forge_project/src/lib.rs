@@ -517,6 +517,10 @@ pub fn load(path: &Path) -> anyhow::Result<LoadedProject> {
     scene.smokes = pf.smokes;
     // Progetto senza animazione: il cursore va sull'istante dei suoi effetti (restano come erano).
     let mut timeline = pf.timeline;
+    // Prima i numeri (tenendo conto di quelli già nell'animazione), poi i vecchi nomi.
+    scene.timeline = timeline.clone();
+    scene.assign_element_ids();
+    timeline.resolve_names(&scene);
     if timeline == forge_scene::Timeline::default() {
         timeline.adopt_effects(&scene);
     }
@@ -565,6 +569,74 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos()
+    }
+
+    #[test]
+    fn a_removed_floor_of_the_test_scene_stays_removed() {
+        let dir = std::env::temp_dir().join(format!("forge_floor_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("p.frproject");
+        let mut scene = Scene::test_scene();
+        let floor = scene.nodes.iter().position(|n| n.name == "Pavimento").unwrap();
+        let id = scene.nodes[floor].id.clone();
+        scene.nodes[floor].removed = true;
+        let meta = ProjectMeta {
+            test_scene: true,
+            ..Default::default()
+        };
+        save(&path, &scene, &meta, &RenderSettings::default()).unwrap();
+        let back = load(&path).unwrap().scene;
+        assert!(back.nodes[back.find(&id).unwrap()].removed);
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn old_projects_find_their_lights_by_name_and_keep_them_after_a_rename() {
+        use forge_scene::{Prop, Target, Track};
+        let mut scene = Scene::default();
+        scene.lights.push(Light::point("Doppia", Vec3::ZERO, 1.0));
+        scene.lights.push(Light::point("Doppia", Vec3::X, 2.0));
+        scene.lights.push(Light::point("Unica", Vec3::Y, 3.0));
+        scene.fogs.push(forge_scene::FogVolume::default());
+        let mut pf = to_project_file(&scene, &ProjectMeta::default(), &RenderSettings::default());
+        pf.timeline.tracks.push(Track {
+            target: Target::Environment,
+            prop: Prop::Intensity,
+            ..Default::default()
+        });
+        // Un progetto scritto da una versione di prima: riferimenti per nome.
+        let mut v = serde_json::to_value(&pf).unwrap();
+        let tl = v.get_mut("timeline").unwrap();
+        tl["elements"] = serde_json::json!([{ "Light": "Doppia" }, { "Light": "Unica" }, { "Fog": "Ghiaccio secco" }]);
+        tl["tracks"][0]["target"] = serde_json::json!({ "Light": "Unica" });
+        tl["stops"] = serde_json::json!([[{ "Fog": "Ghiaccio secco" }, 2.0]]);
+
+        let dir = std::env::temp_dir().join(format!("forge_nomi_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("p.frproject");
+        std::fs::write(&path, serde_json::to_vec(&v).unwrap()).unwrap();
+        let mut back = load(&path).unwrap().scene;
+
+        let ids: Vec<u32> = back.lights.iter().map(|l| l.id).collect();
+        assert!(ids.iter().all(|&n| n != 0));
+        assert_ne!(ids[0], ids[1], "due luci omonime restano distinte");
+        let fog = back.fogs[0].id;
+        assert_eq!(
+            back.timeline.elements,
+            [Target::Light(ids[0]), Target::Light(ids[2]), Target::Fog(fog)]
+        );
+        assert_eq!(back.timeline.tracks[0].target, Target::Light(ids[2]));
+        assert_eq!(back.timeline.stops[0].0, Target::Fog(fog));
+
+        // Rinominare non perde niente, nemmeno dopo aver salvato e riaperto.
+        back.lights[2].name = "Rinominata".into();
+        assert_eq!(back.timeline.tracks[0].target.name(&back), "Rinominata");
+        save(&path, &back, &ProjectMeta::default(), &RenderSettings::default()).unwrap();
+        let again = load(&path).unwrap().scene;
+        assert_eq!(again.lights[2].id, ids[2]);
+        assert_eq!(again.timeline.tracks[0].target, Target::Light(ids[2]));
+        assert!(again.timeline.tracks[0].target.exists(&again));
+        std::fs::remove_dir_all(dir).ok();
     }
 
     #[test]
@@ -641,6 +713,7 @@ mod tests {
         };
 
         let pfile = dir.join("progetto.frproject");
+        scene.assign_element_ids();
         save(&pfile, &scene, &meta, &settings).unwrap();
         let loaded = load(&pfile).unwrap();
         assert!(loaded.report.missing_components.is_empty());

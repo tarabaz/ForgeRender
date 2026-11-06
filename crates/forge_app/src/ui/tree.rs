@@ -3,21 +3,27 @@ use crate::i18n::{tf, tr};
 use eframe::egui;
 use std::collections::BTreeSet;
 
+/// Altezza che resta sempre all'albero della scena (titolo e qualche riga).
+const SCENE_MIN: f32 = 150.0;
+
 /// Pannello di sinistra: albero della scena sopra, luci sotto, con un bordo trascinabile tra i due
 /// (altezza delle luci regolabile) e ognuno con il suo scorrimento.
 pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
     let avail = ui.available_height();
+    // Limiti anche per le altezze salvate: all'albero restano sempre titolo e qualche riga.
+    let cameras_max = (avail * 0.25).max(60.0);
+    let lights_max = (avail - cameras_max - SCENE_MIN).max(90.0);
     egui::Panel::bottom("tree-lights")
         .resizable(true)
-        .default_size(170.0)
+        .default_size(170.0_f32.min(lights_max))
         .min_size(80.0)
-        .max_size((avail * 0.8).max(90.0))
+        .max_size(lights_max)
         .show(ui, |ui| lights(app, ui));
     egui::Panel::bottom("tree-cameras")
         .resizable(true)
-        .default_size(96.0)
+        .default_size(96.0_f32.min(cameras_max))
         .min_size(54.0)
-        .max_size((avail * 0.4).max(60.0))
+        .max_size(cameras_max)
         .show(ui, |ui| cameras(app, ui));
     egui::CentralPanel::default().show(ui, |ui| scene_tree(app, ui));
 }

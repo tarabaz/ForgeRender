@@ -549,6 +549,9 @@ fn set_look_lights(scene: &mut Scene, lights: Vec<Light>) {
         .into_iter()
         .map(|mut l| {
             l.from_look = true;
+            // Stesso posto nell'aspetto nuovo: tiene il numero, e con quello l'animazione.
+            let old = scene.lights.iter().find(|o| o.from_look && o.name == l.name);
+            l.id = old.map_or(0, |o| o.id);
             l
         })
         .collect();

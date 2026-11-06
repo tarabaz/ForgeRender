@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct FogVolume {
+    /// Numero stabile nella scena (0 = non ancora assegnato): la timeline trova la nebbia con questo.
+    pub id: u32,
     pub name: String,
     pub enabled: bool,
     /// Seme del rumore e della turbolenza: cambia la forma, a parità di parametri.
@@ -67,6 +69,7 @@ pub const FOG_QUALITY: [(&str, u32, u32); 5] = [
 impl Default for FogVolume {
     fn default() -> Self {
         Self {
+            id: 0,
             name: "Ghiaccio secco".into(),
             enabled: true,
             seed: 1,

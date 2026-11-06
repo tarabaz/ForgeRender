@@ -171,6 +171,7 @@ pub fn tick(app: &mut ForgeApp, ctx: &egui::Context) {
         let mut tl = std::mem::take(&mut app.scene.timeline);
         tl.adopt_effects(&app.scene);
         app.scene.timeline = tl;
+        app.timeline_settled();
     }
     if effects < app.timeline_ui.seen_effects {
         // Effetto tolto: le sue righe non servono più.
@@ -178,11 +179,13 @@ pub fn tick(app: &mut ForgeApp, ctx: &egui::Context) {
         tl.prune(&app.scene);
         app.scene.timeline = tl;
         app.timeline_ui.selection.clear();
+        app.timeline_settled();
     }
     app.timeline_ui.seen_effects = effects;
     if app.timeline_ui.demo_pending && !app.scene.roots.is_empty() {
         app.timeline_ui.demo_pending = false;
         demo(app);
+        app.timeline_settled();
     }
     if app.timeline_ui.run.is_some() {
         tick_render(app);
@@ -238,6 +241,19 @@ pub fn render_play_running(app: &ForgeApp) -> bool {
 }
 
 /// Scena sostituita: stato legato a quella vecchia via, Play nel Render compreso.
+/// Si sta trascinando qualcosa nella timeline (anche nella finestra staccata).
+pub fn dragging(app: &ForgeApp) -> bool {
+    let ui = &app.timeline_ui;
+    ui.drag.is_some() || ui.marquee.is_some()
+}
+
+/// Annulla o Ripeti hanno rimesso un'animazione: le chiavi selezionate possono non esserci più.
+pub fn restored(app: &mut ForgeApp) {
+    app.timeline_ui.selection.clear();
+    app.timeline_ui.seen_effects = time_effects(app);
+    apply(app);
+}
+
 pub fn scene_replaced(app: &mut ForgeApp) {
     let effects = time_effects(app);
     let ui = &mut app.timeline_ui;
@@ -521,7 +537,8 @@ fn fmt_time(t: f32, fps: f32) -> String {
 }
 
 fn toolbar(app: &mut ForgeApp, ui: &mut egui::Ui) {
-    ui.horizontal(|ui| {
+    // Va a capo da sola: in una finestra stretta nessun comando esce dal pannello.
+    ui.horizontal_wrapped(|ui| {
         let keys = app.scene.timeline.key_times();
         let t = app.scene.timeline.time;
         let tl_frame = app.scene.timeline.frame();
@@ -617,23 +634,21 @@ fn toolbar(app: &mut ForgeApp, ui: &mut egui::Ui) {
             }
             None => save_menu(app, ui),
         }
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let (label, hint) = if app.prefs.timeline_detached {
-                (
-                    format!("{}  {}", icons::BACK, tr("Riporta nel programma")),
-                    tr("Rimette la timeline in basso, al posto della console"),
-                )
-            } else {
-                (
-                    format!("{}  {}", icons::EXPORT, tr("Stacca dal programma")),
-                    tr("Apre la timeline in una finestra a parte, da spostare anche su un altro schermo"),
-                )
-            };
-            if ui.button(label).on_hover_text(hint).clicked() {
-                let d = !app.prefs.timeline_detached;
-                set_detached(app, d);
-            }
-        });
+        let (label, hint) = if app.prefs.timeline_detached {
+            (
+                format!("{}  {}", icons::BACK, tr("Riporta nel programma")),
+                tr("Rimette la timeline in basso, al posto della console"),
+            )
+        } else {
+            (
+                format!("{}  {}", icons::EXPORT, tr("Stacca dal programma")),
+                tr("Apre la timeline in una finestra a parte, da spostare anche su un altro schermo"),
+            )
+        };
+        if ui.button(label).on_hover_text(hint).clicked() {
+            let d = !app.prefs.timeline_detached;
+            set_detached(app, d);
+        }
     });
 }
 
@@ -708,7 +723,7 @@ fn add_element_menu(app: &mut ForgeApp, ui: &mut egui::Ui) {
         ui.menu_button(tr("Luce"), |ui| {
             for l in &app.scene.lights {
                 if ui.button(&l.name).clicked() {
-                    add.push(Target::Light(l.name.clone()));
+                    add.push(Target::Light(l.id));
                     ui.close();
                 }
             }
@@ -727,7 +742,7 @@ fn add_element_menu(app: &mut ForgeApp, ui: &mut egui::Ui) {
             ui.menu_button(tr("Ghiaccio secco"), |ui| {
                 for f in &app.scene.fogs {
                     if ui.button(&f.name).clicked() {
-                        add.push(Target::Fog(f.name.clone()));
+                        add.push(Target::Fog(f.id));
                         ui.close();
                     }
                 }
@@ -1753,7 +1768,7 @@ fn finish_render(app: &mut ForgeApp) {
         ],
     );
     tracing::info!("{}", text.replace('\n', " "));
-    app.info = Some(text);
+    app.notify_saved(text, Some(run.dir.clone()));
     apply(app);
 }
 
@@ -1786,6 +1801,6 @@ fn finish_video(app: &mut ForgeApp) {
         _ => {}
     }
     tracing::info!("{}", text.replace('\n', " "));
-    app.info = Some(text);
+    app.notify_saved(text, Some(run.dir.clone()));
     apply(app);
 }
