@@ -7,7 +7,7 @@ Branch di riferimento: sviluppo
 
 ## Obiettivo
 
-Raccogliere in questa nota le modifiche richieste da Valerio relative ad animazioni, simulazioni, Particle System e configurazione dell'esportazione video. La nota è volutamente più ampia del solo Particle System: le richieste future sul sistema di animazione potranno essere aggiunte qui.
+Raccogliere in questa nota le modifiche richieste da Valerio relative ad animazioni, simulazioni, Particle System, configurazione dell'esportazione video e uniformità della barra superiore. Le richieste future su questi ambiti potranno essere aggiunte qui.
 
 ## 1. Fumo: salvare anche la griglia fine
 
@@ -57,51 +57,85 @@ Analizzare prima il percorso di esportazione attuale, le librerie/encoder dispon
 
 - **Contenitore/formato:** almeno MP4 e AVI; valutare MOV e MKV se supportati in modo affidabile dall'encoder disponibile.
 - **Codec:** mostrare soltanto codec realmente disponibili per il formato scelto. Non confondere contenitore e codec: AVI, per esempio, può contenere video non compresso oppure codec lossless.
-- **Qualità/compressione:** offrire preset chiari, ad esempio:
-  - dimensione ridotta / compressione alta;
-  - qualità alta;
-  - qualità molto alta / compressione leggera;
-  - lossless, quando supportato;
-  - non compresso, quando supportato.
-- **Bitrate:** possibilità di impostare il bitrate (almeno per codec che lo supportano), con indicazione o stima della dimensione finale.
-- **Qualità del codec:** esporre il parametro CRF o equivalente quando pertinente, spiegandone il significato e senza mostrare controlli non applicabili al codec selezionato.
-- **Pixel format e profondità colore:** esporre le opzioni realmente supportate, ad esempio 8/10 bit quando disponibili; evitare conversioni di qualità non dichiarate.
-- **Frame rate:** usare il frame rate della timeline come valore iniziale, ma permettere di controllarlo se l'architettura lo consente senza alterare in modo ambiguo la temporizzazione.
-- **Risoluzione:** mantenere la risoluzione del render come valore iniziale e consentire di scegliere una risoluzione di esportazione solo se esiste un ridimensionamento corretto e documentato.
-- **Percorso e nome file:** scelta esplicita della destinazione e dell'estensione coerente con il contenitore selezionato.
-- **Preset salvabili:** almeno preset predefiniti sensati e possibilità di ricordare l'ultima configurazione usata.
+- **Qualità/compressione:** preset chiari: dimensione ridotta/compressione alta, qualità alta, qualità molto alta/compressione leggera, lossless e non compresso quando supportati.
+- **Bitrate:** possibilità di impostarlo per i codec che lo supportano, con indicazione o stima della dimensione finale.
+- **Qualità del codec:** esporre CRF o equivalente quando pertinente, spiegandone il significato e senza mostrare controlli non applicabili.
+- **Pixel format e profondità colore:** opzioni realmente supportate, ad esempio 8/10 bit quando disponibili; evitare conversioni non dichiarate.
+- **Frame rate:** usare quello della timeline come valore iniziale, permettendo di controllarlo se la temporizzazione resta chiara.
+- **Risoluzione:** mantenere quella del render come valore iniziale; consentire un'altra risoluzione solo con ridimensionamento corretto e documentato.
+- **Percorso e nome file:** scelta esplicita della destinazione ed estensione coerente con il contenitore.
+- **Preset salvabili:** preset predefiniti sensati e possibilità di ricordare l'ultima configurazione.
 
 ### Caso d'uso prioritario: AVI non compresso e compressione meno aggressiva
 
-Valerio vuole poter esportare, per esempio:
-- un AVI non compresso, se supportato;
-- un AVI con codec lossless (valutare FFV1 o alternativa effettivamente disponibile);
-- un MP4 con qualità elevata e compressione meno aggressiva rispetto al preset attuale;
-- eventualmente un formato intermedio ad alta qualità per ulteriori lavorazioni in software di montaggio.
+Valerio vuole poter esportare:
+- AVI non compresso, se supportato;
+- AVI lossless (valutare FFV1 o alternativa realmente disponibile);
+- MP4 ad alta qualità e con compressione meno aggressiva del preset attuale;
+- un formato intermedio di alta qualità per ulteriori lavorazioni in software di montaggio.
 
-Non dare per scontato che ogni codec sia disponibile. Verificare l'encoder effettivo e le combinazioni contenitore/codec supportate. Se AVI non compresso o FFV1 non sono disponibili nell'attuale backend, spiegare il motivo e valutare l'integrazione minima necessaria, senza introdurre dipendenze pesanti o binari esterni senza motivazione.
+Verificare encoder e combinazioni contenitore/codec. Se AVI non compresso o FFV1 non sono disponibili nell'attuale backend, spiegarne il motivo e valutare l'integrazione minima necessaria, senza introdurre dipendenze pesanti o binari esterni senza motivazione.
 
 ### UX e protezione da errori
 
-- Mostrare una breve descrizione comprensibile di ogni preset, indicando il compromesso qualità/dimensione.
+- Descrivere il compromesso qualità/dimensione di ogni preset.
 - Avvisare quando un formato non supporta una particolare opzione.
 - Non applicare silenziosamente un codec o una qualità diversi da quelli scelti.
-- Gestire correttamente errori di encoder, spazio disco insufficiente, interruzione e file parziali: non lasciare un output apparentemente valido se l'esportazione è fallita.
-- Se possibile, mostrare una stima della dimensione prima dell'esportazione, distinguendo stima da valore garantito.
-- Conservare invariati i frame renderizzati: la scelta del codec deve riguardare la codifica del video e non modificare il rendering della scena.
+- Gestire errori encoder, spazio disco insufficiente, interruzione e file parziali.
+- Se possibile, mostrare una stima della dimensione, distinguendola da un valore garantito.
+- La scelta del codec non deve modificare i frame renderizzati né il rendering della scena.
 
 ### Criteri di accettazione video
 
-1. Prima dell'esportazione è possibile scegliere formato/contenitore e codec compatibile.
-2. È possibile selezionare un MP4 ad alta qualità con compressione meno aggressiva del preset attuale.
+1. Prima dell'esportazione si possono scegliere formato/contenitore e codec compatibile.
+2. È disponibile un MP4 ad alta qualità con compressione meno aggressiva del preset attuale.
 3. È possibile esportare AVI non compresso, se supportato, oppure un'alternativa lossless chiaramente identificata.
-4. Le impostazioni non applicabili al codec selezionato sono disabilitate o nascoste, non ignorate silenziosamente.
-5. Il file risultante è riproducibile e la sua estensione corrisponde al contenitore reale.
-6. Vengono riportati codec, pixel format, frame rate, risoluzione e parametri di qualità effettivamente usati.
-7. Un errore o un'interruzione non lascia un file incompleto presentato come esportazione riuscita.
-8. Il percorso di esportazione standard continua a funzionare e mantiene un preset predefinito ragionevole.
+4. Le impostazioni non applicabili sono disabilitate o nascoste, non ignorate.
+5. Il file è riproducibile e l'estensione corrisponde al contenitore reale.
+6. Sono riportati codec, pixel format, frame rate, risoluzione e parametri effettivi.
+7. Un errore/interruzione non lascia un file incompleto presentato come riuscito.
+8. Il percorso standard continua a funzionare con un preset predefinito ragionevole.
 
-## 5. Analisi architetturale richiesta
+## 5. Uniformare i pulsanti della barra superiore
+
+Valerio vuole che **tutti i pulsanti della barra superiore abbiano lo stesso linguaggio visivo, la stessa altezza e lo stesso ingombro verticale**.
+
+Situazione mostrata nelle immagini:
+- Nella parte sinistra, i pulsanti principali (per esempio Materiale, Avvia render, Stop, Riavvia, Esporta) sono più alti e hanno un aspetto da pulsante grande.
+- Nella parte destra, i controlli (Viewport, Render, Riavvio automatico, AI MCP OFF) sono più bassi e compatti, ma già coerenti tra loro come famiglia di controlli.
+
+### Risultato desiderato
+
+- Uniformare la parte sinistra alla dimensione/altezza compatta già usata dalla parte destra.
+- Tutti i controlli della barra superiore devono condividere altezza, allineamento verticale, padding e stile dei bordi/raggio, per quanto compatibile con la funzione.
+- Il pulsante Avvia render non deve più essere visivamente molto più alto o dominante rispetto agli altri.
+- Mantenere distinguibili gli stati e le azioni: per esempio Avvia render può conservare il colore d'accento, ma non dimensioni maggiori; Stop, Riavvia ed Esporta devono avere la stessa altezza e baseline.
+- Non modificare le funzioni, le etichette, le icone, le scorciatoie o il comportamento dei comandi.
+- Verificare spaziatura e allineamento anche con finestra stretta, DPI/scaling differenti e testi tradotti più lunghi.
+- Preferire un componente/stile condiviso o token di dimensionamento comuni, evitando correzioni isolate con valori diversi per ciascun pulsante.
+
+### Riferimenti visivi
+
+Le immagini qui sotto sono ricostruzioni illustrative dei due ritagli forniti da Valerio, inserite come riferimenti visivi temporanei per questa richiesta.
+
+**Parte sinistra — pulsanti attualmente troppo alti**
+
+![Riferimento barra superiore sinistra](./_condivisione_temporanea/toolbar-sinistra.svg)
+
+**Parte destra — altezza compatta da usare come riferimento**
+
+![Riferimento barra superiore destra](./_condivisione_temporanea/toolbar-destra.svg)
+
+### Criteri di accettazione UI
+
+1. Tutti i pulsanti/controlli della barra superiore hanno la stessa altezza visiva.
+2. La parte sinistra adotta la dimensione compatta della parte destra.
+3. Icone e testi sono centrati e allineati sulla stessa baseline.
+4. Il colore d'accento può differenziare l'azione primaria, ma non dimensioni e altezza.
+5. Nessuna regressione di funzioni, scorciatoie, tooltip o stato dei controlli.
+6. Verifica a dimensioni finestra diverse e con le lingue supportate.
+
+## 6. Analisi architetturale richiesta
 
 Prima dell'implementazione, descrivere brevemente:
 - dove vengono eseguite oggi le simulazioni di fumo e particelle;
@@ -109,11 +143,12 @@ Prima dell'implementazione, descrivere brevemente:
 - come sono gestite collisioni e interazioni;
 - quali dati sono già salvati e quali ricostruiti;
 - come viewport e render recuperano lo stato simulato;
-- quale backend/encoder produce attualmente il video, quali contenitori e codec supporta e quali parametri espone.
+- quale backend/encoder produce attualmente il video, quali contenitori e codec supporta e quali parametri espone;
+- quali componenti e stili UI generano i pulsanti nelle due zone della barra superiore e quali dimensioni/padding usano.
 
 Evitare sistemi di cache duplicati se è possibile condividere il meccanismo comune. Non compromettere la reattività dell'anteprima durante la normale modifica della scena e non cambiare il risultato del rendering per effetto delle sole impostazioni di codifica video.
 
-## 6. Criteri di accettazione generali
+## 7. Criteri di accettazione generali
 
 1. Il precalcolo del fumo salva anche la griglia fine e il render la riutilizza senza ricostruirla per ogni frame.
 2. Una modifica ai parametri del fumo invalida dal primo frame interessato, non prima.
@@ -124,24 +159,19 @@ Evitare sistemi di cache duplicati se è possibile condividere il meccanismo com
 7. Dimensioni e pulizia della cache sono controllate.
 8. Nessuna regressione alla simulazione normale del fumo o all'anteprima delle particelle.
 9. L'esportazione video consente di scegliere consapevolmente formato e qualità, inclusi percorsi ad alta qualità/lossless quando supportati.
+10. La barra superiore presenta pulsanti uniformi per altezza, allineamento e dimensionamento.
 
-## 7. Test richiesti
+## 8. Test richiesti
 
 Creare una scena riproducibile con emettitore, oggetto animato che attraversa la traiettoria delle particelle e prova di controllo con oggetto fermo. Includere anche una simulazione di fumo su più frame con griglia fine.
 
 Verificare per le simulazioni: primo precalcolo; riproduzione da cache; modifica parametri e invalidazione; modifica della traiettoria e aggiornamento delle interazioni; confronto viewport/render; chiusura e riapertura progetto; cache parziale o non valida.
 
-Per il video, esportare almeno brevi sequenze di prova con:
-- MP4 a preset standard;
-- MP4 a qualità elevata/bitrate più alto o CRF più basso, secondo l'encoder;
-- AVI non compresso, se disponibile;
-- AVI lossless con FFV1 o codec equivalente, se disponibile.
+Per il video, esportare brevi sequenze di prova con MP4 standard, MP4 ad alta qualità, AVI non compresso se disponibile e AVI lossless con FFV1 o equivalente se disponibile. Verificare con uno strumento di ispezione i parametri effettivi del file (contenitore, codec, pixel format, frame rate, risoluzione e bitrate), oltre alla riproduzione. Confrontare dimensioni e qualità senza dichiarare equivalenti impostazioni diverse.
 
-Verificare con uno strumento di ispezione dei media i parametri effettivi del file prodotto (contenitore, codec, pixel format, frame rate, risoluzione e bitrate), oltre alla riproduzione del file. Confrontare dimensioni e qualità, senza dichiarare equivalenti impostazioni diverse.
+Per la UI, verificare visivamente la barra superiore in almeno una finestra larga e una stretta, con le lingue supportate. I test unitari non sostituiscono la verifica visiva.
 
-I test unitari non bastano per dichiarare risolti i problemi: effettuare anche una verifica visiva reale dell'animazione in viewport e del render, e aprire i video esportati in un player o software di montaggio, se l'ambiente lo consente.
-
-## 8. Risposta richiesta a ChatGPT
+## 9. Risposta richiesta a ChatGPT
 
 Aggiungere al normale handoff una risposta datata con:
 - causa effettiva del problema del Particle System;
@@ -151,6 +181,7 @@ Aggiungere al normale handoff una risposta datata con:
 - strategia di invalidazione e ripresa;
 - backend video, contenitori, codec e opzioni effettivamente supportati;
 - impostazioni predefinite e comportamento dei preset video;
+- componenti/stili UI modificati per uniformare la barra;
 - test e comandi realmente eseguiti e relativi risultati;
 - verifica visiva svolta oppure esplicitamente non eseguita;
 - dimensioni dei temporanei, dimensioni dei video e tempi di precalcolo/esportazione, se misurati;
