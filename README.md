@@ -184,7 +184,7 @@ A participating medium that fills the scene (or only a layer of it) and that eve
 
 ![Volumetric smoke — clouds, plumes and incense](docs/img/features/volumetric-smoke.jpg)
 
-https://github.com/user-attachments/assets/1ab45c29-e76f-4156-9bbf-e61cc103f83b
+[Watch the demo: volumetric smoke and lighting](docs/video-demo-volumetrico.md)
 
 Real volumetric smoke clouds for product shots: incense smoke next to a perfume bottle, steam rising from a cup, a plume from a pipe or chimney, dense dark industrial smoke. Each cloud lives in a box that you select in the viewport and move or resize with the gizmo: the rendered smoke follows the box exactly, with nothing left behind where it was.
 
@@ -263,7 +263,7 @@ Spot and Directional lights are aimed from the viewport: select the light, click
 
 ![ForgeRender volumetric light beam](docs/img/features/dopo_fascio_solo_camera.jpg)
 
-https://github.com/user-attachments/assets/1ab45c29-e76f-4156-9bbf-e61cc103f83b
+[Watch the demo: volumetric smoke and lighting](docs/video-demo-volumetrico.md)
 
 Spotlights can create visible beams with adjustable density and length. Volumetric fog is a participating medium with scattering and shadows: light interacts with the volume and becomes visible in space, not only on surfaces.
 
