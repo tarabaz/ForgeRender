@@ -2988,3 +2988,11 @@ Richieste di Valerio: "Sostituisci materiale" (tutti i componenti con un materia
 ## Voce RAM processo tolta — 06/11/2026 (Claude, 0.48.2)
 
 Su richiesta di Valerio: tolti `StatusItem::RamProcess`, `refresh_processes` e i tre testi inglesi. RAM di sistema resta. Il thread `forge-monitor` resta per CPU, memoria e GPU. Un test copre un file di impostazioni che contiene ancora la voce.
+
+## Barra di stato e anteprima del fumo — 06/11/2026 (Claude, 0.48.3)
+
+**Barra:** caselle a larghezza stabile, controllate con due schermate del programma vero.
+
+**Anteprima del fumo:** Valerio ricordava un'anteprima che ignorava un oggetto veloce. La fisica dell'anteprima risulta corretta in prove automatiche (sfera, 0,15 s, riquadri da 1 e 4 m). Corretti due percorsi di anteprima vecchia, coperti da test sulle decisioni. **Non verificato:** il comportamento in finestra con i clic, e se il ricordo di Valerio venga da prima della 0.47.0.
+
+**Trovato e non corretto:** sorgente sul pavimento in un riquadro grande: l'anteprima resta senza punti, il render ha fumo.

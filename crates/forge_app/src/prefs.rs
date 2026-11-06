@@ -72,7 +72,7 @@ pub struct Preferences {
 pub const MAX_STATUS_ITEMS: usize = 9;
 
 /// Un contatore della barra di stato.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum StatusItem {
     Elapsed,
     Remaining,

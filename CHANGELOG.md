@@ -13,6 +13,11 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.48.3 — 6 nov 2026
+
+- **Barra di stato ferma:** ogni contatore ha ora il suo spazio, largo quanto il suo valore più lungo, così i numeri cambiano senza spingere quelli dopo. Anche la scritta dello stato non sposta più la barra di avanzamento.
+- **Anteprima del fumo al passo con gli oggetti animati:** premendo play poteva restare un'anteprima calcolata prima di animare un oggetto, e un fumo "solo anteprima" non selezionato non veniva più ricalcolato: il fumo sembrava non vedere l'oggetto che si muoveva. Ora in entrambi i casi si ricalcola.
+
 ## 0.48.2 — 6 nov 2026
 
 - **Tolta la voce RAM processo dalla barra di stato:** era la lettura lenta dietro lo scatto corretto nella 0.48.1, e nient'altro la usava. RAM di sistema resta. Le impostazioni salvate con quella voce continuano a funzionare: viene saltata e tutto il resto si conserva.

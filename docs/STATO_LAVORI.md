@@ -845,3 +845,9 @@ Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
 ## 0.48.2 — 06/11/2026 (Claude)
 
 - Tolta la voce `RamProcess` e la chiamata `refresh_processes`, su richiesta di Valerio: il costo annotato nella 0.48.1 non c'è più. `status_items` si legge con `known_status_items`, che salta le voci sconosciute: senza, una voce tolta rendeva non valido tutto il file delle impostazioni.
+
+## 0.48.3 — 06/11/2026 (Claude)
+
+- Barra di stato: `steady_text` in `ui/status.rs` tiene per ogni contatore una casella che non si stringe mai, larga almeno quanto `widest_texts`. "GPU: lettura non disponibile" ha una casella a sé, se no nel primo secondo allargherebbe per sempre quella di GPU.
+- Anteprima del fumo: confrontata col render, una sfera che attraversa il fumo in 0,15 s lo sposta anche nell'anteprima (riquadro di 1 m: 11,7 contro 11,2 cm; di 4 m con raggio 25 cm: 22 contro 11 cm). L'anteprima sente gli oggetti dalla 0.47.0 (`preview_with_movers`). Corretti due casi di anteprima vecchia in `ui/smoke_preview.rs`: `keep_while_playing` e `previewed_smoke`.
+- Da sapere: con riquadro grande e sorgente sul pavimento l'anteprima può non avere punti mentre il render ha fumo (riquadro di 4 m, sorgente sul piano, celle da 11,8 contro 8,2 cm). Non corretto.

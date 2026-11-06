@@ -10,6 +10,11 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.48.3 — 6 Nov 2026
+
+- **Steady status bar:** every counter now has its own space, wide enough for its longest value, so numbers change without pushing the ones after them. The state label no longer moves the progress bar.
+- **Smoke preview up to date with animated objects:** pressing play could keep showing a preview computed before an object was animated, and a preview-only smoke was never computed again while not selected, so the smoke looked as if the object stood still. Both cases now compute it again.
+
 ## 0.48.2 — 6 Nov 2026
 
 - **Removed the Process RAM item from the status bar:** it was the slow reading behind the stutter fixed in 0.48.1, and nothing else used it. System RAM stays. Saved settings that listed the item keep working: it is skipped and everything else is kept.

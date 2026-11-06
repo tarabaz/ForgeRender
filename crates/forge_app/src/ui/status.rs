@@ -206,9 +206,68 @@ fn gpu_sample<'a>(app: &'a ForgeApp, p: &forge_render_core::Progress) -> Result<
         .ok_or(tr("La scheda che fa il render non è NVIDIA: NVML legge solo le schede NVIDIA"))
 }
 
+/// Larghezza di una casella: non si stringe mai, così quello che segue non si sposta.
+fn slot_width(previous: f32, widest: f32, text: f32) -> f32 {
+    previous.max(widest).max(text).ceil()
+}
+
+fn text_width(ui: &egui::Ui, text: &str) -> f32 {
+    let font = egui::TextStyle::Body.resolve(ui.style());
+    ui.painter()
+        .layout_no_wrap(text.to_string(), font, ui.visuals().text_color())
+        .size()
+        .x
+}
+
+/// Testo allineato a sinistra in una casella che tiene la larghezza più grande vista finora (e
+/// almeno `widest`): i numeri cambiano senza spostare quello che viene dopo.
+fn steady_text(ui: &mut egui::Ui, id: egui::Id, text: egui::RichText, widest: f32) -> egui::Response {
+    let previous = ui.data(|d| d.get_temp::<f32>(id)).unwrap_or(0.0);
+    let width = slot_width(previous, widest, text_width(ui, text.text()));
+    ui.data_mut(|d| d.insert_temp(id, width));
+    let height = ui.text_style_height(&egui::TextStyle::Body);
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::hover());
+    let galley = egui::WidgetText::from(text).into_galley(ui, Some(egui::TextWrapMode::Extend), f32::INFINITY, egui::TextStyle::Body);
+    let pos = egui::pos2(rect.left(), rect.center().y - galley.size().y / 2.0);
+    ui.painter().galley(pos, galley, ui.visuals().text_color());
+    response
+}
+
+/// I testi più lunghi che un contatore può mostrare: le caselle sono già larghe abbastanza dal
+/// primo fotogramma. Quello che non è previsto qui allarga la casella la prima volta che appare.
+fn widest_texts(i: StatusItem) -> Vec<String> {
+    let dur = || tf("{}m {:02}s", &["888".to_string(), "88".to_string()]);
+    match i {
+        StatusItem::Elapsed => vec![tf("Tempo: {}", &[dur()])],
+        StatusItem::Remaining => vec![
+            tf("Codifica: mancano {}", &[dur()]),
+            tf("Fotogrammi: mancano {}", &[dur()]),
+            tf("Tempo rimanente: {}", &[dur()]),
+            tr("Calcolo stima…").to_string(),
+        ],
+        StatusItem::Frames => vec![tf("Fotogrammi: {} / {}", &["8888".to_string(), "8888".to_string()])],
+        StatusItem::ViewportFps => vec![tf("FPS viewport: {}", &["8888".to_string()])],
+        StatusItem::VideoFps => vec![tf("FPS video: {}", &["888".to_string()])],
+        StatusItem::RenderSpeed => vec![tf("{:.2} Mcampioni/s", &["8888.88".to_string()])],
+        StatusItem::Cpu => vec![tf("CPU: {:.0}%", &["100".to_string()])],
+        StatusItem::Gpu => vec![tf("GPU: {}", &["100%".to_string()])],
+        StatusItem::Vram => vec![tf(
+            "VRAM {}/{} GB (libera {} GB)",
+            &["88.8".to_string(), "88.8".to_string(), "88.8".to_string()],
+        )],
+        StatusItem::RamSystem => vec![tf("RAM sistema: {:.1}/{:.1} GB", &["888.8".to_string(), "888.8".to_string()])],
+        StatusItem::AveragePass => vec![tf("Media/passata: {}", &[dur()])],
+        StatusItem::LastPass => vec![tf("Ultima passata: {}", &[dur()])],
+        StatusItem::Resolution => vec![tf("Risoluzione: {}×{}", &["8888".to_string(), "8888".to_string()])],
+        StatusItem::Denoiser => vec![tr("Denoiser: inattivo").to_string()],
+    }
+}
+
 /// Un contatore della barra.
 fn item(app: &ForgeApp, ui: &mut egui::Ui, i: StatusItem, p: &forge_render_core::Progress, job: Option<&VideoJob>) {
     let gib = forge_telemetry::gib;
+    let widest = widest_texts(i).iter().map(|t| text_width(ui, t)).fold(0.0, f32::max);
+    let id = egui::Id::NULL.with(("contatore", i));
     let text = match i {
         StatusItem::Elapsed => tf("Tempo: {}", &[fmt_dur(p.elapsed)]),
         StatusItem::Remaining => {
@@ -234,7 +293,7 @@ fn item(app: &ForgeApp, ui: &mut egui::Ui, i: StatusItem, p: &forge_render_core:
         StatusItem::Cpu => tf("CPU: {:.0}%", &[format!("{:.0}", app.monitor.cpu_usage_percent)]),
         StatusItem::Gpu | StatusItem::Vram => match gpu_sample(app, p) {
             Err(why) => {
-                ui.label(tr("GPU: lettura non disponibile")).on_hover_text(why);
+                steady_text(ui, id.with("assente"), tr("GPU: lettura non disponibile").into(), 0.0).on_hover_text(why);
                 return;
             }
             Ok(g) if i == StatusItem::Gpu => tf("GPU: {}", &[g.usage_percent.map(|u| format!("{u}%")).unwrap_or_else(|| "—".into())]),
@@ -263,7 +322,7 @@ fn item(app: &ForgeApp, ui: &mut egui::Ui, i: StatusItem, p: &forge_render_core:
             (Ok(_), false) => tf("Denoiser: {}", std::slice::from_ref(&p.denoiser)),
         },
     };
-    ui.label(text).on_hover_text(item_hint(i));
+    steady_text(ui, id, text.into(), widest).on_hover_text(item_hint(i));
 }
 
 /// Riga dei contatori: quelli scelti partono da sinistra e vanno a capo se serve; Backend e
@@ -313,7 +372,8 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             SessionState::Failed(_) => ui.visuals().error_fg_color,
             _ => ui.visuals().text_color(),
         };
-        ui.colored_label(color, egui::RichText::new(tr_dyn(&p.state.label())).strong());
+        let state = egui::RichText::new(tr_dyn(&p.state.label())).strong().color(color);
+        steady_text(ui, egui::Id::NULL.with("stato-render"), state, 0.0);
         let target = if p.target == 0 { "∞".to_string() } else { p.target.to_string() };
         let bar = egui::ProgressBar::new(p.fraction())
             .desired_width(260.0)
@@ -415,4 +475,21 @@ fn tabs_and_log(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 ui.label(egui::RichText::new(&l.message).color(color).monospace().small());
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn slot_never_shrinks() {
+        assert_eq!(slot_width(0.0, 80.0, 60.0), 80.0);
+        assert_eq!(slot_width(80.0, 80.0, 95.2), 96.0);
+        assert_eq!(slot_width(96.0, 80.0, 40.0), 96.0);
+    }
+
+    #[test]
+    fn every_counter_has_a_widest_text() {
+        assert!(StatusItem::ALL.iter().all(|&i| !widest_texts(i).is_empty()));
+    }
 }

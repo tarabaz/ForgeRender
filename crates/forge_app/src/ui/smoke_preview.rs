@@ -34,6 +34,10 @@ pub struct SmokePreviewState {
     cancel: Arc<AtomicBool>,
     /// In calcolo.
     pub busy: bool,
+    /// Fumo del calcolo in corso.
+    computing: Option<usize>,
+    /// Animazione degli oggetti con cui è stata calcolata l'anteprima.
+    motion: u64,
     clock: Instant,
     /// Numero del fumo e controllo della sua sorgente, sulla griglia del calcolo vero.
     pub source: Option<(u32, SourceCheck)>,
@@ -53,6 +57,8 @@ impl Default for SmokePreviewState {
             rx: None,
             cancel: Arc::new(AtomicBool::new(false)),
             busy: false,
+            computing: None,
+            motion: 0,
             clock: Instant::now(),
             source: None,
             just_added: None,
@@ -84,6 +90,23 @@ fn key(s: &SmokeCloud, geometry_rev: u64, horizon: f32, motion: u64) -> String {
     )
 }
 
+/// Il fumo di cui tenere pronta l'anteprima: quello selezionato o, senza selezione, il primo
+/// segnato "solo anteprima", che si disegna sempre e non deve restare fermo a un calcolo vecchio.
+fn previewed_smoke(selected: Option<usize>, smokes: &[SmokeCloud]) -> Option<usize> {
+    let usable = |s: &SmokeCloud| s.enabled && s.mode == SmokeMode::Simulated;
+    match selected {
+        Some(i) => smokes.get(i).filter(|s| usable(s)).map(|_| i),
+        None => smokes.iter().position(|s| usable(s) && s.preview_only),
+    }
+}
+
+/// Mentre l'animazione gira non si ricalcola, perché i valori degli effetti cambiano a ogni
+/// fotogramma: si guarda l'anteprima pronta. Ma se è stata fatta con un'altra animazione degli
+/// oggetti mostrerebbe il fumo come se quegli oggetti fossero fermi: quella si rifà.
+fn keep_while_playing(playing: bool, shown: bool, computed_motion: u64, motion: u64) -> bool {
+    playing && shown && computed_motion == motion
+}
+
 /// Tiene aggiornata l'anteprima del fumo selezionato (da chiamare a ogni fotogramma).
 pub fn update(app: &mut ForgeApp) {
     if let Some(rx) = &app.smoke_preview.rx {
@@ -94,17 +117,15 @@ pub fn update(app: &mut ForgeApp) {
             if check.is_some_and(|(_, c)| c.blocked) {
                 // Il render non mostrerà fumo, quindi nemmeno i punti.
                 app.smoke_preview.data = None;
-            } else if let (Some(p), Some(i)) = (preview, app.selected_smoke) {
+            } else if let (Some(p), Some(i)) = (preview, app.smoke_preview.computing) {
                 app.smoke_preview.data = Some((i, Arc::new(p)));
             }
             free_new_smoke(app, check);
         }
     }
-    let target = app
-        .selected_smoke
+    let target = previewed_smoke(app.selected_smoke, &app.scene.smokes)
         .filter(|_| app.smoke_preview.enabled)
-        .and_then(|i| app.scene.smokes.get(i).map(|s| (i, s)))
-        .filter(|(_, s)| s.enabled && s.mode == SmokeMode::Simulated);
+        .map(|i| (i, &app.scene.smokes[i]));
     let Some((i, s)) = target else {
         // Deselezionato (per esempio con un clic nella viewport): l'anteprima pronta resta, così
         // riselezionando lo stesso fumo non si rifà; si ferma solo un calcolo in corso.
@@ -116,13 +137,13 @@ pub fn update(app: &mut ForgeApp) {
         }
         return;
     };
-    // Mentre l'animazione gira non si ricalcola: si guarda l'anteprima già pronta.
-    if app.timeline_ui.playing && app.smoke_preview.data.is_some() {
+    let motion = forge_render_core::smoke_bake::motion_key(&app.scene);
+    let shown = app.smoke_preview.data.as_ref().is_some_and(|d| d.0 == i);
+    if keep_while_playing(app.timeline_ui.playing, shown, app.smoke_preview.motion, motion) {
         return;
     }
     let tl = &app.scene.timeline;
     let horizon = (tl.duration - tl.start_of(&forge_scene::Target::Smoke(s.n))).max(0.1);
-    let motion = forge_render_core::smoke_bake::motion_key(&app.scene);
     // Con oggetti animati la loro posizione sta nell'animazione: il cursore non cambia il calcolo.
     let moving = !app.scene.moving_nodes().is_empty();
     let rev = if moving { app.structure_rev() } else { app.geometry_rev };
@@ -142,6 +163,8 @@ pub fn update(app: &mut ForgeApp) {
     app.smoke_preview.cancel = cancel.clone();
     app.smoke_preview.key = k;
     app.smoke_preview.busy = true;
+    app.smoke_preview.computing = Some(i);
+    app.smoke_preview.motion = motion;
     if app.smoke_preview.data.as_ref().is_some_and(|d| d.0 != i) {
         app.smoke_preview.data = None;
     }
@@ -274,5 +297,35 @@ pub fn controls(ui: &mut egui::Ui, st: &mut SmokePreviewState, time: f32) {
                 .small()
                 .weak(),
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn simulated(preview_only: bool) -> SmokeCloud {
+        SmokeCloud {
+            mode: SmokeMode::Simulated,
+            preview_only,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn a_preview_only_smoke_stays_up_to_date_without_selection() {
+        let smokes = [simulated(false), simulated(true)];
+        assert_eq!(previewed_smoke(None, &smokes), Some(1));
+        assert_eq!(previewed_smoke(Some(0), &smokes), Some(0));
+        assert_eq!(previewed_smoke(None, &smokes[..1]), None);
+        assert_eq!(previewed_smoke(Some(5), &smokes), None);
+    }
+
+    #[test]
+    fn playing_keeps_the_preview_only_if_the_animation_is_the_same() {
+        assert!(keep_while_playing(true, true, 7, 7));
+        assert!(!keep_while_playing(true, true, 7, 8), "oggetti animati dopo il calcolo");
+        assert!(!keep_while_playing(true, false, 7, 7), "niente da guardare");
+        assert!(!keep_while_playing(false, true, 7, 7));
     }
 }
