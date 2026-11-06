@@ -7,7 +7,7 @@ Branch di riferimento: sviluppo
 
 ## Obiettivo
 
-Raccogliere in questa nota le modifiche richieste da Valerio relative ad animazioni, simulazioni, Particle System, configurazione dell'esportazione video e uniformità della barra superiore. Le richieste future su questi ambiti potranno essere aggiunte qui.
+Raccogliere in questa nota le modifiche richieste da Valerio relative ad animazioni, simulazioni, Particle System, polvere sospesa, configurazione dell'esportazione video e uniformità della barra superiore. Le richieste future su questi ambiti potranno essere aggiunte qui.
 
 ## 1. Fumo: salvare anche la griglia fine
 
@@ -47,7 +47,70 @@ Valutare e implementare un precalcolo temporale persistente anche per il Particl
 - Gestire riapertura del progetto, cache mancante/incompleta, versionamento e pulizia.
 - Valutare il riuso dei meccanismi comuni di `smoke_bake.rs` (impronte, cache, ripresa, invalidazione), mantenendo distinti i dati e le logiche specifiche delle particelle.
 
-## 4. Impostazioni complete di esportazione video
+## 4. Polvere sospesa: animazione naturale e interazione con scena e fumo
+
+Valerio vuole che l'effetto **Polvere sospesa**, ora che ForgeRender dispone della timeline e delle animazioni, non resti un insieme di granelli statici o distribuiti in modo immobile. Deve comportarsi come vera polvere fine sospesa nell'aria: particelle che fluttuano, derivano lentamente e cambiano traiettoria con movimenti casuali ma continui e credibili.
+
+### Comportamento visivo richiesto
+
+- La polvere deve muoversi durante la timeline anche in una scena senza oggetti animati.
+- Il moto deve essere lento, leggero, irregolare e tridimensionale: deriva, piccoli spostamenti verticali/orizzontali, oscillazioni e variazioni graduali di direzione e velocità.
+- Usare un moto casuale **continuo e coerente nel tempo**, non una posizione casuale rigenerata a ogni frame: niente tremolio, teletrasporti o cambi di direzione bruschi.
+- Usare seed deterministici per le particelle, così lo stesso progetto e la stessa timeline producono lo stesso risultato tra riproduzioni e render.
+- Variare il comportamento tra granelli: dimensioni, inerzia, velocità di deriva e risposta alle correnti, senza dare a ogni particella una traiettoria identica.
+- Evitare l'effetto sciame organizzato o bollicine: deve sembrare pulviscolo ambientale sospeso, non un emettitore di particelle evidente.
+- Il comportamento deve essere valutabile sia in viewport sia nel rendering dell'animazione, con coerenza temporale tra i due.
+
+### Fisica semplificata e parametri
+
+Analizzare una simulazione leggera, adatta al rendering e non necessariamente una simulazione fluidodinamica completa. Valutare una combinazione di:
+- inerzia e velocità propria della particella;
+- resistenza/drag dell'aria, dominante per la polvere molto fine;
+- gravità molto attenuata o compensata dalla sospensione e dai moti convettivi;
+- deriva lenta e turbolenza a bassa frequenza, ottenute con rumore continuo nel tempo o un campo di velocità coerente;
+- eventuale variazione di massa/dimensione, con risposta fisica plausibile ma controllata.
+
+Non introdurre rumore indipendente per frame. Il rumore deve essere una funzione continua di posizione e tempo oppure uno stato simulato integrato con timestep stabile. Il risultato deve essere riproducibile anche quando si salta direttamente a un frame della timeline, non soltanto quando si preme Play dall'inizio.
+
+### Interazione con oggetti animati
+
+Valutare quanto la polvere debba essere influenzata dagli oggetti:
+- Oggetti in movimento dovrebbero poter spostare l'aria e creare una perturbazione leggera del pulviscolo vicino, coerente con direzione e velocità del movimento.
+- La polvere dovrebbe rispettare le superfici solide: evitare che attraversi palesemente gli oggetti quando la scena o la scala del granello rendono visibile la collisione.
+- Non è necessario trattare ogni granello come un corpo rigido con collisioni costose: valutare collisioni semplificate, campionamento spaziale, volumi di influenza o interazione basata sul campo di velocità.
+- Distinguere l'interazione con oggetti grandi e veloci da quella con dettagli geometrici minuti, che non giustificano costi elevati.
+- Se l'oggetto è fermo, non deve generare continuamente turbolenza artificiale.
+
+### Interazione con il fumo e con l'aria della scena
+
+Valutare esplicitamente il rapporto tra polvere sospesa e fumo:
+- Il fumo e le correnti associate dovrebbero poter trascinare o deviare la polvere nelle zone in cui i due effetti si sovrappongono.
+- La polvere può essere trasportata dal campo di velocità del fumo, se disponibile, con intensità regolabile e attenuata in base alla risposta/inerzia delle particelle.
+- Valutare se il movimento degli oggetti che già spinge l'aria nel sistema del fumo possa alimentare anche il moto della polvere, evitando due modelli di interazione incoerenti.
+- Come comportamento iniziale, preferire un accoppiamento unidirezionale leggero: aria/fumo e oggetti influenzano la polvere, ma la polvere non deve modificare la simulazione del fumo. Un accoppiamento bidirezionale va considerato soltanto se esiste una motivazione visiva/fisica concreta e il costo è sostenibile.
+- Se il campo di velocità del fumo non è disponibile o non è conveniente da campionare, proporre un'alternativa semplice e dichiararne i limiti. Non fingere un'interazione fisica che il modello non calcola.
+
+### Prestazioni, cache e controlli
+
+- Valutare il costo con un numero elevato di granelli e su sequenze lunghe.
+- Evitare collisioni mesh-per-particella a ogni step se il costo è sproporzionato.
+- Usare LOD o semplificazioni per viewport e render, senza cambiare arbitrariamente la distribuzione o il comportamento temporale.
+- Il moto deve essere indipendente dal frame rate di riproduzione; timestep e integrazione non devono produrre risultati diversi a seconda della velocità di Play.
+- Se è necessario uno stato simulato, prevedere precalcolo/cache e invalidazione coerenti con le altre simulazioni. Se è possibile ricavare il moto in modo deterministico direttamente da tempo e seed, valutare questa soluzione per evitare cache superflue.
+- Esporre soltanto controlli utili, per esempio intensità del moto/deriva e influenza delle correnti, mantenendo preset naturale di default. Non riempire l'interfaccia con parametri fisici difficili da comprendere.
+
+### Criteri di accettazione della polvere
+
+1. La polvere sospesa si muove anche senza animazioni degli oggetti.
+2. Il moto è lento, organico, tridimensionale e continuo, senza scatti o tremolii casuali tra frame.
+3. La riproduzione è deterministica: Play, salto diretto a un frame e render dello stesso frame producono posizioni coerenti.
+4. Gli oggetti animati influenzano in modo visibile ma non eccessivo il pulviscolo nelle loro vicinanze, se l'interazione viene implementata.
+5. Il fumo/campo d'aria può trascinare la polvere in modo plausibile, senza introdurre un accoppiamento bidirezionale costoso non necessario.
+6. Le particelle non attraversano palesemente superfici solide quando la collisione è visibile e rilevante.
+7. Il costo resta ragionevole con molti granelli e sequenze lunghe.
+8. La resa è coerente tra viewport e render e non degrada l'effetto di polvere già esistente nelle scene statiche.
+
+## 5. Impostazioni complete di esportazione video
 
 Attualmente l'esportazione dell'animazione produce un MP4 con impostazioni scelte automaticamente dal programma. Valerio vuole poter decidere formato e qualità del file, senza essere vincolato a una compressione aggressiva o a un unico MP4 predefinito.
 
@@ -96,21 +159,20 @@ Verificare encoder e combinazioni contenitore/codec. Se AVI non compresso o FFV1
 7. Un errore/interruzione non lascia un file incompleto presentato come riuscito.
 8. Il percorso standard continua a funzionare con un preset predefinito ragionevole.
 
-## 5. Uniformare i pulsanti della barra superiore
+## 6. Uniformare i pulsanti della barra superiore
 
-Valerio vuole che **tutti i pulsanti della barra superiore abbiano lo stesso linguaggio visivo, la stessa altezza e lo stesso ingombro verticale**.
+Valerio vuole che tutti i pulsanti della barra superiore abbiano lo stesso linguaggio visivo, la stessa altezza e lo stesso ingombro verticale.
 
 Situazione mostrata nelle immagini:
 - Nella parte sinistra, i pulsanti principali (per esempio Materiale, Avvia render, Stop, Riavvia, Esporta) sono più alti e hanno un aspetto da pulsante grande.
 - Nella parte destra, i controlli (Viewport, Render, Riavvio automatico, AI MCP OFF) sono più bassi e compatti, ma già coerenti tra loro come famiglia di controlli.
 
-### Risultato desiderato
-
+Risultato desiderato:
 - Uniformare la parte sinistra alla dimensione/altezza compatta già usata dalla parte destra.
 - Tutti i controlli della barra superiore devono condividere altezza, allineamento verticale, padding e stile dei bordi/raggio, per quanto compatibile con la funzione.
 - Il pulsante Avvia render non deve più essere visivamente molto più alto o dominante rispetto agli altri.
 - Mantenere distinguibili gli stati e le azioni: per esempio Avvia render può conservare il colore d'accento, ma non dimensioni maggiori; Stop, Riavvia ed Esporta devono avere la stessa altezza e baseline.
-- Non modificare le funzioni, le etichette, le icone, le scorciatoie o il comportamento dei comandi.
+- Non modificare funzioni, etichette, icone, scorciatoie o comportamento dei comandi.
 - Verificare spaziatura e allineamento anche con finestra stretta, DPI/scaling differenti e testi tradotti più lunghi.
 - Preferire un componente/stile condiviso o token di dimensionamento comuni, evitando correzioni isolate con valori diversi per ciascun pulsante.
 
@@ -135,7 +197,7 @@ Le immagini qui sotto sono ricostruzioni illustrative dei due ritagli forniti da
 5. Nessuna regressione di funzioni, scorciatoie, tooltip o stato dei controlli.
 6. Verifica a dimensioni finestra diverse e con le lingue supportate.
 
-## 6. Analisi architetturale richiesta
+## 7. Analisi architetturale richiesta
 
 Prima dell'implementazione, descrivere brevemente:
 - dove vengono eseguite oggi le simulazioni di fumo e particelle;
@@ -148,7 +210,7 @@ Prima dell'implementazione, descrivere brevemente:
 
 Evitare sistemi di cache duplicati se è possibile condividere il meccanismo comune. Non compromettere la reattività dell'anteprima durante la normale modifica della scena e non cambiare il risultato del rendering per effetto delle sole impostazioni di codifica video.
 
-## 7. Criteri di accettazione generali
+## 8. Criteri di accettazione generali
 
 1. Il precalcolo del fumo salva anche la griglia fine e il render la riutilizza senza ricostruirla per ogni frame.
 2. Una modifica ai parametri del fumo invalida dal primo frame interessato, non prima.
@@ -160,18 +222,19 @@ Evitare sistemi di cache duplicati se è possibile condividere il meccanismo com
 8. Nessuna regressione alla simulazione normale del fumo o all'anteprima delle particelle.
 9. L'esportazione video consente di scegliere consapevolmente formato e qualità, inclusi percorsi ad alta qualità/lossless quando supportati.
 10. La barra superiore presenta pulsanti uniformi per altezza, allineamento e dimensionamento.
+11. La polvere sospesa ha un moto naturale, deterministico e coerente con gli oggetti e i campi d'aria/fumo, con costo controllato.
 
-## 8. Test richiesti
+## 9. Test richiesti
 
 Creare una scena riproducibile con emettitore, oggetto animato che attraversa la traiettoria delle particelle e prova di controllo con oggetto fermo. Includere anche una simulazione di fumo su più frame con griglia fine.
 
-Verificare per le simulazioni: primo precalcolo; riproduzione da cache; modifica parametri e invalidazione; modifica della traiettoria e aggiornamento delle interazioni; confronto viewport/render; chiusura e riapertura progetto; cache parziale o non valida.
+Verificare per le simulazioni: primo precalcolo; riproduzione da cache; modifica parametri e invalidazione; modifica della traiettoria e aggiornamento delle interazioni; confronto viewport/render; chiusura e riapertura progetto; cache parziale o non valida. Per la polvere verificare anche moto in assenza di oggetti animati, riproducibilità con salto diretto al frame, interazione con oggetti in movimento e fumo, e costo con molti granelli.
 
 Per il video, esportare brevi sequenze di prova con MP4 standard, MP4 ad alta qualità, AVI non compresso se disponibile e AVI lossless con FFV1 o equivalente se disponibile. Verificare con uno strumento di ispezione i parametri effettivi del file (contenitore, codec, pixel format, frame rate, risoluzione e bitrate), oltre alla riproduzione. Confrontare dimensioni e qualità senza dichiarare equivalenti impostazioni diverse.
 
 Per la UI, verificare visivamente la barra superiore in almeno una finestra larga e una stretta, con le lingue supportate. I test unitari non sostituiscono la verifica visiva.
 
-## 9. Risposta richiesta a ChatGPT
+## 10. Risposta richiesta a ChatGPT
 
 Aggiungere al normale handoff una risposta datata con:
 - causa effettiva del problema del Particle System;
@@ -179,6 +242,7 @@ Aggiungere al normale handoff una risposta datata con:
 - file modificati e motivazione;
 - architettura e formato della cache per fumo e particelle;
 - strategia di invalidazione e ripresa;
+- approccio scelto per la polvere sospesa, interazioni implementate e motivazione delle semplificazioni fisiche;
 - backend video, contenitori, codec e opzioni effettivamente supportati;
 - impostazioni predefinite e comportamento dei preset video;
 - componenti/stili UI modificati per uniformare la barra;
