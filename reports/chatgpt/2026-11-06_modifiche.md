@@ -694,3 +694,64 @@ Non è necessario implementare ogni voce proposta se il dato non esiste o richie
 - Individuare inoltre il punto in cui vengono renderizzati i frame della viewport e l'indicatore `INTEL(R) C++ Compiler`, per mantenerli correttamente nella barra.
 
 **Indicazione a Claude:** prima mappare i dati già disponibili e il punto in cui il video viene esportato; proporre una struttura dati unica per gli indicatori e il wrapping responsive, senza duplicare monitoraggi. Implementare in modo incrementale, con test per persistenza, limite 9+2, layout e calcolo ETA. Non dichiarare verificata la stima video finché non è stata confrontata con un'esportazione reale.
+
+
+## 9. Esportazione video affidabile in background — 06/11/2026
+
+**Problema osservato da Valerio:** ha avviato un rendering/esportazione video e ha lasciato ForgeRender lavorare mentre utilizzava il PC per altre attività. A un certo punto l'elaborazione sembrava essersi fermata; cliccando nuovamente sull'icona di ForgeRender, il programma si è riaperto/è tornato visibile e il lavoro è ripreso. Non è ancora chiaro se fosse una pausa, un blocco della UI, una sospensione del sistema, un problema del processo o un comportamento di ripresa dopo la minimizzazione. Non presumere la causa senza riprodurre e diagnosticare.
+
+**Obiettivo:** l'esportazione di un video deve proseguire in modo affidabile anche quando la finestra è minimizzata, non in primo piano o coperta da altre applicazioni. Valerio deve poter continuare a usare Windows durante l'esportazione. Il lavoro non deve dipendere dal focus della finestra, dal repaint della viewport o dall'interazione dell'utente.
+
+### A. Diagnosi prima della correzione
+
+1. Ricostruire il percorso completo dell'esportazione: generazione dei frame, simulazioni/precalcoli, passaggio dei frame all'encoder, codifica e finalizzazione del file.
+2. Verificare se una perdita di focus, minimizzazione, occlusione della finestra o riduzione dei repaint possa sospendere o interrompere uno dei passaggi.
+3. Verificare la gestione del ciclo di vita dell'app e dei task/thread: nessuna attesa della UI deve essere necessaria perché il worker continui; nessun lock o canale pieno deve bloccare il worker in attesa di un repaint o di un'interazione.
+4. Verificare se il renderer GPU o il backend di codifica si comportino diversamente quando ForgeRender è in background, e se Windows possa sospendere il PC durante esportazioni lunghe.
+5. Aggiungere log diagnostici con timestamp e stato delle fasi (render frame, attesa, codifica, pausa, ripresa, annullamento, errore), così da distinguere un vero arresto da una UI che non si aggiorna.
+6. Se il problema non è riproducibile, dichiararlo: non attribuire una causa certa all'episodio riferito da Valerio.
+
+### B. Esecuzione in background
+
+- Eseguire l'esportazione in un worker/task dedicato, indipendente dal ciclo di disegno della UI e dal focus della finestra.
+- La UI deve ricevere aggiornamenti di progresso tramite un canale/thread-safe non bloccante e limitato, senza dover elaborare ogni singolo aggiornamento per consentire al render di proseguire.
+- Minimizzare, coprire o cambiare finestra non deve mettere in pausa il lavoro. La pausa deve avvenire solo tramite un comando esplicito dell'utente o una condizione di errore gestita e comunicata.
+- Il worker non deve attendere che la finestra venga ridisegnata, né fare affidamento sul frame rate della viewport.
+- Evitare di eseguire simulazioni o rendering pesanti sul thread UI.
+- La chiusura dell'app deve avere una semantica chiara: chiedere se annullare o attendere il completamento, senza perdere silenziosamente il lavoro.
+
+### C. Uso delle risorse mentre Valerio continua a lavorare
+
+- Consentire all'utente di continuare a usare Windows e altre applicazioni durante l'esportazione.
+- Verificare e, se necessario, introdurre una modalità di carico controllato: priorità CPU del worker inferiore alla normale attività interattiva, numero di thread configurabile o limitazione del carico quando serve.
+- Per la GPU, verificare se il rendering video satura il dispositivo e rende il desktop poco reattivo; valutare una limitazione controllabile del carico o una modalità "Uso PC" che riduca l'impatto senza interrompere l'esportazione.
+- Non introdurre limiti arbitrari che allunghino sempre i render: offrire un compromesso configurabile tra velocità di esportazione e reattività del PC.
+- Evitare polling aggressivo e aggiornamenti UI continui. Il progresso va aggiornato a intervalli ragionevoli.
+
+### D. Sospensione di Windows e continuità
+
+- Durante un'esportazione attiva, valutare l'uso corretto delle API Windows per impedire la sospensione automatica del sistema, senza impedire inutilmente lo spegnimento del display.
+- Rilasciare sempre la richiesta di attività quando l'esportazione termina, viene annullata o fallisce.
+- Non tentare di impedire lo spegnimento volontario del PC o di aggirare la chiusura dell'app.
+- Distinguere chiaramente la sospensione del PC (che ferma inevitabilmente il calcolo) dalla semplice minimizzazione della finestra.
+
+### E. Recupero e integrità dell'esportazione
+
+- Verificare se i frame già renderizzati vengono conservati in modo sicuro durante l'esportazione.
+- In caso di errore dell'encoder o chiusura inattesa, non lasciare un file finale apparentemente valido ma incompleto: finalizzazione atomica o file temporaneo con promozione al completamento.
+- Valutare un manifest/checkpoint per poter riprendere un'esportazione interrotta dai frame già completati, se compatibile con l'architettura attuale. Non sovrascrivere o mescolare frame di configurazioni diverse: registrare impronta del progetto, impostazioni, intervallo, risoluzione, FPS e formato.
+- Se la ripresa automatica non è sicura o richiede modifiche troppo invasive, almeno conservare i frame completati e mostrare un messaggio esplicito con possibilità di riprendere o ripartire.
+
+### F. Test di accettazione
+
+1. Avviare un'esportazione lunga e minimizzare ForgeRender per almeno 5 minuti: il conteggio dei frame deve continuare ad avanzare.
+2. Coprire la finestra con altre applicazioni e lavorare sul PC: l'esportazione deve continuare.
+3. Ripristinare ForgeRender: UI, percentuale, frame completati, tempo trascorso e stima devono essere aggiornati e coerenti.
+4. Verificare che minimizzazione e perdita di focus non attivino pausa o annullamento.
+5. Eseguire un test con CPU e uno con GPU; verificare anche la codifica finale, non soltanto il rendering dei frame.
+6. Durante l'esportazione, usare applicazioni comuni e verificare la reattività del desktop; confrontare modalità a piena velocità e modalità a carico controllato.
+7. Verificare il comportamento con sospensione automatica di Windows prevista durante un'esportazione: il sistema deve restare operativo se è stata richiesta la protezione dalla sospensione, e tornare alle impostazioni normali alla fine.
+8. Simulare un errore/annullamento e verificare che non venga presentato come completo un video parziale e che i frame già completati siano gestiti correttamente.
+9. Verificare che pausa, ripresa e annullamento espliciti continuino a funzionare.
+
+**Indicazione a Claude Code:** partire dalla diagnosi del caso segnalato e dalla separazione netta tra worker di esportazione e ciclo UI. Non considerare sufficiente il fatto che il contatore continui ad aggiornarsi: il test deve dimostrare che i frame e la codifica proseguono davvero mentre la finestra è minimizzata e l'utente lavora in altre applicazioni. Documentare causa riprodotta o, se non riprodotta, limiti della verifica. Non dichiarare il problema risolto senza i test di accettazione.
