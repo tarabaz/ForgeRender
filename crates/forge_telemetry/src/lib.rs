@@ -3,6 +3,7 @@
 pub mod gpu;
 
 use std::collections::VecDeque;
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
@@ -63,16 +64,48 @@ pub fn gib(b: u64) -> f64 {
     b as f64 / (1024.0 * 1024.0 * 1024.0)
 }
 
-/// Campionatore periodico dell'utilizzo di CPU e memoria del processo/sistema.
+/// Una lettura di CPU, memoria e GPU.
+#[derive(Default)]
+struct Sample {
+    cpu_usage_percent: f32,
+    used_ram_bytes: u64,
+    process_ram_bytes: u64,
+    gpus: Vec<gpu::GpuSample>,
+}
+
+/// Fa una lettura. Può costare centinaia di millisecondi (la memoria del processo su Windows):
+/// mai sul thread dell'interfaccia.
+fn read_sample(sys: &mut System, nvml: Option<&gpu::NvmlMonitor>) -> Sample {
+    sys.refresh_cpu_usage();
+    sys.refresh_memory();
+    let mut process_ram_bytes = 0;
+    if let Ok(pid) = sysinfo::get_current_pid() {
+        sys.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[pid]), true);
+        process_ram_bytes = sys.process(pid).map(|p| p.memory()).unwrap_or(0);
+    }
+    Sample {
+        cpu_usage_percent: sys.global_cpu_usage(),
+        used_ram_bytes: sys.used_memory(),
+        process_ram_bytes,
+        gpus: nvml.map(gpu::NvmlMonitor::sample).unwrap_or_default(),
+    }
+}
+
+/// Campionatore periodico dell'utilizzo di CPU e memoria del processo/sistema. Le letture stanno
+/// su un thread a sé: [`ResourceMonitor::tick`] non aspetta mai, chiede la prossima e raccoglie
+/// quelle pronte. I campi hanno l'ultimo valore arrivato.
 pub struct ResourceMonitor {
-    sys: System,
     last: Instant,
+    /// Lettura chiesta e non ancora arrivata.
+    waiting: bool,
+    requests: Sender<()>,
+    samples: Receiver<Sample>,
     pub cpu_usage_percent: f32,
     pub used_ram_bytes: u64,
     pub process_ram_bytes: u64,
     /// Schede NVIDIA lette con NVML (vuoto senza driver NVIDIA: vedi `nvml_available`).
     pub gpus: Vec<gpu::GpuSample>,
-    nvml: Option<gpu::NvmlMonitor>,
+    nvml: bool,
 }
 
 impl Default for ResourceMonitor {
@@ -83,41 +116,57 @@ impl Default for ResourceMonitor {
 
 impl ResourceMonitor {
     pub fn new() -> Self {
-        let mut sys = System::new();
-        sys.refresh_cpu_usage();
+        let nvml = gpu::NvmlMonitor::open();
+        let nvml_available = nvml.is_some();
+        let (requests, request_rx) = channel::<()>();
+        let (sample_tx, samples) = channel();
+        // Si legge solo su richiesta, così a programma fermo non c'è nessun lavoro. Il thread
+        // finisce da solo quando il monitor viene chiuso.
+        let spawned = std::thread::Builder::new().name("forge-monitor".into()).spawn(move || {
+            let mut sys = System::new();
+            sys.refresh_cpu_usage();
+            for () in request_rx {
+                if sample_tx.send(read_sample(&mut sys, nvml.as_ref())).is_err() {
+                    break;
+                }
+            }
+        });
+        if let Err(e) = spawned {
+            tracing::warn!("statistiche di sistema non disponibili: {e}");
+        }
         Self {
-            sys,
             last: Instant::now() - Duration::from_secs(10),
+            waiting: false,
+            requests,
+            samples,
             cpu_usage_percent: 0.0,
             used_ram_bytes: 0,
             process_ram_bytes: 0,
             gpus: Vec::new(),
-            nvml: gpu::NvmlMonitor::open(),
+            nvml: nvml_available,
         }
     }
 
     /// `true` se il driver NVIDIA permette di leggere utilizzo GPU e VRAM.
     pub fn nvml_available(&self) -> bool {
-        self.nvml.is_some()
+        self.nvml
     }
 
-    /// Aggiorna al massimo una volta al secondo (la misura della CPU richiede un intervallo).
+    /// Raccoglie le letture pronte e ne chiede una nuova al massimo una volta al secondo (la
+    /// misura della CPU richiede un intervallo). Non blocca: si può chiamare a ogni fotogramma.
     pub fn tick(&mut self) {
-        if self.last.elapsed() < Duration::from_secs(1) {
+        for s in self.samples.try_iter() {
+            self.waiting = false;
+            self.cpu_usage_percent = s.cpu_usage_percent;
+            self.used_ram_bytes = s.used_ram_bytes;
+            self.process_ram_bytes = s.process_ram_bytes;
+            self.gpus = s.gpus;
+        }
+        if self.waiting || self.last.elapsed() < Duration::from_secs(1) {
             return;
         }
         self.last = Instant::now();
-        self.sys.refresh_cpu_usage();
-        self.sys.refresh_memory();
-        self.cpu_usage_percent = self.sys.global_cpu_usage();
-        self.used_ram_bytes = self.sys.used_memory();
-        if let Ok(pid) = sysinfo::get_current_pid() {
-            self.sys.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[pid]), true);
-            self.process_ram_bytes = self.sys.process(pid).map(|p| p.memory()).unwrap_or(0);
-        }
-        if let Some(n) = &self.nvml {
-            self.gpus = n.sample();
-        }
+        self.waiting = self.requests.send(()).is_ok();
     }
 }
 
@@ -264,6 +313,22 @@ pub fn default_log_dir() -> Option<std::path::PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn monitor_delivers_samples_without_waiting_in_tick() {
+        let mut m = ResourceMonitor::new();
+        let start = Instant::now();
+        while m.used_ram_bytes == 0 && start.elapsed() < Duration::from_secs(30) {
+            m.tick();
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        assert!(m.used_ram_bytes > 0, "nessuna lettura arrivata");
+        assert!(m.process_ram_bytes > 0);
+        // Una seconda richiesta parte solo dopo un secondo dalla prima.
+        m.last = Instant::now();
+        m.tick();
+        assert!(!m.waiting);
+    }
 
     #[test]
     fn detects_something() {

@@ -2974,3 +2974,13 @@ Richieste di Valerio: "Sostituisci materiale" (tutti i componenti con un materia
 **Non verificato:** una sospensione reale di Windows al timer, reattività del desktop misurata sulla GPU (la sonda è solo CPU), ripresa dalla finestra di domanda con clic (provata con `--riprendi`), Interrompi su un'animazione dalla timeline a mano, `ffmpeg` in priorità bassa, inglese delle finestre nuove, durata oltre i 5 minuti.
 
 **Limiti:** con la finestra ridotta ogni fotogramma costa circa 0,2–0,3 s in più (1,75 contro 3,2 fotogrammi al secondo in una scena leggerissima, irrilevante su render lunghi). La ripresa vale per Render della timeline e turntable, non per l'Anteprima né per le viste singole. Il formato del video non entra nell'impronta: si codifica con le impostazioni attuali, dai fotogrammi già fatti.
+
+## Scatto regolare della viewport — 06/11/2026 (Claude, 0.48.1)
+
+**Causa misurata:** la lettura delle statistiche, una volta al secondo sul thread dell'interfaccia. `refresh_processes` di `sysinfo` costa circa 200 ms; identico con e senza polvere, quindi non dipende dalla scena.
+
+**Fatto:** letture su un thread a sé, richieste da `ResourceMonitor::tick`, che non aspetta mai.
+
+**Provato con l'eseguibile vero, RTX 5070, rotazione continua simulata e polvere:** mediana 4,17 ms invariata; picco massimo da 423 ms a 11,5 ms; 0 blocchi nella logica dell'interfaccia.
+
+**Non verificato:** la scena di Valerio e la rotazione col mouse vero. Valerio vedeva lo scatto circa ogni 2 secondi, la misura lo trova ogni secondo.

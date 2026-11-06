@@ -10,6 +10,10 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.48.1 — 6 Nov 2026
+
+- **Fixed the regular stutter of the viewport:** once a second the program read its own memory use for the status bar, and that reading stopped the interface for 200–300 ms, with any scene. CPU, memory and GPU readings now run on a separate thread and the interface never waits for them.
+
 ## 0.48.0 — 6 Nov 2026
 
 From section 9 of `reports/chatgpt/2026-11-06_modifiche.md`.
