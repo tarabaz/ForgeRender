@@ -110,7 +110,6 @@ pub fn item_label(i: StatusItem) -> &'static str {
         StatusItem::Cpu => tr("CPU"),
         StatusItem::Gpu => tr("GPU"),
         StatusItem::Vram => tr("VRAM"),
-        StatusItem::RamProcess => tr("RAM processo"),
         StatusItem::RamSystem => tr("RAM sistema"),
         StatusItem::AveragePass => tr("Media per passata"),
         StatusItem::LastPass => tr("Ultima passata"),
@@ -134,7 +133,6 @@ fn item_hint(i: StatusItem) -> &'static str {
         StatusItem::Cpu => tr("Utilizzo della CPU, aggiornato ogni secondo"),
         StatusItem::Gpu => tr("Utilizzo della GPU: solo schede NVIDIA, letto dal driver ogni secondo"),
         StatusItem::Vram => tr("Memoria video usata da tutti i programmi: solo schede NVIDIA"),
-        StatusItem::RamProcess => tr("Memoria usata da ForgeRender"),
         StatusItem::RamSystem => tr("Memoria usata da tutto il sistema"),
         StatusItem::AveragePass => tr("Tempo medio di una passata del render"),
         StatusItem::LastPass => tr("Tempo dell'ultima passata del render"),
@@ -249,7 +247,6 @@ fn item(app: &ForgeApp, ui: &mut egui::Ui, i: StatusItem, p: &forge_render_core:
                 ],
             ),
         },
-        StatusItem::RamProcess => tf("RAM processo: {:.2} GB", &[format!("{:.2}", gib(app.monitor.process_ram_bytes))]),
         StatusItem::RamSystem => tf(
             "RAM sistema: {:.1}/{:.1} GB",
             &[

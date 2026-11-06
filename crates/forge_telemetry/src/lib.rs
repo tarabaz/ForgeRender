@@ -69,29 +69,21 @@ pub fn gib(b: u64) -> f64 {
 struct Sample {
     cpu_usage_percent: f32,
     used_ram_bytes: u64,
-    process_ram_bytes: u64,
     gpus: Vec<gpu::GpuSample>,
 }
 
-/// Fa una lettura. Può costare centinaia di millisecondi (la memoria del processo su Windows):
-/// mai sul thread dell'interfaccia.
+/// Fa una lettura: niente di tutto questo deve stare sul thread dell'interfaccia.
 fn read_sample(sys: &mut System, nvml: Option<&gpu::NvmlMonitor>) -> Sample {
     sys.refresh_cpu_usage();
     sys.refresh_memory();
-    let mut process_ram_bytes = 0;
-    if let Ok(pid) = sysinfo::get_current_pid() {
-        sys.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[pid]), true);
-        process_ram_bytes = sys.process(pid).map(|p| p.memory()).unwrap_or(0);
-    }
     Sample {
         cpu_usage_percent: sys.global_cpu_usage(),
         used_ram_bytes: sys.used_memory(),
-        process_ram_bytes,
         gpus: nvml.map(gpu::NvmlMonitor::sample).unwrap_or_default(),
     }
 }
 
-/// Campionatore periodico dell'utilizzo di CPU e memoria del processo/sistema. Le letture stanno
+/// Campionatore periodico dell'utilizzo di CPU, memoria di sistema e GPU. Le letture stanno
 /// su un thread a sé: [`ResourceMonitor::tick`] non aspetta mai, chiede la prossima e raccoglie
 /// quelle pronte. I campi hanno l'ultimo valore arrivato.
 pub struct ResourceMonitor {
@@ -102,7 +94,6 @@ pub struct ResourceMonitor {
     samples: Receiver<Sample>,
     pub cpu_usage_percent: f32,
     pub used_ram_bytes: u64,
-    pub process_ram_bytes: u64,
     /// Schede NVIDIA lette con NVML (vuoto senza driver NVIDIA: vedi `nvml_available`).
     pub gpus: Vec<gpu::GpuSample>,
     nvml: bool,
@@ -141,7 +132,6 @@ impl ResourceMonitor {
             samples,
             cpu_usage_percent: 0.0,
             used_ram_bytes: 0,
-            process_ram_bytes: 0,
             gpus: Vec::new(),
             nvml: nvml_available,
         }
@@ -159,7 +149,6 @@ impl ResourceMonitor {
             self.waiting = false;
             self.cpu_usage_percent = s.cpu_usage_percent;
             self.used_ram_bytes = s.used_ram_bytes;
-            self.process_ram_bytes = s.process_ram_bytes;
             self.gpus = s.gpus;
         }
         if self.waiting || self.last.elapsed() < Duration::from_secs(1) {
@@ -323,7 +312,6 @@ mod tests {
             std::thread::sleep(Duration::from_millis(5));
         }
         assert!(m.used_ram_bytes > 0, "nessuna lettura arrivata");
-        assert!(m.process_ram_bytes > 0);
         // Una seconda richiesta parte solo dopo un secondo dalla prima.
         m.last = Instant::now();
         m.tick();

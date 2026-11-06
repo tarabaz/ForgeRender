@@ -64,6 +64,7 @@ pub struct Preferences {
     /// Formato e qualità del video (l'ultima configurazione).
     pub video: crate::video::VideoSettings,
     /// Contatori scelti per la barra di stato, al massimo [`MAX_STATUS_ITEMS`].
+    #[serde(deserialize_with = "known_status_items")]
     pub status_items: Vec<StatusItem>,
 }
 
@@ -82,7 +83,6 @@ pub enum StatusItem {
     Cpu,
     Gpu,
     Vram,
-    RamProcess,
     RamSystem,
     AveragePass,
     LastPass,
@@ -91,7 +91,7 @@ pub enum StatusItem {
 }
 
 impl StatusItem {
-    pub const ALL: [StatusItem; 15] = [
+    pub const ALL: [StatusItem; 14] = [
         StatusItem::Elapsed,
         StatusItem::Remaining,
         StatusItem::Frames,
@@ -101,7 +101,6 @@ impl StatusItem {
         StatusItem::Cpu,
         StatusItem::Gpu,
         StatusItem::Vram,
-        StatusItem::RamProcess,
         StatusItem::RamSystem,
         StatusItem::AveragePass,
         StatusItem::LastPass,
@@ -119,6 +118,13 @@ impl StatusItem {
             StatusItem::Vram,
         ]
     }
+}
+
+/// Le voci che non esistono più si saltano: una voce tolta dal programma non deve far perdere
+/// tutte le impostazioni.
+fn known_status_items<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<StatusItem>, D::Error> {
+    let items = Vec::<serde_json::Value>::deserialize(d)?;
+    Ok(items.into_iter().filter_map(|v| serde_json::from_value(v).ok()).collect())
 }
 
 /// Elenco utilizzabile: niente doppioni e non oltre il limite, anche con un file scritto a mano.
@@ -315,6 +321,16 @@ mod tests {
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
         d.join(FILE_NAME)
+    }
+
+    #[test]
+    fn removed_status_item_keeps_the_other_settings() {
+        let p = tmp("voce-tolta");
+        std::fs::write(&p, r#"{"auto_restart": false, "status_items": ["Cpu", "RamProcess", "Gpu"]}"#).unwrap();
+        let (loaded, err) = Preferences::load_from(&p);
+        assert!(err.is_none(), "{err:?}");
+        assert!(!loaded.auto_restart);
+        assert_eq!(loaded.status_items, vec![StatusItem::Cpu, StatusItem::Gpu]);
     }
 
     #[test]

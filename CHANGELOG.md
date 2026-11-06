@@ -13,6 +13,10 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.48.2 — 6 nov 2026
+
+- **Tolta la voce RAM processo dalla barra di stato:** era la lettura lenta dietro lo scatto corretto nella 0.48.1, e nient'altro la usava. RAM di sistema resta. Le impostazioni salvate con quella voce continuano a funzionare: viene saltata e tutto il resto si conserva.
+
 ## 0.48.1 — 6 nov 2026
 
 - **Corretto lo scatto regolare della viewport:** una volta al secondo il programma leggeva la propria memoria per la barra di stato, e quella lettura fermava l'interfaccia per 200–300 ms, con qualsiasi scena. Le letture di CPU, memoria e GPU ora stanno su un thread separato e l'interfaccia non le aspetta mai.

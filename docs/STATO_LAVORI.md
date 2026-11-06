@@ -841,3 +841,7 @@ Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
 
 - Scatto della viewport circa ogni secondo: `ResourceMonitor::tick` stava sul thread dell'interfaccia e `refresh_processes` di `sysinfo` costava circa 200 ms (CPU e memoria di sistema meno di 1 ms). Ora le letture stanno sul thread `forge-monitor`, su richiesta: `tick` non blocca e a programma fermo non c'è lavoro. Misura con rotazione continua e polvere, 240 fps: prima picchi di 200–420 ms ogni secondo, dopo massimo 11,5 ms in 26 s.
 - Da sapere: il costo di `refresh_processes` resta, su un thread a parte; il valore serve solo alla voce "RAM processo" della barra di stato.
+
+## 0.48.2 — 06/11/2026 (Claude)
+
+- Tolta la voce `RamProcess` e la chiamata `refresh_processes`, su richiesta di Valerio: il costo annotato nella 0.48.1 non c'è più. `status_items` si legge con `known_status_items`, che salta le voci sconosciute: senza, una voce tolta rendeva non valido tutto il file delle impostazioni.

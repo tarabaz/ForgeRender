@@ -2984,3 +2984,7 @@ Richieste di Valerio: "Sostituisci materiale" (tutti i componenti con un materia
 **Provato con l'eseguibile vero, RTX 5070, rotazione continua simulata e polvere:** mediana 4,17 ms invariata; picco massimo da 423 ms a 11,5 ms; 0 blocchi nella logica dell'interfaccia.
 
 **Non verificato:** la scena di Valerio e la rotazione col mouse vero. Valerio vedeva lo scatto circa ogni 2 secondi, la misura lo trova ogni secondo.
+
+## Voce RAM processo tolta — 06/11/2026 (Claude, 0.48.2)
+
+Su richiesta di Valerio: tolti `StatusItem::RamProcess`, `refresh_processes` e i tre testi inglesi. RAM di sistema resta. Il thread `forge-monitor` resta per CPU, memoria e GPU. Un test copre un file di impostazioni che contiene ancora la voce.
