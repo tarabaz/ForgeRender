@@ -851,3 +851,8 @@ Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
 - Barra di stato: `steady_text` in `ui/status.rs` tiene per ogni contatore una casella che non si stringe mai, larga almeno quanto `widest_texts`. "GPU: lettura non disponibile" ha una casella a sé, se no nel primo secondo allargherebbe per sempre quella di GPU.
 - Anteprima del fumo: confrontata col render, una sfera che attraversa il fumo in 0,15 s lo sposta anche nell'anteprima (riquadro di 1 m: 11,7 contro 11,2 cm; di 4 m con raggio 25 cm: 22 contro 11 cm). L'anteprima sente gli oggetti dalla 0.47.0 (`preview_with_movers`). Corretti due casi di anteprima vecchia in `ui/smoke_preview.rs`: `keep_while_playing` e `previewed_smoke`.
 - Da sapere: con riquadro grande e sorgente sul pavimento l'anteprima può non avere punti mentre il render ha fumo (riquadro di 4 m, sorgente sul piano, celle da 11,8 contro 8,2 cm). Non corretto.
+
+## 0.48.4 — 07/11/2026 (Claude)
+
+- Sorgente del fumo senza celle libere nel raggio: `run` in `forge_volume/src/smoke_sim.rs` emetteva solo nelle celle libere con il centro entro `max(raggio, 0,75 cella)`. Con la sorgente sul pavimento e celle grosse (anteprima di un riquadro di 4 m) erano tutte solide, e anche senza oggetti una sorgente tra i centri delle celle poteva non toccarne nessuno. Ora `source_reach2` allarga il raggio fino alla cella libera più vicina, al più due celle oltre; si ricalcola quando cambiano gli oggetti in movimento. Il raggio cambia solo quando prima non usciva niente.
+- Test: `source_buried_in_the_floor_still_emits`. Non verificato nella finestra con la scena di Valerio.

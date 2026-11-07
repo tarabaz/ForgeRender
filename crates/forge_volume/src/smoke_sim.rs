@@ -295,6 +295,35 @@ pub fn simulate_smoke_frames(
 /// Destinatario dei fotogrammi di [`simulate_smoke_frames`]: (tempo, densità).
 type FrameSink<'a> = &'a mut dyn FnMut(f32, &[f32]);
 
+/// Raggio² con cui la sorgente emette: il suo, se dentro c'è almeno una cella libera. Se sono
+/// tutte occupate da un oggetto (sorgente appoggiata sul pavimento con celle grosse, come
+/// nell'anteprima) si allarga fino alle celle libere più vicine, al più due celle oltre: il fumo
+/// esce dalla superficie invece di non uscire affatto.
+fn source_reach2(spec: &GridSpec, source: Vec3, r2: f32, solid: &[bool]) -> f32 {
+    let h = spec.cell;
+    let limit = r2.sqrt() + 2.0 * h;
+    let g = (source - spec.min) / h;
+    let span = |c: f32, m: usize| {
+        let lo = (c - limit / h - 1.0).floor().max(0.0) as usize;
+        let hi = ((c + limit / h + 1.0).ceil().max(0.0) as usize).min(m);
+        lo..hi
+    };
+    let mut nearest = f32::INFINITY;
+    for z in span(g.z, spec.res[2]) {
+        for y in span(g.y, spec.res[1]) {
+            for x in span(g.x, spec.res[0]) {
+                if !solid[spec.index(x, y, z)] {
+                    nearest = nearest.min((spec.center(x, y, z) - source).length_squared());
+                }
+            }
+        }
+    }
+    if nearest < r2 || nearest > limit * limit {
+        return r2;
+    }
+    (nearest.sqrt() + 0.75 * h).powi(2)
+}
+
 fn run(
     p: &SmokeSimParams,
     solid: Option<&[bool]>,
@@ -336,6 +365,7 @@ fn run(
         }
     };
     let src_r2 = p.source_radius.max(h * 0.75).powi(2);
+    let mut src_reach2 = source_reach2(&p.spec, p.source, src_r2, &solid);
     let coords = |i: usize| p.spec.coords(i);
     // Bordi sfumati: in ogni cella quanto fumo resta a ogni passo (1 lontano dalle pareti; sulla
     // parete si dissolve in circa un decimo di secondo, fuori dal riquadro subito).
@@ -413,6 +443,7 @@ fn run(
         if let Some(sf) = bake.as_mut().and_then(|b| b.hooks.solid(time)) {
             if sf.mask.len() == n {
                 solid = sf.mask;
+                src_reach2 = source_reach2(&p.spec, p.source, src_r2, &solid);
             }
             solid_vel = sf.velocity;
             moving_zone = sf.zone;
@@ -430,8 +461,8 @@ fn run(
                     let (x, y, z) = coords(i);
                     let c = p.spec.center(x, y, z);
                     let d2 = (c - p.source).length_squared();
-                    if d2 < src_r2 && !solid[i] {
-                        let k = 1.0 - d2 / src_r2;
+                    if d2 < src_reach2 && !solid[i] {
+                        let k = 1.0 - d2 / src_reach2;
                         *r = (*r + p.emission * flicker * k * dt).min(1.0);
                         *t = t.max(p.temperature * k);
                         *vy = vy.max(p.exit_speed * k).min(p.exit_speed.max(*vy));
@@ -907,6 +938,39 @@ mod tests {
             patchiness: 0.0,
             emit_stop: 0.0,
         }
+    }
+
+    /// Sorgente appoggiata sul pavimento con celle più grosse di lei: tutte le celle nel suo raggio
+    /// sono pavimento. Il fumo deve uscire lo stesso dalle celle libere subito sopra; se la
+    /// sorgente ha celle libere il raggio resta il suo.
+    #[test]
+    fn source_buried_in_the_floor_still_emits() {
+        let spec = GridSpec::covering(Vec3::ZERO, Vec3::new(1.0, 1.0, 1.0), 12);
+        let floor: Vec<bool> = (0..spec.len()).map(|i| spec.coords(i).1 < 2).collect();
+        let p = SmokeSimParams { time: 0.5, ..params(spec) };
+        let r2 = p.source_radius.max(spec.cell * 0.75).powi(2);
+        let free = vec![false; spec.len()];
+        assert_eq!(source_reach2(&spec, spec.center(6, 6, 6), r2, &free), r2);
+        // Tra i centri delle celle, anche senza oggetti, nessun centro cade nel raggio.
+        assert!(source_reach2(&spec, p.source, r2, &free) > r2);
+        assert!(source_reach2(&spec, p.source, r2, &floor) > r2);
+        let none = simulate_smoke(
+            &SmokeSimParams {
+                source: Vec3::new(0.5, 0.05, 0.5),
+                ..p
+            },
+            Some(&floor),
+            &|_| {},
+            &|| false,
+        );
+        assert!(none.unwrap().density.iter().sum::<f32>() > 0.01, "sorgente dentro il pavimento");
+        let f = simulate_smoke(&p, Some(&floor), &|_| {}, &|| false).unwrap();
+        let total: f32 = f.density.iter().sum();
+        assert!(total > 0.01, "fumo emesso: {total}");
+        assert!(
+            f.density.iter().zip(&floor).all(|(d, s)| !*s || *d == 0.0),
+            "niente fumo nel pavimento"
+        );
     }
 
     /// Fumo che arriva al soffitto: senza bordi sfumati si ammassa contro il riquadro, con i

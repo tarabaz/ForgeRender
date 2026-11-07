@@ -2996,3 +2996,7 @@ Su richiesta di Valerio: tolti `StatusItem::RamProcess`, `refresh_processes` e i
 **Anteprima del fumo:** Valerio ricordava un'anteprima che ignorava un oggetto veloce. La fisica dell'anteprima risulta corretta in prove automatiche (sfera, 0,15 s, riquadri da 1 e 4 m). Corretti due percorsi di anteprima vecchia, coperti da test sulle decisioni. **Non verificato:** il comportamento in finestra con i clic, e se il ricordo di Valerio venga da prima della 0.47.0.
 
 **Trovato e non corretto:** sorgente sul pavimento in un riquadro grande: l'anteprima resta senza punti, il render ha fumo.
+
+## Sorgente del fumo sul pavimento — 07/11/2026 (Claude, 0.48.4)
+
+Corretto il caso annotato nella 0.48.3: anteprima senza punti con la sorgente sul pavimento in un riquadro grande. Causa: nessuna cella libera entro il raggio della sorgente, quindi emissione nulla. Ora la sorgente emette dalle celle libere più vicine (al più due celle oltre). Coperto da un test nella simulazione; **non provato** nella finestra.

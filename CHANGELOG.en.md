@@ -10,6 +10,10 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.48.4 — 7 Nov 2026
+
+- **Smoke from a source resting on the floor:** when every cell within the source radius was taken by an object, or the source fell between cell centres, no smoke came out at all. This happened mostly in the viewport preview of large boxes, where cells are coarser, so the preview stayed empty while the render had smoke. The source now emits from the nearest free cells, at most two cells away. Smokes that already emitted are unchanged.
+
 ## 0.48.3 — 6 Nov 2026
 
 - **Steady status bar:** every counter now has its own space, wide enough for its longest value, so numbers change without pushing the ones after them. The state label no longer moves the progress bar.

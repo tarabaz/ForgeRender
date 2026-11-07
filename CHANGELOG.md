@@ -13,6 +13,10 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.48.4 — 7 nov 2026
+
+- **Fumo da una sorgente appoggiata sul pavimento:** quando tutte le celle nel raggio della sorgente erano occupate da un oggetto, o la sorgente cadeva tra i centri delle celle, non usciva niente. Capitava soprattutto nell'anteprima della viewport con riquadri grandi, dove le celle sono più grosse: l'anteprima restava vuota mentre il render il fumo lo faceva. Ora la sorgente emette dalle celle libere più vicine, al più due celle più in là. I fumi che già uscivano non cambiano.
+
 ## 0.48.3 — 6 nov 2026
 
 - **Barra di stato ferma:** ogni contatore ha ora il suo spazio, largo quanto il suo valore più lungo, così i numeri cambiano senza spingere quelli dopo. Anche la scritta dello stato non sposta più la barra di avanzamento.
