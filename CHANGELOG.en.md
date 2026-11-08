@@ -10,6 +10,14 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.49.0 — 8 Nov 2026
+
+- **The internal manual is complete:** Help → Manual (F1) now has 33 pages in 12 chapters, in English and in Italian: introduction and first render, Simple mode, window, viewport and settings, import, Object tab and projects, lights, materials, environment, effects, camera, rendering, saving images, views and turntable, timeline and video, AI control and keyboard shortcuts. Every page says where the control is, what it does, its range and default (taken from the program's code) and the common mistakes. F1 over a tab opens the page of that tab; in Simple mode it opens the Simple mode page.
+- **Comparison images:** the main settings show the same scene rendered with the value low, medium and high, side by side: samples (16, 64, 256, 1024), noise threshold, denoiser off and on, max bounces, exposure, tone mapping, caustics, render styles and outlines, roughness, metallic, specular, IOR, transmission, light size, color temperature, environment intensity, focal length, aperture and haze density. 56 images, 640 × 480, rendered by ForgeRender on the GPU with at least 256 samples (except the comparisons of samples and noise threshold), on the test scene and on the material preview ball.
+- **Images on one line become a gallery:** in the manual pages, several images in the same paragraph are drawn next to each other with their captions (on more rows when the window is narrow); hovering over a reduced image shows it full size.
+- **Images kept in the repository too:** `docs/manual/renders/` has the same files, named setting_slider_value (for example `render_samples_064.png`); `tools/manuale/render_confronti.js` renders them again with `forgerender-cli`.
+- **New tests:** every comparison image is used by a page and its copy in `docs/manual/renders/` is identical; the search finds the new pages from everyday words (samples, aperture, kelvin, caustics, focal length, exposure, bounces, metalness). New search synonyms in both languages.
+
 ## 0.48.4 — 7 Nov 2026
 
 - **Smoke from a source resting on the floor:** when every cell within the source radius was taken by an object, or the source fell between cell centres, no smoke came out at all. This happened mostly in the viewport preview of large boxes, where cells are coarser, so the preview stayed empty while the render had smoke. The source now emits from the nearest free cells, at most two cells away. Smokes that already emitted are unchanged.

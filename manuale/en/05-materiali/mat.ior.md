@@ -3,7 +3,7 @@ id: mat.ior
 titolo: IOR (index of refraction)
 parole: refraction, index, glass, water, diamond, transparency, reflection
 ui: panel.materials.ior
-correlate: mat.roughness
+correlate: mat.transmission, mat.roughness, mat.specular
 ---
 # IOR (index of refraction)
 
@@ -12,6 +12,11 @@ correlate: mat.roughness
 **What it does:** sets how much light bends when it enters the material and how much the
 material reflects when seen head-on. It matters most for transparent materials
 (**Transmission** above 0) and for the reflections of non-metallic surfaces.
+
+![IOR 1.1: almost no bending, faint reflections](img/comune/mat_ior_110.png) ![IOR 1.5: ordinary glass](img/comune/mat_ior_150.png) ![IOR 2.4: diamond, strong bending and reflections](img/comune/mat_ior_240.png)
+
+*Clear glass (Transmission 1, roughness 0) with IOR 1.1, 1.5 and 2.4: look at how the black
+core inside is distorted and how much the edges reflect.*
 
 | Material | Typical IOR |
 |---|---|

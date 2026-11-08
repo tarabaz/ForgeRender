@@ -149,7 +149,7 @@ pub fn context_target(app: &ForgeApp, ctx: &egui::Context) -> String {
         return id.to_string();
     }
     match app.prefs.ui_mode {
-        crate::prefs::UiMode::Simple => "intro.benvenuto".into(),
+        crate::prefs::UiMode::Simple => "intro.semplice".into(),
         crate::prefs::UiMode::Advanced => crate::commands::spec(crate::commands::Cmd::Tab(app.tab)).id.to_string(),
     }
 }
@@ -424,26 +424,64 @@ fn block(
             ui.add_space(8.0);
         }
         Block::Image { src, caption } => {
-            let path = manual.image_path(src);
-            let tex = textures.entry(path.clone()).or_insert_with(|| load_texture(ui.ctx(), &path));
-            match tex {
-                Some(t) => {
-                    let [w, h] = t.size();
-                    let width = (w as f32).min(ui.available_width());
-                    let size = egui::vec2(width, width * h as f32 / w.max(1) as f32);
-                    ui.add(egui::Image::new((t.id(), size)).corner_radius(4.0));
-                }
-                None => {
-                    ui.colored_label(style::WARN, tf("Immagine mancante: {}", std::slice::from_ref(src)));
-                }
-            }
+            let width = ui.available_width();
+            picture(ui, manual, textures, src, width);
             if !caption.is_empty() {
                 ui.label(egui::RichText::new(caption).italics().weak());
             }
             ui.add_space(8.0);
         }
+        Block::Gallery(items) => {
+            // Confronto affiancato: tutte le immagini su una riga se ci stanno (almeno ~180 px
+            // l'una), altrimenti su più righe. Passando sopra un'immagine la si vede grande.
+            let gap = 8.0;
+            let avail = ui.available_width();
+            let cols = items.len().min(((avail + gap) / (180.0 + gap)).floor().max(1.0) as usize);
+            let cell = (avail - gap * (cols as f32 - 1.0)) / cols as f32;
+            for row in items.chunks(cols) {
+                ui.horizontal_top(|ui| {
+                    ui.spacing_mut().item_spacing.x = gap;
+                    for (src, caption) in row {
+                        ui.vertical(|ui| {
+                            ui.set_width(cell);
+                            picture(ui, manual, textures, src, cell);
+                            if !caption.is_empty() {
+                                ui.add(egui::Label::new(egui::RichText::new(caption).small().weak()).wrap());
+                            }
+                        });
+                    }
+                });
+                ui.add_space(4.0);
+            }
+            ui.add_space(6.0);
+        }
         Block::Rule => {
             ui.separator();
+        }
+    }
+}
+
+/// Disegna un'immagine del manuale larga al massimo `max_width` (mai più grande del file). Se è
+/// rimpicciolita, passandoci sopra col mouse la si vede a grandezza naturale.
+fn picture(ui: &mut egui::Ui, manual: &Manual, textures: &mut HashMap<PathBuf, Option<egui::TextureHandle>>, src: &str, max_width: f32) {
+    let path = manual.image_path(src);
+    let tex = textures.entry(path.clone()).or_insert_with(|| load_texture(ui.ctx(), &path));
+    match tex {
+        Some(t) => {
+            let [w, h] = t.size();
+            let aspect = h as f32 / w.max(1) as f32;
+            let width = (w as f32).min(max_width);
+            let r = ui.add(egui::Image::new((t.id(), egui::vec2(width, width * aspect))).corner_radius(4.0));
+            if width + 1.0 < w as f32 {
+                let id = t.id();
+                r.on_hover_ui(|ui| {
+                    let big = (w as f32).min(ui.ctx().content_rect().width() * 0.6);
+                    ui.add(egui::Image::new((id, egui::vec2(big, big * aspect))));
+                });
+            }
+        }
+        None => {
+            ui.colored_label(style::WARN, tf("Immagine mancante: {}", &[src.to_string()]));
         }
     }
 }

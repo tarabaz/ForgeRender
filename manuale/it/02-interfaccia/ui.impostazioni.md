@@ -1,0 +1,27 @@
+---
+id: ui.impostazioni
+titolo: Impostazioni
+parole: impostazioni, preferenze, opzioni, lingua, cartella libreria, percorsi, nuovi progetti, barra di stato
+ui: edit.preferences, edit.reset_preferences
+correlate: ui.finestra, mat.pannello, render.pannello
+---
+# Impostazioni
+
+**Dove si trova:** **Modifica → Impostazioni…**. **Modifica → Ripristina impostazioni
+predefinite** riporta ogni impostazione al valore iniziale.
+
+Le impostazioni sono del programma, non del progetto: restano uguali qualunque cosa apri.
+
+| Sezione | Cosa contiene |
+|---|---|
+| Lingua | Lingua di tutta l'interfaccia (italiano, inglese, o un file `lang/Lan_*.json` aggiunto accanto al programma). Cambia subito. Il manuale la segue. |
+| Libreria e import | Risoluzione dei download, sito proposto (ambientCG o Poly Haven), cosa fare con la height map all'import (**Spento**, consigliato; un valore proposto del 3 % del lato della texture; oppure il valore del file MaterialX della fonte), qualità, campioni e dimensione dell'oggetto delle anteprime dei materiali, **Svuota cache anteprime** |
+| Percorsi | Cartella della libreria (HDRI, Materiali, Texture). La variabile d'ambiente `FORGE_LIBRARY_DIR` ha la precedenza. |
+| Rendering | Valori dei **nuovi** progetti: dispositivo, campioni per pixel (0 = senza limite), thread CPU (0 = automatico), riavvio automatico. I progetti salvati tengono i loro. |
+| Barra di stato | Quali contatori mostrare in basso (fino a 9). |
+| Informazioni | Versione, **Mostra all'avvio** per la schermata di benvenuto, **Chiedi la modalità all'avvio** (Semplice o Avanzata). |
+
+## Dove vanno i file
+
+Quello che salvi o esporti va di base nella cartella `Rendering` accanto al programma, oppure in
+`Documenti\ForgeRender` se la cartella del programma non è scrivibile.

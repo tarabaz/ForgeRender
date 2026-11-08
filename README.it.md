@@ -18,6 +18,12 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
+### Novità della versione 0.49.0
+
+- **Un vero manuale dentro il programma:** Guida → Manuale (F1) ora spiega ogni pannello e impostazione, in inglese e in italiano, in 33 pagine e 12 capitoli, con ricerca e F1 sui controlli.
+- **Vedi cosa fa davvero un cursore:** le impostazioni principali di render, materiali, luci, ambiente, camera ed effetti mostrano la stessa scena calcolata con il valore basso, medio e alto, una accanto all'altra.
+- **Render fatti da ForgeRender stesso:** 56 immagini di confronto calcolate con il renderer del programma, conservate anche in `docs/manual/renders/`.
+
 ### Novità della versione 0.48.0
 
 - **Esportazioni che proseguono in background:** riduci ForgeRender a icona e fotogrammi, codifica e file finale vanno avanti, e il PC intanto non va in sospensione.
@@ -341,6 +347,15 @@ Una timeline professionale, sempre disponibile: sta in basso con le schede **Tim
 - **Tempo rimanente:** la barra di stato conta i fotogrammi e stima quanto manca per il render e poi per la codifica, solo quando ci sono dati veri.
 - **Opacità degli oggetti:** una proprietà a sé, resa lasciando passare ogni raggio con probabilità 1 − opacità, così l'oggetto sfuma con la sua ombra, uguale su CPU e GPU.
 
+### 17. Manuale interno con immagini di confronto
+
+**Guida → Manuale** (o **F1** sopra un controllo) apre un manuale che sta dentro il programma e funziona senza internet: capitoli a sinistra, pagina al centro, ricerca in alto, Indietro / Avanti e scelta della lingua. Segue la lingua dell'interfaccia.
+
+- **Ogni pannello e impostazione:** introduzione e primo render, modalità Semplice, finestra e viewport, impostazioni, importazione, oggetti e progetti, luci, materiali, ambiente, effetti, camera, rendering, salvataggio delle immagini, timeline e video, controllo con l'IA e scorciatoie da tastiera: 33 pagine in inglese e in italiano, con intervalli e valori predefiniti presi dal programma.
+- **Immagini di confronto:** per le impostazioni che contano di più, la stessa scena è calcolata con il cursore basso, medio e alto e mostrata in fila: campioni e soglia di rumore, denoiser, rimbalzi, esposizione e tone mapping, caustiche, stili del render, roughness, metallic, specular, IOR e transmission, dimensione e temperatura colore delle luci, intensità dell'ambiente, focale, diaframma e densità della foschia. Passando col mouse sopra un'immagine la si vede grande.
+- **Fatte con ForgeRender:** le 56 immagini (640 × 480, almeno 256 campioni, tranne i confronti sul numero di campioni e sulla soglia di rumore) le calcola il path tracer del programma sulla scena di prova e sulla sfera delle anteprime dei materiali. `tools/manuale/render_confronti.js` le rifà; una copia è in [docs/manual/renders/](docs/manual/renders), con il nome che dice impostazione, cursore e valore (per esempio `render_samples_064.png`).
+- **Controllato dai test:** ogni pagina esiste nelle due lingue, collegamenti e immagini sono validi, ogni immagine è usata e la ricerca trova la pagina giusta anche con le parole di tutti i giorni.
+
 ## Cosa fa oggi
 
 - **Interfaccia Semplice / Avanzata** (selettore in alto, predefinita Semplice): "Foto prodotto in
@@ -448,6 +463,7 @@ Una timeline professionale, sempre disponibile: sta in basso con le schede **Tim
 - **Finestra di importazione STEP**: impostazioni di tassellazione, anteprima 3D, conversione ripetibile, arresto.
 - **Esportazione video**: MP4, MOV, MKV e AVI con H.264, H.265, ProRes, FFV1 o non compresso, preset, stima della dimensione e parametri veri alla fine.
 - **Esportazioni lunghe affidabili**: proseguono da ridotte a icona o coperte, bloccano la sospensione automatica, possono lasciare il PC usabile e riprendere dai fotogrammi fatti.
+- **Manuale interno**: Guida → Manuale o F1 su un controllo, 33 pagine in inglese e in italiano su ogni pannello, con immagini di confronto calcolate da ForgeRender per i cursori principali (basso, medio, alto).
 - **Barra di stato configurabile**: fino a 9 contatori su 15 (FPS viewport, fotogrammi, tempo rimanente, GPU, VRAM, RAM e altri), Backend e processore fissi a destra.
 - **Bersaglio delle luci nel viewport**: Spot e Direzionali si puntano trascinando il bersaglio, con Annulla.
 
@@ -672,6 +688,7 @@ file di output e le immagini. Poi aggiungi una riga all'indice in `reports/READM
 - [docs/ARCHITECTURE.it.md](docs/ARCHITECTURE.it.md) — architettura, scelte tecniche e limiti noti ([English](docs/ARCHITECTURE.md))
 - [docs/BENCHMARK.it.md](docs/BENCHMARK.it.md) — misure eseguite (solo dati reali; traduzione inglese da completare)
 - [docs/STATO_LAVORI.md](docs/STATO_LAVORI.md) — diario dello sviluppo
+- [docs/manual/renders/](docs/manual/renders) — i render di confronto del manuale interno (impostazione_cursore_valore.png)
 
 ## Licenza e contributi
 

@@ -3,7 +3,7 @@ id: keys.elenco
 titolo: Keyboard shortcuts
 parole: keys, keyboard, shortcuts, hotkeys, combinations
 ui: help.shortcuts
-correlate: intro.benvenuto
+correlate: intro.benvenuto, ui.viewport, anim.timeline
 ---
 # Keyboard shortcuts
 
@@ -42,6 +42,7 @@ Shortcuts work when you are not typing in a text field. The same list opens from
 | 5 | Perspective / orthographic |
 | Q, W, E, R | Select, Move, Rotate, Scale |
 | F5 | Start, pause or resume the render |
+| F1 | Open the manual on the page of the control under the mouse |
 
 ## Mouse in the viewport
 
@@ -53,3 +54,11 @@ Shortcuts work when you are not typing in a text field. The same list opens from
 | Alt + drag | Move the selection instead of the camera |
 | Ctrl while dragging the gizmo | Snap to fixed steps |
 | Esc | Cancel the current drag; otherwise deselect everything |
+
+## Timeline
+
+| Keys | Command |
+|---|---|
+| Delete | Delete the selected keys |
+| Ctrl+C, Ctrl+V | Copy the selected keys and paste them at the playhead |
+| F9 | Ease in and out on the selected keys |

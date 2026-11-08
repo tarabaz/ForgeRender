@@ -3,17 +3,62 @@
     {
       "id": "01-introduzione",
       "titolo": { "it": "Introduzione", "en": "Introduction" },
-      "pagine": ["intro.benvenuto"]
+      "pagine": ["intro.benvenuto", "intro.primo-render", "intro.semplice"]
+    },
+    {
+      "id": "02-interfaccia",
+      "titolo": { "it": "Interfaccia", "en": "Interface" },
+      "pagine": ["ui.finestra", "ui.viewport", "ui.impostazioni"]
+    },
+    {
+      "id": "03-scena",
+      "titolo": { "it": "Scena e oggetti", "en": "Scene and objects" },
+      "pagine": ["scene.importa", "scene.oggetto", "scene.progetti"]
+    },
+    {
+      "id": "04-luci",
+      "titolo": { "it": "Luci", "en": "Lights" },
+      "pagine": ["light.tipi", "light.dimensione", "light.colore"]
     },
     {
       "id": "05-materiali",
       "titolo": { "it": "Materiali", "en": "Materials" },
-      "pagine": ["mat.roughness", "mat.ior"]
+      "pagine": ["mat.pannello", "mat.roughness", "mat.metallic", "mat.specular", "mat.ior", "mat.transmission", "mat.texture"]
+    },
+    {
+      "id": "06-ambiente",
+      "titolo": { "it": "Ambiente", "en": "Environment" },
+      "pagine": ["env.ambiente"]
+    },
+    {
+      "id": "07-effetti",
+      "titolo": { "it": "Effetti", "en": "Effects" },
+      "pagine": ["fx.effetti", "fx.foschia"]
+    },
+    {
+      "id": "08-camera",
+      "titolo": { "it": "Camera", "en": "Camera" },
+      "pagine": ["cam.obiettivo", "cam.dof", "cam.tiltshift"]
     },
     {
       "id": "09-rendering",
       "titolo": { "it": "Rendering", "en": "Rendering" },
-      "pagine": ["render.denoiser"]
+      "pagine": ["render.pannello", "render.campioni", "render.denoiser", "render.rimbalzi", "render.esposizione", "render.caustiche", "render.stili"]
+    },
+    {
+      "id": "10-esportazione",
+      "titolo": { "it": "Salvare le immagini", "en": "Saving images" },
+      "pagine": ["export.immagine", "export.viste"]
+    },
+    {
+      "id": "11-animazione",
+      "titolo": { "it": "Animazione", "en": "Animation" },
+      "pagine": ["anim.timeline", "anim.video"]
+    },
+    {
+      "id": "12-ia",
+      "titolo": { "it": "Controllo con l'IA", "en": "AI control" },
+      "pagine": ["ai.mcp"]
     },
     {
       "id": "13-scorciatoie",

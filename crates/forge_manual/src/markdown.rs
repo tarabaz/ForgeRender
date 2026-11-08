@@ -36,6 +36,9 @@ pub enum Block {
         src: String,
         caption: String,
     },
+    /// Più immagini nello stesso paragrafo: confronto affiancato (per esempio valore basso,
+    /// medio e alto di un cursore). Ogni elemento è (percorso, didascalia).
+    Gallery(Vec<(String, String)>),
     Rule,
 }
 
@@ -60,6 +63,15 @@ impl Block {
         }
     }
 
+    /// Percorsi delle immagini del blocco (una, più di una per le gallerie, nessuna).
+    pub fn image_sources(&self) -> Vec<&str> {
+        match self {
+            Block::Image { src, .. } => vec![src.as_str()],
+            Block::Gallery(items) => items.iter().map(|(s, _)| s.as_str()).collect(),
+            _ => Vec::new(),
+        }
+    }
+
     /// Testo semplice del blocco (per la ricerca).
     pub fn plain_text(&self) -> String {
         let join = |v: &[Span]| v.iter().map(|s| s.text.as_str()).collect::<String>();
@@ -73,6 +85,7 @@ impl Block {
                 .collect::<Vec<_>>()
                 .join(" "),
             Block::Image { caption, .. } => caption.clone(),
+            Block::Gallery(items) => items.iter().map(|(_, c)| c.as_str()).collect::<Vec<_>>().join(" "),
             Block::Code(c) => c.clone(),
             Block::Rule => String::new(),
         }
@@ -98,7 +111,9 @@ pub fn parse_blocks(md: &str) -> Vec<Block> {
     let mut in_item = false;
     let mut quote = false;
     let mut code: Option<String> = None;
-    let mut image: Option<(String, String)> = None;
+    // Immagini del paragrafo in corso e "si sta leggendo la didascalia di un'immagine".
+    let mut images: Vec<(String, String)> = Vec::new();
+    let mut in_image = false;
     let mut table: Option<TableAcc> = None;
     let mut row: Vec<Vec<Span>> = Vec::new();
 
@@ -134,8 +149,14 @@ pub fn parse_blocks(md: &str) -> Vec<Block> {
                         text: " ".into(),
                         ..Default::default()
                     });
-                } else if let Some((src, caption)) = image.take() {
-                    out.push(Block::Image { src, caption });
+                } else if !images.is_empty() {
+                    let mut imgs = std::mem::take(&mut images);
+                    out.push(if imgs.len() == 1 {
+                        let (src, caption) = imgs.remove(0);
+                        Block::Image { src, caption }
+                    } else {
+                        Block::Gallery(imgs)
+                    });
                     spans.clear();
                 } else if !spans.is_empty() {
                     let s = std::mem::take(&mut spans);
@@ -169,8 +190,11 @@ pub fn parse_blocks(md: &str) -> Vec<Block> {
             Event::End(TagEnd::Emphasis) => style.italic = style.italic.saturating_sub(1),
             Event::Start(Tag::Link { dest_url, .. }) => style.link = Some(dest_url.to_string()),
             Event::End(TagEnd::Link) => style.link = None,
-            Event::Start(Tag::Image { dest_url, .. }) => image = Some((dest_url.to_string(), String::new())),
-            Event::End(TagEnd::Image) => {}
+            Event::Start(Tag::Image { dest_url, .. }) => {
+                images.push((dest_url.to_string(), String::new()));
+                in_image = true;
+            }
+            Event::End(TagEnd::Image) => in_image = false,
             Event::Start(Tag::Table(_)) => table = Some((Vec::new(), Vec::new(), true)),
             Event::End(TagEnd::Table) => {
                 if let Some((header, rows, _)) = table.take() {
@@ -194,8 +218,10 @@ pub fn parse_blocks(md: &str) -> Vec<Block> {
             Event::Text(t) => {
                 if let Some(c) = &mut code {
                     c.push_str(&t);
-                } else if let Some((_, caption)) = &mut image {
-                    caption.push_str(&t);
+                } else if in_image {
+                    if let Some((_, caption)) = images.last_mut() {
+                        caption.push_str(&t);
+                    }
                 } else {
                     push_text(&mut spans, &style, &t, false);
                 }
@@ -235,5 +261,20 @@ mod tests {
         assert_eq!(items.len(), 2);
         let Block::Table { header, rows } = &b[4] else { panic!("{b:?}") };
         assert_eq!((header.len(), rows.len()), (2, 1));
+    }
+
+    #[test]
+    fn images_on_one_line_make_a_gallery() {
+        let b = parse_blocks("![Basso](img/a.png) ![Medio](img/b.png)\n![Alto](img/c.png)\n\n![Sola](img/d.png)\n");
+        assert_eq!(
+            b[0],
+            Block::Gallery(vec![
+                ("img/a.png".into(), "Basso".into()),
+                ("img/b.png".into(), "Medio".into()),
+                ("img/c.png".into(), "Alto".into()),
+            ])
+        );
+        assert_eq!(b[0].image_sources(), ["img/a.png", "img/b.png", "img/c.png"]);
+        assert!(matches!(&b[1], Block::Image { caption, .. } if caption == "Sola"));
     }
 }

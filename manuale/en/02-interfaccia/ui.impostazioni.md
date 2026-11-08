@@ -1,0 +1,27 @@
+---
+id: ui.impostazioni
+titolo: Settings
+parole: settings, preferences, options, language, library folder, paths, new projects, status bar
+ui: edit.preferences, edit.reset_preferences
+correlate: ui.finestra, mat.pannello, render.pannello
+---
+# Settings
+
+**Where:** **Edit → Settings…**. **Edit → Restore default settings** brings every setting back
+to its initial value.
+
+The settings belong to the program, not to the project: they stay the same whatever you open.
+
+| Section | What it holds |
+|---|---|
+| Language | Language of the whole interface (Italian, English, or a `lang/Lan_*.json` file added next to the program). It switches immediately. The manual follows it. |
+| Library and import | Resolution of the downloads, proposed site (ambientCG or Poly Haven), what to do with the height map when importing (**Off (recommended)**; a proposed value of 3 % of the texture side; or the value of the source's MaterialX file), quality, samples and object size of the material previews, **Clear preview cache** |
+| Paths | Library folder (HDRI, materials, textures). The environment variable `FORGE_LIBRARY_DIR` takes precedence. |
+| Rendering | Values for **new** projects: device, samples per pixel (0 = no limit), CPU threads (0 = automatic), automatic restart. Saved projects keep their own. |
+| Status bar | Which counters to show at the bottom (up to 9). |
+| Information | Version, **Show at startup** for the welcome screen, **Ask for the mode at startup** (Simple or Advanced). |
+
+## Where files go
+
+What you save or export goes by default into the `Rendering` folder next to the program, or into
+`Documents\ForgeRender` if the program folder cannot be written.

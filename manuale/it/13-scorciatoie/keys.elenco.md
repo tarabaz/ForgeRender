@@ -3,7 +3,7 @@ id: keys.elenco
 titolo: Scorciatoie da tastiera
 parole: tasti, tastiera, scorciatoie, shortcut, combinazioni
 ui: help.shortcuts
-correlate: intro.benvenuto
+correlate: intro.benvenuto, ui.viewport, anim.timeline
 ---
 # Scorciatoie da tastiera
 
@@ -42,6 +42,7 @@ apre da **Guida → Scorciatoie da tastiera**.
 | 5 | Prospettica / ortografica |
 | Q, W, E, R | Seleziona, Sposta, Ruota, Scala |
 | F5 | Avvia, metti in pausa o riprendi il render |
+| F1 | Apre il manuale alla pagina del controllo sotto il mouse |
 
 ## Mouse nella viewport
 
@@ -53,3 +54,11 @@ apre da **Guida → Scorciatoie da tastiera**.
 | Alt + trascina | Sposta la selezione invece della camera |
 | Ctrl mentre trascini il gizmo | Snap a passi fissi |
 | Esc | Annulla il trascinamento in corso; altrimenti deseleziona tutto |
+
+## Timeline
+
+| Tasti | Comando |
+|---|---|
+| Canc | Elimina le chiavi selezionate |
+| Ctrl+C, Ctrl+V | Copia le chiavi selezionate e le incolla al cursore del tempo |
+| F9 | Rallenta in entrata e in uscita (ease in e out) sulle chiavi selezionate |

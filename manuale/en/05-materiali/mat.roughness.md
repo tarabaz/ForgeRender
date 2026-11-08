@@ -3,7 +3,7 @@ id: mat.roughness
 titolo: Roughness
 parole: rough, glossy, matte, satin, reflection, surface
 ui: panel.materials.roughness
-correlate: mat.ior
+correlate: mat.metallic, mat.specular, mat.ior
 ---
 # Roughness
 
@@ -12,6 +12,10 @@ correlate: mat.ior
 **What it does:** sets how smooth or rough the surface is at a microscopic level. A smooth
 surface reflects a sharp image, like a mirror; a rough one scatters light and the reflection
 becomes soft, until it disappears.
+
+![Roughness 0.05: polished, sharp reflections](img/comune/mat_roughness_005.png) ![Roughness 0.3: satin, blurred reflections](img/comune/mat_roughness_030.png) ![Roughness 0.7: matte, the reflection is almost gone](img/comune/mat_roughness_070.png)
+
+*Gold metal (Metallic 1) with roughness 0.05, 0.3 and 0.7.*
 
 | Value | Look | Examples |
 |---|---|---|

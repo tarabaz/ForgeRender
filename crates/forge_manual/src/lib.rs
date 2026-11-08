@@ -23,7 +23,8 @@
 //! ```
 //!
 //! Le immagini si scrivono `![didascalia](img/comune/roughness.jpg)` (percorso dalla cartella
-//! `manuale/`), i collegamenti interni `[IOR](mat.ior)`.
+//! `manuale/`); più immagini sulla stessa riga (stesso paragrafo) diventano un confronto
+//! affiancato. I collegamenti interni si scrivono `[IOR](mat.ior)`.
 
 mod markdown;
 mod search;
@@ -172,7 +173,7 @@ impl Manual {
                         out.push(format!("[{}] {}: collegamento a {target}, che non esiste", self.lang, p.id));
                     }
                 });
-                if let Block::Image { src, .. } = &b {
+                for src in b.image_sources() {
                     if !self.image_path(src).is_file() {
                         out.push(format!("[{}] {}: immagine mancante {src}", self.lang, p.id));
                     }
@@ -345,10 +346,54 @@ mod repo_tests {
             ("en", "matte", "mat.roughness"),
             ("en", "refraction", "mat.ior"),
             ("en", "shortcuts", "keys.elenco"),
+            ("it", "campioni", "render.campioni"),
+            ("it", "diaframma", "cam.dof"),
+            ("it", "kelvin", "light.colore"),
+            ("it", "caustiche", "render.caustiche"),
+            ("en", "focal length", "cam.obiettivo"),
+            ("en", "exposure", "render.esposizione"),
+            ("en", "bounces", "render.rimbalzi"),
+            ("en", "metalness", "mat.metallic"),
         ] {
             let m = super::Manual::load(&root, lang).unwrap();
             let first = m.search(q).first().map(|h| h.id.clone());
             assert_eq!(first.as_deref(), Some(want), "{lang}: \"{q}\"");
         }
+    }
+
+    /// Le immagini di confronto (`img/comune/`) sono tutte usate da qualche pagina e la copia in
+    /// `docs/manual/renders/` è identica, file per file.
+    #[test]
+    fn comparison_images_are_used_and_mirrored_in_docs() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../manuale");
+        let docs = root.join("../docs/manual/renders");
+        let mut used = std::collections::BTreeSet::new();
+        for lang in super::languages(&root) {
+            let m = super::Manual::load(&root, &lang).unwrap();
+            for p in m.pages.values() {
+                for b in super::parse_blocks(&p.body) {
+                    used.extend(b.image_sources().into_iter().map(str::to_string));
+                }
+            }
+        }
+        let mut names: Vec<String> = std::fs::read_dir(root.join("img/comune"))
+            .unwrap()
+            .flatten()
+            .filter_map(|e| e.file_name().to_str().map(str::to_string))
+            .filter(|n| n.ends_with(".png"))
+            .collect();
+        names.sort();
+        assert!(names.len() >= 40, "{names:?}");
+        for n in &names {
+            assert!(
+                used.contains(&format!("img/comune/{n}")),
+                "immagine non usata da nessuna pagina: {n}"
+            );
+            let a = std::fs::read(root.join("img/comune").join(n)).unwrap();
+            let b = std::fs::read(docs.join(n)).unwrap_or_default();
+            assert!(a == b, "docs/manual/renders/{n} manca o è diversa da manuale/img/comune/{n}");
+        }
+        let in_docs = std::fs::read_dir(&docs).unwrap().flatten().count();
+        assert_eq!(in_docs, names.len(), "docs/manual/renders ha file in più");
     }
 }

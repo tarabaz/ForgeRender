@@ -18,6 +18,12 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
+### What's new in 0.49.0
+
+- **A real manual inside the program:** Help → Manual (F1) now explains every panel and setting, in English and Italian, in 33 pages and 12 chapters, with search and F1 on the controls.
+- **See what a slider really does:** the main render, material, light, environment, camera and effect settings show the same scene rendered with the value low, medium and high, side by side.
+- **Renders made by ForgeRender itself:** 56 comparison images computed with the program's own renderer, also kept in `docs/manual/renders/`.
+
 ### What's new in 0.48.0
 
 - **Exports that keep going in the background:** minimize ForgeRender and frames, encoding and the final file carry on, and the PC does not go to sleep meanwhile.
@@ -330,6 +336,15 @@ A professional timeline, always available: it sits at the bottom with **Timeline
 - **Time remaining:** the status bar counts frames and estimates what is left for rendering and then for encoding, starting only when there is real data.
 - **Object opacity:** a property of its own, rendered by letting each ray through with probability 1 − opacity, so the object fades with its shadow, the same on CPU and GPU.
 
+### 17. Built-in manual with comparison images
+
+**Help → Manual** (or **F1** over any control) opens a manual that lives inside the program and works offline: chapters on the left, the page in the middle, search at the top, Back / Forward and a language switch. It follows the language of the interface.
+
+- **Every panel and setting:** introduction and first render, Simple mode, the window and the viewport, settings, import, objects and projects, lights, materials, environment, effects, camera, rendering, saving images, timeline and video, AI control and keyboard shortcuts: 33 pages in English and Italian, with ranges and defaults taken from the program.
+- **Comparison images:** for the settings that matter most, the same scene is rendered with the slider low, medium and high and shown side by side: samples and noise threshold, denoiser, bounces, exposure and tone mapping, caustics, render styles, roughness, metallic, specular, IOR and transmission, light size and color temperature, environment intensity, focal length, aperture and haze density. Hover over an image to see it full size.
+- **Made with ForgeRender:** the 56 images (640 × 480, at least 256 samples, except the comparisons of the number of samples and of the noise threshold) are rendered by the program's own path tracer on the test scene and the material preview ball. `tools/manuale/render_confronti.js` renders them again; a copy is in [docs/manual/renders/](docs/manual/renders), named after setting, slider and value (for example `render_samples_064.png`).
+- **Checked by the tests:** every page exists in both languages, links and images are valid, every image is used, and the search finds the right page for everyday words.
+
 ## What it does today
 
 - **Simple / Advanced interface** (switch at the top, Simple by default): "Product photo in
@@ -427,6 +442,7 @@ A professional timeline, always available: it sits at the bottom with **Timeline
 - **STEP import window**: tessellation settings, 3D preview, repeatable conversion, stop.
 - **Video export**: MP4, MOV, MKV and AVI with H.264, H.265, ProRes, FFV1 or uncompressed, presets, size estimate and the real parameters at the end.
 - **Reliable long exports**: they keep going minimized or covered, block automatic sleep, can leave the PC usable and resume from the finished frames.
+- **Built-in manual**: Help → Manual or F1 on a control, 33 pages in English and Italian covering every panel, with comparison images rendered by ForgeRender for the main sliders (low, medium, high).
 - **Configurable status bar**: up to 9 counters out of 15 (viewport FPS, frames, time remaining, GPU, VRAM, RAM and more), Backend and processor fixed on the right.
 - **Light targets in the viewport**: Spot and Directional aimed by dragging their target, with undo.
 - `.frproject` projects (versioned JSON, atomic save, relative paths).
@@ -649,6 +665,7 @@ Then add a row to the index in `reports/README.md`.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architecture, technical choices and known limitations (English; [Italian](docs/ARCHITECTURE.it.md))
 - [docs/BENCHMARK.md](docs/BENCHMARK.md) — measured performance results (Italian version currently available at [docs/BENCHMARK.md](docs/BENCHMARK.it.md))
 - [docs/STATO_LAVORI.md](docs/STATO_LAVORI.md) — development log (Italian)
+- [docs/manual/renders/](docs/manual/renders) — the comparison renders of the built-in manual (setting_slider_value.png)
 
 ## License and contributions
 

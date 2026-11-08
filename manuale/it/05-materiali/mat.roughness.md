@@ -3,7 +3,7 @@ id: mat.roughness
 titolo: Roughness (rugosità)
 parole: rugosità, lucido, opaco, satinato, riflesso, superficie
 ui: panel.materials.roughness
-correlate: mat.ior
+correlate: mat.metallic, mat.specular, mat.ior
 ---
 # Roughness (rugosità)
 
@@ -12,6 +12,10 @@ correlate: mat.ior
 **A cosa serve:** dice quanto è liscia o ruvida la superficie, a livello microscopico. Una
 superficie liscia riflette un'immagine nitida, come uno specchio; una ruvida sparge la luce e
 il riflesso diventa morbido, fino a sparire.
+
+![Roughness 0,05: lucidato, riflessi nitidi](img/comune/mat_roughness_005.png) ![Roughness 0,3: satinato, riflessi sfocati](img/comune/mat_roughness_030.png) ![Roughness 0,7: opaco, il riflesso quasi sparisce](img/comune/mat_roughness_070.png)
+
+*Oro (Metallic 1) con roughness 0,05, 0,3 e 0,7.*
 
 | Valore | Aspetto | Esempi |
 |---|---|---|

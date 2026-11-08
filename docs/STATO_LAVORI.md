@@ -856,3 +856,11 @@ Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
 
 - Sorgente del fumo senza celle libere nel raggio: `run` in `forge_volume/src/smoke_sim.rs` emetteva solo nelle celle libere con il centro entro `max(raggio, 0,75 cella)`. Con la sorgente sul pavimento e celle grosse (anteprima di un riquadro di 4 m) erano tutte solide, e anche senza oggetti una sorgente tra i centri delle celle poteva non toccarne nessuno. Ora `source_reach2` allarga il raggio fino alla cella libera più vicina, al più due celle oltre; si ricalcola quando cambiano gli oggetti in movimento. Il raggio cambia solo quando prima non usciva niente.
 - Test: `source_buried_in_the_floor_still_emits`. Non verificato nella finestra con la scena di Valerio.
+
+## 0.49.0 — 08/11/2026 (Claude)
+
+- Manuale interno completo: 33 pagine per lingua (EN e IT) in 13 capitoli, indice in `manuale/indice.json`. Intervalli e predefiniti presi dal codice di `ui/inspector.rs`, `ui/simple.rs`, `presets.rs`, `settings.rs` e dai testi di `lang/Lan_eng.json` per i nomi inglesi dei controlli. F1 in modalità Semplice apre `intro.semplice`; le pagine dichiarano in `ui:` gli id delle schede (`panel.*`) e dei comandi (`commands.rs`).
+- Immagini di confronto: 56 PNG 640×480 in `manuale/img/comune/`, copia identica in `docs/manual/renders/` (git le salva una volta sola). Le fa `tools/manuale/render_confronti.js` con `forgerender-cli --patch` sulla scena di prova e su `assets/anteprima/anteprima.frproject` (materiale `ceramica` modificato), GPU, seed 7, almeno 256 campioni tranne i confronti su campioni e soglia di rumore. Circa 1 s l'una sulla RTX 5070, le caustiche 25 s.
+- `forge_manual`: `Block::Gallery` (più immagini nello stesso paragrafo) e `Block::image_sources`; nell'app le gallerie vanno in fila (almeno ~180 px l'una) e un'immagine rimpicciolita si vede grande col mouse sopra (`picture` in `ui/manual.rs`).
+- Test nuovi: `images_on_one_line_make_a_gallery`, `comparison_images_are_used_and_mirrored_in_docs`, 8 casi di ricerca in più. fmt, clippy (-D warnings) e test del workspace: 408 passati, 0 falliti, 10 ignorati.
+- Da sapere: la finestra del manuale con le gallerie non l'ho vista sullo schermo (nessuno strumento per guardare il programma aperto); la verifica è dei test e della compilazione. Le immagini del capitolo 17 del README le mette Valerio.

@@ -3000,3 +3000,11 @@ Su richiesta di Valerio: tolti `StatusItem::RamProcess`, `refresh_processes` e i
 ## Sorgente del fumo sul pavimento — 07/11/2026 (Claude, 0.48.4)
 
 Corretto il caso annotato nella 0.48.3: anteprima senza punti con la sorgente sul pavimento in un riquadro grande. Causa: nessuna cella libera entro il raggio della sorgente, quindi emissione nulla. Ora la sorgente emette dalle celle libere più vicine (al più due celle oltre). Coperto da un test nella simulazione; **non provato** nella finestra.
+
+## Manuale interno completo — 08/11/2026 (Claude, 0.49.0)
+
+**Fatto:** Guida → Manuale (F1) ha 33 pagine in inglese e italiano su ogni pannello e impostazione, con 56 immagini di confronto (cursore basso, medio, alto) calcolate da ForgeRender con `forgerender-cli`. Immagini in `manuale/img/comune/` e, uguali, in `docs/manual/renders/`; si rifanno con `node tools/manuale/render_confronti.js`. Più immagini su una riga del Markdown diventano una galleria affiancata.
+
+**Provato:** test del manuale (lingue complete, collegamenti, immagini usate e copiate, ricerca), clippy e tutti i test del workspace verdi.
+
+**Non verificato:** l'aspetto della finestra del manuale con le gallerie nel programma aperto.

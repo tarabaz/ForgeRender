@@ -3,7 +3,7 @@ id: render.denoiser
 titolo: Denoiser (noise reduction)
 parole: noise, grain, grainy, clean, oidn, cuda, preview
 ui: panel.render.denoiser
-correlate: intro.benvenuto
+correlate: render.campioni, intro.benvenuto
 ---
 # Denoiser (noise reduction)
 
@@ -13,6 +13,10 @@ it is always on with the best values.
 **What it does:** a path tracer starts with a grainy (noisy) image, and the grain only goes away
 with many samples. The denoiser (Intel Open Image Denoise) cleans the image by recognizing edges,
 colors and surfaces: a few hundred samples are enough for a clean photo.
+
+![Denoiser off, 256 samples: grain in the glass and on the floor](img/comune/render_denoiser_off.png) ![Denoiser on, 256 samples: clean](img/comune/render_denoiser_on.png)
+
+*The same 256 samples without and with the denoiser (High quality, details preserved).*
 
 ## Controls
 
@@ -27,6 +31,8 @@ colors and surfaces: a few hundred samples are enough for a clean photo.
 | Preserve details (albedo and normals) | on / off | on | Uses surface colors and orientation so textures and edges are not smudged |
 | View | Final · Raw · Albedo · Normals | Final | Shows the result or the data used by the denoiser, for checking |
 
+None of these settings restarts the render: the current image is cleaned again.
+
 ## Tips
 
 - **For the final photo:** *Final image only* or *Fast preview + final* mode, High quality,
@@ -34,6 +40,8 @@ colors and surfaces: a few hundred samples are enough for a clean photo.
 - **Intensity below 100 %:** keeps a trace of natural grain; the 90 % of Simple mode avoids the
   "plastic" look on matte surfaces.
 - **Smudged textures:** check that **Preserve details** is on.
+- **Too few samples:** with very few samples the denoiser has to invent detail and the image
+  looks waxy. Give it at least 64 – 128 samples, more for glass and fog.
 
 ## Common mistakes
 
