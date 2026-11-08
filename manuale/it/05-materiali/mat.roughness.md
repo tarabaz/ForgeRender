@@ -7,7 +7,7 @@ correlate: mat.metallic, mat.specular, mat.ior
 ---
 # Roughness (rugosità)
 
-**Dove si trova:** modalità Avanzata → scheda **Materiali** → cursore **Roughness**.
+**Dove si trova:** modalità Avanzata → scheda **Selezione** (materiale del pezzo scelto) o **Scena → Materiali** → cursore **Ruvidità (roughness)**.
 
 **A cosa serve:** dice quanto è liscia o ruvida la superficie, a livello microscopico. Una
 superficie liscia riflette un'immagine nitida, come uno specchio; una ruvida sparge la luce e

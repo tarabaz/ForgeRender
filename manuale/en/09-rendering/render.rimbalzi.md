@@ -7,7 +7,8 @@ correlate: render.campioni, mat.transmission, render.caustiche
 ---
 # Bounces, Russian roulette, clamp and seed
 
-**Where:** Render tab → **Path tracing**.
+**Where:** Render tab → **Path tracing** (Max bounces); the other values are in the
+**Advanced** section just below, closed by default.
 
 ## Max bounces
 
@@ -35,7 +36,7 @@ image on average.
 - **Range:** 1 to 16. **Default:** 3.
 - Lower values = faster passes but a little more noise in indirect light.
 
-## Indirect clamp
+## Indirect light limit (clamp)
 
 Limits the brightness of the indirect light. It reduces **fireflies** (isolated very bright
 pixels, typical of small lights seen through glass or in glossy reflections), but it removes
@@ -44,7 +45,7 @@ some energy, so the image is no longer physically exact.
 - **Range:** 0 to 1000. **Default:** 0 = off (physically correct).
 - If you need it, start from high values (10 – 20) and lower them only as far as needed.
 
-## Seed
+## Random seed
 
 The starting number of the random sequence. The same scene with the same seed gives exactly the
 same image; changing it gives a different pattern of noise with the same quality. It is useful

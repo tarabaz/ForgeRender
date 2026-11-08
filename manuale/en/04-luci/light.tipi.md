@@ -7,7 +7,7 @@ correlate: light.dimensione, light.colore, env.ambiente, fx.foschia
 ---
 # Lights panel and light types
 
-**Where:** Advanced mode → **Lights** tab. The lights are listed in the Scene panel on the left:
+**Where:** Advanced mode → **Scene → Lights** (presets and new lights); a selected light shows in the **Selection** tab. The lights are listed in the Scene panel on the left:
 click one to edit it.
 
 ## Presets

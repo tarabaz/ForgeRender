@@ -10,7 +10,7 @@ correlate: render.campioni, render.denoiser, render.rimbalzi, render.esposizione
 **Where:** Advanced mode → **Render** tab; **Rendering → Render settings and denoiser…**.
 
 From top to bottom the tab holds: [render style and outlines](render.stili), the render camera,
-the device, color (RGB or spectral) and [caustics](render.caustiche), CPU threads, resolution,
+the device, color (RGB or spectral) and [caustics](render.caustiche), resolution,
 [samples per pixel](render.campioni), [path tracing](render.rimbalzi),
 [display](render.esposizione) and [noise reduction](render.denoiser).
 
@@ -19,7 +19,7 @@ the device, color (RGB or spectral) and [caustics](render.caustiche), CPU thread
 | Device | Notes |
 |---|---|
 | GPU (compute shader) | Default. The graphics card through Vulkan or DirectX 12. When the card has ray tracing units (**RT cores**) the panel says so: the rays are traced in hardware, same result, many times faster |
-| CPU (all cores) | Works on every PC. **CPU threads**: 0 = automatic (logical threads − 1, to keep the interface responsive) |
+| CPU (all cores) | Works on every PC. **CPU threads** (in **Path tracing → Advanced**): 0 = automatic (logical threads − 1, to keep the interface responsive) |
 
 If the GPU cannot be used, the panel says why and the render runs on the CPU. CPU and GPU give
 the same image.
@@ -38,7 +38,7 @@ the time for the same quality.
 | Start render / Pause / Resume | F5 | Starts, pauses or resumes the path tracing |
 | Stop | | Stops and keeps the current image |
 | Restart | | Starts again from zero samples |
-| Automatic restart | | When materials, lights or camera change, the render starts again by itself (only in the Render view) |
+| Automatic restart | | When materials, lights or camera change, the render starts again by itself (only in the Render view). The box is above the central area, on the right |
 
 Some settings do not restart the render: the number of samples, exposure, tone mapping and the
 denoiser apply to the image being computed. The others (resolution, bounces, clamp, seed,

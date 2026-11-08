@@ -7,7 +7,7 @@ correlate: mat.roughness, mat.metallic, mat.transmission, mat.texture
 ---
 # Pannello Materiali e libreria
 
-**Dove si trova:** modalità Avanzata → scheda **Materiali**; menu **Libreria**; in modalità
+**Dove si trova:** modalità Avanzata → scheda **Selezione** (il materiale del pezzo scelto) o **Scena → Materiali**; menu **Libreria**; in modalità
 Semplice **Apri la libreria materiali**.
 
 ## Assegnare i materiali

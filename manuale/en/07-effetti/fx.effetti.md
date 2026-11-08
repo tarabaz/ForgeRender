@@ -1,13 +1,13 @@
 ---
 id: fx.effetti
-titolo: Effects tab (smoke, fog, dust, fireflies, decals)
+titolo: Effects (smoke, fog, dust, fireflies, decals)
 parole: effects, smoke, fog, dry ice, haze, dust, fireflies, decal, sticker, label, logo, volumetric, plume, incense, steam
 ui: panel.effects
 correlate: fx.foschia, light.tipi, anim.timeline
 ---
-# Effects tab (smoke, fog, dust, fireflies, decals)
+# Effects (smoke, fog, dust, fireflies, decals)
 
-**Where:** Advanced mode → **Effects** tab → **Add effect**; **Scene → Effects and fog…**.
+**Where:** Advanced mode → **Scene → Effects** → **Add effect**, or the **+** of the **Effects** group in the Scene panel; a selected effect shows in the **Selection** tab; **Scene → Effects and fog…**.
 
 Volumetric effects are computed **ahead of time**, one at a time, with the progress shown in the
 status bar; then the render uses them on CPU and GPU. Each effect has a box (or an emitter) you

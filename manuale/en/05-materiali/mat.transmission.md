@@ -7,7 +7,7 @@ correlate: mat.ior, render.caustiche, mat.roughness
 ---
 # Transmission (glass and liquids)
 
-**Where:** Advanced mode → **Materials** tab → **Transmission** slider.
+**Where:** Advanced mode → **Selection** tab (material of the selected part) or **Scene → Materials** → **Transmission** slider.
 
 **What it does:** makes the material transparent like glass or a liquid: light goes through it
 and bends according to the [IOR](mat.ior). At 0 the material is opaque, at 1 it is fully

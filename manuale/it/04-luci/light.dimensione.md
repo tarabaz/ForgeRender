@@ -7,7 +7,7 @@ correlate: light.tipi, light.colore
 ---
 # Dimensione della luce e ombre morbide
 
-**Dove si trova:** scheda Luci → una luce **Area** → **Larghezza (m)** e **Altezza (m)**.
+**Dove si trova:** scegli una luce **Area** (scheda **Selezione**, o **Scena → Luci**) → **Larghezza (m)** e **Altezza (m)**.
 
 **A cosa serve:** la grandezza della luce vista dall'oggetto decide quanto sono morbide le ombre.
 Una luce piccola dà ombre nette e riflessi piccoli e brillanti; una luce grande avvolge

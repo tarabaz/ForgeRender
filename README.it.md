@@ -18,6 +18,12 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
+### Novità della versione 0.50.0
+
+- **Una finestra più ordinata:** in alto due righe invece di quattro. Menu a sinistra, selettore Semplice / Avanzata e Impostazioni a destra; Avvia render, Stop, Riavvia ed Esporta sempre nello stesso punto; linguette Viewport | Render subito sopra la vista.
+- **Il pannello segue quello che clicchi:** il pannello di destra ha tre schede. **Selezione** mostra ciò che hai scelto (un oggetto con il suo materiale, una luce, una camera o un effetto), **Scena** raccoglie luci, ambiente, effetti, camera e materiali, **Render** le impostazioni del calcolo, con i valori da tecnico in una sezione **Avanzate** chiusa.
+- **Un solo albero della scena e più spazio per l'immagine:** oggetti, luci, camere ed effetti in un unico elenco a sinistra; la timeline resta ridotta a una riga finché non c'è un'animazione; testi piccoli più grandi e leggibili e arancione tenuto per Avvia render e per ciò che è selezionato.
+
 ### Novità della versione 0.49.0
 
 - **Un vero manuale dentro il programma:** Guida → Manuale (F1) ora spiega ogni pannello e impostazione, in inglese e in italiano, in 33 pagine e 12 capitoli, con ricerca e F1 sui controlli.
@@ -271,7 +277,7 @@ Materiali diffusi, metalli e plastiche GGX, vetro Fresnel, vetro satinato ed emi
 - **Pacchetto aggiuntivo:** altri 109 materiali con mappe a 2K (legni e cortecce, pietre e intonaci, tessuti, metalli arrugginiti e consumati, asfalti, tetti), circa 1,6 GB, da scaricare a parte e copiare come `materiali-aggiuntivi` accanto a `forgerender.exe`: al riavvio compaiono nella stessa libreria.
 - **Liberi da ridistribuire:** i materiali con texture vengono da Poly Haven e ambientCG (CC0); la fonte di ogni materiale è in `assets/materiali/LEGGIMI.md`.
 - **Anteprime nitide:** ogni anteprima dei materiali si renderizza una volta con il path tracer a 512 px e si rimpicciolisce per ogni grandezza delle schede, così resta nitida sia grande sia piccola.
-- **Sostituisci materiale:** nel pannello Materiali scegli "Sostituisci [materiale] con «selezionato»" (oppure clic destro su un materiale della scena): tutti i componenti con quel materiale, anche quelli che lo ereditano e il predefinito della scena, passano a quello selezionato, senza dover selezionare cento oggetti. "Annulla sostituzione" rimette le assegnazioni di prima.
+- **Sostituisci materiale:** in **Gestione materiali** (sotto il materiale della selezione, oppure Scena → Materiali) scegli "Sostituisci [materiale] con «selezionato»" (oppure clic destro su un materiale della scena): tutti i componenti con quel materiale, anche quelli che lo ereditano e il predefinito della scena, passano a quello selezionato, senza dover selezionare cento oggetti. "Annulla sostituzione" rimette le assegnazioni di prima.
 - **Selettore colore:** cliccando il campione di un colore del materiale (colore base, colore in volume, emissione) si apre un solo pannello con tre schede: **RGB** (ruota dei colori, R, G, B e codice esadecimale), **CMYK** (ciano, magenta, giallo e nero in percentuale, con una conversione matematica semplice, non un profilo di stampa) e **Palette** (colori con codice e nome). Il colore cambia subito; **Applica** lo tiene, **Annulla** (o Esc) rimette quello di prima. La scheda palette comprende i codici RAL Classic con nome italiano e inglese e valori RGB **indicativi** (media di fonti pubbliche, non i valori ufficiali RAL, che RAL vende come libreria digitale); in più puoi importare la libreria ufficiale RAL CLASSIC `.ase` o una tua palette `.json`/`.csv` nella cartella Colori della libreria. Un colore preso da una palette mostra il suo codice (per esempio **RAL 7016**) accanto al campione, salvato con il progetto; cambiando il colore a mano torna un normale colore RGB.
 
 ### 10. Studio fotografico e illuminazione
@@ -298,7 +304,7 @@ Per la nebbia che riempie la scena vedi [Foschia d'ambiente](#5-foschia-dambient
 
 Le camere di rendering offrono focale, diaframma, profondità di campo e decentramento. Le viste automatiche frontale, posteriore, laterali, superiore e a tre quarti aiutano a presentare un prodotto da più angolazioni; è possibile esportare video turntable in MP4.
 
-- **Camere come componenti:** le camere di rendering sono elencate nel pannello di sinistra, subito sopra le luci. Selezionandone una compare nella viewport una linea fino al suo bersaglio (un rombo): il gizmo sposta insieme camera e bersaglio, fa girare la camera attorno al bersaglio (Ruota) oppure, dopo un clic sul rombo, sposta solo il bersaglio. Il bersaglio può seguire un oggetto, come per le spot, così l'oggetto resta al centro anche quando lo sposti.
+- **Camere come componenti:** le camere di rendering sono elencate nel gruppo **Camere** del pannello di sinistra. Selezionandone una compare nella viewport una linea fino al suo bersaglio (un rombo): il gizmo sposta insieme camera e bersaglio, fa girare la camera attorno al bersaglio (Ruota) oppure, dopo un clic sul rombo, sposta solo il bersaglio. Il bersaglio può seguire un oggetto, come per le spot, così l'oggetto resta al centro anche quando lo sposti.
 - **Tilt-shift:** una fascia nitida sull'immagine finale (posizione, larghezza e angolo: orizzontale, verticale o inclinata) con la sfocatura che cresce ai lati, ogni lato con la sua transizione, da un passaggio netto a una sfumatura molto ampia. È separato dalla profondità di campo: diaframma, focale e messa a fuoco non cambiano, e con tutte e due accese la fascia si aggiunge alla sfocatura della lente. La sfocatura rispetta la profondità (un oggetto vicino e nitido non sbava sullo sfondo sfocato) ed è continua anche molto forte (si raccoglie da copie dell'immagine via via ridotte, così i riflessi luminosi diventano una sfumatura morbida invece di copie ripetute), è uguale su CPU e GPU, e spostare la fascia si vede subito, senza rifare il render.
 
 ### 13. Render pass e workflow di post-produzione
@@ -331,7 +337,7 @@ Un file STEP si converte in mesh una volta sola. Il risultato resta in una cache
 
 ### 16. Timeline — animazione di oggetti, luci, camera ed effetti
 
-Una timeline professionale, sempre disponibile: sta in basso con le schede **Timeline | Console**, oppure in una finestra a parte con "Stacca dal programma", da spostare su un altro schermo.
+Una timeline professionale, sempre disponibile: sta in basso con le schede **Timeline | Console** (ridotte a una riga finché non c'è un'animazione), oppure in una finestra a parte con "Stacca dal programma", da spostare su un altro schermo.
 
 ![Timeline di animazione di ForgeRender](docs/img/features/timeline-animation.jpg)
 
@@ -356,19 +362,30 @@ Una timeline professionale, sempre disponibile: sta in basso con le schede **Tim
 - **Fatte con ForgeRender:** le 56 immagini (640 × 480, almeno 256 campioni, tranne i confronti sul numero di campioni e sulla soglia di rumore) le calcola il path tracer del programma sulla scena di prova e sulla sfera delle anteprime dei materiali. `tools/manuale/render_confronti.js` le rifà; una copia è in [docs/manual/renders/](docs/manual/renders), con il nome che dice impostazione, cursore e valore (per esempio `render_samples_064.png`).
 - **Controllato dai test:** ogni pagina esiste nelle due lingue, collegamenti e immagini sono validi, ogni immagine è usata e la ricerca trova la pagina giusta anche con le parole di tutti i giorni.
 
+### 18. Un'interfaccia chiara e ordinata
+
+La finestra è disposta in modo che si sappia sempre dove guardare e cosa fare dopo.
+
+- **Due righe in alto:** i menu, con a destra il selettore **Semplice / Avanzata** e l'ingranaggio delle **Impostazioni**; sotto, file e aggiunte a sinistra e **Avvia render**, Stop, Riavvia, Esporta e AI MCP a destra. La lingua si sceglie in Impostazioni → Lingua.
+- **Un solo albero della scena:** a sinistra gli oggetti del modello e, sotto, i gruppi **Luci**, **Camere** ed **Effetti**, che si aprono e si chiudono e hanno un **+** per aggiungerne uno. Ciò che è selezionato è evidenziato in arancione.
+- **Un pannello che segue la selezione:** in modalità Avanzata il pannello di destra ha tre schede. **Selezione** mostra ciò che hai cliccato nella viewport o nell'albero: un oggetto con posizione, misure e materiale, oppure una luce, una camera o un effetto con le sue proprietà. **Scena** raccoglie ciò che vale per tutta la scena in sotto-schede (Luci, Ambiente, Effetti, Camera, Materiali). **Render** contiene le impostazioni del calcolo; roulette russa, limite della luce indiretta, seme casuale e thread della CPU sono in una sezione **Avanzate** chiusa.
+- **Più spazio per la vista:** **Viewport | Render** e **Riavvio automatico** stanno subito sopra l'area centrale; timeline e console restano ridotte a una riga finché non c'è un'animazione (**Riduci** le richiude).
+- **Più facile da leggere:** i testi piccoli sono più grandi e più chiari, le impostazioni dei materiali hanno nomi italiani con il termine tecnico tra parentesi, e l'arancione resta per Avvia render, l'avanzamento del render e ciò che è selezionato.
+
 ## Cosa fa oggi
 
-- **Interfaccia Semplice / Avanzata** (selettore in alto, predefinita Semplice): "Foto prodotto in
+- **Interfaccia Semplice / Avanzata** (selettore in alto a destra, predefinita Semplice): "Foto prodotto in
   5 passi" con pulsanti grandi (importa, appoggia sulla base, inquadra, aspetto, materiali,
   formato 16:9 / 1:1 / 4:5 / 9:16, qualità Bozza / Bilanciata / Alta, render e salvataggio).
-  La Avanzata ha tutti i controlli; le due modalità modificano gli stessi valori.
+  La Avanzata ha tutti i controlli in tre schede, Selezione, Scena e Render, accanto a un solo
+  albero della scena; le due modalità modificano gli stessi valori.
 - **Studio fotografico**: scena di partenza con fondale in tela inclinato e quattro luci da
   studio; colore delle luci (calda 3200 K, neutra 5500 K, fredda 7500 K o per singola luce).
   Altri aspetti: Sfondo chiaro, Sfondo scuro, Studio scenografico. **Prepara scena prodotto** e
   **Adatta la scena al prodotto** ridimensionano fondale e luci sulle misure del prodotto;
   **Annulla preset** riporta la scena com'era. Luci e oggetti nuovi nascono vicino al prodotto.
-- **Lingue**: italiano e inglese, cambio immediato di tutta l'interfaccia (in alto o in
-  Impostazioni → Lingua). Le traduzioni sono file separati `lang/Lan_*.json`: se ne aggiungono
+- **Lingue**: italiano e inglese, cambio immediato di tutta l'interfaccia (in
+  Impostazioni → Lingua, l'ingranaggio in alto a destra). Le traduzioni sono file separati `lang/Lan_*.json`: se ne aggiungono
   altri copiando `Lan_eng.json`.
 - **Controllo IA (MCP)**: comanda ForgeRender in linguaggio naturale tramite Claude Code o Claude Desktop, con il ponte `forgerender-mcp.exe` e l'interruttore "AI MCP" nella barra (ON/OFF, con l'ingranaggio per le impostazioni dell'integrazione AI). Consulta la [guida di configurazione MCP](docs/MCP.md) per installazione, esempi, strumenti disponibili e sicurezza.
 - **Schermata di benvenuto** all'avvio con immagine (`assets/splash.png`), versione e commit;

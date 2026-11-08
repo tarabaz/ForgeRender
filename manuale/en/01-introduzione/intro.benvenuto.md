@@ -42,12 +42,12 @@ graphics card (GPU) or on the processor (CPU).
 
 ## Simple or Advanced
 
-Choose the mode at the top left:
+Choose the mode at the top right:
 
 - **Simple**: a guided panel in 5 steps (product, look, materials, format and quality, render).
   The technical settings are already tuned for a good result. See [Simple mode](intro.semplice).
-- **Advanced**: every control, in the Object, Materials, Lights, Environment, Effects, Camera
-  and Render tabs.
+- **Advanced**: every control, in the Selection (what you picked), Scene (lights, environment,
+  effects, camera, materials) and Render tabs.
 
 The values are the same in both modes: you can prepare the scene in Simple and refine it in
 Advanced.

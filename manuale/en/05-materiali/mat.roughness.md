@@ -7,7 +7,7 @@ correlate: mat.metallic, mat.specular, mat.ior
 ---
 # Roughness
 
-**Where:** Advanced mode → **Materials** tab → **Roughness** slider.
+**Where:** Advanced mode → **Selection** tab (material of the selected part) or **Scene → Materials** → **Roughness** slider.
 
 **What it does:** sets how smooth or rough the surface is at a microscopic level. A smooth
 surface reflects a sharp image, like a mirror; a rough one scatters light and the reflection

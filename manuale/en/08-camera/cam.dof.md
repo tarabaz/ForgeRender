@@ -7,7 +7,7 @@ correlate: cam.obiettivo, cam.tiltshift
 ---
 # Depth of field, aperture and focus
 
-**Where:** Camera tab → **Depth of field: on**.
+**Where:** **Scene → Camera** → **Depth of field: on**.
 
 **What it does:** a real optical blur (thin lens): sharp on the focus plane, blurred in front of
 it and behind it. It detaches the product from the background, as in a real photo.

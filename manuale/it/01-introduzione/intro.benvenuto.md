@@ -42,13 +42,13 @@ vero. Lavora sulla scheda video (GPU) o sul processore (CPU).
 
 ## Semplice o Avanzata
 
-Scegli la modalità in alto a sinistra:
+Scegli la modalità in alto a destra:
 
 - **Semplice**: un pannello guidato in 5 passi (prodotto, aspetto, materiali, formato e qualità,
   render). Le impostazioni tecniche sono già regolate per un buon risultato. Vedi
   [Modalità Semplice](intro.semplice).
-- **Avanzata**: tutti i controlli, nelle schede Oggetto, Materiali, Luci, Ambiente, Effetti,
-  Camera e Render.
+- **Avanzata**: tutti i controlli, nelle schede Selezione (ciò che hai scelto), Scena (luci,
+  ambiente, effetti, camera, materiali) e Render.
 
 I valori sono gli stessi nelle due modalità: puoi preparare la scena in Semplice e rifinirla in
 Avanzata.

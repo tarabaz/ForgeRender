@@ -7,7 +7,7 @@ correlate: mat.ior, mat.roughness, mat.metallic
 ---
 # Specular (forza del riflesso)
 
-**Dove si trova:** modalità Avanzata → scheda **Materiali** → cursore **Specular**.
+**Dove si trova:** modalità Avanzata → scheda **Selezione** (materiale del pezzo scelto) o **Scena → Materiali** → cursore **Riflesso (specular)**.
 
 **A cosa serve:** regola quanto è forte il riflesso di una superficie **non metallica**. A 0,5 il
 riflesso è quello fisico che deriva dall'[IOR](mat.ior); valori più bassi lo indeboliscono,

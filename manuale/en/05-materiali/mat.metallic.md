@@ -7,7 +7,7 @@ correlate: mat.roughness, mat.specular, mat.pannello
 ---
 # Metallic
 
-**Where:** Advanced mode → **Materials** tab → **Metallic** slider.
+**Where:** Advanced mode → **Selection** tab (material of the selected part) or **Scene → Materials** → **Metallic** slider.
 
 **What it does:** tells whether the surface is a metal or not. A non-metal (plastic, paint,
 wood) shows its color in the diffuse light and has white, fairly weak reflections; a metal has

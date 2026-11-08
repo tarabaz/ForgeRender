@@ -13,6 +13,16 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.50.0 — 8 nov 2026
+
+- **Due righe in alto:** il selettore Semplice / Avanzata e un ingranaggio per le Impostazioni sono a destra nella barra dei menu; il selettore della lingua non è più in alto (sta in Impostazioni → Lingua). Nella barra degli strumenti Avvia render, Stop, Riavvia ed Esporta stanno a destra accanto ad AI MCP; le linguette Viewport | Render e Riavvio automatico sono subito sopra l'area centrale.
+- **Pannello di destra in tre schede:** **Selezione** mostra ciò che è scelto nella viewport o nell'albero (un oggetto con posizione, misure e materiale, oppure una luce, una camera o un effetto); **Scena** raccoglie Luci, Ambiente, Effetti, Camera e Materiali come sotto-schede; **Render** tiene le impostazioni del calcolo, con roulette russa, limite della luce indiretta, seme casuale e thread della CPU in una sezione **Avanzate** chiusa. Un clic su qualunque cosa nella scena apre Selezione.
+- **Un solo albero della scena:** gli oggetti, poi i gruppi Luci, Camere ed Effetti (nebbie, fumi, polvere, foschia, lucciole, adesivi), ognuno apribile e chiudibile, con un + per aggiungerne uno.
+- **Materiali:** le proprietà del materiale vengono subito dopo i materiali della scena e i pulsanti di assegnazione; sostituisci, assegna per nome, materiale predefinito, nuovo, duplica, elimina e salva nella libreria sono nella sezione **Gestione materiali**, chiusa. I cursori hanno nomi italiani con il termine tecnico tra parentesi.
+- **Parte bassa:** timeline e console restano ridotte a una riga finché la timeline non ha qualcosa; **Riduci** le richiude. Backend e processore occupano una riga sola.
+- **Leggibilità:** testo piccolo da 9 a 12 punti, testi e note più chiari; arancione solo per Avvia render, l'avanzamento del render e ciò che è selezionato nella scena; la guida ai tasti del gizmo è in una sezione chiusa. L'avviso del denoiser mancante ha un pulsante che apre la pagina del manuale con il rimedio.
+- **Manuale:** le pagine su finestra, materiali, luci, ambiente, effetti, camera e rendering descrivono le schede nuove (inglese e italiano).
+
 ## 0.49.0 — 8 nov 2026
 
 - **Il manuale interno è completo:** Guida → Manuale (F1) ha ora 33 pagine in 12 capitoli, in inglese e in italiano: introduzione e primo render, modalità Semplice, finestra, viewport e impostazioni, importazione, scheda Oggetto e progetti, luci, materiali, ambiente, effetti, camera, rendering, salvataggio delle immagini, viste e turntable, timeline e video, controllo con l'IA e scorciatoie da tastiera. Ogni pagina dice dove sta il controllo, a cosa serve, intervallo e valore predefinito (presi dal codice del programma) e gli errori comuni. F1 sopra una scheda apre la pagina di quella scheda; in modalità Semplice apre la pagina della modalità Semplice.

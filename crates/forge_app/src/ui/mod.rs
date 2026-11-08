@@ -86,12 +86,19 @@ impl eframe::App for ForgeApp {
         // Limite d'altezza anche per quella salvata: in una finestra piccola il pannello non deve
         // coprire la viewport e l'albero.
         let tall = (ui.available_height() * 0.6).max(120.0);
-        egui::Panel::bottom("status-timeline")
-            .resizable(true)
-            .default_size(320.0_f32.min(tall))
-            .min_size(70.0)
-            .max_size(tall)
-            .show(ui, |ui| status::show(self, ui));
+        if status::bottom_open(self) {
+            egui::Panel::bottom("status-timeline")
+                .resizable(true)
+                .default_size(320.0_f32.min(tall))
+                .min_size(70.0)
+                .max_size(tall)
+                .show(ui, |ui| status::show(self, ui));
+        } else {
+            // Ridotta: stato del render e una riga per aprire timeline o console.
+            egui::Panel::bottom("status-compact")
+                .resizable(false)
+                .show(ui, |ui| status::show(self, ui));
+        }
         // Limiti di larghezza: un contenuto largo (es. molte miniature) non può più far
         // crescere un pannello fino a coprire la viewport; vale anche per le larghezze
         // salvate dalle sessioni precedenti.

@@ -7,7 +7,7 @@ correlate: light.dimensione, light.colore, env.ambiente, fx.foschia
 ---
 # Pannello Luci e tipi di luce
 
-**Dove si trova:** modalità Avanzata → scheda **Luci**. Le luci sono elencate nel pannello Scena a
+**Dove si trova:** modalità Avanzata → **Scena → Luci** (preset e luci nuove); la luce scelta compare nella scheda **Selezione**. Le luci sono elencate nel pannello Scena a
 sinistra: clicca una luce per modificarla.
 
 ## Preset

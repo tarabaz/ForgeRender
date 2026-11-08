@@ -423,7 +423,7 @@ fn tab_id(t: InspectorTab) -> &'static str {
 
 pub fn tab_label(t: InspectorTab) -> &'static str {
     match t {
-        InspectorTab::Object => tk("Oggetto"),
+        InspectorTab::Object => tk("Selezione"),
         InspectorTab::Materials => tk("Materiali"),
         InspectorTab::Lights => tk("Luci"),
         InspectorTab::Environment => tk("Ambiente"),
@@ -670,7 +670,7 @@ pub fn open_tab(app: &mut ForgeApp, t: InspectorTab) {
             ..app.prefs.clone()
         };
         app.apply_prefs(p, false);
-        app.toast(tr("Passato alla modalità Avanzata (si torna alla Semplice in alto a sinistra)."));
+        app.toast(tr("Passato alla modalità Avanzata (si torna alla Semplice in alto a destra)."));
     }
 }
 

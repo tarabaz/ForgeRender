@@ -7,7 +7,7 @@ correlate: mat.ior, render.caustiche, mat.roughness
 ---
 # Transmission (vetri e liquidi)
 
-**Dove si trova:** modalità Avanzata → scheda **Materiali** → cursore **Transmission**.
+**Dove si trova:** modalità Avanzata → scheda **Selezione** (materiale del pezzo scelto) o **Scena → Materiali** → cursore **Trasparenza (transmission)**.
 
 **A cosa serve:** rende il materiale trasparente come un vetro o un liquido: la luce lo attraversa
 e si piega secondo l'[IOR](mat.ior). A 0 il materiale è opaco, a 1 è del tutto trasparente.

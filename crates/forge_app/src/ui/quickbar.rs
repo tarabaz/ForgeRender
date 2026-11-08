@@ -1,11 +1,12 @@
 //! Toolbar delle azioni rapide (seconda riga in alto): i comandi più usati, a gruppi. Tutti i
 //! controlli passano da `Control`: stessa altezza, stessi bordi, icona e testo sulla stessa riga;
-//! il colore distingue l'azione principale, non la misura. A destra: Viewport | Render, Riavvio
-//! automatico e, in fondo, AI MCP con il suo ingranaggio. Con la finestra stretta i gruppi di
-//! sinistra che non entrano si tolgono (sono anche nei menu), a partire dai comandi dei file:
-//! quelli del render restano sempre interi.
+//! il colore distingue l'azione principale, non la misura. A sinistra file e aggiunte; a destra
+//! Avvia render, Stop, Riavvia, Esporta e, in fondo, AI MCP con il suo ingranaggio. Viewport |
+//! Render e Riavvio automatico stanno sopra la viewport ([`crate::ui::central`]). Con la finestra
+//! stretta i gruppi di sinistra che non entrano si tolgono (sono anche nei menu), a partire dai
+//! comandi dei file: quelli del render restano sempre interi.
 
-use crate::app::{ForgeApp, InspectorTab, View};
+use crate::app::{ForgeApp, InspectorTab};
 use crate::commands::{self, Cmd};
 use crate::i18n::{tf, tr};
 use crate::ui::{icons, menubar, style};
@@ -41,27 +42,15 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
         let used = ui
             .with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let start = ui.cursor().max.x;
-                // Da destra: AI MCP in fondo, poi Riavvio automatico, poi Viewport | Render.
+                // Da destra: AI MCP in fondo, poi i comandi del render con Avvia render per
+                // ultimo, così l'azione principale sta sempre nello stesso punto.
                 ai_block(app, ui);
                 menubar::ai_controlled_label(app, ui);
                 ui.separator();
-                let mut auto = app.auto_restart;
-                let sp = commands::spec(Cmd::AutoRestart);
-                let label = tr(sp.label);
-                let w = text_width(ui, label) + ui.spacing().icon_width + ui.spacing().icon_spacing + PAD_X;
-                let check = egui::Checkbox::new(&mut auto, label);
-                if ui.add_sized([w, HEIGHT], check).on_hover_text(tr(sp.hint)).clicked() {
-                    run(app, ui, Cmd::AutoRestart);
-                }
-                ui.separator();
-                // Da destra a sinistra: prima Render, poi Viewport.
-                for (v, cmd) in [(View::Render, Cmd::ShowRender), (View::Viewport, Cmd::ShowViewport)] {
-                    let sp = commands::spec(cmd);
-                    let look = if app.view == v { Look::Selected } else { Look::Plain };
-                    if tool_button(ui, "", tr(sp.label), true, look).on_hover_text(tr(sp.hint)).clicked() {
-                        app.view = v;
-                    }
-                }
+                cmd_button(app, ui, Cmd::Export, tr("Esporta"));
+                cmd_button(app, ui, Cmd::Restart, tr("Riavvia"));
+                cmd_button(app, ui, Cmd::Stop, tr("Stop"));
+                render_button(app, ui);
                 start - ui.min_rect().min.x
             })
             .inner;
@@ -82,30 +71,16 @@ fn left_group(app: &mut ForgeApp, ui: &mut egui::Ui, width: f32) {
     let files = sum(ui, &file_items) + SEPARATOR;
     let add_labels = add_items();
     let add_refs: Vec<(&str, &str)> = add_labels.iter().map(|(i, l)| (*i, l.as_str())).collect();
-    let add = sum(ui, &add_refs) + SEPARATOR;
-    let render = sum(
-        ui,
-        &[
-            (icons::RENDER, tr(commands::render_label(app))),
-            (commands::spec(Cmd::Stop).icon, tr("Stop")),
-            (commands::spec(Cmd::Restart).icon, tr("Riavvia")),
-            (commands::spec(Cmd::Export).icon, tr("Esporta")),
-        ],
-    );
-    if width >= files + add + render {
+    let add = sum(ui, &add_refs);
+    if width >= files + add {
         for cmd in FILES {
             cmd_button(app, ui, cmd, short_label(cmd));
         }
         ui.separator();
     }
-    if width >= add + render {
+    if width >= add {
         add_group(app, ui);
-        ui.separator();
     }
-    render_button(app, ui);
-    cmd_button(app, ui, Cmd::Stop, tr("Stop"));
-    cmd_button(app, ui, Cmd::Restart, tr("Riavvia"));
-    cmd_button(app, ui, Cmd::Export, tr("Esporta"));
 }
 
 /// Icone e testi del gruppo delle aggiunte (quelli a tendina hanno anche la freccia).
@@ -291,8 +266,6 @@ enum Look {
     Plain,
     /// Azione principale (solo "Avvia render").
     Primary,
-    /// Scheda scelta.
-    Selected,
     /// Acceso (verde).
     Active,
     /// Spento (testo attenuato).
@@ -336,14 +309,13 @@ fn tool_button(ui: &mut egui::Ui, icon: &str, label: &str, enabled: bool, look: 
         let plain = if hot { vis.bg_fill } else { visuals.widgets.inactive.weak_bg_fill };
         let bg = match look {
             Look::Primary if enabled => style::ACCENT.gamma_multiply(if hot { 1.0 } else { 0.85 }),
-            Look::Selected => visuals.selection.bg_fill,
             Look::Active if !hot => style::OK.gamma_multiply(0.18),
             _ => plain,
         };
         ui.painter().rect_filled(rect, RADIUS, bg);
         let color = match look {
             _ if !enabled => visuals.weak_text_color(),
-            Look::Primary | Look::Selected => egui::Color32::WHITE,
+            Look::Primary => egui::Color32::WHITE,
             Look::Active => style::OK,
             Look::Off => visuals.weak_text_color(),
             Look::Plain => vis.text_color(),

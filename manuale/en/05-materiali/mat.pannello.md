@@ -7,7 +7,7 @@ correlate: mat.roughness, mat.metallic, mat.transmission, mat.texture
 ---
 # Materials panel and library
 
-**Where:** Advanced mode → **Materials** tab; **Library** menu; in Simple mode **Open the
+**Where:** Advanced mode → **Selection** tab (the material of the selected part) or **Scene → Materials**; **Library** menu; in Simple mode **Open the
 material library**.
 
 ## Assigning materials

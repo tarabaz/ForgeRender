@@ -245,7 +245,11 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
 }
 
 fn tips(ui: &mut egui::Ui) {
-    ui.label(
+    // Chiusi di default: servono la prima volta, poi occupano solo spazio.
+    egui::CollapsingHeader::new(tr("Tasti del gizmo e della selezione"))
+        .id_salt("tasti-gizmo")
+        .show(ui, |ui| {
+            ui.label(
         egui::RichText::new(tr(
             "Gizmo nella viewport: W sposta · E ruota · R scala · Q solo selezione · Ctrl durante il trascinamento = snap · Esc annulla.\n\
              H nasconde la selezione · Shift+H nasconde tutto il resto · Alt+H mostra tutto · Ctrl+Z / Ctrl+Y annulla e ripeti.\n\
@@ -256,6 +260,7 @@ fn tips(ui: &mut egui::Ui) {
         .weak()
         .small(),
     );
+        });
 }
 
 fn wrap180(a: f32) -> f32 {

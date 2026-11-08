@@ -7,7 +7,7 @@ correlate: cam.dof, cam.obiettivo
 ---
 # Tilt-shift
 
-**Dove si trova:** scheda Camera → **Tilt-shift**.
+**Dove si trova:** **Scena → Camera** → **Tilt-shift**.
 
 **A cosa serve:** una fascia nitida sull'immagine finale con lo sfocato che cresce ai due lati,
 come gli obiettivi tilt-shift che fanno sembrare le scene vere dei plastici. È **separato dalla

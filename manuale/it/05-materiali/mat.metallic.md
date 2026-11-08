@@ -7,7 +7,7 @@ correlate: mat.roughness, mat.specular, mat.pannello
 ---
 # Metallic (metallicità)
 
-**Dove si trova:** modalità Avanzata → scheda **Materiali** → cursore **Metallic**.
+**Dove si trova:** modalità Avanzata → scheda **Selezione** (materiale del pezzo scelto) o **Scena → Materiali** → cursore **Metallicità (metallic)**.
 
 **A cosa serve:** dice se la superficie è un metallo o no. Un non metallo (plastica, vernice,
 legno) mostra il suo colore nella luce diffusa e ha riflessi bianchi e piuttosto deboli; un

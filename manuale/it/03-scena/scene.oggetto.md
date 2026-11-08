@@ -1,13 +1,13 @@
 ---
 id: scene.oggetto
-titolo: Spostare, ruotare e ridimensionare (scheda Oggetto)
+titolo: Spostare, ruotare e ridimensionare (scheda Selezione)
 parole: oggetto, posizione, dimensioni, misure, sposta, ruota, scala, appoggia, pavimento, duplica, elimina, snap, contatto
 ui: panel.object, edit.duplicate, edit.delete, edit.hide, edit.isolate, edit.show_all
 correlate: ui.viewport, scene.importa, mat.pannello
 ---
-# Spostare, ruotare e ridimensionare (scheda Oggetto)
+# Spostare, ruotare e ridimensionare (scheda Selezione)
 
-**Dove si trova:** modalità Avanzata → scheda **Oggetto**, con uno o più componenti selezionati.
+**Dove si trova:** modalità Avanzata → scheda **Selezione**, con uno o più componenti selezionati.
 
 | Controllo | Cosa fa |
 |---|---|

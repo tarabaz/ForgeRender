@@ -9,10 +9,37 @@ use forge_scene::{primitives, Camera, ComponentId, Light, LightKind, Material, S
 use std::sync::mpsc::Receiver;
 
 pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
+    view_tabs(app, ui);
     match app.view {
         View::Viewport => viewport(app, ui, frame),
         View::Render => render_view(app, ui),
     }
+}
+
+/// Linguette sopra l'area centrale: Viewport | Render a sinistra, Riavvio automatico a destra.
+/// Stanno sopra ciò che comandano invece che nella barra in alto.
+fn view_tabs(app: &mut ForgeApp, ui: &mut egui::Ui) {
+    use crate::commands::{self, Cmd};
+    ui.horizontal(|ui| {
+        for (v, cmd) in [(View::Viewport, Cmd::ShowViewport), (View::Render, Cmd::ShowRender)] {
+            let sp = commands::spec(cmd);
+            if ui
+                .selectable_label(app.view == v, egui::RichText::new(tr(sp.label)).strong())
+                .on_hover_text(tr(sp.hint))
+                .clicked()
+            {
+                app.view = v;
+            }
+        }
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let mut auto = app.auto_restart;
+            let sp = commands::spec(Cmd::AutoRestart);
+            if ui.checkbox(&mut auto, tr(sp.label)).on_hover_text(tr(sp.hint)).clicked() {
+                commands::run(app, ui.ctx(), Cmd::AutoRestart);
+            }
+        });
+    });
+    ui.add_space(2.0);
 }
 
 /// Gestione mouse comune: orbita, pan, zoom. Restituisce la risposta per il picking.
@@ -336,25 +363,25 @@ fn viewport(app: &mut ForgeApp, ui: &mut egui::Ui, frame: &eframe::Frame) {
                     0 | 7 => {
                         app.selected_light = Some(i);
                         app.light_target_handle = kind == 7;
-                        app.tab = crate::app::InspectorTab::Lights;
+                        app.tab = crate::app::InspectorTab::Object;
                     }
                     1 => {
                         app.selected_fog = Some(i);
-                        app.tab = crate::app::InspectorTab::Effects;
+                        app.tab = crate::app::InspectorTab::Object;
                     }
                     2 | 6 => {
                         app.selected_smoke = Some(i);
                         app.smoke_source_handle = kind == 6;
-                        app.tab = crate::app::InspectorTab::Effects;
+                        app.tab = crate::app::InspectorTab::Object;
                     }
                     3 => {
                         app.selected_dust = true;
-                        app.tab = crate::app::InspectorTab::Effects;
+                        app.tab = crate::app::InspectorTab::Object;
                     }
                     k => {
                         app.selected_camera = Some(i);
                         app.camera_target_handle = k == 5;
-                        app.tab = crate::app::InspectorTab::Camera;
+                        app.tab = crate::app::InspectorTab::Object;
                     }
                 }
                 return;

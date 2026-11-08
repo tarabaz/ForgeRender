@@ -374,6 +374,9 @@ pub struct ForgeApp {
     pub timeline_ui: crate::ui::timeline::TimelineUi,
     /// Scheda mostrata nella parte bassa.
     pub bottom_tab: BottomTab,
+    /// Parte bassa aperta (timeline o console) o ridotta a una riga. `None`: aperta solo se la
+    /// timeline ha qualcosa, così senza animazioni la viewport prende quello spazio.
+    pub bottom_open: Option<bool>,
     /// Finestra "Modifica materiale" (clic su un materiale della libreria).
     pub material_editor: crate::ui::material_editor::MaterialEditorUi,
     /// Impostazioni dell'app (menu Impostazioni) e finestra aperta.
@@ -486,7 +489,7 @@ impl ForgeApp {
             fog_gizmo_zone: false,
             selected_material: MaterialId::new("default"),
             view: View::Viewport,
-            tab: InspectorTab::Materials,
+            tab: InspectorTab::Object,
             auto_restart: true,
             import_opts: ImportOptions::default(),
             unsaved: false,
@@ -552,6 +555,7 @@ impl ForgeApp {
             sequence: Default::default(),
             timeline_ui: Default::default(),
             bottom_tab: BottomTab::Timeline,
+            bottom_open: None,
             prefs: Default::default(),
             prefs_open: false,
             prefs_error: None,
@@ -2805,12 +2809,18 @@ impl ForgeApp {
 }
 
 impl ForgeApp {
-    /// Dopo una selezione: mostra la scheda Materiali, salvo che l'utente stia
-    /// già lavorando su Oggetto o Materiali.
+    /// Dopo aver scelto uno o più oggetti: la scheda Selezione mostra loro e il loro materiale.
+    /// Le luci, camere ed effetti scelti prima si lasciano, altrimenti coprirebbero gli oggetti.
     pub fn show_selection_tab(&mut self) {
-        if !matches!(self.tab, InspectorTab::Object | InspectorTab::Materials) {
-            self.tab = InspectorTab::Materials;
-        }
+        self.selected_light = None;
+        self.selected_fog = None;
+        self.selected_smoke = None;
+        self.selected_dust = false;
+        self.selected_camera = None;
+        self.camera_target_handle = false;
+        self.light_target_handle = false;
+        self.smoke_source_handle = false;
+        self.tab = InspectorTab::Object;
     }
 
     /// Chiamata a ogni frame prima del disegno dell'interfaccia.
@@ -2820,13 +2830,13 @@ impl ForgeApp {
             if let Some(name) = self.startup_light.take() {
                 if let Some(i) = self.scene.lights.iter().position(|l| l.name == name) {
                     self.selected_light = Some(i);
-                    self.tab = InspectorTab::Lights;
+                    self.tab = InspectorTab::Object;
                 }
             }
             if let Some(name) = self.startup_fog.take() {
                 if let Some(i) = self.scene.fogs.iter().position(|f| f.name == name) {
                     self.selected_fog = Some(i);
-                    self.tab = InspectorTab::Effects;
+                    self.tab = InspectorTab::Object;
                 }
             }
             if let Some(name) = self.startup_aim.take() {

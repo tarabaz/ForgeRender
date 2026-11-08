@@ -3,44 +3,68 @@ use crate::i18n::{tf, tr};
 use eframe::egui;
 use std::collections::BTreeSet;
 
-/// Altezza che resta sempre all'albero della scena (titolo e qualche riga).
-const SCENE_MIN: f32 = 150.0;
+/// Altezza massima dell'elenco di un gruppo sotto gli oggetti (luci, camere, effetti): oltre
+/// scorre, e agli oggetti resta il resto.
+const GROUP_MAX: f32 = 180.0;
 
-/// Pannello di sinistra: albero della scena sopra, luci sotto, con un bordo trascinabile tra i due
-/// (altezza delle luci regolabile) e ognuno con il suo scorrimento.
+/// Pannello di sinistra: un solo albero della scena a gruppi. Gli oggetti prendono lo spazio che
+/// resta; sotto, i gruppi Luci, Camere ed Effetti si aprono e si chiudono, ognuno col suo
+/// scorrimento. Un clic su qualunque riga mostra le sue proprietà nella scheda Selezione.
 pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
-    let avail = ui.available_height();
-    // Limiti anche per le altezze salvate: all'albero restano sempre titolo e qualche riga.
-    let cameras_max = (avail * 0.25).max(60.0);
-    let lights_max = (avail - cameras_max - SCENE_MIN).max(90.0);
-    egui::Panel::bottom("tree-lights")
-        .resizable(true)
-        .default_size(170.0_f32.min(lights_max))
-        .min_size(80.0)
-        .max_size(lights_max)
-        .show(ui, |ui| lights(app, ui));
-    egui::Panel::bottom("tree-cameras")
-        .resizable(true)
-        .default_size(96.0_f32.min(cameras_max))
-        .min_size(54.0)
-        .max_size(cameras_max)
-        .show(ui, |ui| cameras(app, ui));
+    crate::ui::style::scene_selection(ui);
+    egui::Panel::bottom("tree-groups").resizable(false).show(ui, |ui| {
+        ui.add_space(2.0);
+        lights(app, ui);
+        cameras(app, ui);
+        effects(app, ui);
+        ui.add_space(2.0);
+    });
     egui::CentralPanel::default().show(ui, |ui| scene_tree(app, ui));
 }
 
+/// Testata di un gruppo: freccia, nome e numero di elementi, a destra il "+" per aggiungerne uno.
+/// Restituisce se è aperto e se è stato premuto il "+".
+fn group_header(ui: &mut egui::Ui, id: &str, label: &str, count: usize, default_open: bool, add_hint: Option<&str>) -> (bool, bool) {
+    let id = ui.make_persistent_id(id);
+    let mut state = egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, default_open);
+    let mut add = false;
+    ui.horizontal(|ui| {
+        state.show_toggle_button(ui, egui::collapsing_header::paint_default_icon);
+        let r = ui.add(egui::Label::new(egui::RichText::new(format!("{label} ({count})")).strong()).sense(egui::Sense::click()));
+        if r.clicked() {
+            state.toggle(ui);
+        }
+        if let Some(hint) = add_hint {
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                add = ui.small_button("+").on_hover_text(hint).clicked();
+            });
+        }
+    });
+    let open = state.is_open();
+    state.store(ui.ctx());
+    (open, add)
+}
+
+/// Mostra le proprietà di ciò che si è appena scelto nell'albero: toglie le altre selezioni.
+fn select_only(app: &mut ForgeApp) {
+    app.deselect_all();
+    app.tab = InspectorTab::Object;
+}
+
 fn scene_tree(app: &mut ForgeApp, ui: &mut egui::Ui) {
-    ui.heading(tr("Scena"));
-    ui.label(
-        egui::RichText::new(tf(
-            "{} componenti · {} triangoli",
-            &[
-                format!("{}", app.scene.nodes.len()),
-                fmt_count(app.scene.triangle_count()).to_string(),
-            ],
-        ))
-        .weak()
-        .small(),
-    );
+    ui.horizontal(|ui| {
+        ui.heading(tr("Scena"));
+        ui.label(
+            egui::RichText::new(tf(
+                "{} componenti · {} triangoli",
+                &[
+                    format!("{}", app.scene.nodes.len()),
+                    fmt_count(app.scene.triangle_count()).to_string(),
+                ],
+            ))
+            .weak(),
+        );
+    });
     ui.separator();
 
     // Righe visibili (rispettando i nodi chiusi).
@@ -223,30 +247,34 @@ fn scene_tree(app: &mut ForgeApp, ui: &mut egui::Ui) {
 /// Camere di rendering come componenti: selezionandone una il gizmo la sposta e la fa orbitare
 /// attorno al bersaglio; il pallino dice quale usa il render.
 fn cameras(app: &mut ForgeApp, ui: &mut egui::Ui) {
-    ui.add_space(4.0);
-    ui.horizontal(|ui| {
-        ui.strong(tr("Camere"));
-        if ui
-            .small_button("+")
-            .on_hover_text(tr("Aggiungi una camera di rendering dalla vista attuale"))
-            .clicked()
-        {
-            app.add_render_camera(None);
-            app.selected_camera = Some(app.scene.render_cameras.len() - 1);
-            app.tab = InspectorTab::Camera;
-        }
-    });
+    let (open, add) = group_header(
+        ui,
+        "albero-camere",
+        tr("Camere"),
+        app.scene.render_cameras.len(),
+        false,
+        Some(tr("Aggiungi una camera di rendering dalla vista attuale")),
+    );
+    if add {
+        app.add_render_camera(None);
+        select_only(app);
+        app.selected_camera = Some(app.scene.render_cameras.len() - 1);
+    }
+    if !open {
+        return;
+    }
     let mut click = None;
     let mut activate = None;
     egui::ScrollArea::vertical()
         .id_salt("tree-cameras-list")
-        .auto_shrink([false, false])
+        .max_height(GROUP_MAX)
         .show(ui, |ui| {
             if app.scene.render_cameras.is_empty() {
-                ui.label(egui::RichText::new(tr("Nessuna: il render usa la vista")).weak().small());
+                ui.label(egui::RichText::new(tr("Nessuna: il render usa la vista")).weak());
             }
             for (i, c) in app.scene.render_cameras.iter().enumerate() {
                 ui.horizontal(|ui| {
+                    ui.add_space(14.0);
                     if ui
                         .radio(app.scene.active_camera == Some(i), "")
                         .on_hover_text(tr("Usa questa camera per il render"))
@@ -274,52 +302,54 @@ fn cameras(app: &mut ForgeApp, ui: &mut egui::Ui) {
         app.set_active_camera(Some(i));
     }
     if let Some(i) = click {
-        app.selection.clear();
-        app.selected_light = None;
-        app.selected_fog = None;
-        app.selected_smoke = None;
-        app.selected_dust = false;
+        select_only(app);
         app.selected_camera = Some(i);
-        app.camera_target_handle = false;
-        app.light_target_handle = false;
-        app.tab = InspectorTab::Camera;
     }
 }
 
-/// Elenco delle luci (scorre se non ci sta).
+/// Luci della scena (scorrono se non ci stanno): casella per accenderle, clic per sceglierle.
 fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
-    ui.add_space(4.0);
-    ui.horizontal(|ui| {
-        ui.strong(tr("Luci"));
-        if ui.small_button("+").on_hover_text(tr("Aggiungi una luce ad area")).clicked() {
-            let (c, r) = app.anchor();
-            app.scene.lights.push(forge_scene::Light::area(
-                tr("Nuova luce"),
-                c + forge_math::Vec3::new(1.0, 2.0, 1.0) * r,
-                c,
-                r,
-                r,
-                5.0,
-            ));
-            app.selected_light = Some(app.scene.lights.len() - 1);
-            app.tab = InspectorTab::Lights;
-            app.shading_changed();
-        }
-    });
+    let (open, add) = group_header(
+        ui,
+        "albero-luci",
+        tr("Luci"),
+        app.scene.lights.len(),
+        true,
+        Some(tr("Aggiungi una luce ad area")),
+    );
+    if add {
+        let (c, r) = app.anchor();
+        app.scene.lights.push(forge_scene::Light::area(
+            tr("Nuova luce"),
+            c + forge_math::Vec3::new(1.0, 2.0, 1.0) * r,
+            c,
+            r,
+            r,
+            5.0,
+        ));
+        select_only(app);
+        app.selected_light = Some(app.scene.lights.len() - 1);
+        app.shading_changed();
+    }
+    if !open {
+        return;
+    }
     let mut light_click = None;
     let mut light_toggle = None;
     egui::ScrollArea::vertical()
         .id_salt("tree-lights-list")
-        .auto_shrink([false, false])
+        .max_height(GROUP_MAX)
         .show(ui, |ui| {
             for (i, l) in app.scene.lights.iter().enumerate() {
                 ui.horizontal(|ui| {
+                    ui.add_space(14.0);
                     let mut on = l.enabled;
                     if ui.checkbox(&mut on, "").on_hover_text(tr("Accendi/spegni")).changed() {
                         light_toggle = Some(i);
                     }
                     if ui
-                        .selectable_label(app.selected_light == Some(i), format!("{} ({})", l.name, tr(l.kind.label())))
+                        .selectable_label(app.selected_light == Some(i), &l.name)
+                        .on_hover_text(tr(l.kind.label()))
                         .clicked()
                     {
                         light_click = Some(i);
@@ -332,8 +362,110 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
         app.shading_changed();
     }
     if let Some(i) = light_click {
+        select_only(app);
         app.selected_light = Some(i);
-        app.tab = InspectorTab::Lights;
+    }
+}
+
+/// Un effetto dell'elenco: quelli col riquadro nella viewport si selezionano, gli altri aprono la
+/// scheda Effetti della scena.
+#[derive(Clone, Copy, PartialEq)]
+enum EffectRow {
+    Fog(usize),
+    Smoke(usize),
+    Dust,
+    Haze,
+    Fireflies,
+    Decal(usize),
+}
+
+/// Effetti presenti nella scena: nebbie, fumi, polvere, foschia, lucciole e adesivi.
+fn effects(app: &mut ForgeApp, ui: &mut egui::Ui) {
+    let s = &app.scene;
+    let mut rows: Vec<(EffectRow, String, bool)> = Vec::new();
+    rows.extend(
+        s.fogs
+            .iter()
+            .enumerate()
+            .map(|(i, f)| (EffectRow::Fog(i), f.name.clone(), f.enabled)),
+    );
+    rows.extend(
+        s.smokes
+            .iter()
+            .enumerate()
+            .map(|(i, f)| (EffectRow::Smoke(i), f.name.clone(), f.enabled)),
+    );
+    if s.haze_dust.enabled {
+        rows.push((EffectRow::Dust, tr("Polvere in sospensione").to_string(), true));
+    }
+    if s.haze.enabled {
+        rows.push((EffectRow::Haze, tr("Foschia").to_string(), true));
+    }
+    if s.fireflies.enabled {
+        rows.push((EffectRow::Fireflies, tr("Lucciole").to_string(), true));
+    }
+    rows.extend(
+        s.decals
+            .iter()
+            .enumerate()
+            .map(|(i, d)| (EffectRow::Decal(i), d.name.clone(), d.enabled)),
+    );
+    let (open, add) = group_header(
+        ui,
+        "albero-effetti",
+        tr("Effetti"),
+        rows.len(),
+        false,
+        Some(tr("Aggiungi un effetto")),
+    );
+    if add {
+        app.tab = InspectorTab::Effects;
+    }
+    if !open {
+        return;
+    }
+    let selected = |r: EffectRow| match r {
+        EffectRow::Fog(i) => app.selected_fog == Some(i),
+        EffectRow::Smoke(i) => app.selected_smoke == Some(i),
+        EffectRow::Dust => app.selected_dust,
+        _ => false,
+    };
+    let mut click = None;
+    egui::ScrollArea::vertical()
+        .id_salt("tree-effects-list")
+        .max_height(GROUP_MAX)
+        .show(ui, |ui| {
+            if rows.is_empty() {
+                ui.label(egui::RichText::new(tr("Nessun effetto: aggiungine uno con il +.")).weak());
+            }
+            for (r, name, on) in &rows {
+                ui.horizontal(|ui| {
+                    ui.add_space(14.0);
+                    let mut text = egui::RichText::new(name);
+                    if !on {
+                        text = text.weak();
+                    }
+                    if ui.selectable_label(selected(*r), text).clicked() {
+                        click = Some(*r);
+                    }
+                });
+            }
+        });
+    match click {
+        Some(EffectRow::Fog(i)) => {
+            select_only(app);
+            app.selected_fog = Some(i);
+        }
+        Some(EffectRow::Smoke(i)) => {
+            select_only(app);
+            app.selected_smoke = Some(i);
+        }
+        Some(EffectRow::Dust) => {
+            select_only(app);
+            app.selected_dust = true;
+        }
+        Some(_) => app.tab = InspectorTab::Effects,
+        None => {}
     }
 }
 

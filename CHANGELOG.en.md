@@ -10,6 +10,16 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.50.0 — 8 Nov 2026
+
+- **Two rows at the top:** the Simple / Advanced switch and a Settings gear moved to the right of the menu bar; the language selector left the top bar (it is in Settings → Language). In the toolbar, Start render, Stop, Restart and Export sit on the right next to AI MCP; the Viewport | Render tabs and Auto restart moved right above the central area.
+- **Right panel in three tabs:** **Selection** shows what is picked in the viewport or in the tree (an object with its position, size and material, or a light, a camera or an effect); **Scene** groups Lights, Environment, Effects, Camera and Materials as sub-tabs; **Render** keeps the render settings, with Russian roulette, indirect light limit, random seed and CPU threads in a closed **Advanced** section. Clicking anything in the scene opens Selection.
+- **One scene tree:** objects, then the Lights, Cameras and Effects groups (fog, smoke, dust, haze, fireflies, decals), each opening and closing, with a + to add one.
+- **Materials:** the properties of the material come right after the scene materials and the assign buttons; replace, assign by name, default material, new, duplicate, delete and save to library are in a closed **Manage materials** section. The sliders have Italian names with the technical term in brackets.
+- **Bottom area:** the timeline and the console stay closed to one row until the timeline has something; **Collapse** closes them again. Backend and processor now take one line.
+- **Readability:** small text from 9 to 12 points, lighter text and hints; orange only for Start render, the render progress and what is selected in the scene; the gizmo key guide is in a closed section. The missing denoiser warning has a button that opens the manual page explaining how to fix it.
+- **Manual:** the pages on the window, materials, lights, environment, effects, camera and rendering describe the new tabs (English and Italian).
+
 ## 0.49.0 — 8 Nov 2026
 
 - **The internal manual is complete:** Help → Manual (F1) now has 33 pages in 12 chapters, in English and in Italian: introduction and first render, Simple mode, window, viewport and settings, import, Object tab and projects, lights, materials, environment, effects, camera, rendering, saving images, views and turntable, timeline and video, AI control and keyboard shortcuts. Every page says where the control is, what it does, its range and default (taken from the program's code) and the common mistakes. F1 over a tab opens the page of that tab; in Simple mode it opens the Simple mode page.

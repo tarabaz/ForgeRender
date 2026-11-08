@@ -44,7 +44,7 @@ pub fn show(app: &mut ForgeApp, ctx: &egui::Context) {
         ui.add_space(10.0);
         ui.label(
             egui::RichText::new(tr(
-                "Puoi cambiarla quando vuoi dal selettore \"Modalità: Semplice | Avanzata\" in alto a sinistra.",
+                "Puoi cambiarla quando vuoi dal selettore \"Modalità: Semplice | Avanzata\" in alto a destra.",
             ))
             .weak(),
         );

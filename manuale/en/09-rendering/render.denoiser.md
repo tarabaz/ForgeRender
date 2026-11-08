@@ -46,6 +46,9 @@ None of these settings restarts the render: the current image is cleaned again.
 ## Common mistakes
 
 - **"Open Image Denoise not found":** the denoiser libraries are missing next to the program.
-  The render still works, but stays grainy.
+  The render still works, but stays grainy. To fix it, reinstall ForgeRender with the installer,
+  or put `OpenImageDenoise.dll`, `OpenImageDenoise_core.dll` and `tbb12.dll` next to
+  `forgerender.exe` (or in its `oidn` subfolder), then restart the program. The ? button next
+  to the warning in the Render tab opens this page.
 - **"CUDA not available on this GPU":** the card is not NVIDIA or the driver is old; the
   denoiser uses the processor, slower but with the same result.

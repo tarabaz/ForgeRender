@@ -46,6 +46,9 @@ Nessuna di queste impostazioni riavvia il render: l'immagine attuale si ripulisc
 ## Errori comuni
 
 - **"Open Image Denoise non trovato":** mancano le librerie del denoiser accanto al programma.
-  Il render funziona lo stesso, ma resta sgranato.
+  Il render funziona lo stesso, ma resta sgranato. Per rimediare reinstalla ForgeRender con
+  l'installer, oppure metti `OpenImageDenoise.dll`, `OpenImageDenoise_core.dll` e `tbb12.dll`
+  accanto a `forgerender.exe` (o nella sua sottocartella `oidn`) e riavvia il programma. Il
+  pulsante ? accanto all'avviso nella scheda Render apre questa pagina.
 - **"CUDA non disponibile su questa GPU":** la scheda non è NVIDIA o il driver è vecchio; il
   denoiser usa il processore, più lento ma con lo stesso risultato.

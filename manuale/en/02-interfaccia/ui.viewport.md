@@ -46,7 +46,7 @@ Choose the tool in the toolbar or with the keys:
   directional lights are aimed by dragging the **diamond** of their target.
 - **Undo / Redo:** Ctrl+Z, Ctrl+Y.
 
-For exact numbers use the **Object** tab: see [Move, rotate and resize](scene.oggetto).
+For exact numbers use the **Selection** tab: see [Move, rotate and resize](scene.oggetto).
 
 ## Hiding
 

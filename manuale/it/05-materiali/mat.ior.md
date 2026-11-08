@@ -7,7 +7,7 @@ correlate: mat.transmission, mat.roughness, mat.specular
 ---
 # IOR (indice di rifrazione)
 
-**Dove si trova:** modalità Avanzata → scheda **Materiali** → cursore **IOR**.
+**Dove si trova:** modalità Avanzata → scheda **Selezione** (materiale del pezzo scelto) o **Scena → Materiali** → cursore **Indice di rifrazione (IOR)**.
 
 **A cosa serve:** dice quanto la luce si piega entrando nel materiale e quanto il materiale
 riflette guardato di fronte. Conta soprattutto per i materiali trasparenti (**Transmission**

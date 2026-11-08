@@ -7,7 +7,7 @@ correlate: light.tipi, intro.semplice, render.esposizione
 ---
 # Light color and temperature (Kelvin)
 
-**Where:** Lights tab → **Color** (any color) and **Temperature** (buttons 2700 K, 4000 K,
+**Where:** select the light (**Selection** tab, or **Scene → Lights**) → **Color** (any color) and **Temperature** (buttons 2700 K, 4000 K,
 5500 K, 6500 K, 9000 K). In Simple mode, **Light color**: Warm 3200 K, Neutral 5500 K, Cool
 7500 K, applied to all lights at once.
 

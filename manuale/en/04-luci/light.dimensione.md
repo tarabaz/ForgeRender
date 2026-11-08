@@ -7,7 +7,7 @@ correlate: light.tipi, light.colore
 ---
 # Light size and soft shadows
 
-**Where:** Lights tab → an **Area** light → **Width (m)** and **Height (m)**.
+**Where:** select an **Area** light (**Selection** tab, or **Scene → Lights**) → **Width (m)** and **Height (m)**.
 
 **What it does:** the size of the light seen from the object decides how soft the shadows are.
 A small light gives sharp shadows and small, bright highlights; a large light wraps the object,

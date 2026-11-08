@@ -7,7 +7,7 @@ correlate: cam.dof, cam.tiltshift, ui.viewport, export.viste
 ---
 # Camera, lens and focal length
 
-**Where:** Advanced mode → **Camera** tab; **View → Camera and lens…**.
+**Where:** Advanced mode → **Scene → Camera** (a selected render camera also shows in the **Selection** tab); **View → Camera and lens…**.
 
 ## Viewport camera and render cameras
 

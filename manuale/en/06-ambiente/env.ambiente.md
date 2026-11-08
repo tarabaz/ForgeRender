@@ -7,7 +7,7 @@ correlate: light.tipi, render.esposizione, mat.metallic
 ---
 # Environment (uniform, gradient sky, HDRI)
 
-**Where:** Advanced mode → **Environment** tab; **Scene → Environment and HDRI…**.
+**Where:** Advanced mode → **Scene → Environment**; **Scene → Environment and HDRI…**.
 
 **What it does:** the environment is the light that comes from everywhere around the scene, as
 from the sky or the walls of a room. It lights the objects, it is reflected by glossy surfaces

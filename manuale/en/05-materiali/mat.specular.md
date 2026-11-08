@@ -7,7 +7,7 @@ correlate: mat.ior, mat.roughness, mat.metallic
 ---
 # Specular
 
-**Where:** Advanced mode → **Materials** tab → **Specular** slider.
+**Where:** Advanced mode → **Selection** tab (material of the selected part) or **Scene → Materials** → **Specular** slider.
 
 **What it does:** sets how strong the reflection of a **non-metallic** surface is. At 0.5 the
 reflection is the physical one derived from the [IOR](mat.ior); lower values weaken it, higher

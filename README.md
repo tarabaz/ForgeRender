@@ -18,6 +18,12 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
+### What's new in 0.50.0
+
+- **A tidier window:** two rows at the top instead of four. Menus on the left, the Simple / Advanced switch and Settings on the right; Start render, Stop, Restart and Export always in the same place; Viewport | Render tabs right above the view.
+- **The panel follows what you click:** the right panel has three tabs. **Selection** shows what you picked (an object with its material, a light, a camera or an effect), **Scene** holds lights, environment, effects, camera and materials, **Render** the render settings, with the technical values in a closed **Advanced** section.
+- **One scene tree and more room for the image:** objects, lights, cameras and effects in one list on the left; the timeline stays closed to one row until there is an animation; larger, readable small text and orange kept for Start render and what is selected.
+
 ### What's new in 0.49.0
 
 - **A real manual inside the program:** Help → Manual (F1) now explains every panel and setting, in English and Italian, in 33 pages and 12 chapters, with search and F1 on the controls.
@@ -260,7 +266,7 @@ Diffuse materials, GGX metals and plastics, Fresnel glass, frosted glass and emi
 - **Additional pack:** 109 more textured materials with 2K maps (woods and barks, stones and plasters, fabrics, rusty and worn metals, asphalt, roofs), about 1.6 GB, downloaded separately and copied as `materiali-aggiuntivi` next to `forgerender.exe`: at the next start they appear in the same library.
 - **Free to redistribute:** the textured materials come from Poly Haven and ambientCG (CC0); each material's source is listed in `assets/materiali/LEGGIMI.md`.
 - **Sharp previews:** every material preview is rendered once with the path tracer at 512 px and scaled down for each card size, so it stays sharp both large and small.
-- **Replace material:** in the Materials panel choose "Replace [material] with «selected»" (or right-click a scene material): every component with that material, including those that inherit it and the scene default, switches to the selected one, without selecting a hundred objects. "Undo replacement" brings the previous assignments back.
+- **Replace material:** in **Manage materials** (under the material of the selection, or Scene → Materials) choose "Replace [material] with «selected»" (or right-click a scene material): every component with that material, including those that inherit it and the scene default, switches to the selected one, without selecting a hundred objects. "Undo replacement" brings the previous assignments back.
 - **Colour picker:** clicking the swatch of a material colour (base colour, volume colour, emission) opens one panel with three tabs: **RGB** (colour wheel, R, G, B and hex code), **CMYK** (cyan, magenta, yellow and black in percent, with a simple mathematical conversion, not a print profile) and **Palette** (colours with code and name). The colour changes live; **Apply** keeps it, **Cancel** (or Esc) restores the previous one. The palette tab includes the RAL Classic codes with Italian and English names and **indicative** RGB values (an average of public sources, not the official RAL values, which RAL sells as a digital library); you can also import the official RAL CLASSIC `.ase` library or your own `.json`/`.csv` palette into the Colours folder of the library. A colour picked from a palette shows its code (for example **RAL 7016**) next to the swatch, saved with the project; changing the colour by hand turns it back into a plain RGB colour.
 
 ### 10. Product studio and lighting
@@ -287,7 +293,7 @@ For fog that fills the whole scene see [Ambient haze](#5-ambient-haze--five-kind
 
 Render cameras provide focal length, aperture, depth of field and lens shift. Automatic front, rear, side, top and three-quarter views help present a product from multiple angles; turntable videos can be exported as MP4.
 
-- **Cameras as components:** the render cameras are listed in the left panel, just above the lights. Selecting one shows a line to its target (a diamond) in the viewport: the gizmo moves the camera and its target together, orbits the camera around the target (Rotate), or, after clicking the diamond, moves only the target. The target can follow an object, like a spot light, so the object stays centred even when you move it.
+- **Cameras as components:** the render cameras are listed in the **Cameras** group of the left panel. Selecting one shows a line to its target (a diamond) in the viewport: the gizmo moves the camera and its target together, orbits the camera around the target (Rotate), or, after clicking the diamond, moves only the target. The target can follow an object, like a spot light, so the object stays centred even when you move it.
 - **Tilt-shift:** a sharp band on the final image (position, width and angle, horizontal, vertical or tilted) with the blur growing on both sides, each side with its own transition, from a hard edge to a very wide fade. It is separate from the depth of field: aperture, focal length and focus do not change, and with both on the band adds to the lens blur. The blur is depth-aware (a near sharp object does not bleed into the blurred background) and smooth even with a strong blur (it is gathered from progressively reduced copies of the image, so bright reflections become a soft blur instead of repeated copies), it works the same on CPU and GPU, and moving the band shows immediately without re-rendering.
 
 ### 13. Render passes and post-production
@@ -320,7 +326,7 @@ A STEP file is converted to meshes once. The result is kept in a conversion cach
 
 ### 16. Timeline — animation of objects, lights, camera and effects
 
-A professional timeline, always available: it sits at the bottom with **Timeline | Console** tabs, or in its own window with "Detach from the program", to be moved to another screen.
+A professional timeline, always available: it sits at the bottom with **Timeline | Console** tabs (closed to one row until there is an animation), or in its own window with "Detach from the program", to be moved to another screen.
 
 ![ForgeRender animation timeline](docs/img/features/timeline-animation.jpg)
 
@@ -345,19 +351,30 @@ A professional timeline, always available: it sits at the bottom with **Timeline
 - **Made with ForgeRender:** the 56 images (640 × 480, at least 256 samples, except the comparisons of the number of samples and of the noise threshold) are rendered by the program's own path tracer on the test scene and the material preview ball. `tools/manuale/render_confronti.js` renders them again; a copy is in [docs/manual/renders/](docs/manual/renders), named after setting, slider and value (for example `render_samples_064.png`).
 - **Checked by the tests:** every page exists in both languages, links and images are valid, every image is used, and the search finds the right page for everyday words.
 
+### 18. A clear, tidy interface
+
+The window is arranged so that you always know where to look and what to do next.
+
+- **Two rows at the top:** the menus, with the **Simple / Advanced** switch and the **Settings** gear on the right; below, files and additions on the left and **Start render**, Stop, Restart, Export and AI MCP on the right. The language is chosen in Settings → Language.
+- **One scene tree:** on the left the objects of the model and, below, the **Lights**, **Cameras** and **Effects** groups, which open and close and have a **+** to add one. What is selected is highlighted in orange.
+- **A panel that follows the selection:** in Advanced mode the right panel has three tabs. **Selection** shows what you clicked in the viewport or in the tree: an object with its position, size and material, or a light, a camera or an effect with its properties. **Scene** holds what applies to the whole scene in sub-tabs (Lights, Environment, Effects, Camera, Materials). **Render** holds the render settings; Russian roulette, indirect light limit, random seed and CPU threads are in a closed **Advanced** section.
+- **More room for the view:** **Viewport | Render** and **Auto restart** sit right above the central area; the timeline and the console stay closed to one row until there is an animation (**Collapse** closes them again).
+- **Easier to read:** small text is bigger and lighter, material settings have Italian names with the technical term in brackets, and orange is kept for Start render, the render progress and what is selected.
+
 ## What it does today
 
-- **Simple / Advanced interface** (switch at the top, Simple by default): "Product photo in
+- **Simple / Advanced interface** (switch at the top right, Simple by default): "Product photo in
   5 steps" with large buttons (import, place on the base, frame, look, materials, 16:9 / 1:1 /
   4:5 / 9:16 format, Draft / Balanced / High quality, render and save). Advanced has every
-  control; both modes edit the same values.
+  control in three tabs, Selection, Scene and Render, next to a single scene tree; both modes
+  edit the same values.
 - **Photo studio**: start-up scene with a tilted cloth backdrop and four studio lights; light
   color (warm 3200 K, neutral 5500 K, cool 7500 K or per light). Other looks: Light background,
   Dark background, Dramatic studio. **Prepare product scene** and **Fit the scene to the
   product** resize backdrop and lights to the product; **Undo preset** restores the scene.
   New lights and objects appear next to the product.
-- **Languages**: Italian and English, the whole interface switches immediately (at the top or in
-  Settings → Language). Translations are separate `lang/Lan_*.json` files: copy `Lan_eng.json`
+- **Languages**: Italian and English, the whole interface switches immediately (in
+  Settings → Language, the gear at the top right). Translations are separate `lang/Lan_*.json` files: copy `Lan_eng.json`
   to add more.
 - **AI control (MCP)**: control ForgeRender in natural language through Claude Code or Claude Desktop, with the `forgerender-mcp.exe` bridge and the "AI MCP" switch in the top bar (ON/OFF, with the gear for the AI integration settings). See the [MCP setup guide](docs/MCP.en.md) for installation, examples, available tools and safety.
 - **Welcome screen** at start-up with an image (`assets/splash.png`), version and commit; it

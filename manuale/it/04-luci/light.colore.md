@@ -7,7 +7,7 @@ correlate: light.tipi, intro.semplice, render.esposizione
 ---
 # Colore e temperatura della luce (Kelvin)
 
-**Dove si trova:** scheda Luci → **Colore** (qualunque colore) e **Temperatura** (pulsanti
+**Dove si trova:** scegli la luce (scheda **Selezione**, o **Scena → Luci**) → **Colore** (qualunque colore) e **Temperatura** (pulsanti
 2700 K, 4000 K, 5500 K, 6500 K, 9000 K). In modalità Semplice, **Colore delle luci**: Calda
 3200 K, Neutra 5500 K, Fredda 7500 K, applicato a tutte le luci insieme.
 

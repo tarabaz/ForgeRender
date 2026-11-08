@@ -413,10 +413,10 @@ fn params_column(ui: &mut egui::Ui, s: &mut BlendImportUi) {
                     }
                 });
                 ui.end_row();
-                ui.label(tr("Metallic"));
+                ui.label(tr("Metallicità (metallic)"));
                 ui.add(egui::Slider::new(&mut m.metallic, 0.0..=1.0));
                 ui.end_row();
-                ui.label(tr("Roughness"));
+                ui.label(tr("Ruvidità (roughness)"));
                 ui.horizontal(|ui| {
                     ui.add(egui::Slider::new(&mut m.roughness, 0.0..=1.0));
                     if m.roughness_texture.is_some() {
@@ -424,7 +424,7 @@ fn params_column(ui: &mut egui::Ui, s: &mut BlendImportUi) {
                     }
                 });
                 ui.end_row();
-                ui.label(tr("IOR"));
+                ui.label(tr("Indice di rifrazione (IOR)"));
                 ui.add(egui::Slider::new(&mut m.ior, 1.0..=3.0));
                 ui.end_row();
             });

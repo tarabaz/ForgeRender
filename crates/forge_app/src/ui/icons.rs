@@ -62,6 +62,8 @@ pub const IMAGE: &str = "\u{E2CA}"; // image
 pub const GPU: &str = "\u{E612}"; // graphics-card
 pub const QUALITY: &str = "\u{E434}"; // sliders-horizontal
 pub const CLOSE: &str = "\u{E4F6}"; // x
+pub const CARET_DOWN: &str = "\u{E136}"; // caret-down
+pub const CARET_RIGHT: &str = "\u{E13A}"; // caret-right
 pub const ARROWS_H: &str = "\u{EB06}"; // arrows-horizontal
 pub const ARROWS_V: &str = "\u{EB04}"; // arrows-vertical
 

@@ -7,7 +7,8 @@ correlate: render.campioni, mat.transmission, render.caustiche
 ---
 # Rimbalzi, Russian roulette, clamp e seed
 
-**Dove si trova:** scheda Render → **Path tracing**.
+**Dove si trova:** scheda Render → **Path tracing** (Rimbalzi massimi); gli altri valori sono
+nella sezione **Avanzate** subito sotto, chiusa di default.
 
 ## Rimbalzi massimi
 
@@ -26,7 +27,7 @@ rimbalzi per ogni superficie di vetro che attraversa.
   rimbalza davvero tante volte; oltre 12 la differenza si vede solo con molti vetri uno dietro
   l'altro (bicchieri con liquido, lampadari, lenti).
 
-## Russian roulette da
+## Roulette russa da (russian roulette)
 
 Da questo rimbalzo in poi, i percorsi scuri che portano poca luce si fermano a caso (e quelli che
 restano contano di più, così il risultato resta giusto). Fa risparmiare tempo senza cambiare
@@ -35,7 +36,7 @@ l'immagine in media.
 - **Intervallo:** da 1 a 16. **Predefinito:** 3.
 - Valori più bassi = passate più veloci ma un po' più di rumore nella luce indiretta.
 
-## Clamp indiretto
+## Limite luce indiretta (clamp)
 
 Limita la luminosità della luce indiretta. Riduce i **firefly** (pixel isolati molto luminosi,
 tipici di luci piccole viste attraverso un vetro o nei riflessi lucidi), ma toglie un po' di
@@ -44,7 +45,7 @@ energia, quindi l'immagine non è più fisicamente esatta.
 - **Intervallo:** da 0 a 1000. **Predefinito:** 0 = disattivato (fisicamente corretto).
 - Se ti serve, parti da valori alti (10 – 20) e abbassali solo quanto basta.
 
-## Seed
+## Seme casuale (seed)
 
 Il numero di partenza della sequenza casuale. La stessa scena con lo stesso seed dà esattamente
 la stessa immagine; cambiandolo cambia il disegno del rumore, a parità di qualità. Serve per i

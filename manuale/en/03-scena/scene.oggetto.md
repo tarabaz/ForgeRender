@@ -1,13 +1,13 @@
 ---
 id: scene.oggetto
-titolo: Move, rotate and resize (Object tab)
+titolo: Move, rotate and resize (Selection tab)
 parole: object, position, dimensions, size, move, rotate, scale, drop, floor, duplicate, delete, snap, contact
 ui: panel.object, edit.duplicate, edit.delete, edit.hide, edit.isolate, edit.show_all
 correlate: ui.viewport, scene.importa, mat.pannello
 ---
-# Move, rotate and resize (Object tab)
+# Move, rotate and resize (Selection tab)
 
-**Where:** Advanced mode → **Object** tab, with one or more components selected.
+**Where:** Advanced mode → **Selection** tab, with one or more components selected.
 
 | Control | What it does |
 |---|---|

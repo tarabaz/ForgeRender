@@ -1,6 +1,6 @@
-//! Barra dei menu (prima riga in alto): modalità e lingua sempre visibili, poi i menu File,
-//! Modifica, Scena, Oggetti, Vista, Rendering, Libreria, Strumenti, Guida. Le voci vengono
-//! dall'elenco unico dei comandi (`crate::commands`).
+//! Barra dei menu (prima riga in alto): i menu File, Modifica, Scena, Oggetti, Vista, Rendering,
+//! Libreria, Strumenti, Guida e, a destra, la modalità Semplice | Avanzata e le Impostazioni. Le
+//! voci vengono dall'elenco unico dei comandi (`crate::commands`).
 
 use crate::app::{ForgeApp, InspectorTab, View};
 use crate::commands::{self, Cmd};
@@ -11,9 +11,6 @@ use forge_render_core::BackendKind;
 
 pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
     egui::MenuBar::new().ui(ui, |ui| {
-        mode_switch(app, ui);
-        language_switch(app, ui);
-        ui.separator();
         ui.menu_button(tr("File"), |ui| file_menu(app, ui));
         ui.menu_button(tr("Modifica"), |ui| edit_menu(app, ui));
         ui.menu_button(tr("Scena"), |ui| scene_menu(app, ui));
@@ -50,6 +47,20 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             ui.colored_label(style::WARN, tr("Modalità sicura"))
                 .on_hover_text(tr("Avviato senza accelerazione GPU: viewport 3D disattivata"));
         }
+        // A destra: le Impostazioni e la modalità, che non sono menu (la lingua sta nelle
+        // Impostazioni). Il layout va da destra a sinistra.
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let sp = commands::spec(Cmd::Preferences);
+            if ui
+                .button(sp.icon)
+                .on_hover_text(format!("{}\n{}", tr(sp.label), tr(sp.hint)))
+                .clicked()
+            {
+                run(app, ui, Cmd::Preferences);
+            }
+            ui.separator();
+            mode_switch(app, ui);
+        });
     });
 }
 
@@ -318,43 +329,16 @@ pub fn ai_controlled_label(app: &ForgeApp, ui: &mut egui::Ui) {
     }
 }
 
-/// Lingua dell'interfaccia: cambia subito tutte le scritte e resta nelle Impostazioni.
-pub fn language_switch(app: &mut ForgeApp, ui: &mut egui::Ui) {
-    let current = app
-        .languages
-        .iter()
-        .find(|l| l.code == app.prefs.language)
-        .map(|l| l.name.clone())
-        .unwrap_or_else(|| "Italiano".into());
-    let mut code = app.prefs.language.clone();
-    egui::ComboBox::from_id_salt("ui-language")
-        .selected_text(current)
-        .width(90.0)
-        .show_ui(ui, |ui| {
-            for l in &app.languages {
-                ui.selectable_value(&mut code, l.code.clone(), &l.name);
-            }
-        })
-        .response
-        .on_hover_text(tr("Lingua dell'interfaccia (file nella cartella lang accanto al programma)"));
-    if code != app.prefs.language {
-        let p = crate::prefs::Preferences {
-            language: code,
-            ..app.prefs.clone()
-        };
-        app.apply_prefs(p, false);
-    }
-}
-
 /// Selettore Semplice | Avanzata: cambia solo il pannello di destra, i valori restano gli stessi.
+/// Sta a destra in un layout da destra a sinistra: i controlli si aggiungono dall'ultimo.
 fn mode_switch(app: &mut ForgeApp, ui: &mut egui::Ui) {
     use crate::prefs::UiMode;
     let mut mode = app.prefs.ui_mode;
-    ui.label(egui::RichText::new(tr("Modalità")).weak());
-    ui.selectable_value(&mut mode, UiMode::Simple, egui::RichText::new(tr("Semplice")).strong())
-        .on_hover_text(tr("Pannello guidato: prepara la scena, scegli aspetto e qualità, avvia il render"));
     ui.selectable_value(&mut mode, UiMode::Advanced, egui::RichText::new(tr("Avanzata")).strong())
         .on_hover_text(tr("Tutti i controlli: oggetti, materiali, luci, ambiente, effetti, camera, render"));
+    ui.selectable_value(&mut mode, UiMode::Simple, egui::RichText::new(tr("Semplice")).strong())
+        .on_hover_text(tr("Pannello guidato: prepara la scena, scegli aspetto e qualità, avvia il render"));
+    ui.label(egui::RichText::new(tr("Modalità")).weak());
     if mode != app.prefs.ui_mode {
         let p = crate::prefs::Preferences {
             ui_mode: mode,

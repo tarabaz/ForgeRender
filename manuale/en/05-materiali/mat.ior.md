@@ -7,7 +7,7 @@ correlate: mat.transmission, mat.roughness, mat.specular
 ---
 # IOR (index of refraction)
 
-**Where:** Advanced mode → **Materials** tab → **IOR** slider.
+**Where:** Advanced mode → **Selection** tab (material of the selected part) or **Scene → Materials** → **Index of refraction (IOR)** slider.
 
 **What it does:** sets how much light bends when it enters the material and how much the
 material reflects when seen head-on. It matters most for transparent materials

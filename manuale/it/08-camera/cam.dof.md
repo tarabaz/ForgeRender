@@ -7,7 +7,7 @@ correlate: cam.obiettivo, cam.tiltshift
 ---
 # Profondità di campo, diaframma e messa a fuoco
 
-**Dove si trova:** scheda Camera → **Profondità di campo: attiva**.
+**Dove si trova:** **Scena → Camera** → **Profondità di campo: attiva**.
 
 **A cosa serve:** uno sfocato ottico vero (lente sottile): nitido sul piano di fuoco, sfocato
 davanti e dietro. Stacca il prodotto dallo sfondo, come in una foto vera.

@@ -7,7 +7,7 @@ correlate: light.tipi, render.esposizione, mat.metallic
 ---
 # Ambiente (uniforme, cielo a gradiente, HDRI)
 
-**Dove si trova:** modalità Avanzata → scheda **Ambiente**; **Scena → Ambiente e HDRI…**.
+**Dove si trova:** modalità Avanzata → **Scena → Ambiente**; **Scena → Ambiente e HDRI…**.
 
 **A cosa serve:** l'ambiente è la luce che arriva da tutto attorno alla scena, come dal cielo o
 dalle pareti di una stanza. Illumina gli oggetti, si riflette sulle superfici lucide e, se vuoi,

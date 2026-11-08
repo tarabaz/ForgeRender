@@ -7,7 +7,7 @@ correlate: cam.dof, cam.tiltshift, ui.viewport, export.viste
 ---
 # Camera, obiettivo e focale
 
-**Dove si trova:** modalità Avanzata → scheda **Camera**; **Vista → Camera e obiettivo…**.
+**Dove si trova:** modalità Avanzata → **Scena → Camera** (la camera di rendering scelta compare anche nella scheda **Selezione**); **Vista → Camera e obiettivo…**.
 
 ## Camera della viewport e camere di rendering
 

@@ -7,7 +7,7 @@ correlate: intro.primo-render, light.colore, render.campioni
 ---
 # Modalità Semplice (foto prodotto in 5 passi)
 
-**Dove si trova:** interruttore **Semplice** in alto a sinistra. È la modalità predefinita.
+**Dove si trova:** interruttore **Semplice** in alto a destra. È la modalità predefinita.
 
 **A cosa serve:** una sola colonna con pulsanti grandi che porta dal modello alla foto. Ogni
 scelta scrive gli stessi valori che trovi in modalità Avanzata, quindi puoi passare dall'una

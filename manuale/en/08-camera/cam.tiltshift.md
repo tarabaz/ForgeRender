@@ -7,7 +7,7 @@ correlate: cam.dof, cam.obiettivo
 ---
 # Tilt-shift
 
-**Where:** Camera tab → **Tilt-shift**.
+**Where:** **Scene → Camera** → **Tilt-shift**.
 
 **What it does:** a sharp band on the final image with the blur growing on both sides, like the
 tilt-shift lenses that make real scenes look like miniatures. It is **separate from the depth of

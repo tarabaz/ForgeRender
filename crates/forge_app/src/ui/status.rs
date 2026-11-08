@@ -325,8 +325,8 @@ fn item(app: &ForgeApp, ui: &mut egui::Ui, i: StatusItem, p: &forge_render_core:
     steady_text(ui, id, text.into(), widest).on_hover_text(item_hint(i));
 }
 
-/// Riga dei contatori: quelli scelti partono da sinistra e vanno a capo se serve; Backend e
-/// processore restano fissi all'estrema destra, su due righe.
+/// Riga dei contatori: quelli scelti partono da sinistra e vanno a capo se serve; il backend
+/// resta fisso all'estrema destra, su una riga (il processore è nel suggerimento).
 fn counters(app: &ForgeApp, ui: &mut egui::Ui, p: &forge_render_core::Progress) {
     let job = video_job(app);
     let device = if p.device.is_empty() {
@@ -341,8 +341,13 @@ fn counters(app: &ForgeApp, ui: &mut egui::Ui, p: &forge_render_core::Progress) 
     );
     let font = egui::TextStyle::Body.resolve(ui.style());
     let color = ui.visuals().text_color();
-    let measure = |ui: &egui::Ui, t: &str| ui.painter().layout_no_wrap(t.to_string(), font.clone(), color).size().x;
-    let fixed = measure(ui, &backend).max(measure(ui, &cpu)).min(ui.available_width() * 0.45).ceil();
+    let fixed = ui
+        .painter()
+        .layout_no_wrap(backend.clone(), font, color)
+        .size()
+        .x
+        .min(ui.available_width() * 0.4)
+        .ceil();
     ui.horizontal_top(|ui| {
         let left = (ui.available_width() - fixed - 12.0).max(40.0);
         ui.allocate_ui(egui::vec2(left, 0.0), |ui| {
@@ -354,10 +359,9 @@ fn counters(app: &ForgeApp, ui: &mut egui::Ui, p: &forge_render_core::Progress) 
                 }
             });
         });
-        ui.with_layout(egui::Layout::top_down(egui::Align::Max), |ui| {
-            ui.spacing_mut().item_spacing.y = 2.0;
-            ui.add(egui::Label::new(backend).truncate());
-            ui.add(egui::Label::new(egui::RichText::new(cpu).weak()).truncate());
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+            ui.add(egui::Label::new(egui::RichText::new(backend).weak()).truncate())
+                .on_hover_text(cpu);
         });
     });
 }
@@ -376,6 +380,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
         steady_text(ui, egui::Id::NULL.with("stato-render"), state, 0.0);
         let target = if p.target == 0 { "∞".to_string() } else { p.target.to_string() };
         let bar = egui::ProgressBar::new(p.fraction())
+            .fill(egui::Color32::from_rgb(200, 100, 20))
             .desired_width(260.0)
             .text(tf("{} / {} campioni", &[format!("{}", p.samples), target.to_string()]));
         ui.add(bar);
@@ -445,13 +450,57 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
     tabs_and_log(app, ui);
 }
 
-/// Schede Timeline e Console.
+/// Parte bassa aperta? Se l'utente non ha scelto: aperta solo quando la timeline (attaccata al
+/// programma) ha qualcosa.
+pub fn bottom_open(app: &ForgeApp) -> bool {
+    app.bottom_open
+        .unwrap_or(!app.scene.timeline.elements.is_empty() && !app.prefs.timeline_detached)
+}
+
+/// Schede Timeline e Console. Ridotta, resta una riga per aprirle; aperta, a destra c'è
+/// "Riduci" per lasciare lo spazio alla viewport.
 fn tabs_and_log(app: &mut ForgeApp, ui: &mut egui::Ui) {
+    use crate::app::BottomTab;
     ui.separator();
+    let open = bottom_open(app);
+    let elements = app.scene.timeline.elements.len();
     ui.horizontal(|ui| {
-        ui.selectable_value(&mut app.bottom_tab, crate::app::BottomTab::Timeline, tr("Timeline"));
-        ui.selectable_value(&mut app.bottom_tab, crate::app::BottomTab::Console, tr("Console"));
+        for (tab, label) in [(BottomTab::Timeline, tr("Timeline")), (BottomTab::Console, tr("Console"))] {
+            let arrow = if open {
+                String::new()
+            } else {
+                format!("{} ", crate::ui::icons::CARET_RIGHT)
+            };
+            if ui
+                .selectable_label(open && app.bottom_tab == tab, format!("{arrow}{label}"))
+                .clicked()
+            {
+                app.bottom_tab = tab;
+                app.bottom_open = Some(true);
+            }
+        }
+        if !open {
+            let text = if elements == 0 {
+                tr("nessuna animazione").to_string()
+            } else {
+                tf("{} elementi animati", &[elements.to_string()])
+            };
+            ui.label(egui::RichText::new(text).weak());
+        }
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if open
+                && ui
+                    .button(format!("{} {}", crate::ui::icons::CARET_DOWN, tr("Riduci")))
+                    .on_hover_text(tr("Riduce la parte bassa a una riga: più spazio per la viewport"))
+                    .clicked()
+            {
+                app.bottom_open = Some(false);
+            }
+        });
     });
+    if !open {
+        return;
+    }
     if app.bottom_tab == crate::app::BottomTab::Timeline {
         if app.prefs.timeline_detached {
             ui.label(egui::RichText::new(tr("La timeline è in una finestra a parte.")).weak());

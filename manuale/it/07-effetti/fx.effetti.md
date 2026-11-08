@@ -7,7 +7,7 @@ correlate: fx.foschia, light.tipi, anim.timeline
 ---
 # Scheda Effetti (fumo, nebbia, polvere, lucciole, adesivi)
 
-**Dove si trova:** modalità Avanzata → scheda **Effetti** → **Aggiungi effetto**; **Scena →
+**Dove si trova:** modalità Avanzata → **Scena → Effetti** → **Aggiungi effetto**, oppure il **+** del gruppo **Effetti** nel pannello Scena; l'effetto scelto compare nella scheda **Selezione**; **Scena →
 Effetti e nebbia…**.
 
 Gli effetti volumetrici si calcolano **in anticipo**, uno alla volta, con l'avanzamento nella

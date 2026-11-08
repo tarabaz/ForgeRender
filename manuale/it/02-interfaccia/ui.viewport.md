@@ -49,7 +49,7 @@ Scegli lo strumento nella barra o con i tasti:
   il loro gizmo. Spot e luci direzionali si puntano trascinando il **rombo** del loro bersaglio.
 - **Annulla / Ripeti:** Ctrl+Z, Ctrl+Y.
 
-Per i valori esatti usa la scheda **Oggetto**: vedi [Spostare, ruotare e
+Per i valori esatti usa la scheda **Selezione**: vedi [Spostare, ruotare e
 ridimensionare](scene.oggetto).
 
 ## Nascondere

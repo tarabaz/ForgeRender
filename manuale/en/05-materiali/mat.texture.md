@@ -7,7 +7,7 @@ correlate: mat.pannello, mat.roughness, fx.effetti
 ---
 # Textures, mapping and relief
 
-**Where:** Advanced mode → **Materials** tab → **Texture** section; with textures, also **Texture
+**Where:** Advanced mode → **Selection** tab (material of the selected part) or **Scene → Materials** → **Texture** section; with textures, also **Texture
 scale and placement** and **Relief (normal, bump, displacement)**.
 
 ## Texture slots
@@ -39,5 +39,5 @@ the **World**: with Piece the texture moves with the part.
 
 ## Labels and logos
 
-To put an image (logo, label) on a part only, use a **decal** in the Effects tab: see
+To put an image (logo, label) on a part only, use a **decal** in **Scene → Effects**: see
 [Effects](fx.effetti).

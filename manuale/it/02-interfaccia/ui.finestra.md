@@ -9,13 +9,12 @@ correlate: ui.viewport, ui.impostazioni, intro.semplice
 
 | Zona | Dove | Cosa contiene |
 |---|---|---|
-| Barra dei menu | in alto | File, Modifica, Scena, Oggetti, Vista, Rendering, Libreria, Strumenti, Guida |
-| Barra degli strumenti | sotto i menu | interruttore Semplice / Avanzata, i comandi più usati, menu **Aggiungi**, **Avvia render**, interruttore **AI MCP** |
-| Pannello Scena | a sinistra | l'albero dei componenti del modello, poi camere di rendering, luci ed effetti |
-| Area centrale | al centro | **Viewport** (vista in tempo reale) o **Render** (l'immagine del path tracer) |
-| Pannello delle impostazioni | a destra | Semplice: i 5 passi. Avanzata: le schede Oggetto, Materiali, Luci, Ambiente, Effetti, Camera, Render |
-| Timeline / Console | in basso | chiavi dell'animazione (vedi [Timeline](anim.timeline)) e messaggi del programma |
-| Barra di stato | in fondo | campioni, tempo, tempo rimanente, effetti in calcolo, dispositivo |
+| Barra dei menu | in alto | File, Modifica, Scena, Oggetti, Vista, Rendering, Libreria, Strumenti, Guida; a destra l'interruttore **Semplice / Avanzata** e l'ingranaggio delle **Impostazioni** |
+| Barra degli strumenti | sotto i menu | a sinistra Nuovo, Apri, Salva, Importa e i menu **Aggiungi**, **Luci**, **Camera**, **Ambiente**, **Materiale**; a destra **Avvia render**, Stop, Riavvia, Esporta e l'interruttore **AI MCP** |
+| Pannello Scena | a sinistra | un solo albero: gli oggetti del modello, poi i gruppi **Luci**, **Camere** ed **Effetti** |
+| Area centrale | al centro | le linguette **Viewport** e **Render** in alto, con **Riavvio automatico** a destra |
+| Pannello delle impostazioni | a destra | Semplice: i 5 passi. Avanzata: le schede **Selezione**, **Scena** e **Render** |
+| Parte bassa | in basso | stato del render e contatori; **Timeline** e **Console**, ridotte a una riga finché non c'è un'animazione |
 
 ## Menu
 
@@ -39,13 +38,31 @@ correlate: ui.viewport, ui.impostazioni, intro.semplice
 ## Pannelli
 
 I pannelli si allargano trascinandone il bordo. Le righe lunghe scorrono dentro il pannello invece
-di allargarlo. Nel pannello Scena un clic seleziona un componente (Ctrl o Maiusc lo aggiungono
-alla selezione), la casella accanto al nome lo nasconde o lo mostra, il tasto destro ha altri
-comandi.
+di allargarlo.
+
+**Pannello Scena.** Un clic su un oggetto lo seleziona (Ctrl o Maiusc lo aggiungono alla
+selezione), la casella accanto al nome lo nasconde o lo mostra, il tasto destro ha altri comandi.
+Sotto gli oggetti i gruppi **Luci**, **Camere** ed **Effetti** si aprono e si chiudono con la
+freccia; il **+** a destra aggiunge una luce, una camera o un effetto. Ciò che è selezionato è
+evidenziato in arancione.
+
+**Pannello delle impostazioni (modalità Avanzata).** Ha tre schede:
+
+- **Selezione** mostra ciò che hai scelto nella viewport o nell'albero, senza cercare la scheda
+  giusta: per un oggetto posizione e misure e, sotto, il suo materiale; per una luce, una camera
+  o un effetto le sue proprietà.
+- **Scena** raccoglie ciò che vale per tutta la scena, in sotto-schede: **Luci** (preset e luci
+  nuove), **Ambiente**, **Effetti**, **Camera** e **Materiali** (tutti i materiali della scena,
+  anche senza niente di selezionato).
+- **Render** contiene le impostazioni del calcolo. I valori da tecnico (roulette russa, limite
+  della luce indiretta, seme casuale, thread della CPU) sono nella sezione **Avanzate**, chiusa.
+
+**Parte bassa.** Senza animazioni la timeline resta ridotta a una riga: un clic su **Timeline** o
+**Console** la apre, **Riduci** la richiude. Si apre da sola quando la timeline ha qualcosa.
 
 ## Barra di stato
 
 Mostra l'avanzamento del render (campioni fatti sull'obiettivo, tempo trascorso, tempo
-rimanente), il calcolo degli effetti come nebbia e fumo, e a destra il **backend** e il
-processore. I contatori si scelgono in **Modifica → Impostazioni… → Barra di stato**: fino a 9
-su 15 (FPS della viewport, fotogrammi, tempo rimanente, GPU, VRAM, RAM e altri).
+rimanente), il calcolo degli effetti come nebbia e fumo, e a destra il **backend** (il
+processore è nel suggerimento). I contatori si scelgono in **Modifica → Impostazioni… → Barra di stato**: fino a 9
+su 14 (FPS della viewport, fotogrammi, tempo rimanente, GPU, VRAM, RAM e altri).

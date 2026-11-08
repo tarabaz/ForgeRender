@@ -7,7 +7,7 @@ correlate: fx.effetti, light.tipi, render.campioni
 ---
 # Foschia d'ambiente
 
-**Dove si trova:** scheda Effetti → **Aggiungi effetto** → **Foschia**.
+**Dove si trova:** **Scena → Effetti** → **Aggiungi effetto** → **Foschia**.
 
 **A cosa serve:** riempie la scena (o una fascia) di una nebbia leggera che ogni luce attraversa:
 spot, sole e lampade disegnano raggi visibili, con dentro le ombre degli oggetti.

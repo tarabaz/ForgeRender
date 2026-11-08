@@ -7,20 +7,67 @@ use forge_math::Vec3;
 use forge_render_core::ToneMapping;
 use forge_scene::{light, Environment, LightKind, Material, MaterialId};
 
+/// Le tre schede del pannello di destra. Selezione mostra ciò che si è scelto (oggetto con il suo
+/// materiale, luce, camera o effetto); Scena raccoglie ciò che vale per tutta la scena, in
+/// sotto-schede; Render le impostazioni del calcolo.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Group {
+    Selection,
+    Scene,
+    Render,
+}
+
+impl Group {
+    fn of(tab: InspectorTab) -> Self {
+        match tab {
+            InspectorTab::Object => Group::Selection,
+            InspectorTab::Render => Group::Render,
+            _ => Group::Scene,
+        }
+    }
+}
+
+/// Sotto-schede di Scena, nell'ordine in cui si usano di solito.
+const SCENE_TABS: [(InspectorTab, &str); 5] = [
+    (InspectorTab::Lights, tk("Luci")),
+    (InspectorTab::Environment, tk("Ambiente")),
+    (InspectorTab::Effects, tk("Effetti")),
+    (InspectorTab::Camera, tk("Camera")),
+    (InspectorTab::Materials, tk("Materiali")),
+];
+
 pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
-    ui.horizontal_wrapped(|ui| {
-        for (tab, label) in [
-            (InspectorTab::Object, tr("Oggetto")),
-            (InspectorTab::Materials, tr("Materiali")),
-            (InspectorTab::Lights, tr("Luci")),
-            (InspectorTab::Environment, tr("Ambiente")),
-            (InspectorTab::Effects, tr("Effetti")),
-            (InspectorTab::Camera, tr("Camera")),
-            (InspectorTab::Render, tr("Render")),
+    // Ultima sotto-scheda di Scena: ci si torna cliccando Scena.
+    let last_id = egui::Id::NULL.with("ultima-scheda-scena");
+    let group = Group::of(app.tab);
+    if group == Group::Scene {
+        ui.ctx().data_mut(|d| d.insert_temp(last_id, app.tab));
+    }
+    ui.horizontal(|ui| {
+        for (g, label) in [
+            (Group::Selection, tr("Selezione")),
+            (Group::Scene, tr("Scena")),
+            (Group::Render, tr("Render")),
         ] {
-            ui.selectable_value(&mut app.tab, tab, label);
+            if ui
+                .selectable_label(group == g, egui::RichText::new(label).size(14.0).strong())
+                .clicked()
+            {
+                app.tab = match g {
+                    Group::Selection => InspectorTab::Object,
+                    Group::Render => InspectorTab::Render,
+                    Group::Scene => ui.ctx().data(|d| d.get_temp(last_id)).unwrap_or(InspectorTab::Lights),
+                };
+            }
         }
     });
+    if group == Group::Scene {
+        ui.horizontal_wrapped(|ui| {
+            for (tab, label) in SCENE_TABS {
+                ui.selectable_value(&mut app.tab, tab, tr(label));
+            }
+        });
+    }
     ui.separator();
     // Anche in orizzontale: una riga troppo lunga scorre invece di allargare il pannello, che
     // resta largo come l'ha messo l'utente.
@@ -28,7 +75,7 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
         .id_salt("inspector-scroll")
         .auto_shrink([false, false])
         .show(ui, |ui| match app.tab {
-            InspectorTab::Object => crate::ui::transform::show(app, ui),
+            InspectorTab::Object => selection(app, ui),
             InspectorTab::Materials => materials(app, ui),
             InspectorTab::Lights => lights(app, ui),
             InspectorTab::Environment => environment(app, ui),
@@ -36,6 +83,51 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
             InspectorTab::Camera => camera(app, ui),
             InspectorTab::Render => render(app, ui),
         });
+}
+
+/// Scheda Selezione: le proprietà di ciò che si è scelto nella viewport o nell'albero, senza
+/// cercare la scheda giusta. Un oggetto mostra posizione e misure e, sotto, il suo materiale.
+fn selection(app: &mut ForgeApp, ui: &mut egui::Ui) {
+    use crate::ui::icons;
+    let heading = |ui: &mut egui::Ui, icon: &str, text: &str| {
+        ui.label(egui::RichText::new(format!("{icon}  {text}")).size(15.0).strong());
+        ui.add_space(2.0);
+    };
+    if let Some(i) = app.selected_light.filter(|&i| i < app.scene.lights.len()) {
+        heading(ui, icons::LIGHT, &app.scene.lights[i].name.clone());
+        light_detail(app, ui);
+    } else if app.selected_camera.is_some_and(|i| i < app.scene.render_cameras.len()) {
+        camera(app, ui);
+    } else if app.selected_fog.is_some() || app.selected_smoke.is_some() || app.selected_dust {
+        effects(app, ui);
+    } else if !app.selection.is_empty() {
+        crate::ui::transform::show(app, ui);
+        ui.add_space(6.0);
+        egui::CollapsingHeader::new(
+            egui::RichText::new(format!("{}  {}", icons::MATERIAL, tr("Materiale")))
+                .size(15.0)
+                .strong(),
+        )
+        .id_salt("selezione-materiale")
+        .default_open(true)
+        .show(ui, |ui| materials(app, ui));
+    } else {
+        ui.add_space(8.0);
+        ui.label(egui::RichText::new(tr("Niente di selezionato")).size(15.0).strong());
+        ui.label(tr(
+            "Clicca un oggetto nella viewport o una riga nell'albero a sinistra: qui compaiono le sue proprietà. \
+             Luci, camere ed effetti si scelgono anche dai loro gruppi sotto l'albero.",
+        ));
+        ui.add_space(8.0);
+        ui.label(egui::RichText::new(tr("Per tutta la scena")).strong());
+        ui.horizontal_wrapped(|ui| {
+            for (tab, label) in SCENE_TABS {
+                if ui.button(tr(label)).clicked() {
+                    app.tab = tab;
+                }
+            }
+        });
+    }
 }
 
 fn is_opacity_copy(m: &Material) -> bool {
@@ -295,58 +387,192 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
         });
     });
 
-    // Sostituisci materiale: tutti i componenti con un materiale passano a quello selezionato.
-    let replace_id = ui.make_persistent_id("sostituisci-materiale");
-    let mut from: Option<MaterialId> = ui.data(|d| d.get_temp(replace_id)).flatten();
-    if from
-        .as_ref()
-        .is_some_and(|f| *f == app.selected_material || !items.iter().any(|m| m.id == *f))
-    {
-        from = None;
-    }
+    // Assegnazione alla selezione: l'operazione di tutti i giorni, sempre in vista.
+    ui.add_space(4.0);
     ui.horizontal_wrapped(|ui| {
-        ui.label(tr("Sostituisci"));
-        let label = from
-            .as_ref()
-            .and_then(|f| items.iter().find(|m| m.id == *f))
-            .map(|m| crate::i18n::tr_dyn(&m.name).to_string())
-            .unwrap_or_else(|| tr("scegli…").to_string());
-        egui::ComboBox::from_id_salt("sostituisci-da")
-            .selected_text(label)
-            .show_ui(ui, |ui| {
-                for m in items.iter().filter(|m| m.id != app.selected_material) {
-                    let usage = app.scene.assignments.values().filter(|v| **v == m.id).count();
-                    let text = format!("{} ({usage})", crate::i18n::tr_dyn(&m.name));
-                    ui.selectable_value(&mut from, Some(m.id.clone()), text);
-                }
-            });
-        ui.label(tf("con «{}»", std::slice::from_ref(&selected_name)));
-        let count = from
-            .as_ref()
-            .map(|f| app.scene.assignments.values().filter(|v| *v == f).count())
-            .unwrap_or(0);
+        if ui.add_enabled(n_sel > 0, egui::Button::new(tr("Assegna alla selezione"))).clicked() {
+            for &i in &app.selection {
+                app.scene
+                    .assignments
+                    .insert(app.scene.nodes[i].id.clone(), app.selected_material.clone());
+            }
+            app.appearance_changed();
+        }
         if ui
-            .add_enabled(from.is_some(), egui::Button::new(tf("Sostituisci ({})", &[count.to_string()])))
-            .on_hover_text(tr(
-                "Tutti i componenti con il primo materiale (anche quelli che lo ereditano, e il predefinito della scena) \
-                 passano a quello selezionato, senza doverli selezionare",
-            ))
+            .add_enabled(n_sel > 0, egui::Button::new(tr("Rimuovi assegnazione")))
+            .on_hover_text(tr("Il componente torna a ereditare il materiale dal genitore o quello predefinito"))
             .clicked()
         {
-            if let Some(f) = from.take() {
-                replace = Some((f, app.selected_material.clone()));
+            for &i in &app.selection {
+                app.scene.assignments.remove(&app.scene.nodes[i].id);
             }
+            app.appearance_changed();
         }
     });
-    ui.data_mut(|d| d.insert_temp(replace_id, from));
-    // Assegnazioni di prima dell'ultima sostituzione, per tornare indietro.
+
+    // Le proprietà del materiale scelto, subito sotto: è quello che si regola più spesso.
+    ui.separator();
+    // Lato più lungo dei componenti selezionati (per contare le ripetizioni della texture).
+    let obj_size = {
+        let mut b = forge_math::Aabb::EMPTY;
+        for &i in &app.selection {
+            b.grow(&app.scene.bounds_of(i));
+        }
+        (!b.is_empty()).then(|| (b.max - b.min).max_element()).filter(|s| *s > 0.0)
+    };
+    if let Some(m) = app.scene.materials.get_mut(&app.selected_material) {
+        if material_form(ui, m, obj_size) {
+            app.appearance_changed();
+        }
+        crate::ui::central::material_preview(app, ui);
+    }
+
+    // Operazioni su più pezzi e sui materiali stessi: in una sezione chiusa, per non coprire le
+    // proprietà. Gli identificativi sono fissi: valgono dentro e fuori dalla sezione.
+    ui.separator();
+    let replace_id = egui::Id::NULL.with("sostituisci-materiale");
     type Before = (std::collections::BTreeMap<forge_scene::ComponentId, MaterialId>, MaterialId, String);
-    let undo_id = ui.make_persistent_id("sostituisci-materiale-prima");
+    let undo_id = egui::Id::NULL.with("sostituisci-materiale-prima");
+    egui::CollapsingHeader::new(egui::RichText::new(tr("Gestione materiali")).strong())
+        .id_salt("gestione-materiali")
+        .show(ui, |ui| {
+            ui.label(
+                egui::RichText::new(tr(
+                    "Sostituire un materiale ovunque, assegnarlo per nome, crearne uno nuovo o salvarlo nella libreria.",
+                ))
+                .weak(),
+            );
+            // Sostituisci materiale: tutti i componenti con un materiale passano a quello selezionato.
+            let mut from: Option<MaterialId> = ui.data(|d| d.get_temp(replace_id)).flatten();
+            if from
+                .as_ref()
+                .is_some_and(|f| *f == app.selected_material || !items.iter().any(|m| m.id == *f))
+            {
+                from = None;
+            }
+            ui.horizontal_wrapped(|ui| {
+                ui.label(tr("Sostituisci"));
+                let label = from
+                    .as_ref()
+                    .and_then(|f| items.iter().find(|m| m.id == *f))
+                    .map(|m| crate::i18n::tr_dyn(&m.name).to_string())
+                    .unwrap_or_else(|| tr("scegli…").to_string());
+                egui::ComboBox::from_id_salt("sostituisci-da")
+                    .selected_text(label)
+                    .show_ui(ui, |ui| {
+                        for m in items.iter().filter(|m| m.id != app.selected_material) {
+                            let usage = app.scene.assignments.values().filter(|v| **v == m.id).count();
+                            let text = format!("{} ({usage})", crate::i18n::tr_dyn(&m.name));
+                            ui.selectable_value(&mut from, Some(m.id.clone()), text);
+                        }
+                    });
+                ui.label(tf("con «{}»", std::slice::from_ref(&selected_name)));
+                let count = from
+                    .as_ref()
+                    .map(|f| app.scene.assignments.values().filter(|v| *v == f).count())
+                    .unwrap_or(0);
+                if ui
+                    .add_enabled(from.is_some(), egui::Button::new(tf("Sostituisci ({})", &[count.to_string()])))
+                    .on_hover_text(tr(
+                        "Tutti i componenti con il primo materiale (anche quelli che lo ereditano, e il predefinito della scena) \
+                         passano a quello selezionato, senza doverli selezionare",
+                    ))
+                    .clicked()
+                {
+                    if let Some(f) = from.take() {
+                        replace = Some((f, app.selected_material.clone()));
+                    }
+                }
+            });
+            ui.data_mut(|d| d.insert_temp(replace_id, from));
+            ui.horizontal(|ui| {
+                ui.label(tr("Nome contiene:"));
+                ui.add(egui::TextEdit::singleline(&mut app.rule_pattern).desired_width(110.0));
+                let pat = app.rule_pattern.trim().to_lowercase();
+                let matches: Vec<usize> = if pat.is_empty() {
+                    Vec::new()
+                } else {
+                    (0..app.scene.nodes.len())
+                        .filter(|&i| app.scene.nodes[i].name.to_lowercase().contains(&pat))
+                        .collect()
+                };
+                if ui
+                    .add_enabled(
+                        !matches.is_empty(),
+                        egui::Button::new(tf("Assegna ({})", &[format!("{}", matches.len())])),
+                    )
+                    .on_hover_text(tr("Assegna il materiale a tutti i componenti il cui nome contiene il testo"))
+                    .clicked()
+                {
+                    for i in matches {
+                        app.scene
+                            .assignments
+                            .insert(app.scene.nodes[i].id.clone(), app.selected_material.clone());
+                    }
+                    app.appearance_changed();
+                }
+            });
+            let is_default = app.scene.default_material == app.selected_material;
+            if ui
+                .add_enabled(
+                    !is_default,
+                    egui::Button::new(tr("Usa come predefinito per i componenti senza assegnazione")),
+                )
+                .clicked()
+            {
+                app.scene.default_material = app.selected_material.clone();
+                app.appearance_changed();
+            }
+            ui.horizontal(|ui| {
+                if ui.button(tr("Nuovo")).clicked() {
+                    let id = app.scene.materials.unique_id("materiale");
+                    app.scene.materials.upsert(Material {
+                        id: id.clone(),
+                        name: tr("Nuovo materiale").into(),
+                        category: tr("Personalizzati").into(),
+                        ..Default::default()
+                    });
+                    app.selected_material = id;
+                    app.appearance_changed();
+                }
+                if ui.button(tr("Duplica")).clicked() {
+                    if let Some(m) = app.scene.materials.get(&app.selected_material).cloned() {
+                        let id = app.scene.materials.unique_id(&format!("{}-copia", m.id.0));
+                        app.scene.materials.upsert(Material {
+                            id: id.clone(),
+                            name: tf("{} (copia)", std::slice::from_ref(&m.name)),
+                            category: tr("Personalizzati").into(),
+                            ..m
+                        });
+                        app.selected_material = id;
+                        app.appearance_changed();
+                    }
+                }
+                let deletable = app.selected_material != MaterialId::new("default");
+                if ui
+                    .add_enabled(deletable, egui::Button::new(tr("Elimina")))
+                    .on_hover_text(tr("I componenti che lo usavano tornano al materiale ereditato/predefinito"))
+                    .clicked()
+                {
+                    let id = app.selected_material.clone();
+                    app.scene.materials.materials.retain(|m| m.id != id);
+                    app.scene.assignments.retain(|_, v| *v != id);
+                    if app.scene.default_material == id {
+                        app.scene.default_material = MaterialId::new("default");
+                    }
+                    app.selected_material = MaterialId::new("default");
+                    app.appearance_changed();
+                }
+            });
+            library_save_controls(app, ui);
+        });
+
+    // Ultima sostituzione (dal menu delle miniature o dalla sezione qui sopra), con l'annulla.
     let before: Option<Before> = ui.data(|d| d.get_temp(undo_id)).flatten();
     if let Some((assignments, default, text)) = &before {
         let mut undo = false;
         ui.horizontal_wrapped(|ui| {
-            ui.label(egui::RichText::new(text).small().weak());
+            ui.label(egui::RichText::new(text).weak());
             undo = ui.small_button(tr("Annulla sostituzione")).clicked();
         });
         if undo {
@@ -372,127 +598,6 @@ fn materials(app: &mut ForgeApp, ui: &mut egui::Ui) {
             app.appearance_changed();
         }
     }
-
-    // Assegnazione.
-    ui.add_space(4.0);
-    ui.horizontal_wrapped(|ui| {
-        if ui.add_enabled(n_sel > 0, egui::Button::new(tr("Assegna alla selezione"))).clicked() {
-            for &i in &app.selection {
-                app.scene
-                    .assignments
-                    .insert(app.scene.nodes[i].id.clone(), app.selected_material.clone());
-            }
-            app.appearance_changed();
-        }
-        if ui
-            .add_enabled(n_sel > 0, egui::Button::new(tr("Rimuovi assegnazione")))
-            .on_hover_text(tr("Il componente torna a ereditare il materiale dal genitore o quello predefinito"))
-            .clicked()
-        {
-            for &i in &app.selection {
-                app.scene.assignments.remove(&app.scene.nodes[i].id);
-            }
-            app.appearance_changed();
-        }
-    });
-    ui.horizontal(|ui| {
-        ui.label(tr("Nome contiene:"));
-        ui.add(egui::TextEdit::singleline(&mut app.rule_pattern).desired_width(110.0));
-        let pat = app.rule_pattern.trim().to_lowercase();
-        let matches: Vec<usize> = if pat.is_empty() {
-            Vec::new()
-        } else {
-            (0..app.scene.nodes.len())
-                .filter(|&i| app.scene.nodes[i].name.to_lowercase().contains(&pat))
-                .collect()
-        };
-        if ui
-            .add_enabled(
-                !matches.is_empty(),
-                egui::Button::new(tf("Assegna ({})", &[format!("{}", matches.len())])),
-            )
-            .on_hover_text(tr("Assegna il materiale a tutti i componenti il cui nome contiene il testo"))
-            .clicked()
-        {
-            for i in matches {
-                app.scene
-                    .assignments
-                    .insert(app.scene.nodes[i].id.clone(), app.selected_material.clone());
-            }
-            app.appearance_changed();
-        }
-    });
-    let is_default = app.scene.default_material == app.selected_material;
-    if ui
-        .add_enabled(
-            !is_default,
-            egui::Button::new(tr("Usa come predefinito per i componenti senza assegnazione")),
-        )
-        .clicked()
-    {
-        app.scene.default_material = app.selected_material.clone();
-        app.appearance_changed();
-    }
-
-    ui.horizontal(|ui| {
-        if ui.button(tr("Nuovo")).clicked() {
-            let id = app.scene.materials.unique_id("materiale");
-            app.scene.materials.upsert(Material {
-                id: id.clone(),
-                name: tr("Nuovo materiale").into(),
-                category: tr("Personalizzati").into(),
-                ..Default::default()
-            });
-            app.selected_material = id;
-            app.appearance_changed();
-        }
-        if ui.button(tr("Duplica")).clicked() {
-            if let Some(m) = app.scene.materials.get(&app.selected_material).cloned() {
-                let id = app.scene.materials.unique_id(&format!("{}-copia", m.id.0));
-                app.scene.materials.upsert(Material {
-                    id: id.clone(),
-                    name: tf("{} (copia)", std::slice::from_ref(&m.name)),
-                    category: tr("Personalizzati").into(),
-                    ..m
-                });
-                app.selected_material = id;
-                app.appearance_changed();
-            }
-        }
-        let deletable = app.selected_material != MaterialId::new("default");
-        if ui
-            .add_enabled(deletable, egui::Button::new(tr("Elimina")))
-            .on_hover_text(tr("I componenti che lo usavano tornano al materiale ereditato/predefinito"))
-            .clicked()
-        {
-            let id = app.selected_material.clone();
-            app.scene.materials.materials.retain(|m| m.id != id);
-            app.scene.assignments.retain(|_, v| *v != id);
-            if app.scene.default_material == id {
-                app.scene.default_material = MaterialId::new("default");
-            }
-            app.selected_material = MaterialId::new("default");
-            app.appearance_changed();
-        }
-    });
-    library_save_controls(app, ui);
-
-    ui.separator();
-    // Lato più lungo dei componenti selezionati (per contare le ripetizioni della texture).
-    let obj_size = {
-        let mut b = forge_math::Aabb::EMPTY;
-        for &i in &app.selection {
-            b.grow(&app.scene.bounds_of(i));
-        }
-        (!b.is_empty()).then(|| (b.max - b.min).max_element()).filter(|s| *s > 0.0)
-    };
-    let Some(m) = app.scene.materials.get_mut(&app.selected_material) else {
-        return;
-    };
-    if material_form(ui, m, obj_size) {
-        app.appearance_changed();
-    }
-    crate::ui::central::material_preview(app, ui);
 }
 
 /// Parametri del materiale (nome, mapping, rilievo, valori, texture): pannello Materiali e
@@ -531,14 +636,14 @@ pub(crate) fn material_form(ui: &mut egui::Ui, m: &mut Material, obj_size: Optio
             from_map(ui, &m.base_color_texture);
         });
         ui.end_row();
-        ui.label(tr("Metallic"));
+        ui.label(tr("Metallicità (metallic)"));
         ui.horizontal(|ui| {
             changed |= ui.add(egui::Slider::new(&mut m.metallic, 0.0..=1.0)).changed();
             from_map(ui, &m.metallic_texture);
         });
         ui.end_row();
         ui.horizontal(|ui| {
-            ui.label(tr("Roughness"));
+            ui.label(tr("Ruvidità (roughness)"));
             help_button(ui, "mat.roughness");
         });
         ui.horizontal(|ui| {
@@ -549,19 +654,19 @@ pub(crate) fn material_form(ui: &mut egui::Ui, m: &mut Material, obj_size: Optio
             from_map(ui, &m.roughness_texture);
         });
         ui.end_row();
-        ui.label(tr("Specular"));
+        ui.label(tr("Riflesso (specular)"));
         changed |= ui
             .add(egui::Slider::new(&mut m.specular, 0.0..=1.0))
             .on_hover_text(tr("0.5 = riflesso fisico derivato dall'IOR"))
             .changed();
         ui.end_row();
         ui.horizontal(|ui| {
-            ui.label("IOR");
+            ui.label(tr("Indice di rifrazione (IOR)"));
             help_button(ui, "mat.ior");
         });
         changed |= ui.add(egui::Slider::new(&mut m.ior, 1.0..=3.0)).help("mat.ior").changed();
         ui.end_row();
-        ui.label(tr("Transmission"));
+        ui.label(tr("Trasparenza (transmission)"));
         changed |= ui
             .add(egui::Slider::new(&mut m.transmission, 0.0..=1.0))
             .on_hover_text(tr("Trasparenza dielettrica (vetro, liquidi)"))
@@ -652,7 +757,7 @@ pub(crate) fn material_form(ui: &mut egui::Ui, m: &mut Material, obj_size: Optio
             changed = true;
         }
         ui.end_row();
-        ui.label(tr("Roughness"));
+        ui.label(tr("Ruvidità (roughness)"));
         if texture_slot(ui, &mut m.roughness_texture, "rough") {
             if m.roughness_texture.is_some() {
                 m.roughness = 1.0; // la texture (canale R) viene moltiplicata per la roughness
@@ -1096,9 +1201,14 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
         }
     });
     ui.separator();
+    light_detail(app, ui);
+}
 
+/// Proprietà della luce scelta: nella scheda Luci della scena e, da sola, nella scheda Selezione.
+fn light_detail(app: &mut ForgeApp, ui: &mut egui::Ui) {
+    let (center, radius) = app.anchor();
     let Some(i) = app.selected_light.filter(|&i| i < app.scene.lights.len()) else {
-        ui.label(egui::RichText::new(tr("Seleziona una luce nell'elenco a sinistra.")).weak());
+        ui.label(egui::RichText::new(tr("Scegli una luce nell'albero a sinistra (gruppo Luci) o nella viewport.")).weak());
         return;
     };
     let mut changed = false;
@@ -2212,16 +2322,6 @@ fn render(app: &mut ForgeApp, ui: &mut egui::Ui) {
     }
     let s = &mut app.settings;
     let max_t = app.system.logical_threads;
-    ui.horizontal(|ui| {
-        ui.label(tr("Thread CPU"));
-        changed |= ui
-            .add(egui::Slider::new(&mut s.threads, 0..=max_t))
-            .on_hover_text(tr("0 = automatico (thread logici − 1, per lasciare reattiva l'interfaccia)"))
-            .changed();
-        if s.threads == 0 {
-            ui.label(egui::RichText::new(tf("auto: {}", &[format!("{}", s.effective_threads())])).weak());
-        }
-    });
 
     ui.separator();
     ui.strong(tr("Risoluzione"));
@@ -2341,21 +2441,52 @@ fn render(app: &mut ForgeApp, ui: &mut egui::Ui) {
         ui.label(tr("Rimbalzi massimi"));
         changed |= ui.add(egui::Slider::new(&mut s.max_bounces, 1..=64)).changed();
         ui.end_row();
-        ui.label(tr("Russian roulette da"));
-        changed |= ui.add(egui::Slider::new(&mut s.russian_roulette_start, 1..=16)).changed();
-        ui.end_row();
-        ui.label(tr("Clamp indiretto"));
-        changed |= ui
-            .add(egui::DragValue::new(&mut s.clamp_indirect).speed(0.1).range(0.0..=1000.0))
-            .on_hover_text(tr(
-                "0 = disattivato (fisicamente corretto). Valori > 0 riducono i firefly introducendo un bias.",
-            ))
-            .changed();
-        ui.end_row();
-        ui.label(tr("Seed"));
-        changed |= ui.add(egui::DragValue::new(&mut s.seed)).changed();
-        ui.end_row();
     });
+    // Valori da tecnico: chiusi di default, quelli predefiniti vanno bene quasi sempre.
+    egui::CollapsingHeader::new(tr("Avanzate"))
+        .id_salt("render-avanzate")
+        .show(ui, |ui| {
+            ui.label(egui::RichText::new(tr("Valori predefiniti adatti quasi sempre: cambiali solo se sai cosa fanno.")).weak());
+            egui::Grid::new("pt-grid-avanzate")
+                .num_columns(2)
+                .spacing([10.0, 6.0])
+                .show(ui, |ui| {
+                    ui.label(tr("Roulette russa da (russian roulette)"));
+                    changed |= ui
+                        .add(egui::Slider::new(&mut s.russian_roulette_start, 1..=16))
+                        .on_hover_text(tr(
+                            "Dal rimbalzo indicato in poi i percorsi deboli si interrompono a caso: render più veloce, \
+                         stesso risultato medio",
+                        ))
+                        .changed();
+                    ui.end_row();
+                    ui.label(tr("Limite luce indiretta (clamp)"));
+                    changed |= ui
+                        .add(egui::DragValue::new(&mut s.clamp_indirect).speed(0.1).range(0.0..=1000.0))
+                        .on_hover_text(tr(
+                            "0 = disattivato (fisicamente corretto). Valori > 0 riducono i firefly introducendo un bias.",
+                        ))
+                        .changed();
+                    ui.end_row();
+                    ui.label(tr("Seme casuale (seed)"));
+                    changed |= ui
+                        .add(egui::DragValue::new(&mut s.seed))
+                        .on_hover_text(tr("Cambia la disposizione della grana, non la qualità"))
+                        .changed();
+                    ui.end_row();
+                    ui.label(tr("Thread CPU"));
+                    ui.horizontal(|ui| {
+                        changed |= ui
+                            .add(egui::Slider::new(&mut s.threads, 0..=max_t))
+                            .on_hover_text(tr("0 = automatico (thread logici − 1, per lasciare reattiva l'interfaccia)"))
+                            .changed();
+                        if s.threads == 0 {
+                            ui.label(egui::RichText::new(tf("auto: {}", &[format!("{}", s.effective_threads())])).weak());
+                        }
+                    });
+                    ui.end_row();
+                });
+        });
 
     ui.separator();
     ui.strong(tr("Visualizzazione (non riavvia il render)"));
@@ -2395,11 +2526,15 @@ fn denoiser(app: &mut ForgeApp, ui: &mut egui::Ui) -> bool {
             ui.label(egui::RichText::new(v).weak().small());
         }
         Err(e) => {
-            ui.colored_label(
-                style::WARN,
-                tr("Open Image Denoise non trovato: il render resta senza riduzione del rumore."),
-            )
-            .on_hover_text(e);
+            ui.horizontal_wrapped(|ui| {
+                ui.colored_label(
+                    style::WARN,
+                    tr("Open Image Denoise non trovato: il render resta senza riduzione del rumore."),
+                )
+                .on_hover_text(e);
+                // Un modo per rimediare, non solo l'avviso: la pagina del manuale spiega cosa fare.
+                help_button(ui, "render.denoiser");
+            });
             return false;
         }
     }

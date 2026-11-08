@@ -326,7 +326,7 @@ fn about(ui: &mut egui::Ui, p: &mut Preferences) {
     ));
     ui.checkbox(&mut p.ask_ui_mode, tr("Chiedi la modalità all'avvio"))
         .on_hover_text(tr(
-            "Finestra per scegliere tra modalità Semplice e Avanzata (si cambia anche dal selettore in alto a sinistra)",
+            "Finestra per scegliere tra modalità Semplice e Avanzata (si cambia anche dal selettore in alto a destra)",
         ));
     egui::Grid::new("prefs-about").num_columns(2).spacing([12.0, 6.0]).show(ui, |ui| {
         ui.label(tr("Libreria"));

@@ -864,3 +864,20 @@ Vedi il piano qui sopra e la tabella di sintesi in docs/ROADMAP.it.md.
 - `forge_manual`: `Block::Gallery` (più immagini nello stesso paragrafo) e `Block::image_sources`; nell'app le gallerie vanno in fila (almeno ~180 px l'una) e un'immagine rimpicciolita si vede grande col mouse sopra (`picture` in `ui/manual.rs`).
 - Test nuovi: `images_on_one_line_make_a_gallery`, `comparison_images_are_used_and_mirrored_in_docs`, 8 casi di ricerca in più. fmt, clippy (-D warnings) e test del workspace: 408 passati, 0 falliti, 10 ignorati.
 - Da sapere: la finestra del manuale con le gallerie non l'ho vista sullo schermo (nessuno strumento per guardare il programma aperto); la verifica è dei test e della compilazione. Le immagini del capitolo 17 del README le mette Valerio.
+
+## 0.50.0 — 08/11/2026 (Claude)
+
+Interfaccia riordinata secondo il layout "A · Studio pulito" scelto da Valerio (le due finestre all'avvio restano come sono, su sua indicazione).
+
+- `ui/menubar.rs`: tolto `language_switch` (la lingua sta in Impostazioni); `mode_switch` e un ingranaggio `Cmd::Preferences` a destra, in un layout da destra a sinistra.
+- `ui/quickbar.rs`: a destra Avvia render, Stop, Riavvia, Esporta e AI MCP; tolti Viewport | Render, Riavvio automatico e l'aspetto `Look::Selected`.
+- `ui/central.rs`: `view_tabs` sopra l'area centrale (Viewport | Render, Riavvio automatico).
+- `ui/tree.rs`: un solo albero; sotto gli oggetti i gruppi Luci, Camere ed Effetti (`group_header`, `EffectRow`) in un pannello in basso senza bordo trascinabile, ogni elenco al massimo 180 px. Un clic chiama `select_only` e apre Selezione.
+- `ui/inspector.rs`: `Group` (Selezione, Scena, Render) sopra `InspectorTab`, che resta com'era per comandi e manuale: `Object` = Selezione, `Render` = Render, il resto = sotto-schede di Scena (`SCENE_TABS`, l'ultima si ricorda in memoria temporanea). `selection` sceglie cosa mostrare: luce (`light_detail`, separata da `lights`), camera, effetto, oggetti (`transform::show` + materiale) o un invito vuoto. `materials`: editor subito dopo assegna/rimuovi, il resto in "Gestione materiali"; gli id della sostituzione sono fissi (`Id::NULL.with`) perché valgano dentro la sezione. Render: "Avanzate" chiusa con roulette russa, clamp, seed e thread.
+- `app.rs`: `show_selection_tab` toglie luci, camere ed effetti scelti e va su Selezione; scheda iniziale Selezione; campo `bottom_open: Option<bool>`.
+- `ui/status.rs` + `ui/mod.rs`: `bottom_open` (None = aperta solo se la timeline ha elementi e non è staccata); pannello "status-compact" senza timeline; backend su una riga col processore nel suggerimento; barra del render arancione esplicita.
+- `ui/style.rs`: selezione grigia (78) per schede e interruttori, `scene_selection` arancione per l'albero; testo Small 12 punti; testo normale grigio 190, attenuato 140.
+- Lingua inglese: 26 testi nuovi, 10 tolti. Manuale: pagine `ui.finestra`, benvenuto, Semplice, viewport, oggetto, luci, materiali, ambiente, effetti, camera, rendering e denoiser aggiornate in EN e IT. Corretto anche "9 su 15" → "9 su 14" contatori.
+- Verificato con schermate del programma vero (copia avviata da una cartella temporanea): avvio, oggetto scelto, luce scelta, scheda Render con Avanzate, timeline aperta e ridotta. **Non provati a mano:** i gruppi Camere ed Effetti con elementi dentro, la modalità Semplice dopo il cambio, la finestra stretta.
+- `manuale/inventario.json` non rigenerato (script Python dello 0.8.0, Python non disponibile qui): le righe e i nomi delle schede che contiene sono vecchi.
+- Controlli: fmt e clippy puliti; test 408 passati, 0 falliti. In una prima esecuzione `preview_shows_hot_smoke_rising_over_time` era fallito solo sul limite di 5 s (da solo 0,8 s; carico di tutti i test insieme), poi passato rieseguendo tutto.

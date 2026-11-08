@@ -7,7 +7,7 @@ correlate: intro.primo-render, light.colore, render.campioni
 ---
 # Simple mode (product photo in 5 steps)
 
-**Where:** **Simple** switch at the top left. It is the default mode.
+**Where:** **Simple** switch at the top right. It is the default mode.
 
 **What it does:** a single column with large buttons that takes you from the model to the photo.
 Every choice writes the same values you find in Advanced mode, so you can switch at any time.

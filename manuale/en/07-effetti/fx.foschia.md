@@ -7,7 +7,7 @@ correlate: fx.effetti, light.tipi, render.campioni
 ---
 # Ambient haze
 
-**Where:** Effects tab → **Add effect** → **Haze**.
+**Where:** **Scene → Effects** → **Add effect** → **Haze**.
 
 **What it does:** fills the scene (or a layer of it) with a light fog that every light crosses:
 spots, sun and lamps draw visible rays, with the shadows of the objects inside them.

@@ -7,7 +7,7 @@ correlate: mat.pannello, mat.roughness, fx.effetti
 ---
 # Texture, posizionamento e rilievo
 
-**Dove si trova:** modalità Avanzata → scheda **Materiali** → sezione **Texture**; con le texture,
+**Dove si trova:** modalità Avanzata → scheda **Selezione** (materiale del pezzo scelto) o **Scena → Materiali** → sezione **Texture**; con le texture,
 anche **Scala e posizionamento texture** e **Rilievo (normal, bump, displacement)**.
 
 ## Slot delle texture
@@ -40,4 +40,4 @@ la rotazione e lo spostamento. L'ancoraggio può essere il **Pezzo**, l'**Assiem
 ## Etichette e loghi
 
 Per mettere un'immagine (logo, etichetta) solo su un pezzo, usa un **adesivo** (decal) nella
-scheda Effetti: vedi [Effetti](fx.effetti).
+**Scena → Effetti**: vedi [Effetti](fx.effetti).
