@@ -1833,12 +1833,10 @@
     "Volume e movimento": "Volume and motion",
     "Angolo massimo tra due triangoli vicini su una curva. Più basso = archi più lisci e più triangoli": "Maximum angle between two neighbouring triangles on a curve. Lower = smoother arcs and more triangles",
     "Anteprima 3D": "3D preview",
-    "Anteprima con {} triangoli: il modello li ha tutti": "Preview with {} triangles: the model has them all",
     "Converti": "Convert",
     "Deviazione angolare": "Angular deviation",
     "Deviazione lineare": "Linear deviation",
     "Dimensioni: {} × {} × {} mm": "Size: {} × {} × {} mm",
-    "Direzione della luce dell'anteprima": "Direction of the preview light",
     "Fil di ferro": "Wireframe",
     "I due valori qui sotto": "The two values below",
     "Il file non contiene geometria da convertire": "The file contains no geometry to convert",
@@ -1902,6 +1900,8 @@
     "Trasparenza (transmission)": "Transmission",
     "Valori predefiniti adatti quasi sempre: cambiali solo se sai cosa fanno.": "The defaults suit almost every scene: change them only if you know what they do.",
     "nessuna animazione": "no animation",
-    "{} elementi animati": "{} animated elements"
+    "{} elementi animati": "{} animated elements",
+    "Anteprima non disponibile: la viewport 3D è spenta (modalità sicura)": "Preview not available: the 3D viewport is off (safe mode)",
+    "Il modello come entrerà nella scena, disegnato come nella viewport. Trascina per girare, Maiusc o tasto destro per spostare, rotella per avvicinare, doppio clic per inquadrare.": "The model as it will enter the scene, drawn as in the viewport. Drag to orbit, Shift or right button to pan, wheel to zoom, double click to frame."
   }
 }

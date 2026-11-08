@@ -319,7 +319,7 @@ The styles are applied at the first surface seen by the camera, so glass and mir
 
 ### 15. STEP models: converted once, then reopened instantly
 
-A single STEP opens its own window: the file on the left, tessellation in the middle, and a 3D preview of the result on the right, shaded or wireframe, to rotate and zoom, with triangles, vertices, size and parts. Draft, Balanced, High quality or Custom set the converter's real linear and angular deviation; you can convert again as often as you like and the model enters the scene only with Import. The original CAD geometry is not shown because it stays in the separate converter process.
+A single STEP opens its own window: the file on the left, tessellation in the middle, and on the right the model as it will be imported (same parts, colours, vertical axis and floor placement), drawn by the same engine as the viewport, shaded or wireframe, to orbit, pan and zoom like the viewport, with triangles, vertices, size and parts. Draft, Balanced, High quality or Custom set the converter's real linear and angular deviation; you can convert again as often as you like and the model enters the scene only with Import, exactly as in the preview and without converting it again. The original CAD geometry is not shown because it stays in the separate converter process.
 
 A STEP file is converted to meshes once. The result is kept in a conversion cache and saved next to the project (`modelli-convertiti/`) and inside `.frpack` packages, so reopening a project does not convert the STEP again. On the optical bench demo, opening went from 27 s to 0.2 s. When the STEP changes (or the parts of a multi-file assembly change, or the quality changes), it is converted again. Packages now also include the part files that a multi-file STEP assembly refers to.
 
@@ -456,7 +456,7 @@ The window is arranged so that you always know where to look and what to do next
 - Start / pause / resume / stop / automatic restart when the scene changes, PNG export.
 - **Fireflies / Enchanted forest**: a flock with its own cycle and palette whose lit fireflies are real scene lights, with occlusion, on CPU and GPU.
 - **Moving floating dust**: drift over time, reaction to moving objects and smoke currents, deterministic.
-- **STEP import window**: tessellation settings, 3D preview, repeatable conversion, stop.
+- **STEP import window**: tessellation settings, preview drawn like the viewport (shaded or wireframe), repeatable conversion, stop, import of the previewed model.
 - **Video export**: MP4, MOV, MKV and AVI with H.264, H.265, ProRes, FFV1 or uncompressed, presets, size estimate and the real parameters at the end.
 - **Reliable long exports**: they keep going minimized or covered, block automatic sleep, can leave the PC usable and resume from the finished frames.
 - **Built-in manual**: Help → Manual or F1 on a control, 33 pages in English and Italian covering every panel, with comparison images rendered by ForgeRender for the main sliders (low, medium, high).

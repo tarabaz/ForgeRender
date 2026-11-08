@@ -881,3 +881,10 @@ Interfaccia riordinata secondo il layout "A · Studio pulito" scelto da Valerio 
 - Verificato con schermate del programma vero (copia avviata da una cartella temporanea): avvio, oggetto scelto, luce scelta, scheda Render con Avanzate, timeline aperta e ridotta. **Non provati a mano:** i gruppi Camere ed Effetti con elementi dentro, la modalità Semplice dopo il cambio, la finestra stretta.
 - `manuale/inventario.json` non rigenerato (script Python dello 0.8.0, Python non disponibile qui): le righe e i nomi delle schede che contiene sono vecchi.
 - Controlli: fmt e clippy puliti; test 408 passati, 0 falliti. In una prima esecuzione `preview_shows_hot_smoke_rising_over_time` era fallito solo sul limite di 5 s (da solo 0,8 s; carico di tutti i test insieme), poi passato rieseguendo tutto.
+
+## 0.50.1 — 09/11/2026 (Claude)
+
+- Anteprima della finestra STEP rifatta su richiesta di Valerio ("strana"). Prima `draw_model` in `ui/step_import.rs` la disegnava con il painter di egui: al massimo 60.000 triangoli presi a salti, facce con la normale verso il dietro scartate (sui STEP con avvolgimento incoerente sparivano), ordinamento per profondità media invece del depth buffer. Ora `build_preview` inserisce il `FrMesh` in una `Scene` vuota con `forge_import::step::insert` e `drop_to_floor`, come Importa, e la disegna un `ViewportRenderer` tutto suo (texture propria, tenuto tra un file e l'altro): stesso shader, MSAA 4× e profondità della viewport. Fil di ferro = vista Mesh della viewport. Mouse come la viewport (`OrbitController`), doppio clic o Inquadra per rifare l'inquadratura.
+- Asse verticale e appoggio cambiati rifanno solo la scena dell'anteprima dal modello già convertito; Importa resta spento solo se cambia la tassellazione (`tessellation`).
+- Importa ora chiama `ForgeApp::import_converted_step` con il `FrMesh` dell'anteprima: niente seconda conversione (prima passava da `import_path`, che la rileggeva dalla cache).
+- fmt, clippy (-D warnings) e test del workspace: 408 passati, 0 falliti, 10 ignorati. Non provato nella finestra con un file STEP vero: niente strumenti per guardare il programma aperto.

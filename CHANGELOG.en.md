@@ -10,6 +10,11 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.50.1 — 9 Nov 2026
+
+- **STEP preview like the viewport:** the STEP import window no longer draws its own approximate preview (fewer triangles, missing faces, no depth). It inserts the converted model into an empty scene exactly as Import does (same parts, colours, vertical axis and floor placement) and draws it with the viewport engine: same shading, antialiasing and depth. **Shaded** or **Wireframe** (the triangle edges of the viewport's Mesh view); the mouse orbits, pans and zooms as in the viewport, double click or **Frame** frames the model again. Changing the vertical axis or the floor placement updates the preview without converting again.
+- **Import loads the previewed model:** Import puts into the project exactly the converted model shown in the preview, without running the conversion again.
+
 ## 0.50.0 — 8 Nov 2026
 
 - **Two rows at the top:** the Simple / Advanced switch and a Settings gear moved to the right of the menu bar; the language selector left the top bar (it is in Settings → Language). In the toolbar, Start render, Stop, Restart and Export sit on the right next to AI MCP; the Viewport | Render tabs and Auto restart moved right above the central area.

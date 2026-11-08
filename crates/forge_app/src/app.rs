@@ -2369,6 +2369,27 @@ impl ForgeApp {
         self.finish_import(path, self.import_opts.clone(), was_empty, r);
     }
 
+    /// Importa un modello STEP già convertito (finestra di importazione STEP): entra nella scena
+    /// esattamente quello che si vedeva nell'anteprima, senza convertirlo di nuovo.
+    pub fn import_converted_step(
+        &mut self,
+        path: &Path,
+        opts: forge_import::ImportOptions,
+        model: forge_import::frmesh::FrMesh,
+        started: std::time::Instant,
+    ) {
+        self.import_opts = opts.clone();
+        self.leave_demo_scene();
+        self.remove_previous_import(path);
+        let was_empty = self.scene.nodes.is_empty();
+        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("modello").to_string();
+        let r = forge_import::step::insert(&mut self.scene, &file_name, model, &opts).map(|r| forge_import::ImportReport {
+            duration: started.elapsed(),
+            ..r
+        });
+        self.finish_import(path, opts, was_empty, r);
+    }
+
     /// Il primo import sostituisce la scena dimostrativa con una scena pulita.
     fn leave_demo_scene(&mut self) {
         if self.meta.test_scene && self.meta.path.is_none() {

@@ -6,24 +6,31 @@
 //! deviazione angolare di `BRepMesh_IncrementalMesh`. Lunghezza massima degli spigoli e spigoli vivi
 //! non ci sono perché il convertitore non li espone. La geometria B-rep di partenza non si può mostrare:
 //! Open CASCADE resta nel suo processo, qui arrivano solo i triangoli.
+//!
+//! L'anteprima è il modello come verrebbe importato: lo stesso inserimento nella scena di Importa
+//! (pezzi, colori, asse verticale, appoggio sul pavimento) disegnato dallo stesso motore della
+//! viewport, ombreggiato o con gli spigoli dei triangoli (vista Mesh). Importa mette nel progetto
+//! proprio quel modello, senza convertirlo di nuovo.
 
 use crate::app::ForgeApp;
 use crate::i18n::{tf, tr};
 use crate::ui::style;
+use crate::viewport::ViewportRenderer;
 use eframe::egui;
+use eframe::egui_wgpu::RenderState;
 use forge_import::frmesh::FrMesh;
 use forge_import::{ImportOptions, StepQuality, UpAxis};
-use forge_math::{Mat4, Vec3};
+use forge_math::Vec3;
+use forge_scene::{OrbitController, Scene};
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Receiver;
 use std::sync::Arc;
 use std::time::Instant;
 
-/// Triangoli al massimo nell'anteprima (è disegnata dall'interfaccia, non dal render).
-const PREVIEW_TRIANGLES: usize = 60_000;
-/// Triangoli al massimo nel fil di ferro.
-const WIRE_TRIANGLES: usize = 15_000;
+/// Sfondo dell'anteprima: lo stesso della viewport.
+const BACKGROUND: f32 = 0.045;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Quality {
@@ -70,14 +77,26 @@ struct Converted {
     parts: usize,
     triangles: usize,
     vertices: usize,
-    /// Dimensioni in millimetri.
-    size_mm: Vec3,
     unit_m: f64,
     seconds: f32,
-    /// Triangoli del modello in spazio normalizzato, con la normale e il colore.
-    tris: Vec<([Vec3; 3], Vec3, [f32; 3])>,
-    /// Parametri con cui è stato fatto: se cambiano, l'anteprima non è più aggiornata.
+    /// Il modello convertito: Importa mette nella scena proprio questo.
+    model: FrMesh,
+    /// Parametri con cui è stato fatto: se cambia la tassellazione, l'anteprima non è più aggiornata.
     made_with: ImportOptions,
+    /// Il modello inserito in una scena vuota come lo inserirebbe Importa.
+    preview: Preview,
+}
+
+/// Scena dell'anteprima e opzioni con cui è stata costruita (asse verticale, appoggio).
+struct Preview {
+    scene: Scene,
+    up: UpAxis,
+    drop_to_floor: bool,
+    /// Dimensioni in millimetri, come risulteranno nella scena.
+    size_mm: Vec3,
+    radius: f32,
+    /// Geometria già caricata sulla GPU dell'anteprima.
+    uploaded: bool,
 }
 
 pub struct StepImport {
@@ -93,11 +112,11 @@ pub struct StepImport {
     status: String,
     error: Option<String>,
     result: Option<Converted>,
+    /// Vista Mesh (spigoli dei triangoli sopra l'ombreggiatura), come nella viewport.
     wire: bool,
-    yaw: f32,
-    pitch: f32,
-    zoom: f32,
-    light: f32,
+    orbit: OrbitController,
+    /// Il motore della viewport, con texture sue (si tiene tra un file e l'altro).
+    renderer: Option<ViewportRenderer>,
 }
 
 impl Default for StepImport {
@@ -115,10 +134,8 @@ impl Default for StepImport {
             error: None,
             result: None,
             wire: false,
-            yaw: 0.6,
-            pitch: 0.4,
-            zoom: 1.0,
-            light: 0.5,
+            orbit: OrbitController::default(),
+            renderer: None,
         }
     }
 }
@@ -126,11 +143,14 @@ impl Default for StepImport {
 impl StepImport {
     /// Apre la finestra sul file e fa subito una prima conversione con i parametri attuali.
     pub fn open_file(&mut self, path: &Path, opts: &ImportOptions) {
+        self.cancel();
+        let renderer = self.renderer.take();
         *self = Self {
             open: true,
             path: path.to_path_buf(),
             bytes: std::fs::metadata(path).map(|m| m.len()).unwrap_or(0),
             opts: opts.clone(),
+            renderer,
             ..Self::default()
         };
         self.quality = match opts.step_quality {
@@ -209,7 +229,18 @@ impl StepImport {
                             self.result = None;
                         }
                         Ok(m) => {
-                            self.result = Some(summarize(&m, started.elapsed().as_secs_f32(), self.options()));
+                            let seconds = started.elapsed().as_secs_f32();
+                            match summarize(&self.path, m, seconds, self.options()) {
+                                Ok(c) => {
+                                    self.orbit = framed_orbit(&c.preview);
+                                    self.result = Some(c);
+                                    self.error = None;
+                                }
+                                Err(e) => {
+                                    self.error = Some(e);
+                                    self.result = None;
+                                }
+                            }
                             self.status.clear();
                         }
                         Err(e) => {
@@ -224,69 +255,57 @@ impl StepImport {
     }
 }
 
-/// Mette insieme il modello: ogni pezzo al suo posto, centrato e riportato a misura uno.
-fn summarize(m: &FrMesh, seconds: f32, made_with: ImportOptions) -> Converted {
-    let nodes = &m.header.nodes;
-    let matrix = |i: usize| {
-        let a = nodes[i].matrix.map(|v| v as f32);
-        Mat4::from_cols_array(&a)
+/// Tassellazione con cui sono fatte le opzioni: è l'unica cosa che richiede di convertire di nuovo.
+fn tessellation(o: &ImportOptions) -> (StepQuality, Option<[f64; 2]>) {
+    (o.step_quality, o.step_custom)
+}
+
+/// Inserisce il modello in una scena vuota esattamente come fa Importa: stessi pezzi, materiali
+/// dai colori del file, asse verticale e appoggio sul pavimento.
+fn build_preview(path: &Path, model: &FrMesh, opts: &ImportOptions) -> Result<Preview, String> {
+    let mut scene = Scene {
+        lights: Vec::new(),
+        ..Default::default()
     };
-    let world = |mut i: usize| {
-        let mut w = matrix(i);
-        while let Some(p) = nodes[i].parent {
-            i = p as usize;
-            w = matrix(i) * w;
-        }
-        w
-    };
-    let z_up = made_with.up.is_z_up("step");
-    let up = if z_up {
-        Mat4::from_rotation_x(-std::f32::consts::FRAC_PI_2)
-    } else {
-        Mat4::IDENTITY
-    };
-    let triangles: usize = m.meshes.iter().map(|x| x.indices.len()).sum();
-    let vertices: usize = m.meshes.iter().map(|x| x.positions.len()).sum();
-    let step = (triangles / PREVIEW_TRIANGLES).max(1);
-    let mut tris = Vec::with_capacity(triangles.min(PREVIEW_TRIANGLES) + 16);
-    let (mut lo, mut hi) = (Vec3::splat(f32::MAX), Vec3::splat(f32::MIN));
-    let mut parts = 0;
-    for (i, n) in nodes.iter().enumerate() {
-        let Some(mesh) = n.mesh.and_then(|k| m.meshes.get(k as usize)) else {
-            continue;
-        };
-        parts += 1;
-        let xf = up * world(i);
-        let color = n.color.unwrap_or([0.72, 0.74, 0.78]);
-        for p in &mesh.positions {
-            let q = xf.transform_point3(Vec3::from(*p));
-            lo = lo.min(q);
-            hi = hi.max(q);
-        }
-        for t in mesh.indices.iter().step_by(step) {
-            let v = t.map(|k| xf.transform_point3(Vec3::from(mesh.positions[k as usize])));
-            let n = (v[1] - v[0]).cross(v[2] - v[0]).normalize_or_zero();
-            tris.push((v, n, color));
-        }
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("modello").to_string();
+    let r = forge_import::step::insert(&mut scene, &name, model.clone(), opts).map_err(|e| e.to_string())?;
+    if opts.drop_to_floor {
+        scene.drop_to_floor(r.root, 0.0);
     }
-    let center = (lo + hi) * 0.5;
-    let size = (hi - lo).max(Vec3::splat(1e-9));
-    let scale = 1.0 / size.max_element();
-    for t in &mut tris {
-        for v in &mut t.0 {
-            *v = (*v - center) * scale;
-        }
-    }
-    Converted {
-        parts,
-        triangles,
-        vertices,
-        size_mm: size * (m.header.unit_m * 1000.0) as f32,
+    let b = scene.bounds();
+    Ok(Preview {
+        size_mm: if b.is_empty() { Vec3::ZERO } else { (b.max - b.min) * 1000.0 },
+        radius: b.radius().max(1e-3),
+        scene,
+        up: opts.up,
+        drop_to_floor: opts.drop_to_floor,
+        uploaded: false,
+    })
+}
+
+/// Camera dell'anteprima: tre quarti dall'alto, con il modello inquadrato.
+fn framed_orbit(p: &Preview) -> OrbitController {
+    let mut orbit = OrbitController {
+        yaw: 0.6,
+        pitch: 0.35,
+        ..Default::default()
+    };
+    orbit.frame(&p.scene.bounds());
+    orbit
+}
+
+fn summarize(path: &Path, m: FrMesh, seconds: f32, made_with: ImportOptions) -> Result<Converted, String> {
+    let preview = build_preview(path, &m, &made_with)?;
+    Ok(Converted {
+        parts: m.header.nodes.iter().filter(|n| n.mesh.is_some()).count(),
+        triangles: m.meshes.iter().map(|x| x.indices.len()).sum(),
+        vertices: m.meshes.iter().map(|x| x.positions.len()).sum(),
         unit_m: m.header.unit_m,
         seconds,
-        tris,
+        model: m,
         made_with,
-    }
+        preview,
+    })
 }
 
 pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
@@ -294,10 +313,12 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
         return;
     }
     app.step_import.poll(ctx);
+    let rs = app.wgpu_state.clone();
     let mut open = true;
     let mut import = false;
     let mut close = false;
     let st = &mut app.step_import;
+    st.refresh_preview();
     egui::Window::new(tr("Importazione STEP"))
         .id(egui::Id::NULL.with("win-step"))
         .open(&mut open)
@@ -308,11 +329,11 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
             ui.columns(3, |c| {
                 source_column(&mut c[0], st);
                 settings_column(&mut c[1], st);
-                preview_column(&mut c[2], st);
+                preview_column(&mut c[2], st, rs.as_ref());
             });
             ui.separator();
             ui.horizontal(|ui| {
-                let stale = st.result.as_ref().is_some_and(|r| r.made_with != st.options());
+                let stale = st.is_stale();
                 let ready = st.job.is_none() && st.result.is_some() && !stale;
                 if ui
                     .add_enabled(
@@ -334,8 +355,10 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
         let st = &mut app.step_import;
         st.open = false;
         let (path, opts) = (st.path.clone(), st.options());
-        app.import_opts = opts;
-        app.import_path(&path);
+        if let Some(c) = st.result.take() {
+            let started = Instant::now() - std::time::Duration::from_secs_f32(c.seconds);
+            app.import_converted_step(&path, opts, c.model, started);
+        }
     } else if close || !open {
         app.step_import.cancel();
         app.step_import.open = false;
@@ -381,13 +404,10 @@ fn source_column(ui: &mut egui::Ui, st: &mut StepImport) {
             u => format!("{u} m"),
         };
         ui.label(tf("Unità dichiarate dal file: {}", &[unit]));
+        let size = r.preview.size_mm;
         ui.label(tf(
             "Dimensioni: {} × {} × {} mm",
-            &[
-                format!("{:.1}", r.size_mm.x),
-                format!("{:.1}", r.size_mm.y),
-                format!("{:.1}", r.size_mm.z),
-            ],
+            &[format!("{:.1}", size.x), format!("{:.1}", size.y), format!("{:.1}", size.z)],
         ));
         ui.label(tf("Pezzi: {}", &[r.parts.to_string()]));
     }
@@ -475,23 +495,98 @@ fn settings_column(ui: &mut egui::Ui, st: &mut StepImport) {
     }
 }
 
-fn preview_column(ui: &mut egui::Ui, st: &mut StepImport) {
+impl StepImport {
+    /// Asse verticale o appoggio cambiati: si rifà la scena dell'anteprima dal modello già
+    /// convertito (non serve convertire di nuovo).
+    fn refresh_preview(&mut self) {
+        let (up, drop) = (self.opts.up, self.opts.drop_to_floor);
+        let Some(c) = &mut self.result else { return };
+        if c.preview.up == up && c.preview.drop_to_floor == drop {
+            return;
+        }
+        let mut opts = c.made_with.clone();
+        opts.up = up;
+        opts.drop_to_floor = drop;
+        match build_preview(&self.path, &c.model, &opts) {
+            Ok(p) => {
+                c.preview = p;
+                c.made_with = opts;
+                self.orbit = framed_orbit(&c.preview);
+            }
+            Err(e) => self.error = Some(e),
+        }
+    }
+
+    /// La tassellazione scelta non è quella dell'anteprima: Importa resta spento finché non si
+    /// converte di nuovo.
+    fn is_stale(&self) -> bool {
+        self.result
+            .as_ref()
+            .is_some_and(|r| tessellation(&r.made_with) != tessellation(&self.options()))
+    }
+}
+
+fn preview_column(ui: &mut egui::Ui, st: &mut StepImport, rs: Option<&RenderState>) {
     ui.heading(tr("Anteprima 3D"));
-    let side = ui.available_width().min(ui.available_height() - 90.0).max(160.0);
-    let (rect, r) = ui.allocate_exact_size(egui::vec2(ui.available_width(), side), egui::Sense::drag());
-    ui.painter().rect_filled(rect, 3.0, egui::Color32::from_gray(24));
-    if r.dragged() {
-        let d = r.drag_delta();
-        st.yaw += d.x * 0.01;
-        st.pitch = (st.pitch + d.y * 0.01).clamp(-1.5, 1.5);
+    let side = (ui.available_height() - 90.0).max(160.0).min(ui.available_width() * 1.2);
+    let (rect, r) = ui.allocate_exact_size(egui::vec2(ui.available_width(), side), egui::Sense::click_and_drag());
+    let bg = (BACKGROUND.powf(1.0 / 2.2) * 255.0) as u8;
+    ui.painter().rect_filled(rect, 3.0, egui::Color32::from_gray(bg));
+    // Mouse come nella viewport: sinistro gira, Maiusc o destro/centrale sposta, rotella avvicina.
+    let delta = r.drag_delta();
+    if delta != egui::Vec2::ZERO {
+        let shift = ui.input(|i| i.modifiers.shift);
+        if r.dragged_by(egui::PointerButton::Secondary)
+            || r.dragged_by(egui::PointerButton::Middle)
+            || (shift && r.dragged_by(egui::PointerButton::Primary))
+        {
+            st.orbit.pan(delta.x / rect.height(), delta.y / rect.height());
+        } else if r.dragged_by(egui::PointerButton::Primary) {
+            st.orbit.orbit(delta.x * 0.008, delta.y * 0.008);
+        }
     }
     if r.hovered() {
-        let wheel = ui.input(|i| i.smooth_scroll_delta.y);
-        st.zoom = (st.zoom * (1.0 + wheel * 0.002)).clamp(0.2, 10.0);
+        let scroll = ui.input(|i| i.smooth_scroll_delta.y);
+        if scroll != 0.0 {
+            st.orbit.zoom((-scroll * 0.0015).exp());
+        }
     }
-    match &st.result {
-        Some(c) => draw_model(ui, rect, c, st.wire, st.yaw, st.pitch, st.zoom, st.light),
-        None => {
+    if r.double_clicked() {
+        if let Some(c) = &st.result {
+            st.orbit = framed_orbit(&c.preview);
+        }
+    }
+    let StepImport {
+        result,
+        renderer,
+        orbit,
+        wire,
+        ..
+    } = st;
+    match (result.as_mut(), rs) {
+        (Some(c), Some(rs)) => {
+            let vp = renderer.get_or_insert_with(|| ViewportRenderer::new(rs));
+            if !c.preview.uploaded {
+                vp.upload_scene(rs, &c.preview.scene, &BTreeSet::new());
+                c.preview.uploaded = true;
+            }
+            let ppp = ui.ctx().pixels_per_point();
+            let px = [(rect.width() * ppp).round() as u32, (rect.height() * ppp).round() as u32];
+            if let Some(tex) = vp.render(rs, &orbit.camera(), c.preview.radius, px, Vec3::splat(BACKGROUND), *wire) {
+                let uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
+                ui.painter_at(rect).image(tex, rect, uv, egui::Color32::WHITE);
+            }
+        }
+        (Some(_), None) => {
+            ui.painter().text(
+                rect.center(),
+                egui::Align2::CENTER_CENTER,
+                tr("Anteprima non disponibile: la viewport 3D è spenta (modalità sicura)"),
+                egui::FontId::proportional(13.0),
+                ui.visuals().weak_text_color(),
+            );
+        }
+        (None, _) => {
             ui.painter().text(
                 rect.center(),
                 egui::Align2::CENTER_CENTER,
@@ -501,83 +596,26 @@ fn preview_column(ui: &mut egui::Ui, st: &mut StepImport) {
             );
         }
     }
+    r.on_hover_text(tr(
+        "Il modello come entrerà nella scena, disegnato come nella viewport. Trascina per girare, \
+         Maiusc o tasto destro per spostare, rotella per avvicinare, doppio clic per inquadrare.",
+    ));
     ui.horizontal(|ui| {
         ui.selectable_value(&mut st.wire, false, tr("Ombreggiata"));
         ui.selectable_value(&mut st.wire, true, tr("Fil di ferro"));
-        ui.add(egui::Slider::new(&mut st.light, 0.0..=1.0).show_value(false))
-            .on_hover_text(tr("Direzione della luce dell'anteprima"));
+        if ui.button(tr("Inquadra")).clicked() {
+            if let Some(c) = &st.result {
+                st.orbit = framed_orbit(&c.preview);
+            }
+        }
     });
     if let Some(c) = &st.result {
         ui.label(tf(
             "{} triangoli, {} vertici, {} s",
             &[c.triangles.to_string(), c.vertices.to_string(), format!("{:.1}", c.seconds)],
         ));
-        if c.tris.len() < c.triangles {
-            ui.label(
-                egui::RichText::new(tf(
-                    "Anteprima con {} triangoli: il modello li ha tutti",
-                    &[c.tris.len().to_string()],
-                ))
-                .weak(),
-            );
-        }
-        if c.made_with != st.options() {
-            ui.colored_label(style::WARN, tr("Parametri cambiati: premi Converti per aggiornare"));
-        }
     }
-}
-
-#[allow(clippy::too_many_arguments)]
-fn draw_model(ui: &egui::Ui, rect: egui::Rect, c: &Converted, wire: bool, yaw: f32, pitch: f32, zoom: f32, light: f32) {
-    let rot = Mat4::from_rotation_x(pitch) * Mat4::from_rotation_y(yaw);
-    let scale = rect.width().min(rect.height()) * 0.72 * zoom;
-    let to_screen = |p: Vec3| {
-        // Prospettiva leggera: profondità sufficiente a capire la forma.
-        let k = 2.6 / (2.6 - p.z);
-        egui::pos2(rect.center().x + p.x * scale * k, rect.center().y - p.y * scale * k)
-    };
-    let painter = ui.painter_at(rect);
-    let a = light * std::f32::consts::PI - std::f32::consts::FRAC_PI_2;
-    let sun = Vec3::new(a.sin(), 0.6, a.cos()).normalize();
-    if wire {
-        let stroke = egui::Stroke::new(0.6, egui::Color32::from_gray(190));
-        let every = (c.tris.len() / WIRE_TRIANGLES).max(1);
-        for (v, ..) in c.tris.iter().step_by(every) {
-            let p = v.map(|q| to_screen(rot.transform_point3(q)));
-            painter.line_segment([p[0], p[1]], stroke);
-            painter.line_segment([p[1], p[2]], stroke);
-            painter.line_segment([p[2], p[0]], stroke);
-        }
-        return;
+    if st.is_stale() {
+        ui.colored_label(style::WARN, tr("Parametri cambiati: premi Converti per aggiornare"));
     }
-    // Dal più lontano al più vicino: l'interfaccia non ha un buffer di profondità.
-    let mut order: Vec<(f32, usize)> = c
-        .tris
-        .iter()
-        .enumerate()
-        .map(|(i, (v, ..))| {
-            (
-                (rot.transform_point3(v[0]).z + rot.transform_point3(v[1]).z + rot.transform_point3(v[2]).z) / 3.0,
-                i,
-            )
-        })
-        .collect();
-    order.sort_by(|a, b| a.0.total_cmp(&b.0));
-    let mut mesh = egui::Mesh::default();
-    for (_, i) in order {
-        let (v, n, color) = &c.tris[i];
-        let normal = rot.transform_vector3(*n);
-        if normal.z <= 0.0 {
-            continue;
-        }
-        let shade = 0.25 + 0.75 * normal.dot(sun).max(0.0);
-        let [r, g, b] = color.map(|x| (x.clamp(0.0, 1.0) * shade * 255.0) as u8);
-        let col = egui::Color32::from_rgb(r, g, b);
-        let base = mesh.vertices.len() as u32;
-        for q in v {
-            mesh.colored_vertex(to_screen(rot.transform_point3(*q)), col);
-        }
-        mesh.add_triangle(base, base + 1, base + 2);
-    }
-    painter.add(egui::Shape::mesh(mesh));
 }

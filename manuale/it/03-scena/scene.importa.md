@@ -35,8 +35,13 @@ Scena a sinistra, e ogni pezzo può avere il suo materiale.
 ## File STEP
 
 Un singolo file STEP apre una finestra sua: il file a sinistra, le impostazioni di
-tassellazione al centro e un'anteprima 3D del risultato a destra (ombreggiata o a fil di ferro,
-con triangoli, vertici, dimensioni e pezzi).
+tassellazione al centro e a destra il modello **come verrà importato**: gli stessi pezzi, colori,
+asse verticale e appoggio sul pavimento, disegnati esattamente come nella viewport. Scegli
+**Ombreggiata** o **Fil di ferro** (gli spigoli dei triangoli, come la vista Mesh della viewport);
+trascina per girare, Maiusc o tasto destro per spostare, rotella per avvicinare, doppio clic o
+**Inquadra** per inquadrarlo di nuovo. Sotto ci sono triangoli, vertici, dimensioni e pezzi.
+Cambiando l'asse verticale o **Appoggia sul pavimento dopo l'importazione** l'anteprima si
+aggiorna subito, senza convertire di nuovo.
 
 | Tassellazione | Deviazione lineare / angolare | Quando |
 |---|---|---|
@@ -45,8 +50,9 @@ con triangoli, vertici, dimensioni e pezzi).
 | Alta qualità | 0,15 % e 8,6° | Primi piani e superfici lucide |
 | Personalizzata | i due valori sotto | **Deviazione lineare**: quanto la mesh può scostarsi dalla superficie CAD. **Deviazione angolare**: angolo massimo tra due triangoli vicini su una curva |
 
-Puoi premere **Converti** quante volte vuoi; il modello entra nella scena solo con **Importa**.
-Il risultato si conserva: riaprendo il progetto lo STEP non si converte di nuovo.
+Puoi premere **Converti** quante volte vuoi; il modello entra nella scena solo con **Importa**, ed
+è proprio il modello dell'anteprima (non si converte di nuovo). Il risultato si conserva: riaprendo
+il progetto lo STEP non si converte di nuovo.
 
 ## Errori comuni
 

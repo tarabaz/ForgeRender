@@ -3012,3 +3012,11 @@ Corretto il caso annotato nella 0.48.3: anteprima senza punti con la sorgente su
 ## Interfaccia riordinata (layout A) — 08/11/2026 (Claude, 0.50.0)
 
 Due righe in alto (modalità e Impostazioni a destra, comandi del render a destra della barra), Viewport | Render sopra l'area centrale, un solo albero con gruppi Luci/Camere/Effetti, pannello destro in tre schede Selezione / Scena / Render (Scena con sotto-schede, Render con "Avanzate" chiusa), materiali con "Gestione materiali" chiusa, timeline ridotta a una riga senza animazioni, testi piccoli a 12 punti e arancione solo per Avvia render e selezione. `InspectorTab` non è cambiato: `Object` ora vuol dire Selezione. Manuale e README aggiornati in EN e IT. Controllato con schermate; non provati a mano camere ed effetti nei gruppi, la modalità Semplice e la finestra stretta.
+
+## Anteprima STEP come la viewport — 09/11/2026 (Claude, 0.50.1)
+
+**Fatto:** l'anteprima della finestra STEP è il modello inserito come lo inserisce Importa, disegnato dal motore della viewport (`ViewportRenderer` con texture propria), ombreggiato o fil di ferro (vista Mesh), con il mouse della viewport. Importa carica proprio quel modello, senza riconvertire.
+
+**Provato:** compilazione, clippy e test del workspace verdi.
+
+**Non verificato:** l'aspetto nella finestra con un file STEP vero, e il caso della modalità sicura (senza GPU l'anteprima mostra un avviso).

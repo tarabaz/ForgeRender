@@ -13,6 +13,11 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.50.1 — 9 nov 2026
+
+- **Anteprima STEP come la viewport:** la finestra di importazione STEP non disegna più un'anteprima sua approssimata (meno triangoli, facce mancanti, niente profondità). Inserisce il modello convertito in una scena vuota esattamente come fa Importa (stessi pezzi, colori, asse verticale e appoggio sul pavimento) e lo disegna con il motore della viewport: stessa ombreggiatura, antialiasing e profondità. **Ombreggiata** o **Fil di ferro** (gli spigoli dei triangoli della vista Mesh della viewport); il mouse gira, sposta e ingrandisce come nella viewport, il doppio clic o **Inquadra** inquadra di nuovo il modello. Cambiando l'asse verticale o l'appoggio sul pavimento l'anteprima si aggiorna senza convertire di nuovo.
+- **Importa carica il modello dell'anteprima:** Importa mette nel progetto proprio il modello convertito che si vede nell'anteprima, senza rifare la conversione.
+
 ## 0.50.0 — 8 nov 2026
 
 - **Due righe in alto:** il selettore Semplice / Avanzata e un ingranaggio per le Impostazioni sono a destra nella barra dei menu; il selettore della lingua non è più in alto (sta in Impostazioni → Lingua). Nella barra degli strumenti Avvia render, Stop, Riavvia ed Esporta stanno a destra accanto ad AI MCP; le linguette Viewport | Render e Riavvio automatico sono subito sopra l'area centrale.

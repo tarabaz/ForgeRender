@@ -330,7 +330,7 @@ Gli stili si applicano alla prima superficie vista dalla camera, quindi vetri e 
 
 ### 15. Modelli STEP: convertiti una volta, poi riaperti subito
 
-Uno STEP da solo apre la sua finestra: il file a sinistra, la tassellazione al centro e a destra un'anteprima 3D del risultato, ombreggiata o in fil di ferro, da ruotare e ingrandire, con triangoli, vertici, dimensioni e pezzi. Bozza, Bilanciata, Alta qualità o Personalizzata impostano le deviazioni lineare e angolare vere del convertitore; si può riconvertire quante volte si vuole e il modello entra nella scena solo con Importa. La geometria CAD originale non si vede perché resta nel processo separato del convertitore.
+Uno STEP da solo apre la sua finestra: il file a sinistra, la tassellazione al centro e a destra il modello come verrà importato (stessi pezzi, colori, asse verticale e appoggio sul pavimento), disegnato dallo stesso motore della viewport, ombreggiato o in fil di ferro, da girare, spostare e ingrandire come nella viewport, con triangoli, vertici, dimensioni e pezzi. Bozza, Bilanciata, Alta qualità o Personalizzata impostano le deviazioni lineare e angolare vere del convertitore; si può riconvertire quante volte si vuole e il modello entra nella scena solo con Importa, uguale all'anteprima e senza convertirlo di nuovo. La geometria CAD originale non si vede perché resta nel processo separato del convertitore.
 
 Un file STEP si converte in mesh una volta sola. Il risultato resta in una cache delle conversioni e si salva accanto al progetto (`modelli-convertiti/`) e dentro i pacchetti `.frpack`, così riaprendo il progetto lo STEP non si riconverte. Sulla demo del banco ottico l'apertura è passata da 27 s a 0,2 s. Se lo STEP cambia (o cambiano i pezzi di un assieme a più file, o la qualità), si riconverte. I pacchetti ora includono anche i file dei pezzi a cui rimanda un assieme STEP a più file.
 
@@ -477,7 +477,7 @@ La finestra è disposta in modo che si sappia sempre dove guardare e cosa fare d
 - CLI per render senza interfaccia, benchmark e import nella libreria.
 - **Lucciole / Bosco incantato**: uno stormo con il suo ciclo e la sua palette, le cui lucciole accese sono luci vere della scena, con occlusione, su CPU e GPU.
 - **Polvere in sospensione in movimento**: moto nel tempo, reazione a oggetti in movimento e correnti del fumo, deterministica.
-- **Finestra di importazione STEP**: impostazioni di tassellazione, anteprima 3D, conversione ripetibile, arresto.
+- **Finestra di importazione STEP**: impostazioni di tassellazione, anteprima disegnata come la viewport (ombreggiata o fil di ferro), conversione ripetibile, arresto, importazione del modello visto in anteprima.
 - **Esportazione video**: MP4, MOV, MKV e AVI con H.264, H.265, ProRes, FFV1 o non compresso, preset, stima della dimensione e parametri veri alla fine.
 - **Esportazioni lunghe affidabili**: proseguono da ridotte a icona o coperte, bloccano la sospensione automatica, possono lasciare il PC usabile e riprendere dai fotogrammi fatti.
 - **Manuale interno**: Guida → Manuale o F1 su un controllo, 33 pagine in inglese e in italiano su ogni pannello, con immagini di confronto calcolate da ForgeRender per i cursori principali (basso, medio, alto).
