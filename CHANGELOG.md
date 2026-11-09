@@ -13,6 +13,15 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.53.0 — 9 nov 2026
+
+- **Sfondo della viewport corretto:** egui 0.37 legge le texture native come già codificate in gamma, mentre la viewport gli dava la vista sRGB della sua texture, così egui riceveva valori lineari e li mostrava come gamma (Grigio chiaro #353A42 compariva circa RGB 9, 11, 14). Ora la texture ha una vista `Rgba8Unorm` per egui e sullo schermo ci sono esattamente i byte scelti; l'ombreggiatura degli oggetti resta quella di sempre. Stessa correzione per l'anteprima STEP, che usa lo stesso renderer.
+- **Sfondo personalizzato con un clic:** la scelta (preset o Personalizzato) ora è separata dal colore personalizzato; il clic su **Personalizzato** lo sceglie subito e il colore personalizzato resta mentre si provano i preset. Le impostazioni delle 0.51–0.52 si convertono.
+- **Griglia metrica:** griglia sul pavimento (y = 0) in misure reali nella viewport e nell'anteprima STEP: mostra/nascondi, unità, misura della cella (preset e a piacere), linee principali ogni N celle, intensità, assi X e Z; le linee minori sfumano quando sono troppo fitte; mai nel render né nei fotogrammi dell'anteprima dell'animazione.
+- **Effetti volumetrici:** il calcolo automatico parte 2,5 s dopo l'ultima modifica (l'attesa riparte a ogni modifica) e non cambia mai scheda; solo il comando Render porta alla scheda Render e calcola subito ciò che manca. Un calcolo annullato non viene più rifatto subito dal riavvio automatico, Stop ferma anche un render che aspettava geometria o volumi, e un calcolo che finisce mentre sei nella viewport non ti porta più alla scheda Render.
+- **Denoiser nelle anteprime dei materiali:** Open Image Denoise (con le guide albedo e normali, qualità Bilanciata) sulle anteprime finite; spento mentre si gira l'anteprima dell'editor; interruttore in Impostazioni → Libreria e import.
+- **Scaglie della polvere in sospensione:** ogni scaglia si inclina piano per conto suo nel tempo (al massimo circa ±22°, periodi di 4,5–12,5 s), in modo deterministico e continuo; traiettorie invariate, scene ferme identiche.
+
 ## 0.52.0 — 9 nov 2026
 
 - **L'IA gestisce gli effetti:** quattro comandi MCP nuovi. `list_effects` restituisce ogni effetto della scena con tutti i suoi valori (i nomi dei campi salvati nel progetto) e cosa si può aggiungere; `add_effect` aggiunge foschia d'ambiente (5 tipi), fumo volumetrico (9 preset), ghiaccio secco (5 preset), polvere in sospensione, lucciole, oppure un adesivo da un'immagine sui pezzi scelti, esattamente come i pulsanti della scheda Effetti; `edit_effect` cambia solo i valori indicati (campi sconosciuti e tipi sbagliati si rifiutano, i valori fuori intervallo si riportano nei limiti come nel pannello), accende, spegne o rinomina l'effetto; `remove_effect` lo elimina. Anche `scene_info` elenca gli effetti.

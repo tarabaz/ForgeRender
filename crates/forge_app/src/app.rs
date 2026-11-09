@@ -331,6 +331,10 @@ pub struct ForgeApp {
     pending_fog: Option<Receiver<()>>,
     /// Il render aspetta la nebbia in calcolo (altrimenti è un calcolo in anticipo).
     fog_then_render: bool,
+    /// Il render in attesa (geometria o volumi) l'ha chiesto l'utente con il comando Render: i
+    /// volumi si calcolano subito, senza l'attesa dopo l'ultima modifica. Si spegne quando il
+    /// render parte, con Stop, annullando il calcolo o modificando la scena mentre si aspetta.
+    render_wanted: bool,
     /// Calcolo in anticipo: impronta delle nebbie e della geometria con l'ora dell'ultimo cambio,
     /// e l'ultima impronta già controllata.
     fog_watch: Option<(String, std::time::Instant)>,
@@ -529,6 +533,7 @@ impl ForgeApp {
             pending_geometry: None,
             pending_fog: None,
             fog_then_render: false,
+            render_wanted: false,
             fog_watch: None,
             fog_checked: None,
             fog_running: None,
@@ -1592,6 +1597,9 @@ impl ForgeApp {
             if stop {
                 forge_render_core::fog::progress::cancel();
                 self.fog_running = None;
+                // La scena è cambiata mentre il render aspettava: non c'è più un comando da
+                // eseguire subito, il calcolo riparte con l'attesa dopo l'ultima modifica.
+                self.render_wanted = false;
             }
             return;
         }
@@ -1601,16 +1609,8 @@ impl ForgeApp {
         {
             return;
         }
-        match &self.fog_watch {
-            Some((f, t)) if *f == fp => {
-                if t.elapsed() < std::time::Duration::from_millis(800) {
-                    return;
-                }
-            }
-            _ => {
-                self.fog_watch = Some((fp, std::time::Instant::now()));
-                return;
-            }
+        if !quiet_for(&mut self.fog_watch, &fp, std::time::Instant::now(), VOLUME_DEBOUNCE) {
+            return;
         }
         if self.fog_checked.as_deref() == Some(fp.as_str()) {
             return;
@@ -1656,6 +1656,7 @@ impl ForgeApp {
         }
         forge_render_core::fog::progress::cancel();
         self.fog_then_render = false;
+        self.render_wanted = false;
         self.fog_running = None;
         self.fog_checked = Some(self.fog_fingerprint());
         self.toast(tr("Calcolo della nebbia annullato: verrà rifatto quando avvii il render"));
@@ -1688,15 +1689,18 @@ impl ForgeApp {
                 self.pending_fog = None;
                 self.fog_running = None;
                 // Calcolo in anticipo: il render parte solo se era stato chiesto (la scena può
-                // essere cambiata nel frattempo: start_render ricontrolla).
-                if std::mem::take(&mut self.fog_then_render) {
-                    self.start_render();
+                // essere cambiata nel frattempo: begin_render ricontrolla). Mai cambio di scheda:
+                // quello lo fa solo il comando Render.
+                if deferred_render_starts(self.fog_then_render, self.render_wanted, self.view == View::Render) {
+                    self.fog_then_render = false;
+                    self.begin_render(self.render_wanted);
                 }
             }
             Err(std::sync::mpsc::TryRecvError::Empty) => {}
             Err(_) => {
                 self.pending_fog = None;
                 self.fog_then_render = false;
+                self.render_wanted = false;
                 self.error = Some(tr("calcolo della nebbia fallito").into());
             }
         }
@@ -1709,8 +1713,8 @@ impl ForgeApp {
                 let (rev, then_render) = (p.rev, p.then_render);
                 self.pending_geometry = None;
                 self.geometry = Some((rev, g));
-                if then_render {
-                    self.start_render();
+                if deferred_render_starts(then_render, self.render_wanted, self.view == View::Render) {
+                    self.begin_render(self.render_wanted);
                 }
             }
             Err(std::sync::mpsc::TryRecvError::Empty) => {}
@@ -1725,28 +1729,41 @@ impl ForgeApp {
     // Rendering
     // ------------------------------------------------------------------
 
+    /// Comando Render dell'utente (pulsante, F5, menu, pannello Semplice, MCP, timeline): porta
+    /// sulla scheda Render e calcola subito ciò che serve (geometria, volumi).
     pub fn start_render(&mut self) {
         // Prima di tutto la scheda Render: anche se l'avvio aspetta la geometria o le nebbie, o
         // non riesce, si vede subito dove arriverà l'immagine (o il messaggio).
         self.view = View::Render;
+        self.render_wanted = true;
+        self.begin_render(true);
+    }
+
+    /// Avvia il render se tutto è pronto, altrimenti lo mette in attesa. Non cambia mai scheda.
+    /// `explicit` = c'è un comando Render da eseguire: i volumi mancanti si calcolano subito.
+    /// Senza (riavvio automatico, fine di un calcolo in attesa) i volumi li calcola
+    /// [`Self::precompute_fog`] dopo [`VOLUME_DEBOUNCE`] senza modifiche, e un calcolo annullato
+    /// resta annullato finché la scena non cambia.
+    fn begin_render(&mut self, explicit: bool) {
         let Some(geometry) = self.current_geometry() else {
             self.request_geometry(true);
-            self.view = View::Render;
             return;
         };
         // Nebbie da calcolare: in background, poi si riparte da qui (le trova in cache).
         // Se è già in calcolo (anche in anticipo) si aspetta quello.
         if self.pending_fog.is_some() {
             self.fog_then_render = true;
-            self.view = View::Render;
             return;
         }
         if !forge_render_core::fog::fogs_ready(&self.scene, &geometry) {
-            self.spawn_fog_bake(geometry);
+            if explicit {
+                self.spawn_fog_bake(geometry);
+            }
             self.fog_then_render = true;
-            self.view = View::Render;
             return;
         }
+        self.fog_then_render = false;
+        self.render_wanted = false;
         let backend: Box<dyn forge_render_core::RenderBackend> = match self.settings.backend {
             forge_render_core::BackendKind::Gpu => match self.gpu_backend() {
                 Ok(g) => Box::new(g),
@@ -1756,7 +1773,7 @@ impl ForgeApp {
                         std::slice::from_ref(&e),
                     ));
                     self.settings.backend = forge_render_core::BackendKind::Cpu;
-                    return self.start_render();
+                    return self.begin_render(explicit);
                 }
             },
             forge_render_core::BackendKind::Cpu => match CpuBackend::from_settings(&self.settings) {
@@ -1787,7 +1804,6 @@ impl ForgeApp {
             session_job,
             backend: self.settings.backend,
         });
-        self.view = View::Render;
     }
 
     /// GPU utilizzabile? Senza aspettare: `None` finché la preparazione in background non è
@@ -1871,7 +1887,8 @@ impl ForgeApp {
         let in_render = self.view == View::Render;
         let stale = self.render_is_stale();
         if should_auto_restart(self.auto_restart, stale, self.is_preparing(), in_render) {
-            self.start_render();
+            // Riavvio automatico: non è un comando, quindi niente calcolo immediato dei volumi.
+            self.begin_render(false);
         } else if should_stop_stale_render(self.auto_restart, stale, self.render_state() == SessionState::Rendering, in_render) {
             self.session.cancel();
         }
@@ -1879,6 +1896,12 @@ impl ForgeApp {
 
     pub fn stop_render(&mut self) {
         self.session.cancel();
+        // Stop vale anche per un render che aspettava geometria o volumi.
+        self.fog_then_render = false;
+        self.render_wanted = false;
+        if let Some(p) = &mut self.pending_geometry {
+            p.then_render = false;
+        }
     }
 
     pub fn toggle_pause(&mut self) {
@@ -2788,7 +2811,13 @@ impl ForgeApp {
     /// Sfondo della viewport scelto nelle Impostazioni, come colore lineare per il disegno (la
     /// texture della viewport è sRGB). Non entra nel render finale.
     pub fn viewport_background(&self) -> forge_math::Vec3 {
-        forge_math::Vec3::from_array(crate::ui::color_picker::from_srgb8(self.prefs.viewport_background))
+        forge_math::Vec3::from_array(crate::ui::color_picker::from_srgb8(self.prefs.viewport_background_color()))
+    }
+
+    /// Griglia metrica della viewport e dell'anteprima STEP (Impostazioni → Viewport), `None`
+    /// se è spenta. Non entra nel render finale né nei fotogrammi dell'anteprima animazione.
+    pub fn viewport_grid(&self) -> Option<crate::viewport::GridLook> {
+        crate::viewport::GridLook::from_prefs(&self.prefs.viewport_grid)
     }
 
     /// Prepara la viewport (upload geometria se cambiata) e restituisce la texture.
@@ -2797,8 +2826,14 @@ impl ForgeApp {
         self.sync_viewport(rs)?;
         let radius = self.viewport_radius;
         let bg = self.viewport_background();
+        let grid = self.viewport_grid();
         let vp = self.viewport.as_mut()?;
-        vp.render(rs, &self.view_camera, radius, size, bg, self.viewport_mesh)
+        let style = crate::viewport::ViewStyle {
+            background: bg,
+            mesh_view: self.viewport_mesh,
+            grid,
+        };
+        vp.render(rs, &self.view_camera, radius, size, style)
     }
 
     /// Un fotogramma della viewport `width`×`height` dalla camera indicata, come l'anteprima
@@ -3068,6 +3103,28 @@ pub fn should_stop_stale_render(auto: bool, stale: bool, rendering: bool, in_ren
     auto && stale && rendering && !in_render_view
 }
 
+/// Attesa dopo l'ultima modifica della scena prima di calcolare da soli fumo, ghiaccio secco e
+/// foschia: durante un trascinamento non parte niente.
+pub const VOLUME_DEBOUNCE: std::time::Duration = std::time::Duration::from_millis(2500);
+
+/// Vero quando `key` è rimasta uguale per almeno `delay`: ogni cambio fa ripartire l'attesa.
+pub fn quiet_for(watch: &mut Option<(String, std::time::Instant)>, key: &str, now: std::time::Instant, delay: std::time::Duration) -> bool {
+    match watch {
+        Some((k, since)) if k == key => now.saturating_duration_since(*since) >= delay,
+        _ => {
+            *watch = Some((key.to_string(), now));
+            false
+        }
+    }
+}
+
+/// Finito il calcolo dei volumi, il render in attesa parte se l'ha chiesto il comando Render
+/// o se si sta guardando la scheda Render (riavvio automatico). Nella viewport, senza comando,
+/// resta in attesa: ripartirà tornando nella scheda Render. In nessun caso si cambia scheda.
+pub fn deferred_render_starts(waiting: bool, explicit: bool, in_render_view: bool) -> bool {
+    waiting && (explicit || in_render_view)
+}
+
 /// Il comando Render (pulsante, F5, menu, pannello Semplice) porta la vista centrale sulla
 /// scheda Render quando fa partire o riprendere un render, così si vede subito che è partito.
 /// Su un render in corso lo stesso comando lo mette in pausa e la vista resta dov'è.
@@ -3093,6 +3150,36 @@ mod auto_restart_tests {
             assert!(render_command_shows_render(&state), "{state:?}");
         }
         assert!(!render_command_shows_render(&SessionState::Rendering));
+    }
+
+    /// Attesa dopo l'ultima modifica: niente prima di 2,5 s di quiete, ogni modifica la fa
+    /// ripartire da zero.
+    #[test]
+    fn volume_precompute_waits_for_quiet() {
+        use std::time::{Duration, Instant};
+        let t0 = Instant::now();
+        let ms = |n| t0 + Duration::from_millis(n);
+        let mut w = None;
+        assert!(!quiet_for(&mut w, "a", ms(0), VOLUME_DEBOUNCE), "prima modifica");
+        assert!(!quiet_for(&mut w, "a", ms(2400), VOLUME_DEBOUNCE), "2,4 s: si aspetta");
+        // Trascinamento: l'impronta cambia, l'attesa riparte.
+        assert!(!quiet_for(&mut w, "b", ms(2450), VOLUME_DEBOUNCE));
+        assert!(!quiet_for(&mut w, "b", ms(4000), VOLUME_DEBOUNCE), "1,55 s dall'ultima modifica");
+        assert!(quiet_for(&mut w, "b", ms(4950), VOLUME_DEBOUNCE), "2,5 s di quiete: parte");
+        assert!(VOLUME_DEBOUNCE >= Duration::from_secs(2) && VOLUME_DEBOUNCE <= Duration::from_secs(3));
+    }
+
+    /// Un render in attesa dei volumi parte a calcolo finito solo per il comando Render o nella
+    /// scheda Render; nella viewport resta in attesa. Il cambio di scheda non dipende da qui.
+    #[test]
+    fn deferred_render_never_starts_from_the_viewport_by_itself() {
+        assert!(
+            deferred_render_starts(true, true, false),
+            "comando Render: parte anche dalla viewport"
+        );
+        assert!(deferred_render_starts(true, false, true), "scheda Render: riavvio automatico");
+        assert!(!deferred_render_starts(true, false, false), "viewport, nessun comando: aspetta");
+        assert!(!deferred_render_starts(false, true, true), "nessun render in attesa");
     }
 
     #[test]

@@ -1140,7 +1140,7 @@ pub fn material_preview(app: &mut ForgeApp, ui: &mut egui::Ui) {
     let Some(mat) = app.scene.materials.get(&app.selected_material).cloned() else {
         return;
     };
-    let key = format!("{mat:?}");
+    let key = format!("{}|{mat:?}", preview_denoise());
     let pv = &mut app.preview;
     if let Some((k, rx)) = &pv.pending {
         if let Ok(rgba) = rx.try_recv() {
@@ -1197,6 +1197,64 @@ pub fn set_preview_samples(n: u32) {
 
 pub fn preview_samples() -> u32 {
     PREVIEW_SAMPLES.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Denoiser sulle anteprime finite (Impostazioni → Anteprime dei materiali).
+static PREVIEW_DENOISE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+
+pub fn set_preview_denoise(on: bool) {
+    PREVIEW_DENOISE.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+pub fn preview_denoise() -> bool {
+    PREVIEW_DENOISE.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Sotto questi campioni (l'anteprima che si gira trascinando, 8 campioni) niente denoiser:
+/// conta la velocità e l'immagine si rifà subito dopo.
+pub const PREVIEW_DENOISE_MIN_SAMPLES: u32 = 16;
+
+/// Open Image Denoise delle anteprime: lo stesso del render finale, con un'istanza sua (le
+/// anteprime si fanno su thread propri, mentre il render usa la sua). Caricato al primo uso.
+fn preview_denoiser() -> Option<&'static std::sync::Mutex<forge_denoise::OidnDenoiser>> {
+    static OIDN: std::sync::OnceLock<Option<std::sync::Mutex<forge_denoise::OidnDenoiser>>> = std::sync::OnceLock::new();
+    OIDN.get_or_init(|| match forge_denoise::OidnDenoiser::load() {
+        Ok(d) => Some(std::sync::Mutex::new(d)),
+        Err(e) => {
+            tracing::info!("anteprime dei materiali senza denoiser: {e:#}");
+            None
+        }
+    })
+    .as_ref()
+}
+
+pub fn preview_denoiser_available() -> bool {
+    preview_denoiser().is_some()
+}
+
+/// Ripulisce l'anteprima come il render finale: guide albedo e normali dalla stessa camera,
+/// poi il filtro RT di OIDN (qualità Bilanciata: le anteprime sono piccole e devono arrivare
+/// presto; CUDA se c'è, altrimenti CPU). Se qualcosa non va resta l'immagine com'era.
+fn denoise_preview(rs: &RenderScene, settings: &RenderSettings, color: Vec<[f32; 3]>) -> Vec<[f32; 3]> {
+    let Some(oidn) = preview_denoiser() else { return color };
+    let cancel = std::sync::atomic::AtomicBool::new(false);
+    let guides = forge_render_cpu::render_guides(rs, settings, forge_render_cpu::GUIDE_SAMPLES, &cancel);
+    let Ok(mut d) = oidn.lock() else { return color };
+    match d.run(
+        &color,
+        guides.as_ref(),
+        settings.width,
+        settings.height,
+        forge_render_core::DenoiseQuality::Balanced,
+        true,
+    ) {
+        Ok(out) if out.len() == color.len() => out,
+        Ok(_) => color,
+        Err(e) => {
+            tracing::warn!("denoiser delle anteprime non riuscito: {e:#}");
+            color
+        }
+    }
 }
 
 /// Dimensione apparente dell'oggetto delle anteprime in centimetri (0 = quella reale dello
@@ -1330,6 +1388,19 @@ pub(crate) fn render_preview(mat: &Material, size: u32) -> Vec<u8> {
 /// Come [`render_preview`], con la camera girata attorno all'oggetto di `yaw_deg` (in pianta)
 /// e `pitch_deg` (in alto/basso) e con `samples` campioni (pochi mentre si trascina).
 pub(crate) fn render_preview_view(mat: &Material, size: u32, yaw_deg: f32, pitch_deg: f32, samples: u32) -> Vec<u8> {
+    let denoise = preview_denoise() && samples >= PREVIEW_DENOISE_MIN_SAMPLES;
+    preview_pixels(mat, size, yaw_deg, pitch_deg, samples, denoise)
+}
+
+/// L'anteprima come colori a 8 bit, con o senza denoiser.
+fn preview_pixels(mat: &Material, size: u32, yaw_deg: f32, pitch_deg: f32, samples: u32, denoise: bool) -> Vec<u8> {
+    let (rs, settings, color) = preview_hdr(mat, size, yaw_deg, pitch_deg, samples);
+    let color = if denoise { denoise_preview(&rs, &settings, color) } else { color };
+    forge_render_core::tonemap_to_rgba8(&color, settings.tone_mapping, 0.0)
+}
+
+/// Il path tracing dell'anteprima: scena, impostazioni e colore lineare accumulato.
+fn preview_hdr(mat: &Material, size: u32, yaw_deg: f32, pitch_deg: f32, samples: u32) -> (RenderScene, RenderSettings, Vec<[f32; 3]>) {
     let size = size.clamp(32, 1024);
     let samples = samples.clamp(1, 4096);
     // Le anteprime piccole usano 2 thread (se ne fanno tante insieme), le grandi metà dei core.
@@ -1383,7 +1454,8 @@ pub(crate) fn render_preview_view(mat: &Material, size: u32, yaw_deg: f32, pitch
                 }
             }
             if done >= samples {
-                return forge_render_core::tonemap_to_rgba8(&acc.resolve(), settings.tone_mapping, 0.0);
+                let color = acc.resolve();
+                return (rs, settings, color);
             }
             acc = Accumulator::new(size, size);
         }
@@ -1395,7 +1467,8 @@ pub(crate) fn render_preview_view(mat: &Material, size: u32, yaw_deg: f32, pitch
             }
         }
     }
-    forge_render_core::tonemap_to_rgba8(&acc.resolve(), settings.tone_mapping, 0.0)
+    let color = acc.resolve();
+    (rs, settings, color)
 }
 
 /// La camera girata attorno al suo bersaglio: `yaw_deg` attorno alla verticale, `pitch_deg`
@@ -1460,10 +1533,60 @@ fn sphere_scene(m: Material) -> Scene {
 mod tests {
     use super::*;
 
+    /// Denoiser delle anteprime: a parità di campioni (16) l'immagine ripulita è più vicina a
+    /// quella da 1024 campioni di quella grezza, per un metallo satinato (riflessi, rugosità) e
+    /// il legno (texture). Senza Open Image Denoise accanto ai test (`FORGE_OIDN_DIR`) si salta.
+    /// Con `FORGE_TEST_OUT` salva le tre immagini per il confronto a occhio.
+    #[test]
+    fn preview_denoiser_reduces_noise_at_equal_samples() {
+        let _gpu = crate::viewport::gpu_test_guard();
+        if !preview_denoiser_available() {
+            eprintln!("Open Image Denoise non trovato: test saltato");
+            return;
+        }
+        let presets = forge_scene::material::presets();
+        for id in ["acciaio-satinato", "legno-rovere"] {
+            let m = presets.iter().find(|m| m.id.0 == id).expect(id);
+            let size = 128;
+            let t = std::time::Instant::now();
+            let raw = preview_pixels(m, size, 0.0, 0.0, 16, false);
+            let t_raw = t.elapsed();
+            let t = std::time::Instant::now();
+            let clean = preview_pixels(m, size, 0.0, 0.0, 16, true);
+            let t_clean = t.elapsed();
+            let reference = preview_pixels(m, size, 0.0, 0.0, 1024, false);
+            let err = |img: &[u8]| {
+                let s: f64 = img
+                    .iter()
+                    .zip(&reference)
+                    .enumerate()
+                    .filter(|(i, _)| i % 4 != 3)
+                    .map(|(_, (&a, &b))| (a as f64 - b as f64).powi(2))
+                    .sum();
+                (s / (img.len() as f64 * 0.75)).sqrt()
+            };
+            let (e_raw, e_clean) = (err(&raw), err(&clean));
+            eprintln!("{id}: errore 16 campioni {e_raw:.2}, con denoiser {e_clean:.2} (render {t_raw:?}, con denoiser {t_clean:?})");
+            assert!(
+                e_clean < e_raw * 0.8,
+                "{id}: il denoiser deve ridurre il rumore ({e_raw:.2} invece di {e_clean:.2})"
+            );
+            if let Ok(dir) = std::env::var("FORGE_TEST_OUT") {
+                for (name, img) in [("16", &raw), ("16_denoiser", &clean), ("1024", &reference)] {
+                    image::RgbaImage::from_raw(size, size, img.clone())
+                        .unwrap()
+                        .save(std::path::Path::new(&dir).join(format!("anteprima_{id}_{name}.png")))
+                        .unwrap();
+                }
+            }
+        }
+    }
+
     /// Le anteprime usano lo shader ball del progetto in assets/anteprima (con il materiale sul
     /// pezzo material_surface) e producono un'immagine; con `FORGE_TEST_OUT` le salva.
     #[test]
     fn previews_use_the_shader_ball() {
+        let _gpu = crate::viewport::gpu_test_guard();
         let stage = preview_stage().expect("assets/anteprima/anteprima.frproject");
         assert!(stage.scene.nodes.iter().any(|n| n.id == stage.target));
         eprintln!("shader ball: {:.3} m", stage.size_m);
@@ -1602,6 +1725,7 @@ mod tests {
     /// "Reale" non tocca niente; il materiale di partenza resta com'è.
     #[test]
     fn preview_object_size_only_scales_the_preview_copy() {
+        let _gpu = crate::viewport::gpu_test_guard();
         let presets = forge_scene::material::presets();
         let oak = presets.iter().find(|m| m.id.0 == "legno-rovere").expect("rovere").clone();
         let before = format!("{oak:?}");

@@ -94,9 +94,11 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
     if reset {
         p = Preferences::default();
     }
-    let previews_changed = p.preview_samples != app.prefs.preview_samples || p.preview_object_cm != app.prefs.preview_object_cm;
-    // La dimensione cambia l'aspetto: le miniature salvate nella libreria vanno rifatte.
-    let object_changed = p.preview_object_cm != app.prefs.preview_object_cm;
+    let previews_changed = p.preview_samples != app.prefs.preview_samples
+        || p.preview_object_cm != app.prefs.preview_object_cm
+        || p.preview_denoise != app.prefs.preview_denoise;
+    // Dimensione e denoiser cambiano l'aspetto: le miniature salvate nella libreria vanno rifatte.
+    let object_changed = p.preview_object_cm != app.prefs.preview_object_cm || p.preview_denoise != app.prefs.preview_denoise;
     if p != app.prefs {
         app.apply_prefs(p, false);
     }
@@ -150,18 +152,20 @@ fn language(ui: &mut egui::Ui, p: &mut Preferences, langs: &[std::sync::Arc<crat
 /// Sfondo della viewport: colori pronti o personalizzato con il selettore colore del programma
 /// (RGB, HEX, CMYK, palette). Si vede subito; il render finale non cambia.
 fn viewport(ui: &mut egui::Ui, p: &mut Preferences) {
-    use crate::prefs::{viewport_background_preset, VIEWPORT_BACKGROUNDS};
+    use crate::prefs::{ViewportBackground, VIEWPORT_BACKGROUNDS};
     use crate::ui::color_picker::{from_srgb8, to_hex, to_srgb8};
     ui.heading(tr("Viewport"));
     ui.label(tr("Sfondo della viewport"));
-    let current = viewport_background_preset(p.viewport_background);
+    // La scelta (colore pronto o Personalizzato) è separata dal colore personalizzato: il clic su
+    // Personalizzato la cambia subito, il colore personalizzato resta anche passando dai preset.
+    let current = p.viewport_background_mode;
     let swatch = |ui: &mut egui::Ui, c: [u8; 3]| {
         let (r, _) = ui.allocate_exact_size(egui::vec2(28.0, 16.0), egui::Sense::hover());
         ui.painter().rect_filled(r, 2.0, egui::Color32::from_rgb(c[0], c[1], c[2]));
         ui.painter()
             .rect_stroke(r, 2.0, ui.visuals().widgets.noninteractive.bg_stroke, egui::StrokeKind::Inside);
     };
-    for (i, (name, c)) in VIEWPORT_BACKGROUNDS.into_iter().enumerate() {
+    for (i, (mode, name, c)) in VIEWPORT_BACKGROUNDS.into_iter().enumerate() {
         ui.horizontal(|ui| {
             swatch(ui, c);
             let label = if i == 0 {
@@ -170,23 +174,23 @@ fn viewport(ui: &mut egui::Ui, p: &mut Preferences) {
                 tr(name).to_string()
             };
             let text = format!("{label}   RGB {}, {}, {} · {}", c[0], c[1], c[2], to_hex(c));
-            if ui.radio(current == Some(name), text).clicked() {
-                p.viewport_background = c;
+            if ui.radio(current == mode, text).clicked() {
+                p.viewport_background_mode = mode;
             }
         });
     }
     ui.horizontal(|ui| {
-        // Personalizzato: parte dal colore attuale, poi si cambia con il selettore.
-        // Solo indicatore: il colore personalizzato si sceglie dal campione accanto.
-        let _ = ui.radio(current.is_none(), tr("Personalizzato"));
-        let mut linear = from_srgb8(p.viewport_background);
+        // Personalizzato: un clic lo sceglie; la prima volta parte dal colore che si vede.
+        let custom = current == ViewportBackground::Personalizzato;
+        if ui.radio(custom, tr("Personalizzato")).clicked() {
+            p.choose_custom_background();
+        }
+        let shown = p.viewport_background_custom.unwrap_or_else(|| p.viewport_background_color());
+        let mut linear = from_srgb8(shown);
         if crate::ui::color_picker::rgb_edit(ui, &mut linear) {
-            p.viewport_background = to_srgb8(linear);
+            p.set_custom_background(to_srgb8(linear));
         }
-        if current.is_none() {
-            let c = p.viewport_background;
-            ui.label(format!("RGB {}, {}, {} · {}", c[0], c[1], c[2], to_hex(c)));
-        }
+        ui.label(format!("RGB {}, {}, {} · {}", shown[0], shown[1], shown[2], to_hex(shown)));
     });
     ui.add_space(6.0);
     ui.label(
@@ -197,6 +201,79 @@ fn viewport(ui: &mut egui::Ui, p: &mut Preferences) {
         .small()
         .weak(),
     );
+    ui.add_space(12.0);
+    grid(ui, &mut p.viewport_grid);
+}
+
+/// Griglia metrica sul pavimento: celle di misura reale (la scena è in metri).
+fn grid(ui: &mut egui::Ui, g: &mut crate::prefs::ViewportGrid) {
+    use crate::prefs::{GridUnit, GRID_CELLS_M, GRID_MAJOR_EVERY};
+    ui.label(egui::RichText::new(tr("Griglia")).strong());
+    ui.checkbox(&mut g.show, tr("Mostra griglia"));
+    ui.add_enabled_ui(g.show, |ui| {
+        ui.horizontal(|ui| {
+            ui.label(tr("Unità"));
+            for u in GridUnit::ALL {
+                ui.selectable_value(&mut g.unit, u, u.symbol());
+            }
+        });
+        let unit = g.unit;
+        let fmt = |m: f32| {
+            let v = m / unit.meters();
+            let s = format!("{v:.3}");
+            let s = s.trim_end_matches('0').trim_end_matches(['.', ',']);
+            format!("{s} {}", unit.symbol())
+        };
+        ui.horizontal_wrapped(|ui| {
+            ui.label(tr("Cella"));
+            for m in GRID_CELLS_M {
+                if ui.selectable_label((g.cell_m - m).abs() < m * 1e-4, fmt(m)).clicked() {
+                    g.cell_m = m;
+                }
+            }
+        });
+        ui.horizontal(|ui| {
+            ui.label(tr("Personalizzata"));
+            let mut v = g.cell_m / unit.meters();
+            let min = 1e-4 / unit.meters();
+            let max = 100.0 / unit.meters();
+            let speed = v.max(min) * 0.02;
+            if ui
+                .add(
+                    egui::DragValue::new(&mut v)
+                        .range(min..=max)
+                        .speed(speed)
+                        .max_decimals(3)
+                        .suffix(format!(" {}", unit.symbol())),
+                )
+                .changed()
+            {
+                g.cell_m = (v * unit.meters()).clamp(1e-4, 100.0);
+            }
+        });
+        ui.horizontal(|ui| {
+            ui.label(tr("Linea principale ogni"));
+            for n in GRID_MAJOR_EVERY {
+                ui.selectable_value(&mut g.major_every, n, n.to_string());
+            }
+            ui.add(egui::DragValue::new(&mut g.major_every).range(2..=100));
+            ui.label(tr("celle"));
+        });
+        ui.horizontal(|ui| {
+            ui.label(tr("Intensità"));
+            ui.add(egui::Slider::new(&mut g.intensity, 0.1..=3.0).max_decimals(2));
+        });
+        ui.label(
+            egui::RichText::new(tf(
+                "Linea principale ogni {}. La scena è in metri: le celle sono misure reali e restano \
+                 tali con lo zoom; quando diventano troppo fitte le linee minori sfumano. Solo viewport e \
+                 anteprima STEP, mai nel render.",
+                &[fmt(g.cell_m * g.major_every as f32)],
+            ))
+            .small()
+            .weak(),
+        );
+    });
 }
 
 fn library(ui: &mut egui::Ui, p: &mut Preferences, clear_cache: &mut bool) {
@@ -281,6 +358,16 @@ fn library(ui: &mut egui::Ui, p: &mut Preferences, clear_cache: &mut bool) {
                     ));
                 }
             });
+            ui.end_row();
+            ui.label(tr("Denoiser"));
+            let available = crate::ui::central::preview_denoiser_available();
+            ui.add_enabled(available, egui::Checkbox::new(&mut p.preview_denoise, tr("Riduci il rumore")))
+                .on_hover_text(tr(
+                    "Open Image Denoise, lo stesso del render finale, sulle anteprime finite (con albedo e \
+                     normali): meno grana a parità di campioni. Mentre giri l'anteprima resta spento, per \
+                     restare veloce.",
+                ))
+                .on_disabled_hover_text(tr("Open Image Denoise non trovato accanto al programma"));
             ui.end_row();
         });
     ui.horizontal(|ui| {

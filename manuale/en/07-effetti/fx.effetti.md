@@ -10,7 +10,11 @@ correlate: fx.foschia, light.tipi, anim.timeline
 **Where:** Advanced mode → **Scene → Effects** → **Add effect**, or the **+** of the **Effects** group in the Scene panel; a selected effect shows in the **Selection** tab; **Scene → Effects and fog…**.
 
 Volumetric effects are computed **ahead of time**, one at a time, with the progress shown in the
-status bar; then the render uses them on CPU and GPU. Each effect has a box (or an emitter) you
+status bar; then the render uses them on CPU and GPU. The computation starts by itself 2.5 seconds
+after the last change (never while you drag an object) and does not change tab: you stay in the
+viewport. The **Render** command computes what is missing straight away. If you cancel the
+computation (the **X** in the status bar) it stays cancelled until you change the scene or start
+the render. Each effect has a box (or an emitter) you
 select in the viewport and move or resize with the gizmo. **Active in the render** switches one
 off without deleting it.
 
@@ -19,7 +23,7 @@ off without deleting it.
 | Haze | Air with fog in the whole scene or a layer of it, where the light beams become visible. See [Ambient haze](fx.foschia) |
 | Smoke | Volumetric clouds in a box: *Cloud*, *Plume*, *Incense thread*, *Bank*, or a physical simulation with heat and buoyancy; presets such as incense, steam from a cup, plume from a pipe, industrial smoke |
 | Dry ice | Cold, heavy fog that falls from an emitter, settles, spreads and flows around objects (fluid simulation) |
-| Floating dust | Specks that sparkle only inside the beams of spots and sun, like dust in a ray through a window |
+| Floating dust | Specks that sparkle only inside the beams of spots and sun, like dust in a ray through a window. With **Flakes** every flake also tilts slowly on its own while it floats, so with the camera and lights still the glints come and go |
 | Fireflies | A flock that flies and lights up at intervals; lit fireflies are real lights |
 | Sticker (decal) | An image (logo, label, PNG with transparency) projected on the selected object where the camera looks; it wraps curved surfaces and moves with the object |
 

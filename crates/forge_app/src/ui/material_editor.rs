@@ -97,7 +97,12 @@ fn preview_image(ui: &mut egui::Ui, pv: &mut Preview, m: &Material) {
     let fast = pv.dragging;
     let px = preview_px(side, ui.ctx().pixels_per_point(), fast);
     let samples = if fast { 8 } else { crate::ui::central::preview_samples() };
-    let key = format!("{px}|{samples}|{:.1}|{:.1}|{m:?}", pv.yaw, pv.pitch);
+    let key = format!(
+        "{px}|{samples}|{}|{:.1}|{:.1}|{m:?}",
+        crate::ui::central::preview_denoise(),
+        pv.yaw,
+        pv.pitch
+    );
     if let Some((k, n, rx)) = &pv.pending {
         if let Ok(rgba) = rx.try_recv() {
             let img = egui::ColorImage::from_rgba_unmultiplied([*n as usize; 2], &rgba);

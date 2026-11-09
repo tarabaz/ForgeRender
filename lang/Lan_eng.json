@@ -1251,7 +1251,6 @@
     "Riflessi parziali": "Partial reflections",
     "Rifrazione nelle lenti: fasci che convergono, si incrociano e divergono": "Refraction in the lenses: beams that converge, cross and diverge",
     "Tre laser su un banco ottico, due bianchi da laboratorio e uno viola UV, attraversano una fila di lenti: i fasci si piegano, si incrociano nel fuoco e si riaprono verso lo schermo. I bianchi a ogni lente si aprono un po' di più in un ventaglio di colori; il viola, di un solo colore, resta una linea.": "Three lasers on an optical bench, two white lab lasers and one UV violet, go through a row of lenses: the beams bend, cross at the focus and open again towards the screen. At every lens the white ones open a little more into a fan of colours; the violet one, a single colour, stays a line.",
-    "Calcolo degli effetti (nebbia, foschia) prima del render, uno alla volta: parte da solo poco dopo l'ultima modifica, così quando avvii il render li trovi già pronti. Puoi continuare a lavorare.": "Effects (fog, haze) computed before the render, one at a time: it starts by itself shortly after the last change, so they are ready when you start the render. You can keep working.",
     "Calcolo della nebbia{}: il render parte appena è pronta": "Computing the fog{}: the render starts as soon as it is ready",
     "Impostazioni dell'integrazione AI: collega o scollega Claude Desktop, Claude Code e Codex": "AI integration settings: connect or disconnect Claude Desktop, Claude Code and Codex",
     "Effetto {} di {}: {} {}%": "Effect {} of {}: {} {}%",
@@ -1909,6 +1908,17 @@
     "Sfondo della viewport": "Viewport background",
     "{} (predefinito)": "{} (default)",
     "Cambia subito lo sfondo della viewport e dell'anteprima STEP. Il render finale non cambia: il suo sfondo lo decidono ambiente e fondale.": "Changes the background of the viewport and of the STEP preview at once. The final render does not change: its background comes from the environment and the backdrop.",
-    "Luce dell'ambiente: cambiando ambiente si sostituisce": "Environment light: it is replaced when you change environment"
+    "Luce dell'ambiente: cambiando ambiente si sostituisce": "Environment light: it is replaced when you change environment",
+    "Calcolo degli effetti (nebbia, foschia) prima del render, uno alla volta: parte da solo 2,5 secondi dopo l'ultima modifica (mai mentre trascini), così quando avvii il render li trovi già pronti. Puoi continuare a lavorare: non cambia scheda.": "Computing the effects (fog, haze) before the render, one at a time: it starts by itself 2.5 seconds after the last change (never while you drag), so they are ready when you start the render. You can keep working: the tab does not change.",
+    "Cella": "Cell",
+    "Griglia": "Grid",
+    "Linea principale ogni": "Major line every",
+    "Linea principale ogni {}. La scena è in metri: le celle sono misure reali e restano tali con lo zoom; quando diventano troppo fitte le linee minori sfumano. Solo viewport e anteprima STEP, mai nel render.": "Major line every {}. The scene is in metres: cells are real sizes and stay so when zooming; when they get too dense the minor lines fade out. Viewport and STEP preview only, never in the render.",
+    "Mostra griglia": "Show grid",
+    "Open Image Denoise non trovato accanto al programma": "Open Image Denoise not found next to the program",
+    "Open Image Denoise, lo stesso del render finale, sulle anteprime finite (con albedo e normali): meno grana a parità di campioni. Mentre giri l'anteprima resta spento, per restare veloce.": "Open Image Denoise, the same as the final render, on finished previews (with albedo and normals): less grain for the same samples. While you rotate the preview it stays off, to stay fast.",
+    "Riduci il rumore": "Reduce noise",
+    "Unità": "Unit",
+    "celle": "cells"
   }
 }

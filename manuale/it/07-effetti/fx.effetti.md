@@ -11,7 +11,10 @@ correlate: fx.foschia, light.tipi, anim.timeline
 Effetti e nebbia…**.
 
 Gli effetti volumetrici si calcolano **in anticipo**, uno alla volta, con l'avanzamento nella
-barra di stato; poi il render li usa su CPU e GPU. Ogni effetto ha un riquadro (o un emettitore)
+barra di stato; poi il render li usa su CPU e GPU. Il calcolo parte da solo 2,5 secondi dopo
+l'ultima modifica (mai mentre trascini un oggetto) e non cambia scheda: resti nella viewport. Il
+comando **Render** calcola subito ciò che manca. Se annulli il calcolo (la **X** nella barra di
+stato) resta annullato finché non cambi la scena o non avvii il render. Ogni effetto ha un riquadro (o un emettitore)
 che selezioni nella viewport e sposti o ridimensioni con il gizmo. **Attivo nel render** lo spegne
 senza eliminarlo.
 
@@ -20,7 +23,7 @@ senza eliminarlo.
 | Foschia | Aria con nebbia in tutta la scena o in una fascia, dove i fasci di luce diventano visibili. Vedi [Foschia d'ambiente](fx.foschia) |
 | Fumo | Nubi volumetriche in un riquadro: *Nube*, *Pennacchio*, *Filo d'incenso*, *Banco*, oppure una simulazione fisica con calore e galleggiamento; preset come incenso, vapore da una tazza, pennacchio da un tubo, fumo industriale |
 | Ghiaccio secco | Nebbia fredda e pesante che scende da un emettitore, si posa, si allarga e scorre attorno agli oggetti (simulazione di fluido) |
-| Polvere in sospensione | Granelli che brillano solo dentro i fasci di spot e sole, come la polvere in un raggio che entra da una finestra |
+| Polvere in sospensione | Granelli che brillano solo dentro i fasci di spot e sole, come la polvere in un raggio che entra da una finestra. Con **Scaglie** ogni scaglia, mentre fluttua, si inclina anche piano per conto suo, così con camera e luci ferme i riflessi si accendono e si spengono |
 | Lucciole | Uno sciame che vola e si accende a intervalli; le lucciole accese sono luci vere |
 | Adesivo (decal) | Un'immagine (logo, etichetta, PNG con trasparenza) proiettata sull'oggetto selezionato dove guarda la camera; avvolge le superfici curve e si muove con l'oggetto |
 

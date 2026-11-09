@@ -456,3 +456,67 @@ Questa precisazione **sostituisce** il requisito precedente secondo cui, dopo l'
 - Verificare che il debounce non ritardi o alteri i render esplicitamente richiesti.
 
 **Nota di implementazione:** separare chiaramente il percorso di invalidazione/aggiornamento automatico del precalcolo dal comando esplicito di render. Il debounce deve agire sul primo; il cambio di scheda Render deve dipendere esclusivamente dal secondo. Riportare il valore effettivo scelto (2 o 3 secondi), la logica di reset del timer, i file modificati, i test eseguiti e il commit.
+
+## Riscontro di Claude — 0.53.0 (09/11/2026)
+
+### 1. Sfondo della viewport quasi nero — causa e correzione
+
+**Causa precisa.** `crates/forge_app/src/viewport.rs`, `ViewportRenderer::ensure_targets`: la texture di colore è `Rgba8UnormSrgb` e a egui veniva registrata (`register_native_texture` / `update_egui_texture_from_wgpu_texture`) la sua vista **sRGB**. egui-wgpu 0.37 tratta le texture native come già in spazio gamma (le sue sono `Rgba8Unorm`, shader `fs_main_gamma_framebuffer`): leggendo una vista sRGB riceve valori **lineari** e li mostra come gamma. Il clear con `from_srgb8(53,58,66)` = (0,035; 0,042; 0,054) usciva quindi come byte ≈ (9, 11, 14): esattamente il valore misurato da Valerio. Il valore arrivava giusto fino al clear; si perdeva nel passaggio texture → egui. Non c'erano altri sfondi in mezzo: la preferenza era già l'unica sorgente (`ForgeApp::viewport_background`), e l'anteprima STEP usa lo stesso `ViewportRenderer::render`.
+
+**Correzione.** La texture si crea con `view_formats: [Rgba8Unorm]` e a egui si dà la vista `Rgba8Unorm` (costante `EGUI_VIEW_FORMAT`): si disegna ancora in sRGB (clear lineare → byte giusti) ed egui legge i byte così come sono. Le superfici degli oggetti si sono sempre viste con il loro valore usato direttamente come byte: per non cambiarne l'aspetto lo shader ora le restituisce linearizzate (`shown()`), così a schermo sono identiche a prima. Render finale non toccato.
+
+**Verifiche fatte.**
+- Test GPU `viewport::tests::background_bytes_match_the_chosen_colour` (GPU vera, non saltato): rilegge la texture che egui legge, per i quattro preset e (200, 10, 77): byte uguali (±1).
+- Programma vero, copia mia con impostazioni mie (`FORGE_SETTINGS_FILE`), fotogramma salvato dal programma (`--screenshot`), scena vuota, zona libera della viewport: Antracite 40,44,52; Grigio Blender 48,52,59; Scuro tecnico 34,40,49; Grigio chiaro 53,58,66; personalizzato 200,120,40 — in modalità Avanzata e Semplice. Anteprima STEP aperta su un file vero, Grigio chiaro: 53,58,66.
+- Persistenza: ogni schermata è un avvio nuovo che legge il file salvato.
+
+### 2. Personalizzato con un clic
+
+**Causa.** In `ui/settings.rs` il radio di Personalizzato era solo un indicatore (`let _ = ui.radio(current.is_none(), …)`): il clic non faceva niente e la modalità era dedotta confrontando il colore con i preset.
+
+**Correzione.** `prefs.rs`: `viewport_background_mode` (enum `ViewportBackground`) separato da `viewport_background_custom: Option<[u8;3]>`; `viewport_background_color()` unica sorgente; `choose_custom_background()` (un clic, la prima volta parte dal colore visto) e `set_custom_background()` (dal selettore). Il vecchio campo `viewport_background` delle 0.51–0.52 si legge una volta e si converte.
+
+**Verifiche.** Test `custom_background_is_one_click_and_kept` (la sequenza chiesta: preset A → Personalizzato → preset B → Personalizzato → colore cambiato → preset A → Personalizzato) e `viewport_background_from_older_files`. Nel programma, con clic sulla mia finestra: Grigio Blender → Personalizzato (un clic: modo Personalizzato, colore 48,52,59) → Scuro tecnico → Personalizzato (un clic, colore conservato 48,52,59), radio sempre coerente. Il passo «modifica del colore con il selettore» l'ho provato solo con il test, non cliccando nel selettore.
+
+### 3. Griglia metrica (viewport e anteprima STEP)
+
+Non c'era una griglia. `viewport.rs`: `GRID_SHADER` + `grid_pipeline`, piano y = 0 (il pavimento usato da «Appoggia sul pavimento»; la scena è in metri) attorno al punto guardato, linee calcolate per pixel in coordinate mondo: spessore in pixel (`fwidth`), spaziatura in metri. Tre livelli (cella, principale, principale×N) che sfumano quando scendono sotto 5–16 px; assi X rosso e Z blu; sfuma verso il bordo. Disegnata dopo gli oggetti con prova di profondità senza scriverla (dietro agli oggetti, picking e gizmo invariati: sono su CPU / egui). Prospettiva e ortografica (estensione dalla mezza altezza ortografica). Mai nel render né nei fotogrammi di `capture` (anteprima animazione). Impostazioni in `prefs.rs` (`ViewportGrid`: mostra, unità mm/cm/m, `cell_m`, `major_every`, intensità, limiti in `sanitized`), pannello in `ui/settings.rs` (`grid`), condivise da viewport e STEP tramite `ForgeApp::viewport_grid` e la nuova `ViewStyle`.
+
+**Verifiche.** Test GPU `grid_lines_are_at_world_distances` (ortografica dall'alto, 1 px = 1 mm: linee a 2 cm nel mondo, sfondo tra le linee, asse Z blu, spenta = solo sfondo, `capture` senza griglia); `viewport_grid_defaults_persistence_and_limits`. A occhio nel programma: viewport e anteprima STEP con la griglia. **Non provati a occhio**: celle da 1 mm e 1 m, la vista ortografica nel programma, rotazione/zoom continui.
+
+### 4. Precalcolo volumetrico: niente salto alla scheda Render, attesa di 2,5 s
+
+**Causa precisa** (`app.rs`). Con un render già fatto e diventato vecchio, la scheda Render lo riavvia da sola (`update_render_job` → `start_render`): `start_render` vedeva il fumo non pronto, rilanciava subito il calcolo e accendeva `fog_then_render`. Così l'annullamento con la X veniva disfatto al fotogramma dopo. Tornati nella viewport, spostare l'oggetto cambia l'impronta del fumo: `precompute_fog` ferma il calcolo in corso, il suo thread finisce, `poll_fog` trova `fog_then_render` e chiama `start_render()`, che **impostava `View::Render`**. In più il calcolo in anticipo partiva 800 ms dopo l'ultima modifica.
+
+**Correzione.** `start_render()` = solo il comando esplicito (pulsante, F5, menu, MCP, timeline): porta alla scheda Render, `render_wanted = true`, calcola subito. `begin_render(explicit)` fa il lavoro e **non cambia mai scheda**; senza comando non lancia il calcolo dei volumi (lo fa `precompute_fog` con l'attesa, e un calcolo annullato resta annullato finché la scena non cambia). `poll_fog` / `poll_geometry` riprendono il render in attesa solo per un comando o se si sta guardando la scheda Render (`deferred_render_starts`). Attesa `VOLUME_DEBOUNCE` = **2,5 s** con `quiet_for`: ogni cambio dell'impronta fa ripartire il conto. Una modifica durante l'attesa toglie l'urgenza del comando. Stop ora ferma anche un render che aspettava geometria o volumi.
+
+**Verifiche.** Test `volume_precompute_waits_for_quiet`, `deferred_render_never_starts_from_the_viewport_by_itself` e quelli di prima. Nel programma (copia mia, fumo «Vapore da tazza» sulla scena di test): calcolo partito da solo restando in Viewport; Avvia render → scheda Render, calcolo subito (43 %); X + Stop → «calcolo annullato» e nessun calcolo per 4 s nella scheda Render; Viewport, trascinata la freccia del fumo per 3 s → durante il gesto nessun calcolo e scheda Viewport; 1,2 s dopo il rilascio nessun calcolo; 4,7 s dopo calcolo ripartito, sempre in Viewport; Avvia render → scheda Render e render completato. **Non provati**: il preset con un oggetto mosso dalla gizmo dell'oggetto (ho mosso il riquadro del fumo, che cambia la stessa impronta), l'annullamento in fasi diverse del calcolo, il ghiaccio secco e la foschia nel programma.
+
+### 5. Denoiser nelle anteprime dei materiali
+
+**Prima:** nessuno. `ui/central.rs`, `render_preview_view`: accumulo dei campioni (GPU o CPU) e subito `tonemap_to_rgba8(&acc.resolve(), …)`.
+**Ora:** `preview_hdr` + `denoise_preview`: lo stesso Open Image Denoise del render finale (`forge_denoise::OidnDenoiser`, istanza propria caricata al primo uso), guide albedo e normali di `forge_render_cpu::render_guides` (8 campioni, stessa camera), qualità Bilanciata, CUDA se c'è. Spento sotto 16 campioni (anteprima dell'editor mentre si gira, 8 campioni). Interruttore «Riduci il rumore» in Impostazioni → Libreria e import (`preview_denoise`); entra nelle chiavi delle anteprime (pannello, editor, miniature della libreria) così non si vede un'anteprima vecchia. Materiali, texture e render finale non toccati.
+
+**Verifiche.** Test `preview_denoiser_reduces_noise_at_equal_samples` con OIDN vero: a 16 campioni, errore rispetto a 1024 campioni acciaio satinato 7,95 → 3,80, rovere 5,42 → 2,52; tempo del denoiser 34 ms a 128 px (195 ms la prima volta, caricamento di OIDN). Guardate a occhio le tre immagini: grana tolta, venature, riflessi e bordi conservati. **Non provati** nel programma: la reattività con tante miniature insieme.
+
+### 6. Scaglie della polvere che ruotano
+
+Percorso unico per anteprima e render: `forge_scene::effects::Dust::build_at` (chiamata da `Scene::sync_dust` con `dust_time`). Prima la normale della scaglia era fissa. Ora `flake_wobble`: due angoli attorno agli assi nel piano della scaglia, ampiezza 5–11° per asse (massimo circa ±22°), periodi 4,5–12,5 s, numeri fissi per scaglia da un generatore a parte (distribuzione, colori e moto invariati), zero a t = 0 (scene ferme identiche), proporzionale al «moto» (0 = ferme). Solo le scaglie.
+
+**Verifiche.** Test `flakes_tilt_slowly_on_their_own`: orientamenti invariati a t = 0, stesso istante = stesse normali, inclinazione massima ≤ 32° e media > 2°, scaglie indipendenti, salto tra due fotogrammi a 24 fps < 1,5°, centri identici ai granelli tondi (traiettorie invariate), moto 0 = ferme, granelli tondi senza rotazione. **Non verificato a occhio**: il luccichio in un'animazione renderizzata.
+
+### 7. Icona di Windows
+
+`assets/forgerender.ico` **non è nel ramo**: non ho fatto niente, come chiesto.
+
+### File modificati
+
+`crates/forge_app/src/viewport.rs`, `app.rs`, `prefs.rs`, `ui/settings.rs`, `ui/step_import.rs`, `ui/central.rs`, `ui/library.rs`, `ui/material_editor.rs`, `ui/status.rs`, `crates/forge_app/Cargo.toml` (pollster per i test GPU), `crates/forge_scene/src/effects.rs`, `lang/Lan_eng.json`, manuale EN+IT (`ui.impostazioni`, `ui.viewport`, `fx.effetti`), README EN+IT, CHANGELOG EN+IT, versione 0.53.0.
+
+### Controlli
+
+`cargo fmt --all`; `cargo clippy --workspace --exclude forge_step --all-targets --release -- -D warnings` pulito; test del workspace **425 passati, 0 falliti, 10 ignorati** (con `FORGE_OIDN_DIR` sulla cartella di OIDN, così il test del denoiser non si salta).
+
+**Da sapere sui test.** Un primo giro completo si è bloccato nei test di forge_app mentre la mia copia del programma usava la GPU per le prove a schermo; non si è ripetuto in sette giri successivi. In un giro il dispositivo GPU delle anteprime è ripiegato su DirectX 12 e lo shader del path tracer ha mandato in panic naga (`back/hlsl/conv.rs:117`): succede anche da solo con `FORGE_GPU_BACKEND=dx12`, quindi è un limite che c'era già (il path tracer su DirectX 12), non della griglia (i test della viewport passano anche su DX12). Ho fatto passare uno alla volta i test di forge_app che usano la GPU (`viewport::gpu_test_guard`): cinque giri di forge_app di fila verdi.
+
+**Commit:** su `sviluppo`, messaggio che inizia con «0.53.0».

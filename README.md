@@ -18,6 +18,14 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
+### What's new in 0.53.0
+
+- **Metric grid in the viewport:** a floor grid in real sizes (mm, cm or m), with major lines every N cells and red/blue X and Z axes; it fades its minor lines when they get too dense, stays behind the objects and never reaches the render. The STEP import preview shows the same grid.
+- **The viewport background is the colour you chose:** the viewport (and the STEP preview) drew the background much darker than the selected colour; now the screen shows exactly the chosen RGB values. **Custom** is selected with a single click and keeps its colour.
+- **Cleaner material previews:** the denoiser of the final render now cleans the material previews too, for the same samples (it can be switched off in Settings).
+- **Glittering flakes:** floating dust flakes tilt slowly on their own, so their glints come and go even with the camera and lights still.
+- **Volumetric effects wait for you:** after a change, smoke, dry ice and haze are computed 2.5 seconds after the last edit, never while you drag, and the program no longer jumps to the Render tab by itself; a cancelled computation stays cancelled.
+
 ### What's new in 0.52.0
 
 - **The AI controls the effects too:** through MCP, Claude or Codex can add, tune and remove haze, volumetric smoke, dry-ice fog, floating dust, fireflies and decals, with the same presets as the Effects tab.
@@ -250,7 +258,7 @@ Real specks (a few millimetres, up to 150,000) scattered in the air, as their ow
 - **Size variation:** how much the size of each speck differs at random from the set size, from all the same to tiny-to-triple.
 - **Two colours and opacity:** a second colour with the share of specks that take it (for example gold and white), and an opacity that makes them semi-transparent: they scatter less light and, if they cast shadows, block only part of it.
 - **Glowing specks:** with **+** you choose a colour: part of the specks lights up in that colour, like fireflies or sparks, and is visible also outside the spot beams (it is ordinary geometry that emits light and lights what is around it). Each colour has its intensity and its share of specks; low intensities keep the colour, high ones turn white like a bulb seen straight on. **Halo** and **halo strength** add a soft glow around each glowing speck the camera sees, like fireflies: a bright core as wide as the speck and a faint tail three times wider, fading to nothing, of the speck's colour. It is added to the finished image (before the tilt-shift), the same on CPU and GPU; a speck hidden by an object has no halo, and the viewport does not show it.
-- **Grains or flakes (fairy dust):** *Grains* are round and scatter the light evenly. *Flakes* are flat and face random directions: they reflect like tiny mirrors, so only those turned the right way between the light and the camera sparkle while the others stay dark, like glitter or fairy dust. **Sparkle** sets how much light the flakes reflect like a mirror, **reflection roughness** how small and intense (low) or wide and soft (high) the sparkles are. The same on CPU and GPU.
+- **Grains or flakes (fairy dust):** *Grains* are round and scatter the light evenly. *Flakes* are flat and face random directions: they reflect like tiny mirrors, so only those turned the right way between the light and the camera sparkle while the others stay dark, like glitter or fairy dust. While they float, the flakes also tilt slowly on their own (a few degrees, each at its own pace), so in an animation with the camera and lights still the glints come and go. **Sparkle** sets how much light the flakes reflect like a mirror, **reflection roughness** how small and intense (low) or wide and soft (high) the sparkles are. The same on CPU and GPU.
 
 ### Fireflies / Enchanted forest
 
@@ -278,7 +286,7 @@ Diffuse materials, GGX metals and plastics, Fresnel glass, frosted glass and emi
 - **Built-in library:** 125 ready materials in 13 categories: metals, anodised aluminium, paints, plastics, rubbers, glass, liquids, ceramics and stone, woods, fabrics and leather, asphalt, roofing and emissive. Every plain material (metals, paints, plastics, glass, liquids, LEDs) is included, plus five textured materials per category, chosen to be different from each other: brushed steel, turned aluminium, diamond plate, perforated sheet and rusty metal; oak, walnut, herringbone parquet, plywood and bark; denim, leather, bouclé wool, jute and satin. Transparent materials carry the right dispersion (Abbe number: crown glass 58, lead crystal 32, optical glass 64, diamond 55, polycarbonate 30, water 56…), visible in the spectral render, and water and drinks behave as liquids inside their glass. Maps are 1024 px to keep the program light.
 - **Additional pack:** 109 more textured materials with 2K maps (woods and barks, stones and plasters, fabrics, rusty and worn metals, asphalt, roofs), about 1.6 GB, downloaded separately and copied as `materiali-aggiuntivi` next to `forgerender.exe`: at the next start they appear in the same library.
 - **Free to redistribute:** the textured materials come from Poly Haven and ambientCG (CC0); each material's source is listed in `assets/materiali/LEGGIMI.md`.
-- **Sharp previews:** every material preview is rendered once with the path tracer at 512 px and scaled down for each card size, so it stays sharp both large and small.
+- **Sharp previews:** every material preview is rendered once with the path tracer at 512 px and scaled down for each card size, so it stays sharp both large and small. The final render's denoiser (Open Image Denoise, with albedo and normals) cleans the finished previews, so they show less grain for the same samples; it can be switched off in Settings → Library and import.
 - **Replace material:** in **Manage materials** (under the material of the selection, or Scene → Materials) choose "Replace [material] with «selected»" (or right-click a scene material): every component with that material, including those that inherit it and the scene default, switches to the selected one, without selecting a hundred objects. "Undo replacement" brings the previous assignments back.
 - **Colour picker:** clicking the swatch of a material colour (base colour, volume colour, emission) opens one panel with three tabs: **RGB** (colour wheel, R, G, B and hex code), **CMYK** (cyan, magenta, yellow and black in percent, with a simple mathematical conversion, not a print profile) and **Palette** (colours with code and name). The colour changes live; **Apply** keeps it, **Cancel** (or Esc) restores the previous one. The palette tab includes the RAL Classic codes with Italian and English names and **indicative** RGB values (an average of public sources, not the official RAL values, which RAL sells as a digital library); you can also import the official RAL CLASSIC `.ase` library or your own `.json`/`.csv` palette into the Colours folder of the library. A colour picked from a palette shows its code (for example **RAL 7016**) next to the swatch, saved with the project; changing the colour by hand turns it back into a plain RGB colour.
 
@@ -377,7 +385,8 @@ The window is arranged so that you always know where to look and what to do next
 - **A panel that follows the selection:** in Advanced mode the right panel has three tabs. **Selection** shows what you clicked in the viewport or in the tree: an object with its position, size and material, or a light, a camera or an effect with its properties. **Scene** holds what applies to the whole scene in sub-tabs (Lights, Environment, Effects, Camera, Materials). **Render** holds the render settings; Russian roulette, indirect light limit, random seed and CPU threads are in a closed **Advanced** section.
 - **More room for the view:** **Viewport | Render** and **Auto restart** sit right above the central area; the timeline and the console stay closed to one row until there is an animation (**Collapse** closes them again).
 - **Easier to read:** small text is bigger and lighter, material settings have Italian names with the technical term in brackets, and orange is kept for Start render, the render progress and what is selected.
-- **Viewport background:** Anthracite (#282C34) by default; **Settings → Viewport** offers Blender-like grey, Technical dark, Light grey or a **Custom** colour with the program's colour picker. It changes the viewport and the STEP preview at once and does not touch the final render.
+- **Viewport background:** Anthracite (#282C34) by default; **Settings → Viewport** offers Blender-like grey, Technical dark, Light grey or a **Custom** colour (one click, and it keeps its colour) with the program's colour picker. The screen shows exactly the chosen RGB values, in the viewport and in the STEP preview, and the final render does not change.
+- **Metric grid:** a floor grid in real sizes; unit (mm, cm, m), cell size, major lines every N cells and intensity in **Settings → Viewport**. It fades the minor lines when zooming out, stays behind the objects, is also in the STEP preview and never appears in the render.
 - **Render shows the render:** Start render, F5, the Rendering menu and the Simple mode button all switch to the **Render** tab when the render starts or resumes.
 
 ## What it does today
@@ -411,7 +420,7 @@ The window is arranged so that you always know where to look and what to do next
   **true displacement**, ambient occlusion, opacity cutout and overall opacity (animatable); UV mapping or world-space box
   projection in metres for CAD models without UVs, with repeat size, rotation and offset.
 - **Library**: 125 built-in materials in 13 categories (an additional pack adds 109 textured ones), plus materials and HDRIs downloaded from ambientCG and
-  Poly Haven or imported from folders/ZIP files, kept in a local `Library` folder with 512 px previews.
+  Poly Haven or imported from folders/ZIP files, kept in a local `Library` folder with 512 px previews (cleaned by the denoiser).
 - **Colour picker**: RGB, CMYK and palettes (RAL Classic with indicative values, or imported
   `.ase`/`.json`/`.csv` palettes) for every material colour, with the palette code next to
   the swatch; the same picker opens from every colour button (lights, environment, haze, smoke,
@@ -470,7 +479,9 @@ The window is arranged so that you always know where to look and what to do next
   it needs CMake (`winget install Kitware.CMake`).
 - **Viewport**: GPU rasterization with the object matrices on the GPU: moving objects does not
   reload the geometry, so animation stays smooth. Background Anthracite (#282C34) or chosen in
-  Settings → Viewport (four presets or custom); starting a render switches to the Render tab.
+  Settings → Viewport (four presets or custom); metric floor grid with configurable unit, cell and
+  major lines (also in the STEP preview); starting a render switches to the Render tab, the
+  automatic computation of volumetric effects never does and waits 2.5 s after the last change.
 - **Editing**: move/rotate/scale gizmo with snapping (also for lights, spot cone handles and fog
   emitters), per-object contact snap, undo/redo, hide (H), duplicate,
   exact drop to floor, Blender-style axis navigator, component tree, persistent material

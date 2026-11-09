@@ -13,7 +13,7 @@
 use crate::material::{Material, MaterialId, Projection, TextureMapping};
 use crate::mesh::Mesh;
 use crate::scene::{ComponentId, NodeIndex, Scene};
-use forge_math::{Mat4, Vec2, Vec3};
+use forge_math::{Mat4, Quat, Vec2, Vec3};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -476,6 +476,20 @@ fn dust_drift(home: Vec3, g: [f32; 4], t: f32, motion: f32) -> Vec3 {
     d * motion
 }
 
+/// Inclinazione propria di una scaglia all'istante `t`: due angoli (rad) attorno agli assi nel
+/// suo piano, zero a `t` = 0 (le scene ferme non cambiano). Lenta e contenuta: ampiezza 5–11°
+/// per asse (la scaglia oscilla al massimo di circa ±22°), periodi tra 4,5 e 12,5 s, frequenze e
+/// fasi diverse per ogni scaglia e per i due assi, così con camera e luce ferme ogni scaglia
+/// accende e spegne il suo riflesso per conto suo. Funzione continua del tempo con i numeri fissi
+/// `r` della scaglia: niente salti né tremolio tra due fotogrammi. Non tocca la traiettoria.
+fn flake_wobble(r: [f32; 4], t: f32, motion: f32) -> (f32, f32) {
+    let tau = std::f32::consts::TAU;
+    let amp = (0.09 + 0.1 * r[0]) * motion.min(2.0);
+    let (w1, w2) = (0.5 + 0.9 * r[1], 0.4 + 0.8 * r[2]);
+    let (p1, p2) = (r[3] * tau, (r[3] * 1.618 + r[0]).fract() * tau);
+    (amp * ((w1 * t + p1).sin() - p1.sin()), amp * ((w2 * t + p2).sin() - p2.sin()))
+}
+
 /// Numero massimo di granelli (≈ 20 triangoli l'uno): oltre la polvere si dirada.
 pub const DUST_MAX: usize = 150_000;
 
@@ -554,6 +568,15 @@ impl Dust {
             drift_state ^= drift_state << 17;
             (drift_state >> 40) as f32 / (1u64 << 24) as f32
         };
+        // Generatore a parte per l'inclinazione propria delle scaglie: gli altri numeri non cambiano.
+        let mut spin_state = 0xC2B2_AE3D_27D4_EB4Fu64 ^ (self.seed as u64).wrapping_mul(0x1656_67B1_9E37_79F9);
+        let mut rnd5 = || {
+            spin_state ^= spin_state << 13;
+            spin_state ^= spin_state >> 7;
+            spin_state ^= spin_state << 17;
+            (spin_state >> 40) as f32 / (1u64 << 24) as f32
+        };
+        let time = t;
         let motion = self.motion.max(0.0);
         let moved = (motion > 0.0 && t != 0.0) || (self.air_response > 0.0 && !air.is_empty());
         let spread = self.size_spread.clamp(0.0, 1.0);
@@ -599,6 +622,16 @@ impl Dust {
                 let n = Vec3::new(r * a.cos(), r * a.sin(), z);
                 let t = if n.x.abs() < 0.9 { Vec3::X } else { Vec3::Y }.cross(n).normalize();
                 let b = n.cross(t);
+                // Inclinazione propria nel tempo, attorno ai due assi della scaglia: si aggiunge
+                // all'orientamento di partenza, il centro (trasporto dell'aria) resta quello.
+                let spin = [rnd5(), rnd5(), rnd5(), rnd5()];
+                let (n, t, b) = if motion > 0.0 && time != 0.0 {
+                    let (ta, tb) = flake_wobble(spin, time, motion);
+                    let q = Quat::from_axis_angle(t, ta) * Quat::from_axis_angle(b, tb);
+                    (q * n, q * t, q * b)
+                } else {
+                    (n, t, b)
+                };
                 for p in &shape.positions {
                     out.positions.push(c + (t * p.x + b * p.y) * d);
                     out.normals.push(n);
@@ -1055,6 +1088,80 @@ mod tests {
         assert!(step < 0.01, "salto tra due fotogrammi: {step}");
         let still = Dust { motion: 0.0, ..dust() };
         assert_eq!(at(&still, 5.0, &none), base);
+    }
+
+    fn flake_normals(d: &Dust, t: f32, air: &DustAir) -> Vec<Vec3> {
+        // Sei vertici per scaglia, tutti con la normale della scaglia.
+        let (a, ..) = d.build_at(Vec3::splat(-1.0), Vec3::ONE, t, air);
+        a.normals.chunks(6).map(|c| c[0]).collect()
+    }
+
+    fn flake_centres(d: &Dust, t: f32, air: &DustAir) -> Vec<Vec3> {
+        let (a, ..) = d.build_at(Vec3::splat(-1.0), Vec3::ONE, t, air);
+        a.positions.chunks(6).map(|c| c.iter().copied().sum::<Vec3>() / 6.0).collect()
+    }
+
+    /// Le scaglie si inclinano da sole nel tempo: orientamento di partenza invariato a t = 0,
+    /// variazione lenta e contenuta (niente capriole), indipendente da una scaglia all'altra,
+    /// continua tra due fotogrammi e uguale a parità di seme e istante. Le traiettorie (centri)
+    /// sono quelle dei granelli tondi di sempre; con il moto a zero restano ferme.
+    #[test]
+    fn flakes_tilt_slowly_on_their_own() {
+        let none = DustAir::default();
+        let flakes = Dust {
+            shape: DustShape::Flakes,
+            ..dust()
+        };
+        let n0 = flake_normals(&flakes, 0.0, &none);
+        assert!(n0.len() > 100);
+        let still = flake_normals(&flakes, 0.0, &none);
+        assert_eq!(n0, still, "t = 0: orientamenti di sempre");
+        let angle = |a: &[Vec3], b: &[Vec3]| -> Vec<f32> {
+            a.iter()
+                .zip(b)
+                .map(|(p, q)| p.dot(*q).clamp(-1.0, 1.0).acos().to_degrees())
+                .collect()
+        };
+        let n5 = flake_normals(&flakes, 5.0, &none);
+        assert_eq!(n5, flake_normals(&flakes, 5.0, &none), "stesso istante, stesse scaglie");
+        let tilt = angle(&n0, &n5);
+        let max = tilt.iter().copied().fold(0.0, f32::max);
+        let mean = tilt.iter().sum::<f32>() / tilt.len() as f32;
+        assert!(max <= 32.0, "inclinazione massima {max}° (niente capriole)");
+        assert!(mean > 2.0, "inclinazione media {mean}°: deve vedersi");
+        // Indipendenti: le scaglie non girano tutte insieme dello stesso angolo.
+        let spread = tilt.iter().map(|a| (a - mean).abs()).sum::<f32>() / tilt.len() as f32;
+        assert!(spread > 1.0, "variazione tra scaglie {spread}°");
+        // Continuità: tra due fotogrammi a 24 fps al massimo poco più di un grado.
+        let step = angle(&n5, &flake_normals(&flakes, 5.0 + 1.0 / 24.0, &none));
+        assert!(
+            step.iter().all(|&a| a < 1.5),
+            "salto tra fotogrammi {:?}",
+            step.iter().copied().fold(0.0, f32::max)
+        );
+        // La traiettoria non cambia: i centri sono quelli dei granelli tondi.
+        let grains = at(&dust(), 5.0, &none);
+        let centres = flake_centres(&flakes, 5.0, &none);
+        let grain_centres: Vec<Vec3> = {
+            let per = grain().positions.len();
+            grains.chunks(per).map(|c| c.iter().copied().sum::<Vec3>() / per as f32).collect()
+        };
+        let off = centres
+            .iter()
+            .zip(&grain_centres)
+            .map(|(a, b)| (*a - *b).length())
+            .fold(0.0, f32::max);
+        assert!(off < 1e-4, "centri spostati di {off}");
+        // Moto a zero: ferme.
+        let frozen = Dust {
+            motion: 0.0,
+            ..flakes.clone()
+        };
+        assert_eq!(flake_normals(&frozen, 5.0, &none), n0);
+        // Granelli tondi: nessuna rotazione nuova (le normali restano quelle della sfera).
+        let (g0, ..) = dust().build_at(Vec3::splat(-1.0), Vec3::ONE, 0.0, &none);
+        let (g5, ..) = dust().build_at(Vec3::splat(-1.0), Vec3::ONE, 5.0, &none);
+        assert_eq!(g0.normals, g5.normals);
     }
 
     /// Un oggetto che passa sposta i granelli vicini e li tiene fuori; fermo non fa niente.

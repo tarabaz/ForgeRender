@@ -3036,3 +3036,11 @@ Due righe in alto (modalità e Impostazioni a destra, comandi del render a destr
 **Provato:** fmt, clippy e test del workspace (416 passati, 0 falliti), con test per ricerca degli effetti, fusione dei valori e preset nella descrizione.
 
 **Non verificato:** l'uso dal vivo con un assistente collegato alla finestra.
+
+## Sfondo, griglia, precalcolo, denoiser anteprime, scaglie — 09/11/2026 (Claude, 0.53.0)
+
+**Fatto:** causa dello sfondo quasi nero trovata e corretta (vista `Rgba8Unorm` per egui in `viewport.rs`); Personalizzato con un clic; griglia metrica in viewport e anteprima STEP; precalcolo volumetrico con attesa di 2,5 s e senza salto alla scheda Render (solo il comando Render cambia scheda); denoiser OIDN sulle anteprime dei materiali; rotazione propria delle scaglie della polvere. Dettagli, file e verifiche in fondo a `reports/chatgpt/2026-11-09_modifiche.md`.
+
+**Provato:** fmt, clippy, test del workspace (425 passati, 0 falliti); test GPU della viewport; nel programma (copia mia): byte dello sfondo per ogni preset, Semplice e STEP, sequenza di Personalizzato, prova del precalcolo con il fumo.
+
+**Non verificato:** luccichio delle scaglie in animazione; alcune misure della griglia e la vista ortografica nel programma; icona (file assente).

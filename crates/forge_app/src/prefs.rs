@@ -46,6 +46,8 @@ pub struct Preferences {
     pub preview_samples: u32,
     /// Dimensione apparente dell'oggetto delle anteprime (cm, 0 = reale, circa 9 cm).
     pub preview_object_cm: u32,
+    /// Denoiser (Open Image Denoise) sulle anteprime dei materiali.
+    pub preview_denoise: bool,
     // --- Percorsi ---
     /// Cartella della libreria scelta dall'utente (`None` = predefinita).
     pub library_dir: Option<PathBuf>,
@@ -66,26 +68,125 @@ pub struct Preferences {
     /// Contatori scelti per la barra di stato, al massimo [`MAX_STATUS_ITEMS`].
     #[serde(deserialize_with = "known_status_items")]
     pub status_items: Vec<StatusItem>,
-    /// Colore dello sfondo della viewport (sRGB a 8 bit). Solo la viewport: il render finale
-    /// non cambia.
-    pub viewport_background: [u8; 3],
+    /// Sfondo della viewport: uno dei colori pronti oppure Personalizzato. Solo la viewport e
+    /// l'anteprima STEP: il render finale non cambia. Il colore da usare lo dà
+    /// [`Preferences::viewport_background_color`].
+    pub viewport_background_mode: ViewportBackground,
+    /// Colore personalizzato (sRGB a 8 bit), conservato anche mentre è scelto un colore pronto.
+    /// `None` finché non si è mai scelto Personalizzato.
+    pub viewport_background_custom: Option<[u8; 3]>,
+    /// Colore unico delle versioni 0.51–0.52: letto una volta e convertito in modalità e colore
+    /// personalizzato da [`Preferences::sanitized`], non si scrive più.
+    #[serde(rename = "viewport_background", skip_serializing)]
+    pub legacy_viewport_background: Option<[u8; 3]>,
+    /// Griglia metrica della viewport e dell'anteprima STEP.
+    pub viewport_grid: ViewportGrid,
+}
+
+/// Scelta dello sfondo della viewport.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ViewportBackground {
+    #[default]
+    Antracite,
+    GrigioBlender,
+    ScuroTecnico,
+    GrigioChiaro,
+    Personalizzato,
+}
+
+/// Unità con cui si mostra e si scrive la misura della cella della griglia. La scena è in metri.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum GridUnit {
+    Mm,
+    #[default]
+    Cm,
+    M,
+}
+
+impl GridUnit {
+    pub const ALL: [GridUnit; 3] = [GridUnit::Mm, GridUnit::Cm, GridUnit::M];
+    /// Metri in un'unità.
+    pub fn meters(self) -> f32 {
+        match self {
+            GridUnit::Mm => 0.001,
+            GridUnit::Cm => 0.01,
+            GridUnit::M => 1.0,
+        }
+    }
+    pub fn symbol(self) -> &'static str {
+        match self {
+            GridUnit::Mm => "mm",
+            GridUnit::Cm => "cm",
+            GridUnit::M => "m",
+        }
+    }
+}
+
+/// Griglia metrica sul pavimento (y = 0) della viewport: celle di misura reale nel mondo.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ViewportGrid {
+    pub show: bool,
+    /// Unità con cui si mostra la cella.
+    pub unit: GridUnit,
+    /// Lato della cella in metri.
+    pub cell_m: f32,
+    /// Una linea principale ogni quante celle.
+    pub major_every: u32,
+    /// Quanto si vedono le linee (1 = normale).
+    pub intensity: f32,
+}
+
+impl Default for ViewportGrid {
+    fn default() -> Self {
+        Self {
+            show: true,
+            unit: GridUnit::Cm,
+            cell_m: 0.01,
+            major_every: 10,
+            intensity: 1.0,
+        }
+    }
+}
+
+/// Misure pronte della cella, in metri: 1, 5, 10, 20, 50, 100 mm, poi 50 cm e 1 m.
+pub const GRID_CELLS_M: [f32; 8] = [0.001, 0.005, 0.01, 0.02, 0.05, 0.1, 0.5, 1.0];
+/// Intervalli pronti delle linee principali.
+pub const GRID_MAJOR_EVERY: [u32; 3] = [5, 10, 20];
+
+impl ViewportGrid {
+    pub fn sanitized(mut self) -> Self {
+        self.cell_m = if self.cell_m.is_finite() {
+            self.cell_m.clamp(1e-4, 100.0)
+        } else {
+            0.01
+        };
+        self.major_every = self.major_every.clamp(2, 100);
+        self.intensity = if self.intensity.is_finite() {
+            self.intensity.clamp(0.1, 3.0)
+        } else {
+            1.0
+        };
+        self
+    }
 }
 
 /// Sfondo predefinito della viewport: Antracite, grigio leggermente freddo che tiene il
 /// contrasto anche con oggetti neri o molto scuri.
 pub const VIEWPORT_BACKGROUND_DEFAULT: [u8; 3] = [40, 44, 52];
 
-/// Colori pronti per lo sfondo della viewport (nome da tradurre, sRGB). Il primo è il predefinito.
-pub const VIEWPORT_BACKGROUNDS: [(&str, [u8; 3]); 4] = [
-    (tk("Antracite"), VIEWPORT_BACKGROUND_DEFAULT),
-    (tk("Grigio Blender-like"), [48, 52, 59]),
-    (tk("Scuro tecnico"), [34, 40, 49]),
-    (tk("Grigio chiaro"), [53, 58, 66]),
+/// Colori pronti per lo sfondo della viewport (scelta, nome da tradurre, sRGB). Il primo è il
+/// predefinito.
+pub const VIEWPORT_BACKGROUNDS: [(ViewportBackground, &str, [u8; 3]); 4] = [
+    (ViewportBackground::Antracite, tk("Antracite"), VIEWPORT_BACKGROUND_DEFAULT),
+    (ViewportBackground::GrigioBlender, tk("Grigio Blender-like"), [48, 52, 59]),
+    (ViewportBackground::ScuroTecnico, tk("Scuro tecnico"), [34, 40, 49]),
+    (ViewportBackground::GrigioChiaro, tk("Grigio chiaro"), [53, 58, 66]),
 ];
 
-/// Nome del colore pronto uguale a `c`, `None` se è un colore personalizzato.
-pub fn viewport_background_preset(c: [u8; 3]) -> Option<&'static str> {
-    VIEWPORT_BACKGROUNDS.iter().find(|(_, v)| *v == c).map(|(n, _)| *n)
+/// Il colore pronto uguale a `c`, `None` se non è nessuno di quelli.
+pub fn viewport_background_preset(c: [u8; 3]) -> Option<ViewportBackground> {
+    VIEWPORT_BACKGROUNDS.iter().find(|(_, _, v)| *v == c).map(|(m, _, _)| *m)
 }
 
 /// Contatori che si possono scegliere; Backend e processore restano sempre a destra.
@@ -219,6 +320,7 @@ impl Default for Preferences {
             library_card_size: 112,
             preview_samples: 64,
             preview_object_cm: 30,
+            preview_denoise: true,
             library_dir: None,
             new_backend: BackendKind::Gpu,
             new_samples: r.target_samples,
@@ -228,8 +330,40 @@ impl Default for Preferences {
             timeline_detached: false,
             video: Default::default(),
             status_items: StatusItem::defaults(),
-            viewport_background: VIEWPORT_BACKGROUND_DEFAULT,
+            viewport_background_mode: ViewportBackground::Antracite,
+            viewport_background_custom: None,
+            legacy_viewport_background: None,
+            viewport_grid: ViewportGrid::default(),
         }
+    }
+}
+
+impl Preferences {
+    /// Colore dello sfondo della viewport (sRGB a 8 bit): l'unica sorgente per viewport e
+    /// anteprima STEP.
+    pub fn viewport_background_color(&self) -> [u8; 3] {
+        match self.viewport_background_mode {
+            ViewportBackground::Personalizzato => self.viewport_background_custom.unwrap_or(VIEWPORT_BACKGROUND_DEFAULT),
+            mode => VIEWPORT_BACKGROUNDS
+                .iter()
+                .find(|(m, _, _)| *m == mode)
+                .map_or(VIEWPORT_BACKGROUND_DEFAULT, |(_, _, c)| *c),
+        }
+    }
+
+    /// Sceglie Personalizzato con un clic: tiene il colore personalizzato già scelto; la prima
+    /// volta parte dal colore che si vede adesso.
+    pub fn choose_custom_background(&mut self) {
+        if self.viewport_background_custom.is_none() {
+            self.viewport_background_custom = Some(self.viewport_background_color());
+        }
+        self.viewport_background_mode = ViewportBackground::Personalizzato;
+    }
+
+    /// Colore personalizzato cambiato dal selettore: diventa anche la scelta attiva.
+    pub fn set_custom_background(&mut self, c: [u8; 3]) {
+        self.viewport_background_custom = Some(c);
+        self.viewport_background_mode = ViewportBackground::Personalizzato;
     }
 }
 
@@ -253,6 +387,18 @@ impl Preferences {
         if self.library_dir.as_ref().is_some_and(|p| p.as_os_str().is_empty()) {
             self.library_dir = None;
         }
+        // File delle 0.51–0.52: un colore solo. Se è uno dei pronti diventa quella scelta,
+        // altrimenti Personalizzato con quel colore.
+        if let Some(c) = self.legacy_viewport_background.take() {
+            match viewport_background_preset(c) {
+                Some(mode) => self.viewport_background_mode = mode,
+                None => {
+                    self.viewport_background_mode = ViewportBackground::Personalizzato;
+                    self.viewport_background_custom = Some(c);
+                }
+            }
+        }
+        self.viewport_grid = self.viewport_grid.sanitized();
         self
     }
 
@@ -274,6 +420,7 @@ impl Preferences {
         forge_library::store::set_import_displacement(self.import_displacement);
         crate::ui::central::set_preview_samples(self.preview_samples);
         crate::ui::central::set_preview_object_cm(self.preview_object_cm);
+        crate::ui::central::set_preview_denoise(self.preview_denoise);
     }
 
     pub fn load_from(path: &Path) -> (Self, Option<String>) {
@@ -376,6 +523,7 @@ mod tests {
             library_card_size: 256,
             preview_samples: 512,
             preview_object_cm: 100,
+            preview_denoise: false,
             library_dir: Some(PathBuf::from("/x/Libreria")),
             new_backend: BackendKind::Gpu,
             new_samples: 256,
@@ -383,7 +531,16 @@ mod tests {
             auto_restart: false,
             recent_projects: vec![PathBuf::from("/x/a.frproject")],
             timeline_detached: true,
-            viewport_background: [12, 200, 99],
+            viewport_background_mode: ViewportBackground::ScuroTecnico,
+            viewport_background_custom: Some([12, 200, 99]),
+            legacy_viewport_background: None,
+            viewport_grid: ViewportGrid {
+                show: false,
+                unit: GridUnit::Mm,
+                cell_m: 0.005,
+                major_every: 20,
+                intensity: 1.5,
+            },
         };
         custom.save_to(&p).unwrap();
         let (back, err) = Preferences::load_from(&p);
@@ -423,34 +580,102 @@ mod tests {
     /// riavvio; i preset hanno i valori chiesti e si riconoscono per nome.
     #[test]
     fn viewport_background_default_presets_and_persistence() {
-        assert_eq!(Preferences::default().viewport_background, [40, 44, 52]);
+        assert_eq!(Preferences::default().viewport_background_color(), [40, 44, 52]);
         let p = tmp("sfondo");
         std::fs::write(&p, r#"{"auto_restart": false}"#).unwrap();
         let (old, err) = Preferences::load_from(&p);
         assert!(err.is_none());
-        assert_eq!(old.viewport_background, VIEWPORT_BACKGROUND_DEFAULT, "file di prima: Antracite");
         assert_eq!(
-            VIEWPORT_BACKGROUNDS.map(|(_, c)| crate::ui::color_picker::to_hex(c)),
+            old.viewport_background_color(),
+            VIEWPORT_BACKGROUND_DEFAULT,
+            "file di prima: Antracite"
+        );
+        assert_eq!(
+            VIEWPORT_BACKGROUNDS.map(|(_, _, c)| crate::ui::color_picker::to_hex(c)),
             ["#282C34", "#30343B", "#222831", "#353A42"]
         );
-        for (name, c) in VIEWPORT_BACKGROUNDS {
-            assert_eq!(viewport_background_preset(c), Some(name));
+        for (mode, name, c) in VIEWPORT_BACKGROUNDS {
+            assert_eq!(viewport_background_preset(c), Some(mode));
             let chosen = Preferences {
-                viewport_background: c,
+                viewport_background_mode: mode,
                 ..Default::default()
             };
             chosen.save_to(&p).unwrap();
-            assert_eq!(Preferences::load_from(&p).0.viewport_background, c, "{name}");
+            assert_eq!(Preferences::load_from(&p).0.viewport_background_color(), c, "{name}");
         }
         let custom = [200, 10, 77];
         assert_eq!(viewport_background_preset(custom), None, "personalizzato");
-        Preferences {
-            viewport_background: custom,
+        let mut chosen = Preferences::default();
+        chosen.set_custom_background(custom);
+        chosen.save_to(&p).unwrap();
+        assert_eq!(Preferences::load_from(&p).0.viewport_background_color(), custom);
+    }
+
+    /// Le impostazioni scritte dalle 0.51–0.52 (un colore solo) diventano la scelta giusta.
+    #[test]
+    fn viewport_background_from_older_files() {
+        let p = tmp("sfondo-vecchio");
+        std::fs::write(&p, r#"{"viewport_background": [53, 58, 66]}"#).unwrap();
+        let (a, _) = Preferences::load_from(&p);
+        assert_eq!(a.viewport_background_mode, ViewportBackground::GrigioChiaro);
+        assert_eq!(a.viewport_background_custom, None);
+        std::fs::write(&p, r#"{"viewport_background": [1, 2, 3]}"#).unwrap();
+        let (b, _) = Preferences::load_from(&p);
+        assert_eq!(b.viewport_background_mode, ViewportBackground::Personalizzato);
+        assert_eq!(b.viewport_background_color(), [1, 2, 3]);
+        b.save_to(&p).unwrap();
+        let text = std::fs::read_to_string(&p).unwrap();
+        assert!(!text.contains("\"viewport_background\""), "il campo vecchio non si riscrive");
+        assert_eq!(Preferences::load_from(&p).0.viewport_background_color(), [1, 2, 3]);
+    }
+
+    /// Personalizzato si sceglie con un solo clic e il suo colore resta passando dai preset:
+    /// preset A → Personalizzato (senza toccare il colore) → preset B → Personalizzato →
+    /// colore cambiato → preset A → Personalizzato.
+    #[test]
+    fn custom_background_is_one_click_and_kept() {
+        let mut p = Preferences {
+            viewport_background_mode: ViewportBackground::GrigioBlender,
             ..Default::default()
-        }
-        .save_to(&p)
+        };
+        p.choose_custom_background();
+        assert_eq!(p.viewport_background_mode, ViewportBackground::Personalizzato);
+        assert_eq!(p.viewport_background_color(), [48, 52, 59], "la prima volta parte dal colore visto");
+        p.viewport_background_mode = ViewportBackground::GrigioChiaro;
+        assert_eq!(p.viewport_background_color(), [53, 58, 66]);
+        p.choose_custom_background();
+        assert_eq!(p.viewport_background_mode, ViewportBackground::Personalizzato);
+        assert_eq!(p.viewport_background_color(), [48, 52, 59], "colore personalizzato conservato");
+        p.set_custom_background([90, 20, 30]);
+        p.viewport_background_mode = ViewportBackground::GrigioBlender;
+        assert_eq!(p.viewport_background_color(), [48, 52, 59]);
+        p.choose_custom_background();
+        assert_eq!(p.viewport_background_color(), [90, 20, 30]);
+        // Anche se il colore personalizzato è uguale a un preset, la scelta resta Personalizzato.
+        p.set_custom_background([40, 44, 52]);
+        assert_eq!(p.viewport_background_mode, ViewportBackground::Personalizzato);
+    }
+
+    /// Griglia: valori predefiniti, salvataggio e valori fuori intervallo.
+    #[test]
+    fn viewport_grid_defaults_persistence_and_limits() {
+        let g = ViewportGrid::default();
+        assert!(g.show);
+        assert_eq!((g.unit, g.cell_m, g.major_every), (GridUnit::Cm, 0.01, 10));
+        let p = tmp("griglia");
+        std::fs::write(
+            &p,
+            r#"{"viewport_grid": {"cell_m": -3, "major_every": 1000, "intensity": 99, "unit": "Mm"}}"#,
+        )
         .unwrap();
-        assert_eq!(Preferences::load_from(&p).0.viewport_background, custom);
+        let (a, err) = Preferences::load_from(&p);
+        assert!(err.is_none(), "{err:?}");
+        assert_eq!(a.viewport_grid.unit, GridUnit::Mm);
+        assert_eq!(a.viewport_grid.cell_m, 1e-4);
+        assert_eq!(a.viewport_grid.major_every, 100);
+        assert_eq!(a.viewport_grid.intensity, 3.0);
+        assert!(a.viewport_grid.show, "campo mancante: predefinito");
+        assert!((GridUnit::Mm.meters() * 10.0 - GridUnit::Cm.meters()).abs() < 1e-9);
     }
 
     #[test]

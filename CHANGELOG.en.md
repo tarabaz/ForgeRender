@@ -10,6 +10,15 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.53.0 — 9 Nov 2026
+
+- **Viewport background fixed:** egui 0.37 reads native textures as already gamma-encoded, while the viewport handed it the sRGB view of its texture, so egui received linear values and showed them as gamma (Light grey #353A42 appeared as about RGB 9, 11, 14). The texture now has an `Rgba8Unorm` view for egui, so the screen shows exactly the chosen bytes; the shading of the objects keeps its usual look. Same fix for the STEP preview, which uses the same renderer.
+- **Custom background in one click:** the choice (preset or Custom) is now separate from the custom colour; clicking **Custom** selects it at once and the custom colour is kept while trying the presets. Settings of 0.51–0.52 are converted.
+- **Metric grid:** floor grid (y = 0) in real sizes in the viewport and the STEP preview: show/hide, unit, cell size (presets and custom), major lines every N cells, intensity, X and Z axes; minor lines fade when too dense; never in the render or in the animation preview frames.
+- **Volumetric effects:** the automatic computation starts 2.5 s after the last change (the timer restarts at every change) and never changes tab; only the Render command switches to the Render tab and computes what is missing at once. A cancelled computation is no longer restarted at once by the automatic restart, Stop also stops a render waiting for geometry or volumes, and a computation that finishes while you are in the viewport no longer pulls you to the Render tab.
+- **Material preview denoiser:** Open Image Denoise (with albedo and normal guides, Balanced quality) on the finished previews; off while rotating the editor preview; switch in Settings → Library and import.
+- **Floating dust flakes:** each flake tilts slowly on its own over time (about ±22° at most, periods of 4.5–12.5 s), deterministic and continuous; trajectories unchanged, still scenes identical.
+
 ## 0.52.0 — 9 Nov 2026
 
 - **The AI can manage the effects:** four new MCP tools. `list_effects` returns every effect in the scene with all its values (the field names saved in the project) and what can be added; `add_effect` adds ambient haze (5 types), volumetric smoke (9 presets), dry-ice fog (5 presets), floating dust, fireflies, or a decal from an image on the chosen parts, exactly like the buttons of the Effects tab; `edit_effect` changes only the given values (unknown fields and wrong types are refused, out-of-range values are clamped as in the panel), switches the effect on or off or renames it; `remove_effect` deletes it. `scene_info` now lists the effects too.

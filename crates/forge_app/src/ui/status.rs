@@ -406,7 +406,8 @@ pub fn show(app: &mut ForgeApp, ui: &mut egui::Ui) {
                 }
                 let hint = tr(
                     "Calcolo degli effetti (nebbia, foschia) prima del render, uno alla volta: parte da solo \
-                     poco dopo l'ultima modifica, così quando avvii il render li trovi già pronti. Puoi continuare a lavorare.",
+                     2,5 secondi dopo l'ultima modifica (mai mentre trascini), così quando avvii il render li trovi \
+                     già pronti. Puoi continuare a lavorare: non cambia scheda.",
                 );
                 match progress::get() {
                     Some(p) => {

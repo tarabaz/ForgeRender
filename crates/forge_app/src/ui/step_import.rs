@@ -313,6 +313,7 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
     let rs = app.wgpu_state.clone();
     // Sfondo dell'anteprima: lo stesso della viewport (Impostazioni → Viewport).
     let background = app.viewport_background();
+    let grid = app.viewport_grid();
     let mut open = true;
     let mut import = false;
     let mut close = false;
@@ -328,7 +329,7 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
             ui.columns(3, |c| {
                 source_column(&mut c[0], st);
                 settings_column(&mut c[1], st);
-                preview_column(&mut c[2], st, rs.as_ref(), background);
+                preview_column(&mut c[2], st, rs.as_ref(), background, grid);
             });
             ui.separator();
             ui.horizontal(|ui| {
@@ -525,7 +526,13 @@ impl StepImport {
     }
 }
 
-fn preview_column(ui: &mut egui::Ui, st: &mut StepImport, rs: Option<&RenderState>, background: Vec3) {
+fn preview_column(
+    ui: &mut egui::Ui,
+    st: &mut StepImport,
+    rs: Option<&RenderState>,
+    background: Vec3,
+    grid: Option<crate::viewport::GridLook>,
+) {
     ui.heading(tr("Anteprima 3D"));
     let side = (ui.available_height() - 90.0).max(160.0).min(ui.available_width() * 1.2);
     let (rect, r) = ui.allocate_exact_size(egui::vec2(ui.available_width(), side), egui::Sense::click_and_drag());
@@ -571,7 +578,17 @@ fn preview_column(ui: &mut egui::Ui, st: &mut StepImport, rs: Option<&RenderStat
             }
             let ppp = ui.ctx().pixels_per_point();
             let px = [(rect.width() * ppp).round() as u32, (rect.height() * ppp).round() as u32];
-            if let Some(tex) = vp.render(rs, &orbit.camera(), c.preview.radius, px, background, *wire) {
+            if let Some(tex) = vp.render(
+                rs,
+                &orbit.camera(),
+                c.preview.radius,
+                px,
+                crate::viewport::ViewStyle {
+                    background,
+                    mesh_view: *wire,
+                    grid,
+                },
+            ) {
                 let uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
                 ui.painter_at(rect).image(tex, rect, uv, egui::Color32::WHITE);
             }

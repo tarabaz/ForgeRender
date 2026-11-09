@@ -18,6 +18,14 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
+### Novità della versione 0.53.0
+
+- **Griglia metrica nella viewport:** una griglia sul pavimento in misure reali (mm, cm o m), con linee principali ogni N celle e gli assi X e Z in rosso e blu; quando le linee minori diventano troppo fitte sfumano, sta dietro agli oggetti e non arriva mai nel render. L'anteprima dell'importazione STEP mostra la stessa griglia.
+- **Lo sfondo della viewport è il colore scelto:** la viewport (e l'anteprima STEP) disegnava lo sfondo molto più scuro del colore selezionato; ora sullo schermo ci sono esattamente i valori RGB scelti. **Personalizzato** si sceglie con un clic e conserva il suo colore.
+- **Anteprime dei materiali più pulite:** il denoiser del render finale ora ripulisce anche le anteprime dei materiali, a parità di campioni (si spegne nelle Impostazioni).
+- **Scaglie che luccicano:** le scaglie della polvere in sospensione si inclinano piano per conto loro, così i riflessi si accendono e si spengono anche con camera e luci ferme.
+- **Gli effetti volumetrici ti aspettano:** dopo una modifica fumo, ghiaccio secco e foschia si calcolano 2,5 secondi dopo l'ultima modifica, mai mentre trascini, e il programma non salta più da solo alla scheda Render; un calcolo annullato resta annullato.
+
 ### Novità della versione 0.52.0
 
 - **L'IA comanda anche gli effetti:** tramite MCP, Claude o Codex possono aggiungere, regolare ed eliminare foschia, fumo volumetrico, ghiaccio secco, polvere in sospensione, lucciole e adesivi, con gli stessi preset della scheda Effetti.
@@ -261,7 +269,7 @@ Granelli veri (qualche millimetro, fino a 150 000) sparsi nell'aria, come effett
 - **Variazione della dimensione:** quanto la dimensione di ogni granello si scosta a caso da quella impostata, da tutti uguali a da piccolissimi al triplo.
 - **Due colori e opacità:** un secondo colore con la parte di granelli che lo prende (per esempio oro e bianco), e un'opacità che li rende semitrasparenti: diffondono meno luce e, se fanno ombra, ne fermano solo una parte.
 - **Granelli luminosi:** con **+** scegli un colore: una parte dei granelli si accende di quel colore, come lucciole o scintille, e si vede anche fuori dai fasci delle spot (è geometria normale che emette luce e illumina quello che ha intorno). Ogni colore ha la sua intensità e la sua percentuale di granelli; con intensità basse il colore resta, con intensità alte diventa bianco come una lampadina vista dritta. **Alone** e **forza dell'alone** aggiungono un bagliore morbido attorno a ogni granello luminoso che la camera vede, come le lucciole: un nucleo luminoso largo quanto il granello e una coda tenue tre volte più larga che sfuma a zero, del colore del granello. Si aggiunge all'immagine finita (prima del tilt-shift), uguale su CPU e GPU; un granello coperto da un oggetto non fa alone, e la viewport non lo mostra.
-- **Granelli o scaglie (polvere di fata):** i *granelli* sono tondi e diffondono la luce uguale da ogni lato. Le *scaglie* sono piatte e girate a caso: riflettono come piccoli specchi, quindi brillano solo quelle girate giuste tra luce e camera mentre le altre restano spente, come brillantini o polvere di fata. **Luccichio** regola quanta luce le scaglie riflettono a specchio, **ruvidità del riflesso** se le scintille sono piccole e intense (bassa) o larghe e tenui (alta). Uguale su CPU e GPU.
+- **Granelli o scaglie (polvere di fata):** i *granelli* sono tondi e diffondono la luce uguale da ogni lato. Le *scaglie* sono piatte e girate a caso: riflettono come piccoli specchi, quindi brillano solo quelle girate giuste tra luce e camera mentre le altre restano spente, come brillantini o polvere di fata. Mentre fluttuano, le scaglie si inclinano anche piano per conto loro (pochi gradi, ognuna con il suo ritmo), così in un'animazione con camera e luci ferme i riflessi si accendono e si spengono. **Luccichio** regola quanta luce le scaglie riflettono a specchio, **ruvidità del riflesso** se le scintille sono piccole e intense (bassa) o larghe e tenui (alta). Uguale su CPU e GPU.
 
 ### Lucciole / Bosco incantato
 
@@ -289,7 +297,7 @@ Materiali diffusi, metalli e plastiche GGX, vetro Fresnel, vetro satinato ed emi
 - **Libreria di serie:** 125 materiali pronti in 13 categorie: metalli, alluminio anodizzato, vernici, plastiche, gomme, vetri, liquidi, ceramiche e pietre, legni, tessuti e pelle, asfalto, coperture ed emissivi. Ci sono tutti i materiali senza texture (metalli, vernici, plastiche, vetri, liquidi, LED) e cinque materiali con texture per categoria, scelti diversi tra loro: acciaio spazzolato, alluminio tornito, lamiera mandorlata, lamiera forata e metallo arrugginito; rovere, noce, parquet a spina di pesce, compensato e corteccia; denim, pelle, lana bouclé, juta e raso. I trasparenti hanno la dispersione giusta (numero di Abbe: vetro 58, cristallo al piombo 32, vetro ottico 64, diamante 55, policarbonato 30, acqua 56…), che si vede nel render spettrale, e acqua e bevande si comportano da liquidi dentro il loro bicchiere. Le mappe sono da 1024 px perché il programma resti leggero.
 - **Pacchetto aggiuntivo:** altri 109 materiali con mappe a 2K (legni e cortecce, pietre e intonaci, tessuti, metalli arrugginiti e consumati, asfalti, tetti), circa 1,6 GB, da scaricare a parte e copiare come `materiali-aggiuntivi` accanto a `forgerender.exe`: al riavvio compaiono nella stessa libreria.
 - **Liberi da ridistribuire:** i materiali con texture vengono da Poly Haven e ambientCG (CC0); la fonte di ogni materiale è in `assets/materiali/LEGGIMI.md`.
-- **Anteprime nitide:** ogni anteprima dei materiali si renderizza una volta con il path tracer a 512 px e si rimpicciolisce per ogni grandezza delle schede, così resta nitida sia grande sia piccola.
+- **Anteprime nitide:** ogni anteprima dei materiali si renderizza una volta con il path tracer a 512 px e si rimpicciolisce per ogni grandezza delle schede, così resta nitida sia grande sia piccola. Il denoiser del render finale (Open Image Denoise, con albedo e normali) ripulisce le anteprime finite, che a parità di campioni hanno meno grana; si spegne in Impostazioni → Libreria e import.
 - **Sostituisci materiale:** in **Gestione materiali** (sotto il materiale della selezione, oppure Scena → Materiali) scegli "Sostituisci [materiale] con «selezionato»" (oppure clic destro su un materiale della scena): tutti i componenti con quel materiale, anche quelli che lo ereditano e il predefinito della scena, passano a quello selezionato, senza dover selezionare cento oggetti. "Annulla sostituzione" rimette le assegnazioni di prima.
 - **Selettore colore:** cliccando il campione di un colore del materiale (colore base, colore in volume, emissione) si apre un solo pannello con tre schede: **RGB** (ruota dei colori, R, G, B e codice esadecimale), **CMYK** (ciano, magenta, giallo e nero in percentuale, con una conversione matematica semplice, non un profilo di stampa) e **Palette** (colori con codice e nome). Il colore cambia subito; **Applica** lo tiene, **Annulla** (o Esc) rimette quello di prima. La scheda palette comprende i codici RAL Classic con nome italiano e inglese e valori RGB **indicativi** (media di fonti pubbliche, non i valori ufficiali RAL, che RAL vende come libreria digitale); in più puoi importare la libreria ufficiale RAL CLASSIC `.ase` o una tua palette `.json`/`.csv` nella cartella Colori della libreria. Un colore preso da una palette mostra il suo codice (per esempio **RAL 7016**) accanto al campione, salvato con il progetto; cambiando il colore a mano torna un normale colore RGB.
 
@@ -388,7 +396,8 @@ La finestra è disposta in modo che si sappia sempre dove guardare e cosa fare d
 - **Un pannello che segue la selezione:** in modalità Avanzata il pannello di destra ha tre schede. **Selezione** mostra ciò che hai cliccato nella viewport o nell'albero: un oggetto con posizione, misure e materiale, oppure una luce, una camera o un effetto con le sue proprietà. **Scena** raccoglie ciò che vale per tutta la scena in sotto-schede (Luci, Ambiente, Effetti, Camera, Materiali). **Render** contiene le impostazioni del calcolo; roulette russa, limite della luce indiretta, seme casuale e thread della CPU sono in una sezione **Avanzate** chiusa.
 - **Più spazio per la vista:** **Viewport | Render** e **Riavvio automatico** stanno subito sopra l'area centrale; timeline e console restano ridotte a una riga finché non c'è un'animazione (**Riduci** le richiude).
 - **Più facile da leggere:** i testi piccoli sono più grandi e più chiari, le impostazioni dei materiali hanno nomi italiani con il termine tecnico tra parentesi, e l'arancione resta per Avvia render, l'avanzamento del render e ciò che è selezionato.
-- **Sfondo della viewport:** Antracite (#282C34) di base; **Impostazioni → Viewport** propone Grigio Blender-like, Scuro tecnico, Grigio chiaro o un colore **Personalizzato** con il selettore colore del programma. Cambia subito la viewport e l'anteprima STEP e non tocca il render finale.
+- **Sfondo della viewport:** Antracite (#282C34) di base; **Impostazioni → Viewport** propone Grigio Blender-like, Scuro tecnico, Grigio chiaro o un colore **Personalizzato** (un clic, e conserva il suo colore) con il selettore colore del programma. Sullo schermo ci sono esattamente i valori RGB scelti, nella viewport e nell'anteprima STEP, e il render finale non cambia.
+- **Griglia metrica:** una griglia sul pavimento in misure reali; unità (mm, cm, m), misura della cella, linee principali ogni N celle e intensità in **Impostazioni → Viewport**. Allontanandosi sfuma le linee minori, sta dietro agli oggetti, c'è anche nell'anteprima STEP e nel render non compare mai.
 - **Render mostra il render:** Avvia render, F5, il menu Rendering e il pulsante della modalità Semplice passano tutti alla scheda **Render** quando il render parte o riprende.
 
 ## Cosa fa oggi
@@ -424,7 +433,7 @@ La finestra è disposta in modo che si sappia sempre dove guardare e cosa fare d
   proiezione box in metri per i modelli CAD senza UV, con dimensione della ripetizione, rotazione
   e spostamento.
 - **Libreria**: 125 materiali di serie in 13 categorie (un pacchetto aggiuntivo ne aggiunge 109 con texture), più materiali e HDRI scaricati da ambientCG e
-  Poly Haven o importati da cartelle/ZIP, conservati nella cartella locale `Libreria` con anteprime a 512 px.
+  Poly Haven o importati da cartelle/ZIP, conservati nella cartella locale `Libreria` con anteprime a 512 px (ripulite dal denoiser).
 - **Selettore colore**: RGB, CMYK e palette (RAL Classic con valori indicativi, o palette
   `.ase`/`.json`/`.csv` importate) per ogni colore dei materiali, con il codice della palette
   accanto al campione; lo stesso selettore si apre da ogni pulsante colore (luci, ambiente,
@@ -489,8 +498,10 @@ La finestra è disposta in modo che si sappia sempre dove guardare e cosa fare d
   serve CMake (`winget install Kitware.CMake`).
 - **Viewport**: rasterizzazione su GPU con le matrici degli oggetti sulla GPU: muovere gli oggetti
   non ricarica la geometria, così l'animazione resta fluida. Sfondo Antracite (#282C34) o scelto
-  in Impostazioni → Viewport (quattro preset o personalizzato); avviare un render passa alla
-  scheda Render.
+  in Impostazioni → Viewport (quattro preset o personalizzato); griglia metrica sul pavimento con
+  unità, cella e linee principali a scelta (anche nell'anteprima STEP); avviare un render passa
+  alla scheda Render, il calcolo automatico degli effetti volumetrici mai e aspetta 2,5 s
+  dall'ultima modifica.
 - **Modifica**: gizmo sposta/ruota/scala con snap (anche per le luci, con le maniglie del cono
   dello spot, e per l'emettitore della nebbia), snap a contatto per oggetto, annulla/ripeti, nascondi (H), duplica, appoggio
   esatto sul pavimento, navigatore degli assi stile Blender, albero dei componenti, assegnazione

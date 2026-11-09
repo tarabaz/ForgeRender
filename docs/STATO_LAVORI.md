@@ -923,3 +923,18 @@ Su richiesta di Valerio ("nell'MCP ci sono anche gli effetti nuovi?" → no, "ag
 - Guida MCP EN+IT (tabella dei comandi ed esempi), manuale `ai.mcp` EN+IT, README EN+IT (novità, capitolo 2, "Cosa fa oggi"), changelog EN+IT, versione 0.52.0.
 - Controlli: `cargo fmt --all`; clippy `-D warnings` pulito; test del workspace 416 passati, 0 falliti, 10 ignorati (prima del cambio di versione); dopo il cambio di versione e dei testi, test di `forge_manual` verdi.
 - **Non provato dal vivo** con Claude collegato alla finestra: serviva una copia del programma nuovo con il ponte aggiornato. I comandi sono provati dai test unitari e dalla compilazione; l'esecuzione sulla finestra vera no.
+
+## 0.53.0 — 09/11/2026 (Claude)
+
+Richieste di GPT/Valerio in `reports/chatgpt/2026-11-09_modifiche.md` (riscontro completo in fondo a quel file).
+
+- **Sfondo viewport quasi nero:** egui 0.37 legge le texture native come gamma; la viewport gli dava la vista sRGB → valori lineari mostrati come gamma (#353A42 → ~9,11,14). Ora vista `Rgba8Unorm` per egui (`EGUI_VIEW_FORMAT`), superfici linearizzate nello shader (`shown()`) per restare come prima. Misurato nel programma: i quattro preset e un personalizzato esatti, in Avanzata, Semplice e anteprima STEP.
+- **Personalizzato:** `viewport_background_mode` + `viewport_background_custom`, `viewport_background_color()` unica sorgente; un clic lo sceglie e il colore resta; file 0.51–0.52 convertiti. Provato con clic sulla mia copia.
+- **Griglia metrica** (viewport e anteprima STEP): `GRID_SHADER`, `ViewportGrid` nelle preferenze, `ViewStyle` per il disegno, mai nel render né in `capture`.
+- **Precalcolo volumetrico:** `start_render` (comando: scheda Render, calcolo subito) separato da `begin_render` (mai cambio di scheda, niente calcolo dei volumi senza comando); `VOLUME_DEBOUNCE` 2,5 s con `quiet_for`; `deferred_render_starts`; Stop ferma anche le attese. Provato nel programma con «Vapore da tazza».
+- **Denoiser nelle anteprime dei materiali:** OIDN con guide, qualità Bilanciata, da 16 campioni in su, interruttore `preview_denoise`. Errore a 16 campioni dimezzato (test).
+- **Scaglie della polvere:** `flake_wobble` in `Dust::build_at`, zero a t = 0, traiettorie invariate.
+- **Icona:** `assets/forgerender.ico` non presente, niente fatto.
+- Test GPU in forge_app uno alla volta (`viewport::gpu_test_guard`): in un giro le anteprime erano ripiegate su DX12, dove lo shader del path tracer manda in panic naga (limite già presente, si riproduce con `FORGE_GPU_BACKEND=dx12`).
+- Controlli: `cargo fmt --all`; clippy `-D warnings` pulito; test del workspace 425 passati, 0 falliti, 10 ignorati.
+- **Non provato:** luccichio delle scaglie in un'animazione renderizzata; celle da 1 mm / 1 m e vista ortografica nel programma; il selettore colore cliccato nella sequenza di Personalizzato; reattività con tante miniature insieme; ghiaccio secco e foschia nella prova del precalcolo.
