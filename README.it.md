@@ -254,6 +254,8 @@ Granelli veri (qualche millimetro, fino a 150 000) sparsi nell'aria, come effett
 
 ### Lucciole / Bosco incantato
 
+![Effetto lucciole nel Bosco incantato](docs/img/features/firefly-effect.jpg)
+
 Uno stormo che vola in un volume, soprattutto in orizzontale, e si accende a intervalli, ogni lucciola per conto suo: spenta, accensione, accesa, spegnimento. Da accese sono **luci vere della scena**: le superfici prendono il loro colore e gli oggetti fermano la loro luce, su CPU e GPU. Oltre *Luci al massimo* le lucciole vicine si uniscono in una luce con la stessa potenza totale, che tiene sotto controllo il rumore al prezzo di ombre meno precise.
 
 - **Volo e ciclo:** quantità, volume con rotazione, velocità, parte verticale, fluidità, dispersione, durate minime e massime di ogni fase.
