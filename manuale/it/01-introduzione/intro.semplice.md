@@ -38,6 +38,11 @@ applica aspetto e qualità e inquadra. **Annulla preset** riporta luci, ambiente
 e posizione del prodotto a com'erano prima dell'ultimo preset. Se cambi luci o ambiente a mano,
 l'aspetto risulta *Personalizzato*.
 
+Le luci di un aspetto gli appartengono e nell'albero della scena hanno **[ENV]** dopo il nome. Il
+primo aspetto spegne le luci già presenti, senza eliminarle né cambiarle; cambiando aspetto si
+eliminano solo le luci dell'aspetto precedente e si creano quelle nuove. Le tue luci non si
+eliminano mai, anche con lo stesso nome.
+
 ## 3. Materiali
 
 Clicca un pezzo nella vista, poi **Apri la libreria materiali** e clicca un materiale: viene

@@ -37,6 +37,11 @@ applies look and quality and frames. **Undo preset** brings lights, environment,
 backdrop and product position back to how they were before the last preset. If you change lights
 or environment by hand, the look shows as *Custom*.
 
+The lights of a look belong to it and show **[ENV]** after their name in the scene tree. The first
+look switches off the lights already in the scene, without deleting or changing them; changing
+look deletes only the previous look's lights and creates the new ones. Your own lights are never
+deleted, even with the same name.
+
 ## 3. Materials
 
 Click a part in the view, then **Open the material library** and click a material: it is applied

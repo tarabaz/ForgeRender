@@ -29,9 +29,6 @@ use std::sync::mpsc::Receiver;
 use std::sync::Arc;
 use std::time::Instant;
 
-/// Sfondo dell'anteprima: lo stesso della viewport.
-const BACKGROUND: f32 = 0.045;
-
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Quality {
     Draft,
@@ -314,6 +311,8 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
     }
     app.step_import.poll(ctx);
     let rs = app.wgpu_state.clone();
+    // Sfondo dell'anteprima: lo stesso della viewport (Impostazioni → Viewport).
+    let background = app.viewport_background();
     let mut open = true;
     let mut import = false;
     let mut close = false;
@@ -329,7 +328,7 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
             ui.columns(3, |c| {
                 source_column(&mut c[0], st);
                 settings_column(&mut c[1], st);
-                preview_column(&mut c[2], st, rs.as_ref());
+                preview_column(&mut c[2], st, rs.as_ref(), background);
             });
             ui.separator();
             ui.horizontal(|ui| {
@@ -526,12 +525,12 @@ impl StepImport {
     }
 }
 
-fn preview_column(ui: &mut egui::Ui, st: &mut StepImport, rs: Option<&RenderState>) {
+fn preview_column(ui: &mut egui::Ui, st: &mut StepImport, rs: Option<&RenderState>, background: Vec3) {
     ui.heading(tr("Anteprima 3D"));
     let side = (ui.available_height() - 90.0).max(160.0).min(ui.available_width() * 1.2);
     let (rect, r) = ui.allocate_exact_size(egui::vec2(ui.available_width(), side), egui::Sense::click_and_drag());
-    let bg = (BACKGROUND.powf(1.0 / 2.2) * 255.0) as u8;
-    ui.painter().rect_filled(rect, 3.0, egui::Color32::from_gray(bg));
+    let [cr, cg, cb] = crate::ui::color_picker::to_srgb8(background.to_array());
+    ui.painter().rect_filled(rect, 3.0, egui::Color32::from_rgb(cr, cg, cb));
     // Mouse come nella viewport: sinistro gira, Maiusc o destro/centrale sposta, rotella avvicina.
     let delta = r.drag_delta();
     if delta != egui::Vec2::ZERO {
@@ -572,7 +571,7 @@ fn preview_column(ui: &mut egui::Ui, st: &mut StepImport, rs: Option<&RenderStat
             }
             let ppp = ui.ctx().pixels_per_point();
             let px = [(rect.width() * ppp).round() as u32, (rect.height() * ppp).round() as u32];
-            if let Some(tex) = vp.render(rs, &orbit.camera(), c.preview.radius, px, Vec3::splat(BACKGROUND), *wire) {
+            if let Some(tex) = vp.render(rs, &orbit.camera(), c.preview.radius, px, background, *wire) {
                 let uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
                 ui.painter_at(rect).image(tex, rect, uv, egui::Color32::WHITE);
             }

@@ -3020,3 +3020,11 @@ Due righe in alto (modalità e Impostazioni a destra, comandi del render a destr
 **Provato:** compilazione, clippy e test del workspace verdi.
 
 **Non verificato:** l'aspetto nella finestra con un file STEP vero, e il caso della modalità sicura (senza GPU l'anteprima mostra un avviso).
+
+## Sfondo viewport, scheda Render, luci dell'ambiente — 09/11/2026 (Claude, 0.51.0)
+
+**Fatto:** sfondo della viewport Antracite (#282C34) con preset e Personalizzato in Impostazioni → Viewport (salvato, subito, solo viewport e anteprima STEP); Avvia/Riprendi render porta sempre alla scheda Render; luci d'ambiente segnate con `Light::from_look` (salvato nel progetto) e "[ENV]" nell'albero, il primo ambiente spegne le luci dell'utente, ogni cambio elimina solo le luci d'ambiente e le ricrea. Riscontro completo in `reports/chatgpt/2026-11-09_modifiche.md`.
+
+**Provato:** fmt, clippy e test del workspace (412 passati, 0 falliti), con test nuovi per preferenze, scheda Render e luci d'ambiente (anche salvataggio e riapertura).
+
+**Non verificato:** l'aspetto nel programma aperto (contrasto con i quattro sfondi, sezione Viewport, cambio di scheda, "[ENV]").

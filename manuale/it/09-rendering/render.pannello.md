@@ -36,7 +36,7 @@ volte il tempo, a parità di qualità.
 
 | Comando | Tasti | Cosa fa |
 |---|---|---|
-| Avvia render / Pausa / Riprendi | F5 | Avvia, mette in pausa o riprende il path tracing |
+| Avvia render / Pausa / Riprendi | F5 | Avvia, mette in pausa o riprende il path tracing. Avviando o riprendendo, l'area centrale passa alla scheda **Render**, da qualunque pulsante e in entrambe le modalità |
 | Stop | | Ferma e tiene l'immagine attuale |
 | Riavvia | | Riparte da zero campioni |
 | Riavvio automatico | | Quando cambiano materiali, luci o camera il render riparte da solo (solo nella vista Render). La casella è sopra l'area centrale, a destra |

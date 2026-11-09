@@ -18,6 +18,12 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
+### Novità della versione 0.51.0
+
+- **Sfondo della viewport a scelta:** la viewport parte su un grigio Antracite leggermente freddo (#282C34) che lascia leggibili gli oggetti scuri; Impostazioni → Viewport propone quattro colori pronti o uno personalizzato, e il render finale non cambia.
+- **Render ti porta all'immagine:** avviando o riprendendo un render da qualunque pulsante, menu o modalità, l'area centrale passa subito alla scheda Render.
+- **Gli ambienti sostituiscono solo le loro luci:** le luci d'ambiente hanno [ENV] nell'albero della scena; cambiando ambiente si sostituiscono senza residui, e le tue luci non si eliminano né si modificano mai.
+
 ### Novità della versione 0.50.0
 
 - **Una finestra più ordinata:** in alto due righe invece di quattro. Menu a sinistra, selettore Semplice / Avanzata e Impostazioni a destra; Avvia render, Stop, Riavvia ed Esporta sempre nello stesso punto; linguette Viewport | Render subito sopra la vista.
@@ -288,6 +294,8 @@ Materiali diffusi, metalli e plastiche GGX, vetro Fresnel, vetro satinato ed emi
 
 Prepara una scena prodotto con fondale e luci da studio, quindi scegli sfondo chiaro, scuro o scenografico. Le luci possono essere regolate singolarmente; la scena può essere adattata alle dimensioni del prodotto senza perdere il controllo sui componenti.
 
+Le luci di un ambiente appartengono all'ambiente e nell'albero della scena hanno **[ENV]** dopo il nome. Il primo ambiente spegne le luci già presenti (restano, invariate); cambiando ambiente si eliminano solo le luci dell'ambiente precedente e si creano quelle nuove, quindi non restano mai residui né doppioni. Le tue luci non si eliminano né si modificano mai: si riconoscono da un segno interno salvato nel progetto, non dal nome.
+
 Le luci Spot e Direzionali si puntano dal viewport: selezioni la luce, clicchi il rombo del suo bersaglio e lo trascini. La sorgente resta ferma, il cono gira dal vivo, i campi numerici restano allineati e lo spostamento si annulla; se la luce è animata, la timeline lo registra come chiave.
 
 ### 11. Illuminazione volumetrica e fasci visibili
@@ -375,6 +383,8 @@ La finestra è disposta in modo che si sappia sempre dove guardare e cosa fare d
 - **Un pannello che segue la selezione:** in modalità Avanzata il pannello di destra ha tre schede. **Selezione** mostra ciò che hai cliccato nella viewport o nell'albero: un oggetto con posizione, misure e materiale, oppure una luce, una camera o un effetto con le sue proprietà. **Scena** raccoglie ciò che vale per tutta la scena in sotto-schede (Luci, Ambiente, Effetti, Camera, Materiali). **Render** contiene le impostazioni del calcolo; roulette russa, limite della luce indiretta, seme casuale e thread della CPU sono in una sezione **Avanzate** chiusa.
 - **Più spazio per la vista:** **Viewport | Render** e **Riavvio automatico** stanno subito sopra l'area centrale; timeline e console restano ridotte a una riga finché non c'è un'animazione (**Riduci** le richiude).
 - **Più facile da leggere:** i testi piccoli sono più grandi e più chiari, le impostazioni dei materiali hanno nomi italiani con il termine tecnico tra parentesi, e l'arancione resta per Avvia render, l'avanzamento del render e ciò che è selezionato.
+- **Sfondo della viewport:** Antracite (#282C34) di base; **Impostazioni → Viewport** propone Grigio Blender-like, Scuro tecnico, Grigio chiaro o un colore **Personalizzato** con il selettore colore del programma. Cambia subito la viewport e l'anteprima STEP e non tocca il render finale.
+- **Render mostra il render:** Avvia render, F5, il menu Rendering e il pulsante della modalità Semplice passano tutti alla scheda **Render** quando il render parte o riprende.
 
 ## Cosa fa oggi
 
@@ -387,7 +397,9 @@ La finestra è disposta in modo che si sappia sempre dove guardare e cosa fare d
   studio; colore delle luci (calda 3200 K, neutra 5500 K, fredda 7500 K o per singola luce).
   Altri aspetti: Sfondo chiaro, Sfondo scuro, Studio scenografico. **Prepara scena prodotto** e
   **Adatta la scena al prodotto** ridimensionano fondale e luci sulle misure del prodotto;
-  **Annulla preset** riporta la scena com'era. Luci e oggetti nuovi nascono vicino al prodotto.
+  **Annulla preset** riporta la scena com'era. Le luci d'ambiente hanno **[ENV]** nell'albero e
+  sono le sole sostituite al cambio di ambiente; il primo ambiente spegne le tue luci senza
+  eliminarle. Luci e oggetti nuovi nascono vicino al prodotto.
 - **Lingue**: italiano e inglese, cambio immediato di tutta l'interfaccia (in
   Impostazioni → Lingua, l'ingranaggio in alto a destra). Le traduzioni sono file separati `lang/Lan_*.json`: se ne aggiungono
   altri copiando `Lan_eng.json`.
@@ -471,7 +483,9 @@ La finestra è disposta in modo che si sappia sempre dove guardare e cosa fare d
   sperimentali. Il convertitore STEP (`forgerender-step.exe`) lo compila `Build-ForgeRender.ps1`;
   serve CMake (`winget install Kitware.CMake`).
 - **Viewport**: rasterizzazione su GPU con le matrici degli oggetti sulla GPU: muovere gli oggetti
-  non ricarica la geometria, così l'animazione resta fluida.
+  non ricarica la geometria, così l'animazione resta fluida. Sfondo Antracite (#282C34) o scelto
+  in Impostazioni → Viewport (quattro preset o personalizzato); avviare un render passa alla
+  scheda Render.
 - **Modifica**: gizmo sposta/ruota/scala con snap (anche per le luci, con le maniglie del cono
   dello spot, e per l'emettitore della nebbia), snap a contatto per oggetto, annulla/ripeti, nascondi (H), duplica, appoggio
   esatto sul pavimento, navigatore degli assi stile Blender, albero dei componenti, assegnazione

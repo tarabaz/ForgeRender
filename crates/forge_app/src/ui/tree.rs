@@ -347,9 +347,21 @@ fn lights(app: &mut ForgeApp, ui: &mut egui::Ui) {
                     if ui.checkbox(&mut on, "").on_hover_text(tr("Accendi/spegni")).changed() {
                         light_toggle = Some(i);
                     }
+                    let (label, hint) = if l.from_look {
+                        (
+                            format!("{} {}", l.name, crate::presets::ENV_LIGHT_SUFFIX),
+                            format!(
+                                "{}\n{}",
+                                tr(l.kind.label()),
+                                tr("Luce dell'ambiente: cambiando ambiente si sostituisce")
+                            ),
+                        )
+                    } else {
+                        (l.name.clone(), tr(l.kind.label()).to_string())
+                    };
                     if ui
-                        .selectable_label(app.selected_light == Some(i), &l.name)
-                        .on_hover_text(tr(l.kind.label()))
+                        .selectable_label(app.selected_light == Some(i), label)
+                        .on_hover_text(hint)
                         .clicked()
                     {
                         light_click = Some(i);

@@ -6,7 +6,7 @@
 //! valori predefiniti, il file rovinato viene conservato come `impostazioni.json.non-valido`.
 //! Campi nuovi o sconosciuti non rompono la lettura (`#[serde(default)]`).
 
-use crate::i18n::tf;
+use crate::i18n::{tf, tk};
 use forge_library::store::ImportDisplacement;
 use forge_render_core::{BackendKind, RenderSettings};
 use serde::{Deserialize, Serialize};
@@ -66,6 +66,26 @@ pub struct Preferences {
     /// Contatori scelti per la barra di stato, al massimo [`MAX_STATUS_ITEMS`].
     #[serde(deserialize_with = "known_status_items")]
     pub status_items: Vec<StatusItem>,
+    /// Colore dello sfondo della viewport (sRGB a 8 bit). Solo la viewport: il render finale
+    /// non cambia.
+    pub viewport_background: [u8; 3],
+}
+
+/// Sfondo predefinito della viewport: Antracite, grigio leggermente freddo che tiene il
+/// contrasto anche con oggetti neri o molto scuri.
+pub const VIEWPORT_BACKGROUND_DEFAULT: [u8; 3] = [40, 44, 52];
+
+/// Colori pronti per lo sfondo della viewport (nome da tradurre, sRGB). Il primo è il predefinito.
+pub const VIEWPORT_BACKGROUNDS: [(&str, [u8; 3]); 4] = [
+    (tk("Antracite"), VIEWPORT_BACKGROUND_DEFAULT),
+    (tk("Grigio Blender-like"), [48, 52, 59]),
+    (tk("Scuro tecnico"), [34, 40, 49]),
+    (tk("Grigio chiaro"), [53, 58, 66]),
+];
+
+/// Nome del colore pronto uguale a `c`, `None` se è un colore personalizzato.
+pub fn viewport_background_preset(c: [u8; 3]) -> Option<&'static str> {
+    VIEWPORT_BACKGROUNDS.iter().find(|(_, v)| *v == c).map(|(n, _)| *n)
 }
 
 /// Contatori che si possono scegliere; Backend e processore restano sempre a destra.
@@ -208,6 +228,7 @@ impl Default for Preferences {
             timeline_detached: false,
             video: Default::default(),
             status_items: StatusItem::defaults(),
+            viewport_background: VIEWPORT_BACKGROUND_DEFAULT,
         }
     }
 }
@@ -362,6 +383,7 @@ mod tests {
             auto_restart: false,
             recent_projects: vec![PathBuf::from("/x/a.frproject")],
             timeline_detached: true,
+            viewport_background: [12, 200, 99],
         };
         custom.save_to(&p).unwrap();
         let (back, err) = Preferences::load_from(&p);
@@ -394,6 +416,41 @@ mod tests {
         assert_eq!(d.download_resolution, forge_library::online::RESOLUTIONS.len() - 1);
         assert_eq!(d.download_provider, "ambientcg");
         assert!(d.auto_restart);
+    }
+
+    /// Sfondo della viewport: Antracite (40, 44, 52) per le installazioni nuove e per i file
+    /// scritti prima che esistesse; un preset scelto o un colore personalizzato restano dopo il
+    /// riavvio; i preset hanno i valori chiesti e si riconoscono per nome.
+    #[test]
+    fn viewport_background_default_presets_and_persistence() {
+        assert_eq!(Preferences::default().viewport_background, [40, 44, 52]);
+        let p = tmp("sfondo");
+        std::fs::write(&p, r#"{"auto_restart": false}"#).unwrap();
+        let (old, err) = Preferences::load_from(&p);
+        assert!(err.is_none());
+        assert_eq!(old.viewport_background, VIEWPORT_BACKGROUND_DEFAULT, "file di prima: Antracite");
+        assert_eq!(
+            VIEWPORT_BACKGROUNDS.map(|(_, c)| crate::ui::color_picker::to_hex(c)),
+            ["#282C34", "#30343B", "#222831", "#353A42"]
+        );
+        for (name, c) in VIEWPORT_BACKGROUNDS {
+            assert_eq!(viewport_background_preset(c), Some(name));
+            let chosen = Preferences {
+                viewport_background: c,
+                ..Default::default()
+            };
+            chosen.save_to(&p).unwrap();
+            assert_eq!(Preferences::load_from(&p).0.viewport_background, c, "{name}");
+        }
+        let custom = [200, 10, 77];
+        assert_eq!(viewport_background_preset(custom), None, "personalizzato");
+        Preferences {
+            viewport_background: custom,
+            ..Default::default()
+        }
+        .save_to(&p)
+        .unwrap();
+        assert_eq!(Preferences::load_from(&p).0.viewport_background, custom);
     }
 
     #[test]

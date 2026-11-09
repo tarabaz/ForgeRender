@@ -18,6 +18,12 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
+### What's new in 0.51.0
+
+- **Choose the viewport background:** the viewport starts on a slightly cool Anthracite grey (#282C34) that keeps dark objects readable; Settings → Viewport offers four ready colours or any custom one, and the final render does not change.
+- **Render takes you to the image:** starting or resuming a render from any button, menu or mode switches the central area to the Render tab at once.
+- **Environments replace only their own lights:** environment lights show [ENV] in the scene tree; changing environment swaps them cleanly, with no leftovers, and never deletes or changes your lights.
+
 ### What's new in 0.50.0
 
 - **A tidier window:** two rows at the top instead of four. Menus on the left, the Simple / Advanced switch and Settings on the right; Start render, Stop, Restart and Export always in the same place; Viewport | Render tabs right above the view.
@@ -277,6 +283,8 @@ Diffuse materials, GGX metals and plastics, Fresnel glass, frosted glass and emi
 
 Prepare a product scene with a backdrop and studio lights, then choose a light, dark or dramatic background. Lights remain individually adjustable, and the studio can be fitted to the product dimensions without taking control away from the user.
 
+The lights of an environment belong to it and show **[ENV]** after their name in the scene tree. The first environment switches off the lights already in the scene (they stay, unchanged); changing environment deletes only the previous environment's lights and creates the new ones, so there are never leftovers or duplicates. Your own lights are never deleted or changed: they are recognised by an internal mark saved in the project, not by their name.
+
 Spot and Directional lights are aimed from the viewport: select the light, click the diamond of its target and drag it. The source stays still, the cone turns live, the numeric fields stay in sync and the move can be undone; if the light is animated, the timeline records it as a key.
 
 ### 11. Volumetric lighting and visible beams
@@ -364,6 +372,8 @@ The window is arranged so that you always know where to look and what to do next
 - **A panel that follows the selection:** in Advanced mode the right panel has three tabs. **Selection** shows what you clicked in the viewport or in the tree: an object with its position, size and material, or a light, a camera or an effect with its properties. **Scene** holds what applies to the whole scene in sub-tabs (Lights, Environment, Effects, Camera, Materials). **Render** holds the render settings; Russian roulette, indirect light limit, random seed and CPU threads are in a closed **Advanced** section.
 - **More room for the view:** **Viewport | Render** and **Auto restart** sit right above the central area; the timeline and the console stay closed to one row until there is an animation (**Collapse** closes them again).
 - **Easier to read:** small text is bigger and lighter, material settings have Italian names with the technical term in brackets, and orange is kept for Start render, the render progress and what is selected.
+- **Viewport background:** Anthracite (#282C34) by default; **Settings → Viewport** offers Blender-like grey, Technical dark, Light grey or a **Custom** colour with the program's colour picker. It changes the viewport and the STEP preview at once and does not touch the final render.
+- **Render shows the render:** Start render, F5, the Rendering menu and the Simple mode button all switch to the **Render** tab when the render starts or resumes.
 
 ## What it does today
 
@@ -376,6 +386,8 @@ The window is arranged so that you always know where to look and what to do next
   color (warm 3200 K, neutral 5500 K, cool 7500 K or per light). Other looks: Light background,
   Dark background, Dramatic studio. **Prepare product scene** and **Fit the scene to the
   product** resize backdrop and lights to the product; **Undo preset** restores the scene.
+  Environment lights are marked **[ENV]** in the tree and are the only ones replaced when the
+  environment changes; the first environment switches off your lights without deleting them.
   New lights and objects appear next to the product.
 - **Languages**: Italian and English, the whole interface switches immediately (in
   Settings → Language, the gear at the top right). Translations are separate `lang/Lan_*.json` files: copy `Lan_eng.json`
@@ -452,7 +464,8 @@ The window is arranged so that you always know where to look and what to do next
   are experimental. The STEP converter (`forgerender-step.exe`) is built by `Build-ForgeRender.ps1`;
   it needs CMake (`winget install Kitware.CMake`).
 - **Viewport**: GPU rasterization with the object matrices on the GPU: moving objects does not
-  reload the geometry, so animation stays smooth.
+  reload the geometry, so animation stays smooth. Background Anthracite (#282C34) or chosen in
+  Settings → Viewport (four presets or custom); starting a render switches to the Render tab.
 - **Editing**: move/rotate/scale gizmo with snapping (also for lights, spot cone handles and fog
   emitters), per-object contact snap, undo/redo, hide (H), duplicate,
   exact drop to floor, Blender-style axis navigator, component tree, persistent material

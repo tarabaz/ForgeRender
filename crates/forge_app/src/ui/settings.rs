@@ -14,6 +14,7 @@ use forge_render_core::BackendKind;
 enum Section {
     #[default]
     Language,
+    Viewport,
     Library,
     Paths,
     Rendering,
@@ -52,6 +53,7 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
                     ui.set_width(150.0);
                     for (s, label) in [
                         (Section::Language, tr("Lingua")),
+                        (Section::Viewport, tr("Viewport")),
                         (Section::Library, tr("Libreria e import")),
                         (Section::Paths, tr("Percorsi")),
                         (Section::Rendering, tr("Rendering")),
@@ -72,6 +74,7 @@ pub fn window(app: &mut ForgeApp, ctx: &egui::Context) {
                 ui.add_space(10.0);
                 ui.vertical(|ui| match section {
                     Section::Language => language(ui, &mut p, &app.languages, &app.language_errors),
+                    Section::Viewport => viewport(ui, &mut p),
                     Section::Library => library(ui, &mut p, &mut clear_cache),
                     Section::Paths => paths(ui, &mut p),
                     Section::Rendering => rendering(ui, &mut p),
@@ -142,6 +145,58 @@ fn language(ui: &mut egui::Ui, p: &mut Preferences, langs: &[std::sync::Arc<crat
     for e in errors {
         ui.colored_label(style::WARN, e);
     }
+}
+
+/// Sfondo della viewport: colori pronti o personalizzato con il selettore colore del programma
+/// (RGB, HEX, CMYK, palette). Si vede subito; il render finale non cambia.
+fn viewport(ui: &mut egui::Ui, p: &mut Preferences) {
+    use crate::prefs::{viewport_background_preset, VIEWPORT_BACKGROUNDS};
+    use crate::ui::color_picker::{from_srgb8, to_hex, to_srgb8};
+    ui.heading(tr("Viewport"));
+    ui.label(tr("Sfondo della viewport"));
+    let current = viewport_background_preset(p.viewport_background);
+    let swatch = |ui: &mut egui::Ui, c: [u8; 3]| {
+        let (r, _) = ui.allocate_exact_size(egui::vec2(28.0, 16.0), egui::Sense::hover());
+        ui.painter().rect_filled(r, 2.0, egui::Color32::from_rgb(c[0], c[1], c[2]));
+        ui.painter()
+            .rect_stroke(r, 2.0, ui.visuals().widgets.noninteractive.bg_stroke, egui::StrokeKind::Inside);
+    };
+    for (i, (name, c)) in VIEWPORT_BACKGROUNDS.into_iter().enumerate() {
+        ui.horizontal(|ui| {
+            swatch(ui, c);
+            let label = if i == 0 {
+                tf("{} (predefinito)", &[tr(name).to_string()])
+            } else {
+                tr(name).to_string()
+            };
+            let text = format!("{label}   RGB {}, {}, {} · {}", c[0], c[1], c[2], to_hex(c));
+            if ui.radio(current == Some(name), text).clicked() {
+                p.viewport_background = c;
+            }
+        });
+    }
+    ui.horizontal(|ui| {
+        // Personalizzato: parte dal colore attuale, poi si cambia con il selettore.
+        // Solo indicatore: il colore personalizzato si sceglie dal campione accanto.
+        let _ = ui.radio(current.is_none(), tr("Personalizzato"));
+        let mut linear = from_srgb8(p.viewport_background);
+        if crate::ui::color_picker::rgb_edit(ui, &mut linear) {
+            p.viewport_background = to_srgb8(linear);
+        }
+        if current.is_none() {
+            let c = p.viewport_background;
+            ui.label(format!("RGB {}, {}, {} · {}", c[0], c[1], c[2], to_hex(c)));
+        }
+    });
+    ui.add_space(6.0);
+    ui.label(
+        egui::RichText::new(tr(
+            "Cambia subito lo sfondo della viewport e dell'anteprima STEP. Il render finale non cambia: \
+             il suo sfondo lo decidono ambiente e fondale.",
+        ))
+        .small()
+        .weak(),
+    );
 }
 
 fn library(ui: &mut egui::Ui, p: &mut Preferences, clear_cache: &mut bool) {

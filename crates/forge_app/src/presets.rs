@@ -522,41 +522,45 @@ pub fn apply_simple_base(s: &mut RenderSettings) {
     d.use_guides = true;
 }
 
-/// Luci dell'aspetto attuale: quelle messe da un aspetto. Nei progetti salvati prima che le luci
-/// fossero segnate nessuna lo è: allora contano tutte (come prima).
+/// Luci dell'ambiente attuale: solo quelle segnate dal caricamento di un ambiente
+/// (`Light::from_look`, salvato nel progetto). Il nome non conta mai: una luce dell'utente con lo
+/// stesso nome di una luce d'ambiente resta dell'utente.
 fn look_lights(scene: &Scene) -> Vec<&Light> {
-    if scene.lights.iter().any(|l| l.from_look) {
-        scene.lights.iter().filter(|l| l.from_look).collect()
-    } else {
-        scene.lights.iter().collect()
-    }
+    scene.lights.iter().filter(|l| l.from_look).collect()
 }
 
-/// Progetto di prima: se tutte le luci sono quelle di un aspetto, si segnano come tali (così il
-/// prossimo aspetto le sostituisce, come faceva prima).
-fn mark_legacy_look_lights(scene: &mut Scene, s: &RenderSettings) {
-    if !scene.lights.iter().any(|l| l.from_look) && look_ignoring_light_placement(scene, s).is_some() {
-        for l in &mut scene.lights {
-            l.from_look = true;
-        }
-    }
-}
+/// Suffisso che l'albero della scena mostra accanto al nome delle luci d'ambiente. Serve solo a
+/// riconoscerle a colpo d'occhio: quali luci si eliminano lo decide `Light::from_look`.
+pub const ENV_LIGHT_SUFFIX: &str = "[ENV]";
 
-/// Mette le luci di un aspetto al posto di quelle dell'aspetto precedente. Le luci aggiunte
-/// dall'utente restano: un aspetto non cancella mai quello che ha messo lui.
+/// Mette le luci di un ambiente al posto di quelle dell'ambiente precedente: le vecchie luci
+/// d'ambiente si eliminano e le nuove si creano da zero, tutte accese. Le luci dell'utente non si eliminano né si modificano.
 fn set_look_lights(scene: &mut Scene, lights: Vec<Light>) {
     let mut all: Vec<Light> = lights
         .into_iter()
         .map(|mut l| {
             l.from_look = true;
-            // Stesso posto nell'aspetto nuovo: tiene il numero, e con quello l'animazione.
-            let old = scene.lights.iter().find(|o| o.from_look && o.name == l.name);
-            l.id = old.map_or(0, |o| o.id);
+            l.enabled = true;
+            // 0 = numero assegnato dalla scena (mai uno ancora usato dalla timeline): l'animazione
+            // di una luce eliminata non passa a quella nuova.
+            l.id = 0;
             l
         })
         .collect();
     all.extend(scene.lights.drain(..).filter(|l| !l.from_look));
     scene.lights = all;
+}
+
+/// Primo ambiente caricato nella scena (nessuna luce d'ambiente presente): le luci dell'utente
+/// si spengono, senza eliminarle né cambiarne gli altri valori. Ai cambi successivi non si
+/// toccano più (se l'utente ne riaccende una, resta accesa).
+fn switch_off_user_lights_on_first_environment(scene: &mut Scene) {
+    if scene.lights.iter().any(|l| l.from_look) {
+        return;
+    }
+    for l in &mut scene.lights {
+        l.enabled = false;
+    }
 }
 
 pub fn apply_look(scene: &mut Scene, s: &mut RenderSettings, look: Look) {
@@ -567,8 +571,8 @@ pub fn apply_look(scene: &mut Scene, s: &mut RenderSettings, look: Look) {
     } else {
         (b.center(), b.radius().max(1e-3))
     };
-    mark_legacy_look_lights(scene, s);
     if let Some(lights) = forge_scene::light::preset(spec.lights, center, radius) {
+        switch_off_user_lights_on_first_environment(scene);
         set_look_lights(scene, lights);
     }
     scene.environment = spec.environment.clone();
@@ -681,7 +685,6 @@ fn fit_backdrop(scene: &mut Scene, want: BackdropStyle, backup: &mut PresetBacku
 /// tenendo i colori delle luci. Senza aspetto riconosciuto le luci restano come sono.
 pub fn fit_scene(scene: &mut Scene, s: &RenderSettings) -> PresetBackup {
     let mut backup = PresetBackup::capture(scene, s);
-    mark_legacy_look_lights(scene, s);
     // Le luci sono ancora dimensionate sulle vecchie misure: l'aspetto si riconosce dal resto.
     let look = matching_look(scene, s).or_else(|| look_ignoring_light_placement(scene, s));
     let style = scene
@@ -691,7 +694,8 @@ pub fn fit_scene(scene: &mut Scene, s: &RenderSettings) -> PresetBackup {
         .or(look.map(|l| l.spec().backdrop))
         .unwrap_or(BackdropStyle::Sweep);
     fit_backdrop(scene, style, &mut backup);
-    if let Some(l) = look {
+    // Solo con luci d'ambiente segnate: senza, le luci sono tutte dell'utente e restano come sono.
+    if let Some(l) = look.filter(|_| !look_lights(scene).is_empty()) {
         let b = product_bounds(scene);
         if !b.is_empty() {
             let colors: Vec<[f32; 3]> = look_lights(scene).iter().map(|l| l.color).collect();
@@ -744,6 +748,8 @@ pub fn matching_look(scene: &Scene, s: &RenderSettings) -> Option<Look> {
                 let mut a = (*a).clone();
                 a.color = b.color;
                 a.from_look = b.from_look;
+                // Il numero lo assegna la scena: non fa parte dell'aspetto.
+                a.id = b.id;
                 a == *b
             })
             && scene.environment == spec.environment
@@ -988,12 +994,13 @@ mod tests {
     }
 
     /// Un aspetto non cancella le luci dell'utente: cambiando aspetto si sostituiscono solo le luci
-    /// dell'aspetto di prima, e quella dell'utente resta (una volta sola).
+    /// dell'aspetto di prima, e quella dell'utente resta (una volta sola, spenta dal primo).
     #[test]
     fn looks_keep_the_users_lights() {
         let mut scene = product_scene();
         let mine = Light::area("Mia luce", Vec3::new(1.0, 2.0, 1.0), Vec3::ZERO, 0.5, 0.5, 7.0);
         scene.lights = vec![mine.clone()];
+        let mine = Light { enabled: false, ..mine };
         let mut s = RenderSettings::default();
         let n_look = |look: Look| forge_scene::light::preset(look.spec().lights, Vec3::ZERO, 1.0).unwrap().len();
         for look in [Look::Light, Look::Dark, Look::Dramatic] {
@@ -1007,6 +1014,116 @@ mod tests {
         // Anche "Adatta la scena al prodotto" lascia la luce dell'utente.
         let _ = fit_scene(&mut scene, &s);
         assert!(scene.lights.contains(&mine));
+    }
+
+    /// Luci dell'ambiente (richiesta del 09/11/2026): il primo ambiente spegne le luci
+    /// dell'utente senza eliminarle né cambiarle; ogni cambio elimina solo le luci d'ambiente e le
+    /// rifà da zero (tutti i valori del nuovo ambiente), senza residui né doppioni,
+    /// passando da molte luci a poche e viceversa e ricaricando lo stesso ambiente. Una luce
+    /// dell'utente con lo stesso nome di una luce d'ambiente non si tocca. Il segno resta dopo
+    /// salvataggio e riapertura del progetto.
+    #[test]
+    fn environment_lights_are_replaced_and_user_lights_kept() {
+        let mut scene = product_scene();
+        let twin = forge_scene::light::preset(Look::Studio.spec().lights, Vec3::ZERO, 1.0).unwrap()[0]
+            .name
+            .clone();
+        scene.lights = vec![
+            Light::area("Mia luce", Vec3::new(1.0, 2.0, 1.0), Vec3::ZERO, 0.5, 0.5, 7.0),
+            Light::area(&twin, Vec3::new(-1.0, 2.0, 1.0), Vec3::ZERO, 0.3, 0.3, 3.0),
+        ];
+        scene.assign_element_ids();
+        let users0 = scene.lights.clone();
+        let mut s = RenderSettings::default();
+        let env = |scene: &Scene| scene.lights.iter().filter(|l| l.from_look).cloned().collect::<Vec<_>>();
+        let users = |scene: &Scene| scene.lights.iter().filter(|l| !l.from_look).cloned().collect::<Vec<_>>();
+        let expected = |scene: &Scene, look: Look| {
+            let b = product_bounds(scene);
+            forge_scene::light::preset(look.spec().lights, b.center(), b.radius().max(1e-3)).unwrap()
+        };
+
+        // Primo caricamento: luci dell'utente spente ma conservate, luci d'ambiente accese.
+        apply_look(&mut scene, &mut s, Look::Studio);
+        scene.assign_element_ids();
+        let u = users(&scene);
+        assert_eq!(u.len(), 2);
+        for (u, u0) in u.iter().zip(&users0) {
+            assert!(!u.enabled, "{}", u.name);
+            assert_eq!(
+                &Light {
+                    enabled: true,
+                    ..u.clone()
+                },
+                u0,
+                "solo spenta"
+            );
+        }
+        assert_eq!(env(&scene).len(), 4);
+        assert!(env(&scene).iter().all(|l| l.enabled));
+        // L'utente riaccende la sua luce: i cambi successivi non la toccano più.
+        scene.lights.iter_mut().find(|l| l.name == "Mia luce").unwrap().enabled = true;
+        let users1 = users(&scene);
+
+        // Cambi: molte → poche → molte, e lo stesso ambiente due volte.
+        for look in [Look::Light, Look::Dark, Look::Studio, Look::Studio, Look::Dramatic, Look::Light] {
+            apply_look(&mut scene, &mut s, look);
+            scene.assign_element_ids();
+            assert_eq!(users(&scene), users1, "{look:?}: luci dell'utente intatte");
+            let mine = env(&scene);
+            let want = expected(&scene, look);
+            assert_eq!(mine.len(), want.len(), "{look:?}: nessun residuo né doppione");
+            for (a, b) in mine.iter().zip(&want) {
+                assert_eq!(
+                    &Light {
+                        id: 0,
+                        from_look: false,
+                        ..a.clone()
+                    },
+                    b,
+                    "{look:?}: tutti i valori del nuovo ambiente"
+                );
+            }
+            assert_eq!(scene.lights.len(), 2 + want.len());
+            assert_eq!(matching_look(&scene, &s), Some(look));
+        }
+
+        // Salvataggio e riapertura: il segno resta, e il cambio dopo la riapertura funziona.
+        let dir = std::env::temp_dir().join(format!("forge_env_lights_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("luci.frproject");
+        let saved = Scene {
+            lights: scene.lights.clone(),
+            ..Default::default()
+        };
+        forge_project::save(&path, &saved, &Default::default(), &s).unwrap();
+        let mut back = forge_project::load(&path).unwrap().scene;
+        assert_eq!(back.lights, saved.lights);
+        assert_eq!(env(&back).len(), 2);
+        apply_look(&mut back, &mut s, Look::Dark);
+        assert_eq!(users(&back), users1);
+        assert_eq!(env(&back).len(), 3);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Il suffisso dell'albero non decide niente: una luce dell'utente chiamata come una luce
+    /// d'ambiente, anche con "[ENV]" nel nome, non si elimina.
+    #[test]
+    fn user_light_named_like_environment_is_never_deleted() {
+        let mut scene = product_scene();
+        let mut s = RenderSettings::default();
+        apply_look(&mut scene, &mut s, Look::Light);
+        let fake = Light::area(
+            &format!("Luce chiave {ENV_LIGHT_SUFFIX}"),
+            Vec3::new(1.0, 2.0, 1.0),
+            Vec3::ZERO,
+            0.5,
+            0.5,
+            7.0,
+        );
+        scene.lights.push(fake.clone());
+        apply_look(&mut scene, &mut s, Look::Dark);
+        assert!(scene.lights.contains(&fake), "luce dell'utente intatta");
     }
 
     #[test]

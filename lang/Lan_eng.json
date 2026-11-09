@@ -1902,6 +1902,13 @@
     "nessuna animazione": "no animation",
     "{} elementi animati": "{} animated elements",
     "Anteprima non disponibile: la viewport 3D è spenta (modalità sicura)": "Preview not available: the 3D viewport is off (safe mode)",
-    "Il modello come entrerà nella scena, disegnato come nella viewport. Trascina per girare, Maiusc o tasto destro per spostare, rotella per avvicinare, doppio clic per inquadrare.": "The model as it will enter the scene, drawn as in the viewport. Drag to orbit, Shift or right button to pan, wheel to zoom, double click to frame."
+    "Il modello come entrerà nella scena, disegnato come nella viewport. Trascina per girare, Maiusc o tasto destro per spostare, rotella per avvicinare, doppio clic per inquadrare.": "The model as it will enter the scene, drawn as in the viewport. Drag to orbit, Shift or right button to pan, wheel to zoom, double click to frame.",
+    "Antracite": "Anthracite",
+    "Grigio Blender-like": "Blender-like grey",
+    "Scuro tecnico": "Technical dark",
+    "Sfondo della viewport": "Viewport background",
+    "{} (predefinito)": "{} (default)",
+    "Cambia subito lo sfondo della viewport e dell'anteprima STEP. Il render finale non cambia: il suo sfondo lo decidono ambiente e fondale.": "Changes the background of the viewport and of the STEP preview at once. The final render does not change: its background comes from the environment and the backdrop.",
+    "Luce dell'ambiente: cambiando ambiente si sostituisce": "Environment light: it is replaced when you change environment"
   }
 }

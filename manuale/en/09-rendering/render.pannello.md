@@ -35,7 +35,7 @@ the time for the same quality.
 
 | Command | Keys | What it does |
 |---|---|---|
-| Start render / Pause / Resume | F5 | Starts, pauses or resumes the path tracing |
+| Start render / Pause / Resume | F5 | Starts, pauses or resumes the path tracing. Starting or resuming switches the central area to the **Render** tab, from any button and in both modes |
 | Stop | | Stops and keeps the current image |
 | Restart | | Starts again from zero samples |
 | Automatic restart | | When materials, lights or camera change, the render starts again by itself (only in the Render view). The box is above the central area, on the right |

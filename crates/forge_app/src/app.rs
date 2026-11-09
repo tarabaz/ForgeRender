@@ -1726,6 +1726,9 @@ impl ForgeApp {
     // ------------------------------------------------------------------
 
     pub fn start_render(&mut self) {
+        // Prima di tutto la scheda Render: anche se l'avvio aspetta la geometria o le nebbie, o
+        // non riesce, si vede subito dove arriverà l'immagine (o il messaggio).
+        self.view = View::Render;
         let Some(geometry) = self.current_geometry() else {
             self.request_geometry(true);
             self.view = View::Render;
@@ -1879,6 +1882,10 @@ impl ForgeApp {
     }
 
     pub fn toggle_pause(&mut self) {
+        // Avvio o ripresa: la scheda Render subito, in ogni modalità e da ogni pulsante.
+        if render_command_shows_render(&self.render_state()) {
+            self.view = View::Render;
+        }
         match self.render_state() {
             SessionState::Rendering => {
                 if self.export_running() {
@@ -2778,20 +2785,20 @@ impl ForgeApp {
         self.camera_changed();
     }
 
+    /// Sfondo della viewport scelto nelle Impostazioni, come colore lineare per il disegno (la
+    /// texture della viewport è sRGB). Non entra nel render finale.
+    pub fn viewport_background(&self) -> forge_math::Vec3 {
+        forge_math::Vec3::from_array(crate::ui::color_picker::from_srgb8(self.prefs.viewport_background))
+    }
+
     /// Prepara la viewport (upload geometria se cambiata) e restituisce la texture.
     pub fn viewport_texture(&mut self, frame: &eframe::Frame, size: [u32; 2]) -> Option<egui::TextureId> {
         let rs = frame.wgpu_render_state()?;
         self.sync_viewport(rs)?;
         let radius = self.viewport_radius;
+        let bg = self.viewport_background();
         let vp = self.viewport.as_mut()?;
-        vp.render(
-            rs,
-            &self.view_camera,
-            radius,
-            size,
-            forge_math::Vec3::splat(0.045),
-            self.viewport_mesh,
-        )
+        vp.render(rs, &self.view_camera, radius, size, bg, self.viewport_mesh)
     }
 
     /// Un fotogramma della viewport `width`×`height` dalla camera indicata, come l'anteprima
@@ -2801,8 +2808,9 @@ impl ForgeApp {
         self.sync_viewport(&rs)?;
         let radius = self.viewport_radius;
         let mesh = self.viewport_mesh;
+        let bg = self.viewport_background();
         let vp = self.viewport.as_mut()?;
-        vp.capture(&rs, camera, radius, [width, height], forge_math::Vec3::splat(0.045), mesh)
+        vp.capture(&rs, camera, radius, [width, height], bg, mesh)
     }
 
     /// Mette d'accordo la GPU con la scena: tutta la geometria se è cambiata, se no solo le matrici.
@@ -3060,9 +3068,32 @@ pub fn should_stop_stale_render(auto: bool, stale: bool, rendering: bool, in_ren
     auto && stale && rendering && !in_render_view
 }
 
+/// Il comando Render (pulsante, F5, menu, pannello Semplice) porta la vista centrale sulla
+/// scheda Render quando fa partire o riprendere un render, così si vede subito che è partito.
+/// Su un render in corso lo stesso comando lo mette in pausa e la vista resta dov'è.
+pub fn render_command_shows_render(state: &SessionState) -> bool {
+    *state != SessionState::Rendering
+}
+
 #[cfg(test)]
 mod auto_restart_tests {
     use super::*;
+
+    /// Il comando Render porta sulla scheda Render quando avvia o riprende (da fermo, in pausa,
+    /// finito o fermato), non quando mette in pausa un render in corso.
+    #[test]
+    fn render_command_switches_to_the_render_tab() {
+        for state in [
+            SessionState::Idle,
+            SessionState::Paused,
+            SessionState::Cancelled,
+            SessionState::Completed,
+            SessionState::Failed("x".into()),
+        ] {
+            assert!(render_command_shows_render(&state), "{state:?}");
+        }
+        assert!(!render_command_shows_render(&SessionState::Rendering));
+    }
 
     #[test]
     fn auto_restart_is_on_or_off() {

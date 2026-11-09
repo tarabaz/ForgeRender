@@ -44,7 +44,45 @@ Per **Personalizzato**, riutilizzare il selettore colore già presente in ForgeR
 
 ## Risposta di Claude Code
 
-_In attesa di implementazione e riscontro._
+Riscontro di Claude Code — 09/11/2026, versione 0.51.0. Valerio ha chiesto di portare il lavoro anche su `main`: il commit è su `main` e su `sviluppo`. Vale per tutte e tre le richieste di questo file.
+
+Parti del codice coinvolte (lette prima di modificare):
+- Sfondo della viewport: era fisso, `Vec3::splat(0.045)` lineare (circa grigio 60 sRGB), passato a `ViewportRenderer::render`/`capture` da `ForgeApp::viewport_texture` e `capture_viewport` (`app.rs`) e una costante uguale in `ui/step_import.rs`. La texture della viewport è `Rgba8UnormSrgb`, quindi il colore di pulizia va dato lineare.
+- Preferenze: `prefs.rs` (`Preferences`, `#[serde(default)]`, salvate in `impostazioni.json` da `ForgeApp::apply_prefs` appena cambiano nella finestra `ui/settings.rs`). Selettore colore esistente: `ui/color_picker.rs` (`rgb_edit`, RGB/HEX/CMYK/palette).
+- Avvio del render: tutti i pulsanti passano da `ForgeApp::toggle_pause` (Avvia render della barra, F5, menu Rendering, pannello Semplice, scheda demo) o `ForgeApp::start_render` (Riavvia, MCP, timeline, viste). `start_render` metteva `View::Render` solo a fine avvio o in attesa di geometria/nebbie; la ripresa da pausa o da fermato (`session.resume()`) non cambiava vista, e nemmeno gli avvii falliti.
+- Ambiente: il menu Ambiente è `presets::Look` (`apply_look`, `prepare_scene`, `fit_scene`). Le luci avevano già il segno salvato `Light::from_look`; `set_look_lights` riprendeva il numero (`id`) delle luci con lo stesso nome, e `mark_legacy_look_lights` segnava come d'ambiente tutte le luci dei progetti vecchi se i nomi coincidevano con un aspetto. I numeri delle luci li assegna `Scene::assign_element_ids` (mai uno ancora usato dalla timeline).
+
+### Sfondo della viewport
+
+- Predefinito RGB 40, 44, 52 (#282C34) per le installazioni nuove e per i file di impostazioni senza il campo (`VIEWPORT_BACKGROUND_DEFAULT` in `crates/forge_app/src/prefs.rs`).
+- **Impostazioni → Viewport**: Antracite (predefinito), Grigio Blender-like (48, 52, 59), Scuro tecnico (34, 40, 49), Grigio chiaro (53, 58, 66), ognuno con campione, RGB e HEX; **Personalizzato** usa il selettore colore già esistente (`rgb_edit`: RGB, HEX, CMYK, palette). Nessun sistema parallelo.
+- Salvato in `impostazioni.json` appena cambia, ripristinato al riavvio, applicato subito alla viewport, alle registrazioni "Anteprima (viewport)" e all'anteprima STEP. Il render finale non lo usa.
+- Contrasto con griglia, assi, selezione e gizmo: **non verificato a schermo**. La viewport non disegna una griglia; selezione e gizmo non li ho guardati con i quattro sfondi.
+
+### Passaggio alla scheda Render
+
+- Tutti i percorsi che avviano un render convergono su `ForgeApp::toggle_pause` o `ForgeApp::start_render` (Avvia render della barra, F5, menu Rendering, pulsante della modalità Semplice, scheda della demo, Riavvia, MCP, viste, timeline). `start_render` ora mette la scheda Render come prima cosa (anche se aspetta geometria o nebbie, o se l'avvio fallisce); `toggle_pause` la mette quando avvia o riprende, non quando mette in pausa un render in corso (`render_command_shows_render`). Il render in sé non è cambiato.
+- **Non provato a mano** nelle due modalità: verificato dalla regola e dal codice.
+
+### Luci dell'ambiente
+
+- Strategia di identificazione: il campo `Light::from_look` (già esistente, salvato nel progetto). Il nome e il suffisso non contano mai; tolto il vecchio riconoscimento per nome dei progetti di prima (`mark_legacy_look_lights`).
+- Primo caricamento (nessuna luce d'ambiente nella scena): le luci presenti si spengono, senza eliminarle né cambiare altro. Cambio: si eliminano solo le luci con `from_look`, le nuove si creano da zero (accese, numero assegnato dalla scena, tutti i valori del preset). Le luci dell'utente non si toccano ai cambi successivi.
+- Albero della scena: "[ENV]" dopo il nome (`presets::ENV_LIGHT_SUFFIX`), con spiegazione nel suggerimento.
+- Fondale e altri oggetti: comportamento invariato.
+- Conseguenze da sapere: nei progetti salvati prima del segno `from_look` le luci contano come dell'utente (il primo ambiente le spegne e aggiunge le sue). Cambiando ambiente l'animazione delle vecchie luci d'ambiente non passa alle nuove. Corretto anche `matching_look`, che ora ignora il numero della luce.
+
+### File modificati
+
+`crates/forge_app/src/prefs.rs`, `crates/forge_app/src/ui/settings.rs`, `crates/forge_app/src/app.rs`, `crates/forge_app/src/ui/step_import.rs`, `crates/forge_app/src/presets.rs`, `crates/forge_app/src/ui/tree.rs`, `lang/Lan_eng.json`, manuale EN+IT (`ui.impostazioni`, `render.pannello`, `intro.semplice`), `README.md`, `README.it.md`, `CHANGELOG.en.md`, `CHANGELOG.md`, `Cargo.toml`, `Cargo.lock`, `packaging/windows/forgerender.iss`, note di lavoro.
+
+### Test eseguiti davvero
+
+- `cargo fmt --all`
+- `cargo clippy --workspace --exclude forge_step --all-targets --release -- -D warnings`: nessun avviso.
+- `cargo test --workspace --exclude forge_step --release --no-fail-fast`: 412 passati, 0 falliti, 10 ignorati.
+- Test nuovi: `prefs::tests::viewport_background_default_presets_and_persistence` (predefinito, file vecchio, valori ed HEX dei preset, salvataggio e caricamento di ogni preset e di un personalizzato); `app::auto_restart_tests::render_command_switches_to_the_render_tab`; `presets::tests::environment_lights_are_replaced_and_user_lights_kept` (i test 1–8 richiesti: primo caricamento, cambio, luci dell'utente intatte, molte↔poche, tutti i valori uguali al nuovo ambiente compresi posizione e bersaglio, segno interno, salvataggio e riapertura con `forge_project::save/load`, stesso ambiente due volte); `presets::tests::user_light_named_like_environment_is_never_deleted`. Il suffisso "[ENV]" nell'albero non ha un test automatico (è interfaccia).
+- **Non eseguite:** prove a schermo nel programma aperto.
 
 ## Comportamento automatico: passaggio alla scheda Render
 
