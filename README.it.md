@@ -332,6 +332,8 @@ Gli stili si applicano alla prima superficie vista dalla camera, quindi vetri e 
 
 ### 15. Modelli STEP: convertiti una volta, poi riaperti subito
 
+![Anteprima della finestra di importazione STEP di ForgeRender](docs/img/features/step-import.jpg)
+
 Uno STEP da solo apre la sua finestra: il file a sinistra, la tassellazione al centro e a destra il modello come verrà importato (stessi pezzi, colori, asse verticale e appoggio sul pavimento), disegnato dallo stesso motore della viewport, ombreggiato o in fil di ferro, da girare, spostare e ingrandire come nella viewport, con triangoli, vertici, dimensioni e pezzi. Bozza, Bilanciata, Alta qualità o Personalizzata impostano le deviazioni lineare e angolare vere del convertitore; si può riconvertire quante volte si vuole e il modello entra nella scena solo con Importa, uguale all'anteprima e senza convertirlo di nuovo. La geometria CAD originale non si vede perché resta nel processo separato del convertitore.
 
 Un file STEP si converte in mesh una volta sola. Il risultato resta in una cache delle conversioni e si salva accanto al progetto (`modelli-convertiti/`) e dentro i pacchetti `.frpack`, così riaprendo il progetto lo STEP non si riconverte. Sulla demo del banco ottico l'apertura è passata da 27 s a 0,2 s. Se lo STEP cambia (o cambiano i pezzi di un assieme a più file, o la qualità), si riconverte. I pacchetti ora includono anche i file dei pezzi a cui rimanda un assieme STEP a più file.
