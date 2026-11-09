@@ -188,3 +188,49 @@ Riprodurre e correggere il bug, non limitarsi a cambiare i valori dei preset o i
 5. Aggiornare manuale/riscontro solo dopo la verifica reale. Riportare causa precisa, file modificati, test eseguiti e commit.
 
 **Non considerare risolto** con i soli test di persistenza delle preferenze: il bug segnalato riguarda la resa GPU reale.
+
+
+## Correzione sfondo viewport: colore effettivo non corrisponde alla preferenza — 09/11/2026
+
+### Problema osservato da Valerio
+
+Nella schermata Impostazioni → Viewport è selezionato **Grigio chiaro**, RGB 53, 58, 66 (#353A42), ma lo sfondo effettivamente visibile nella viewport rimane quasi nero. Dallo screenshot fornito, una zona libera della viewport misura circa RGB (9, 11, 14), quindi il colore mostrato non è quello selezionato.
+
+Non è accettabile che il selettore mostri un colore e che la viewport ne disegni un altro. Non aggiungere workaround, overlay o correzioni approssimative: individuare la causa reale e correggere il punto responsabile.
+
+### Indagine richiesta prima della modifica
+
+Tracciare l'intero percorso del colore dalla preferenza UI fino al pixel finale della viewport:
+1. valore selezionato nel pannello Impostazioni e relativa persistenza;
+2. stato/configurazione passato alla viewport e aggiornamento immediato quando si cambia preset;
+3. codice che disegna il fondale della viewport (render pass GPU, clear color, renderer/texture e compositing);
+4. eventuali sfondi separati usati da viewport, anteprima STEP, modalità Semplice o altre modalità;
+5. eventuali valori hardcoded, fallback o passaggi successivi che sovrascrivono il colore scelto.
+
+Controllare in particolare il percorso di rendering effettivo della viewport e il suo render pass/clear color: il fatto che il selettore salvi e mostri correttamente il valore non dimostra che il renderer lo stia usando.
+
+### Correzione richiesta
+
+- Stabilire **un'unica sorgente di verità** per il colore di sfondo selezionato.
+- Il renderer che produce lo sfondo visibile della viewport deve ricevere e usare esattamente quel colore, convertendolo correttamente nel formato/spazio colore richiesto dal renderer.
+- Eliminare o collegare alla stessa sorgente eventuali colori hardcoded, fallback o sfondi paralleli che causano divergenze.
+- Il cambio preset/colore personalizzato deve aggiornare immediatamente il fondale effettivamente disegnato, senza riavvio.
+- La viewport deve mostrare il colore selezionato in modo uniforme in tutte le modalità e dimensioni della finestra.
+- Se l'anteprima STEP usa un percorso grafico distinto, verificare che riceva la stessa preferenza e produca lo stesso colore di sfondo.
+- Non cambiare il colore del render finale: la modifica riguarda esclusivamente lo sfondo della viewport e le sue anteprime.
+
+### Verifiche obbligatorie
+
+Per ciascuno dei quattro preset e per un colore personalizzato:
+1. selezionare il colore nelle Impostazioni;
+2. verificare il colore effettivo dei pixel in una zona libera della viewport, lontano da oggetti, gizmo e overlay;
+3. confrontare il valore effettivo con RGB/HEX selezionato, ammettendo solo la tolleranza dovuta alla conversione colore documentata;
+4. ripetere in viewport normale, modalità Semplice e anteprima STEP se applicabile;
+5. cambiare preset più volte e verificare che non restino valori precedenti o cache non aggiornate;
+6. salvare, riaprire il programma e verificare che il colore effettivo corrisponda alla preferenza persistita.
+
+Aggiungere test automatici per la propagazione del valore dalla preferenza alla configurazione del renderer, ma non considerarli sostitutivi della verifica visiva/pixel della viewport reale.
+
+### Riscontro richiesto a Claude
+
+Prima descrivere la causa individuata indicando **file, funzioni e passaggio preciso** in cui il colore viene perso/sovrascritto o non applicato. Poi descrivere la correzione, i file modificati e i test effettivamente eseguiti. Non dichiarare risolto il problema senza aver verificato il colore effettivamente disegnato.
