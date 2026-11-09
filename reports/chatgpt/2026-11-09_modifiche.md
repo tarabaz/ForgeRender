@@ -306,3 +306,26 @@ La griglia metrica configurabile richiesta per la viewport deve essere visualizz
 5. Verificare che né griglia né sfondo entrino nel render finale o nei dati importati.
 
 Prima di implementare, controllare il renderer dedicato alla preview STEP (già descritto nell'handoff come basato su ViewportRenderer con texture propria) e riutilizzare lo stesso percorso/configurazione di sfondo e griglia della viewport, evitando due implementazioni divergenti. Questa richiesta si aggiunge alla correzione già annotata per il disallineamento tra colore selezionato e colore realmente disegnato: prima risolvere la causa di quel disallineamento, poi assicurarsi che viewport e preview STEP condividano lo stesso risultato. Riportare file/funzioni modificati e test effettivi. Lavorare su sviluppo.
+
+
+## Correzione selezione del preset Personalizzato per lo sfondo viewport — 09/11/2026
+
+### Problema segnalato da Valerio
+
+In Impostazioni → Viewport, cliccando su **Personalizzato**, la modalità non viene selezionata immediatamente: diventa selezionabile/attiva soltanto dopo che l'utente modifica manualmente il colore. Dopo aver scelto un preset predefinito, inoltre, può non essere più possibile tornare a Personalizzato con un semplice clic: sembra necessario modificare di nuovo il colore manualmente.
+
+### Comportamento richiesto
+
+- Il clic su **Personalizzato** deve selezionare immediatamente la modalità Personalizzato, anche se il colore non viene modificato.
+- Quando si entra in Personalizzato, mantenere e mostrare il colore personalizzato già memorizzato; se non esiste ancora un valore personalizzato, inizializzarlo in modo deterministico (ad esempio dal colore attualmente visualizzato), senza obbligare l'utente a intervenire sul selettore.
+- La selezione della modalità e la modifica del valore RGB/HEX sono due azioni distinte: il cambio di modalità non deve dipendere da un evento di modifica del colore.
+- Dopo aver selezionato un preset predefinito, l'utente deve poter tornare a Personalizzato con un solo clic, senza dover prima cambiare manualmente RGB/HEX.
+- Passare da Personalizzato a un preset e poi nuovamente a Personalizzato deve conservare il valore personalizzato precedente, salvo che l'utente lo modifichi esplicitamente.
+- La selezione deve aggiornare subito il colore effettivo della viewport e, una volta condivisa la configurazione, anche quello della preview STEP; non deve essere necessario riaprire le impostazioni o riavviare il programma.
+- La selezione visiva del radio/preset deve sempre corrispondere alla modalità realmente applicata.
+
+### Indagine e test
+
+Controllare la gestione dello stato UI: verificare che il radio button Personalizzato non sia legato impropriamente al confronto tra colore corrente e colore custom, né che la callback venga invocata soltanto quando cambia RGB/HEX. Separare esplicitamente `background_mode` (preset/custom) dal valore `custom_background_color`.
+
+Testare la sequenza completa: preset A → Personalizzato senza toccare il colore → preset B → Personalizzato con un solo clic → modifica colore custom → preset A → Personalizzato. Verificare stato selezionato, valore conservato, colore effettivo nella viewport e nella preview STEP. Aggiungere test automatici per le transizioni di stato e non dichiarare risolto il problema senza aver provato la sequenza nell'interfaccia.
