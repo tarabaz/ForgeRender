@@ -321,6 +321,8 @@ The styles are applied at the first surface seen by the camera, so glass and mir
 
 ### 15. STEP models: converted once, then reopened instantly
 
+![ForgeRender STEP import window preview](docs/img/features/step-import.jpg)
+
 A single STEP opens its own window: the file on the left, tessellation in the middle, and on the right the model as it will be imported (same parts, colours, vertical axis and floor placement), drawn by the same engine as the viewport, shaded or wireframe, to orbit, pan and zoom like the viewport, with triangles, vertices, size and parts. Draft, Balanced, High quality or Custom set the converter's real linear and angular deviation; you can convert again as often as you like and the model enters the scene only with Import, exactly as in the preview and without converting it again. The original CAD geometry is not shown because it stays in the separate converter process.
 
 A STEP file is converted to meshes once. The result is kept in a conversion cache and saved next to the project (`modelli-convertiti/`) and inside `.frpack` packages, so reopening a project does not convert the STEP again. On the optical bench demo, opening went from 27 s to 0.2 s. When the STEP changes (or the parts of a multi-file assembly change, or the quality changes), it is converted again. Packages now also include the part files that a multi-file STEP assembly refers to.
