@@ -383,3 +383,50 @@ Quando si usa l'effetto **Polvere in sospensione** impostando il tipo di partice
 6. Aggiungere test automatici per orientamento iniziale/variazione temporale/determinismo, se il percorso lo consente. Separare i risultati dei test automatici dalla verifica visiva effettiva.
 
 Prima di modificare, ispezionare il codice della polvere e il modo in cui il renderer calcola la normale/tangente delle scaglie. Riutilizzare la stessa funzione temporale per anteprima e render, se possibile. Lavorare sul branch `sviluppo`; nel riscontro indicare file e funzioni coinvolti, soluzione adottata, test realmente eseguiti e commit.
+
+
+## Il render riparte automaticamente dopo l'interruzione del precalcolo volumetrico — 09/11/2026
+
+### Problema osservato da Valerio (riproduzione)
+
+1. Nella scena è presente un oggetto e viene aggiunto un effetto di **Fumo volumetrico**, preset **Tazza di caffè**.
+2. ForgeRender avvia il precalcolo del volume.
+3. L'utente passa alla scheda **Render** mentre il precalcolo è ancora in corso.
+4. L'utente interrompe il render e interrompe anche il calcolo/precalcolo volumetrico.
+5. Torna alla **Viewport**.
+6. Appena prova a spostare l'oggetto, l'interazione non resta nella viewport: ForgeRender torna automaticamente alla scheda **Render** e avvia nuovamente il calcolo/precalcolo, senza che l'utente abbia impartito un nuovo comando Render.
+
+Il problema è quindi riproducibile dopo un annullamento esplicito: una normale modifica/trasformazione dell'oggetto sembra riattivare un lavoro che l'utente aveva appena fermato.
+
+### Comportamento richiesto
+
+- Dopo che l'utente interrompe esplicitamente il render e/o il precalcolo volumetrico, l'operazione deve rimanere **annullata**.
+- Tornando alla Viewport, l'utente deve poter selezionare, spostare, ruotare e modificare gli oggetti liberamente senza essere riportato alla scheda Render.
+- Una modifica alla scena può invalidare i risultati/precalcoli precedenti, ma **non deve avviare automaticamente un nuovo render o precalcolo** se l'ultimo lavoro è stato annullato dall'utente.
+- Il nuovo calcolo deve partire soltanto quando l'utente impartisce esplicitamente un nuovo comando **Render/Avvia render** (o un'altra azione che per specifica richieda chiaramente il calcolo).
+- Mantenere distinta la condizione di scena modificata/risultato non aggiornato dallo stato del comando di render: "dirty/invalidato" non significa "avvia automaticamente".
+- Il passaggio automatico alla scheda Render introdotto nella 0.51.0 deve avvenire quando viene effettivamente richiesto o avviato un render, non come effetto collaterale di una modifica alla scena dopo un annullamento.
+- Non bloccare o disabilitare le normali operazioni di editing in viewport mentre un precalcolo è stato annullato.
+
+### Indagine richiesta
+
+Prima di correggere, ricostruire il ciclo di vita del render e del precalcolo volumetrico, in particolare:
+- chi riceve e conserva il comando di annullamento/interruzione;
+- se il flag di cancellazione viene azzerato da una modifica della scena, dalla ricostruzione della geometria o dall'aggiornamento del volume;
+- se esiste un job/task rimasto in stato pending o una richiesta di render automatica che viene ripresentata al frame UI successivo;
+- quali callback o percorsi di invalidazione, durante il trascinamento/trasformazione di un oggetto, richiamano start_render, toggle_pause o il precalcolo del fumo;
+- se la navigazione automatica alla scheda Render è causata da un vero nuovo comando o da un semplice aggiornamento dello stato del render.
+
+Non risolvere il problema disabilitando genericamente il precalcolo o impedendo l'aggiornamento dei volumi: il render esplicito successivo deve continuare a ricalcolare correttamente i dati invalidati.
+
+### Test e verifica richiesti
+
+1. Riprodurre la sequenza descritta con il preset Fumo volumetrico → Tazza di caffè.
+2. Interrompere sia il render sia il precalcolo mentre sono in corso; tornare alla Viewport.
+3. Spostare, ruotare e selezionare l'oggetto più volte: la vista deve restare Viewport e non deve partire alcun nuovo precalcolo/render.
+4. Premere esplicitamente Avvia render: il render deve partire e il precalcolo volumetrico necessario deve essere eseguito correttamente.
+5. Ripetere il test interrompendo il precalcolo in fasi diverse (inizio e durante l'elaborazione), se possibile.
+6. Verificare che il comportamento non regredisca per gli altri effetti volumetrici o per i normali render senza volume.
+7. Aggiungere test automatici per la macchina a stati/cancellazione e per il fatto che una modifica della scena dopo l'annullamento non riaccoda automaticamente il lavoro. La riproduzione visiva nel programma va riportata separatamente.
+
+Lavorare sul branch sviluppo. Nel riscontro indicare la causa precisa, i percorsi/funzioni coinvolti, la distinzione introdotta tra invalidazione e richiesta esplicita di render, i test realmente eseguiti e il commit. Non dichiarare risolto il problema senza aver verificato la sequenza completa.
