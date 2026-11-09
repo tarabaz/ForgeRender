@@ -243,6 +243,8 @@ Real specks (a few millimetres, up to 150,000) scattered in the air, as their ow
 
 ### Fireflies / Enchanted forest
 
+![Firefly effect in the Enchanted forest](docs/img/features/firefly-effect.jpg)
+
 A flock that flies through a volume, mostly horizontally, and lights up at intervals, each firefly on its own: off, glow in, on, glow out. When lit they are **real lights of the scene**: surfaces take their colour, objects stop their light, on CPU and GPU. Above *Maximum lights* nearby fireflies merge into one light with the same total power, which keeps noise under control at the price of less precise shadows.
 
 - **Flight and cycle:** quantity, volume with rotation, speed, vertical share, smoothness, dispersion, and minimum and maximum durations of each phase.
