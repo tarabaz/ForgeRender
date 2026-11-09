@@ -329,3 +329,29 @@ In Impostazioni → Viewport, cliccando su **Personalizzato**, la modalità non 
 Controllare la gestione dello stato UI: verificare che il radio button Personalizzato non sia legato impropriamente al confronto tra colore corrente e colore custom, né che la callback venga invocata soltanto quando cambia RGB/HEX. Separare esplicitamente `background_mode` (preset/custom) dal valore `custom_background_color`.
 
 Testare la sequenza completa: preset A → Personalizzato senza toccare il colore → preset B → Personalizzato con un solo clic → modifica colore custom → preset A → Personalizzato. Verificare stato selezionato, valore conservato, colore effettivo nella viewport e nella preview STEP. Aggiungere test automatici per le transizioni di stato e non dichiarare risolto il problema senza aver provato la sequenza nell'interfaccia.
+
+
+## Denoiser nelle anteprime dei materiali — 09/11/2026
+
+### Richiesta di Valerio
+
+Verificare come vengono generate le anteprime dei materiali (material preview): capire se il renderer applica già un denoiser oppure se mostra semplicemente il risultato dei sample accumulati.
+
+### Indagine e comportamento richiesto
+
+1. Individuare il percorso effettivo di rendering delle anteprime dei materiali e verificare nel codice se e quale denoiser viene applicato. Non dedurre la risposta dal denoiser del render finale: controllare specificamente il renderer delle preview.
+2. Se le anteprime usano soltanto un numero limitato di sample e **non applicano alcun denoiser**, aggiungere un denoiser alle anteprime.
+3. Riutilizzare, se tecnicamente compatibile, il denoiser già presente nel motore/render finale, evitando di introdurre una seconda implementazione non necessaria. Se il denoiser esistente non è adatto alle preview (dimensioni, buffer, tempi o dipendenze), spiegare il motivo e proporre l'adattamento minimo.
+4. Applicare il denoising al risultato dell'anteprima senza alterare i dati del materiale, le texture o il rendering finale.
+5. Considerare che le preview sono piccole e devono restare reattive: scegliere un'impostazione di qualità/costo adatta alle miniature, evitando blocchi dell'interfaccia e tempi eccessivi quando si selezionano o modificano molti materiali.
+6. Aggiornare l'anteprima quando cambiano materiale o parametri, evitando di mostrare un risultato denoised obsoleto appartenente alla preview precedente.
+
+### Verifiche richieste
+
+- Riportare file, funzioni e percorso di rendering che dimostrano se oggi il denoiser è presente o assente nelle preview.
+- Confrontare la stessa anteprima con denoiser disattivato e attivato, a parità di sample, per verificare riduzione del rumore e conservazione dei dettagli (riflessi, roughness, texture e bordi).
+- Verificare reattività e tempi di aggiornamento quando si selezionano materiali diversi o si modificano rapidamente i parametri.
+- Aggiungere test automatici per l'invocazione/integrazione del denoiser, dove testabile; documentare separatamente l'eventuale verifica visiva.
+- Se le preview applicano già un denoiser, non aggiungerne un secondo: descrivere quale viene usato, dove e con quali impostazioni, e verificare che sia effettivamente attivo.
+
+Prima di implementare, Claude deve riferire il comportamento attuale trovato nel codice. Lavorare sul branch sviluppo e indicare file modificati, test effettivi e commit.
