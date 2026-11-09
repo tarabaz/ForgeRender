@@ -152,12 +152,12 @@ Lavorare sul branch `sviluppo`. Prima di implementare, controllare come il model
 
 Integrare nel repository l'icona ufficiale fornita da Valerio e includerla nel prossimo build di ForgeRender.
 
-- File previsto: `assets/forgerender.ico`
+- File previsto: `assets/forgerender.ico` (da aggiungere).
 - Uso: icona dell'eseguibile Windows e, dove applicabile, icona della finestra/taskbar.
-- Il file ICO è stato caricato sul branch `sviluppo` con il commit dedicato; verificare il contenuto binario e tutte le dimensioni incorporate prima di usarlo nel pacchetto finale.
+- Il trasferimento binario tramite l'integrazione GitHub non ha preservato integralmente il file ICO: un tentativo incompleto è stato rimosso. **Il file ICO valido non è attualmente presente nel repository** e va caricato tramite Git sul PC di sviluppo prima dell'integrazione.
 - Nel prossimo build, integrare l'icona nelle risorse Windows dell'eseguibile (non limitarsi a copiarla accanto all'EXE).
 - Verificare separatamente l'icona mostrata da Explorer, collegamento/installer e finestra/taskbar: per quest'ultima controllare l'integrazione eframe/winit/Windows, perché la risorsa dell'EXE da sola potrebbe non impostare l'icona della finestra.
 - Aggiornare gli script di build/package e l'installer se necessario, mantenendo un'unica sorgente dell'icona.
 - Non cambiare il logo né ridisegnarlo. Non dichiarare verificata la resa visiva senza averla controllata nel programma e in Windows Explorer.
 
-**Nota tecnica per Claude:** il file è in `assets/forgerender.ico`. Prima di modificare il packaging, controlla che sia un ICO valido e che contenga davvero le risoluzioni multi-size attese; se il contenuto risulta incompleto o corrotto, segnalarlo prima di integrare e chiedere un nuovo upload, senza creare un'icona sostitutiva.
+**Nota tecnica per Claude:** quando `assets/forgerender.ico` sarà presente nel branch, controlla che sia un ICO valido e che contenga davvero le risoluzioni multi-size attese; quindi integra l'icona nel prossimo build. Non creare un'icona sostitutiva né usare un file incompleto.
