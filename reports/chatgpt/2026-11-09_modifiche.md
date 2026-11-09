@@ -65,77 +65,45 @@ L'obiettivo è evitare che il rendering parta mentre l'utente continua a vedere 
 
 ## Gestione delle luci quando si carica o si cambia Environment
 
-### Richiesta di Valerio
+### Richiesta definitiva di Valerio
 
-La funzione Environment carica una scenografia composta da fondale e luci. La gestione delle luci deve evitare sia la perdita delle luci originali della scena sia l'accumulo di luci quando si cambia scenografia.
+La funzione Environment carica una scenografia composta da fondale e luci. Le luci della scenografia devono essere trattate come elementi appartenenti all'Environment e avere un ciclo di vita legato alla scenografia caricata.
+
+**Questa è la strategia definitiva: quando si cambia Environment, eliminare le sole luci della scenografia precedente e crearne di nuove. Non riutilizzare le vecchie luci e non limitarsi a disattivare quelle in eccesso.**
 
 ### Comportamento richiesto
 
 **Primo caricamento di una scenografia**
-1. Se nella scena sono già presenti luci dell'utente, disattivarle (non eliminarle e non modificarne i parametri).
-2. Caricare e attivare tutte le luci appartenenti alla scenografia selezionata.
-3. Le luci originali devono restare nella scena, conservate e riattivabili dall'utente.
+1. Se nella scena sono già presenti luci dell'utente, disattivarle, ma non eliminarle né modificarne i parametri.
+2. Creare e attivare tutte le luci appartenenti alla nuova scenografia.
+3. Nell'albero della scena mostrare un suffisso riconoscibile, ad esempio `[ENV]`, accanto al nome di ciascuna luce Environment.
 
 **Cambio da una scenografia a un'altra**
-1. ForgeRender deve distinguere in modo affidabile le luci create/caricate da Environment dalle luci preesistenti dell'utente.
-2. Le luci della scenografia precedente vanno riutilizzate e aggiornate con quelle della nuova scenografia, senza crearne copie a ogni cambio.
-3. Aggiornare tutti i parametri di ciascuna luce: tipo, posizione, orientamento/rotazione, colore, intensità/potenza, dimensioni e ogni altra proprietà supportata dal modello luce.
-4. Se la nuova scenografia contiene più luci della precedente, aggiungere soltanto quelle mancanti.
-5. Se contiene meno luci, disattivare le luci Environment in eccesso della scenografia precedente. Non eliminarle, così da mantenere una gestione reversibile e coerente.
-6. Non modificare né disattivare le luci dell'utente durante i cambi successivi di Environment: la sostituzione deve riguardare esclusivamente le luci riconosciute come appartenenti alla scenografia.
-
-### Aspetti tecnici da verificare
-
-- Ispezionare il codice reale del caricamento Environment, la struttura delle luci e il sistema di identificazione/serializzazione.
-- Introdurre, se necessario, un'identificazione persistente e non ambigua delle luci gestite da Environment (ad esempio un gruppo/ruolo o metadato dedicato). Non basarsi soltanto sul nome visibile della luce.
-- Il caricamento ripetuto della stessa scenografia deve essere idempotente: non deve generare duplicati.
-- Verificare cosa accade quando si carica un Environment dopo aver modificato manualmente una luce della scenografia: il cambio deve applicare integralmente i parametri della nuova scenografia.
-- Verificare anche il caso di una scenografia senza luci, se ammesso dal formato.
-- Conservare il comportamento del fondale e non alterare le altre luci/oggetti della scena.
-
-### Test richiesti
-
-Preparare test che coprano almeno:
-1. Prima applicazione: le luci preesistenti vengono disattivate ma conservate; le luci Environment vengono caricate e attivate.
-2. Cambio con meno luci: le luci Environment in eccesso vengono disattivate, senza eliminazione.
-3. Cambio con più luci: vengono aggiunte soltanto le nuove luci necessarie.
-4. Aggiornamento completo dei parametri, inclusi posizione e orientamento.
-5. Le luci originali dell'utente restano invariate nei cambi successivi.
-6. Ricaricare lo stesso Environment non crea duplicati.
-
-Lavorare sul branch di sviluppo. Nel riscontro finale indicare file modificati, strategia usata per identificare le luci Environment, test realmente eseguiti e commit. Non dichiarare come verificato ciò che non è stato provato.
-
-## Chiarimento e revisione della strategia luci Environment — 09/11/2026
-
-### Decisione preferita da Valerio e raccomandazione di ChatGPT
-
-Valutata l'alternativa, si preferisce gestire le luci della scenografia come elementi di proprietà dell'Environment, con un ciclo di vita legato alla scenografia attualmente caricata. Questa strategia **sostituisce, per i cambi di Environment, la precedente indicazione di riutilizzare le luci e disattivare quelle in eccesso**.
-
-Comportamento aggiornato:
-
-1. Al primo caricamento di un Environment, disattivare le luci già presenti nella scena, senza eliminarle né modificarne i parametri: sono luci originali dell'utente.
-2. Creare le luci appartenenti al nuovo Environment e attivarle.
-3. Nell'albero della scena mostrare un suffisso chiaro, ad esempio `[ENV]`, accanto al nome di ogni luce gestita dalla scenografia, così che l'utente possa riconoscerle immediatamente.
-4. Quando si cambia Environment, eliminare **soltanto** le luci appartenenti all'Environment precedente e creare quelle della nuova scenografia con tutti i parametri previsti (tipo, posizione, orientamento, colore, potenza, dimensioni e ogni altra proprietà supportata).
-5. Le luci originali dell'utente, prive del contrassegno Environment, non devono essere eliminate o modificate nei cambi successivi.
-6. Se il nuovo Environment contiene più o meno luci, il numero di luci Environment presenti dopo il caricamento deve corrispondere esattamente a quello previsto dalla nuova scenografia: nessun residuo e nessun duplicato.
-7. Ricaricare lo stesso Environment deve produrre lo stesso risultato, senza accumulare luci.
+1. Individuare le luci appartenenti all'Environment attualmente caricato.
+2. Eliminare esclusivamente quelle luci Environment.
+3. Creare e attivare le luci della nuova scenografia, con tutti i parametri previsti: tipo, posizione, orientamento/rotazione, colore, intensità/potenza, dimensioni e ogni altra proprietà supportata.
+4. Le luci originali dell'utente non devono essere eliminate né modificate durante i cambi successivi.
+5. Dopo il caricamento, devono essere presenti esattamente le luci previste dalla nuova scenografia: nessun residuo e nessun duplicato, sia quando la nuova scenografia ha più luci sia quando ne ha meno.
+6. Ricaricare la stessa scenografia deve produrre lo stesso risultato, senza accumulare luci.
 
 ### Identificazione e sicurezza
 
-Il suffisso `[ENV]` nell'albero è un'indicazione visiva per l'utente, **non deve essere l'unico criterio tecnico per decidere quali luci eliminare**. Usare un metadato/ruolo interno dedicato e persistente per identificare in modo affidabile le luci create dal caricamento Environment. Il nome visualizzato può includere il suffisso, ma non deve essere la fonte di verità.
+- Il suffisso `[ENV]` nell'albero serve a riconoscere visivamente le luci della scenografia da parte dell'utente.
+- Il suffisso **non deve essere l'unico criterio tecnico** per decidere quali luci eliminare. Usare un metadato/ruolo interno dedicato e persistente per identificare in modo affidabile le luci create dal caricamento Environment.
+- Verificare che l'identificazione sopravviva al salvataggio e alla riapertura del progetto.
+- Non eliminare mai una luce dell'utente sulla base del solo nome o di una somiglianza con una luce Environment.
+- Conservare il comportamento del fondale e non alterare gli altri oggetti della scena.
 
-Verificare anche salvataggio e riapertura del progetto: l'appartenenza delle luci all'Environment deve restare riconoscibile. Se il formato/progetto non conserva un metadato adatto, individuare una soluzione compatibile prima di implementare la cancellazione.
+### Test richiesti
 
-### Test aggiornati
+1. Primo caricamento: luci preesistenti disattivate ma conservate; luci Environment create, identificate e attive.
+2. Cambio Environment: eliminate solo le vecchie luci Environment; create tutte quelle della nuova scenografia.
+3. La scena utente non perde né modifica le proprie luci durante i cambi.
+4. Cambio da Environment con molte luci a uno con poche e viceversa: nessun residuo.
+5. Tutti i parametri delle nuove luci corrispondono alla nuova scenografia, inclusi posizione e orientamento.
+6. Suffisso `[ENV]` visibile nell'albero e metadato interno coerente.
+7. Salvataggio e riapertura del progetto preservano l'identificazione.
+8. Ricaricamento dello stesso Environment senza duplicati.
 
-- Primo caricamento: luci preesistenti disattivate e conservate; luci Environment create, identificate e attive.
-- Cambio Environment: vengono eliminate solo le vecchie luci Environment e create quelle nuove.
-- La scena utente non perde né modifica le proprie luci durante i cambi.
-- Cambio da Environment con molte luci a uno con poche e viceversa: nessun residuo.
-- Tutti i parametri delle nuove luci corrispondono alla nuova scenografia, inclusi posizione e orientamento.
-- Suffisso `[ENV]` visibile nell'albero e metadato interno coerente.
-- Salvataggio e riapertura del progetto preservano l'identificazione.
-- Ricaricamento dello stesso Environment senza duplicati.
+Lavorare sul branch `sviluppo`. Prima di implementare, controllare come il modello scena gestisce identificatori, eliminazione delle luci, persistenza e nomi nell'albero. Nel riscontro finale indicare file modificati, strategia di identificazione, test realmente eseguiti e commit. Non dichiarare come verificato ciò che non è stato provato.
 
-**Nota per Claude:** questa è la strategia preferita e aggiorna le indicazioni precedenti sul cambio di scenografia. Prima di implementare, controlla come il modello scena gestisce identificatori, eliminazione delle luci, persistenza e nomi nell'albero; poi scegli la soluzione più sicura senza affidarti al solo suffisso.
