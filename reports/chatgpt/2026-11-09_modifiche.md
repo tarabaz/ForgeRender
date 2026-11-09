@@ -430,3 +430,29 @@ Non risolvere il problema disabilitando genericamente il precalcolo o impedendo 
 7. Aggiungere test automatici per la macchina a stati/cancellazione e per il fatto che una modifica della scena dopo l'annullamento non riaccoda automaticamente il lavoro. La riproduzione visiva nel programma va riportata separatamente.
 
 Lavorare sul branch sviluppo. Nel riscontro indicare la causa precisa, i percorsi/funzioni coinvolti, la distinzione introdotta tra invalidazione e richiesta esplicita di render, i test realmente eseguiti e il commit. Non dichiarare risolto il problema senza aver verificato la sequenza completa.
+
+
+### Precisazione definitiva di Valerio — debounce del precalcolo e nessun cambio forzato di scheda (09/11/2026)
+
+Questa precisazione **sostituisce** il requisito precedente secondo cui, dopo l'annullamento, il calcolo dovrebbe ripartire soltanto su comando esplicito. Valerio chiarisce che il precalcolo automatico può anche ripartire: il problema è che parte immediatamente durante l'interazione e forza la navigazione alla scheda Render.
+
+#### Comportamento corretto richiesto
+
+1. Quando una modifica alla scena (per esempio trascinare/spostare un oggetto che influenza il fumo volumetrico) rende necessario aggiornare il precalcolo, **non avviare il lavoro in tempo reale durante il gesto**.
+2. Introdurre un debounce di circa **2–3 secondi dall'ultima modifica**: ogni nuova modifica durante il trascinamento/azione riavvia il timer. Il calcolo parte solo quando l'utente smette di modificare la scena per 2–3 secondi.
+3. Durante l'attesa e durante il precalcolo automatico, se l'utente si trova nella scheda **Viewport**, deve rimanere nella Viewport. **È vietato forzare il passaggio alla scheda Render** come effetto collaterale del precalcolo automatico o dell'aggiornamento del volume.
+4. Il passaggio automatico alla scheda Render resta appropriato quando l'utente impartisce esplicitamente un comando Render/Avvia render. Non deve essere invocato dal percorso di aggiornamento automatico del precalcolo.
+5. Se l'utente interrompe il precalcolo e poi continua a modificare la scena, applicare comunque il debounce: non ripartire mentre sta trascinando; attendere 2–3 secondi dall'ultima modifica prima di un eventuale nuovo tentativo automatico.
+6. Il render esplicito deve poter avviare subito il precalcolo necessario, senza attendere il debounce automatico, perché in quel caso l'utente ha chiesto di renderizzare.
+
+#### Test aggiornati
+
+- Trascinare un oggetto per più secondi con il fumo Tazza di caffè: nessun precalcolo deve ripartire durante il trascinamento.
+- Rilasciare l'oggetto: il precalcolo automatico può iniziare solo dopo circa 2–3 secondi senza ulteriori modifiche.
+- Riprendere a trascinare prima della scadenza: il timer deve ripartire da zero.
+- Durante attesa e calcolo automatico, la scheda deve restare Viewport se era quella attiva.
+- Interrompere il calcolo, tornare alla Viewport e ripetere: nessun cambio forzato alla scheda Render.
+- Premere esplicitamente Avvia render: passaggio alla scheda Render e precalcolo immediato, senza debounce.
+- Verificare che il debounce non ritardi o alteri i render esplicitamente richiesti.
+
+**Nota di implementazione:** separare chiaramente il percorso di invalidazione/aggiornamento automatico del precalcolo dal comando esplicito di render. Il debounce deve agire sul primo; il cambio di scheda Render deve dipendere esclusivamente dal secondo. Riportare il valore effettivo scelto (2 o 3 secondi), la logica di reset del timer, i file modificati, i test eseguiti e il commit.
