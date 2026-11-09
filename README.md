@@ -18,6 +18,11 @@ No installation is required when using the portable ZIP: extract it and run `for
 
 [Browse all releases and previous versions](https://github.com/tarabaz/ForgeRender/releases).
 
+### What's new in 0.52.0
+
+- **The AI controls the effects too:** through MCP, Claude or Codex can add, tune and remove haze, volumetric smoke, dry-ice fog, floating dust, fireflies and decals, with the same presets as the Effects tab.
+- **Lasers by voice:** the assistant can add and edit lasers (colour, diameter, partial reflections, visible beam).
+
 ### What's new in 0.51.0
 
 - **Choose the viewport background:** the viewport starts on a slightly cool Anthracite grey (#282C34) that keeps dark objects readable; Settings → Viewport offers four ready colours or any custom one, and the final render does not change.
@@ -155,7 +160,7 @@ Visible dispersion requires a transparent material with an Abbe number. Lower Ab
 
 ![ForgeRender AI scene control through MCP, with Claude issuing a natural-language command](docs/img/features/ai-scene-control.jpg)
 
-Connect Claude Desktop, Claude Code or Codex through the ForgeRender MCP bridge and control supported scene operations using natural language. Ask the assistant to adjust lighting, assign materials, configure the camera or prepare a render; ForgeRender applies the supported operations directly to the open scene. AI control is explicit and can be switched off from the interface.
+Connect Claude Desktop, Claude Code or Codex through the ForgeRender MCP bridge and control supported scene operations using natural language. Ask the assistant to adjust lighting, assign materials, add and tune effects (haze, smoke, dry ice, floating dust, fireflies, decals, lasers), configure the camera or prepare a render; ForgeRender applies the supported operations directly to the open scene. AI control is explicit and can be switched off from the interface.
 
 [MCP setup guide](docs/MCP.en.md).
 
@@ -392,7 +397,7 @@ The window is arranged so that you always know where to look and what to do next
 - **Languages**: Italian and English, the whole interface switches immediately (in
   Settings → Language, the gear at the top right). Translations are separate `lang/Lan_*.json` files: copy `Lan_eng.json`
   to add more.
-- **AI control (MCP)**: control ForgeRender in natural language through Claude Code or Claude Desktop, with the `forgerender-mcp.exe` bridge and the "AI MCP" switch in the top bar (ON/OFF, with the gear for the AI integration settings). See the [MCP setup guide](docs/MCP.en.md) for installation, examples, available tools and safety.
+- **AI control (MCP)**: control ForgeRender in natural language through Claude Code or Claude Desktop, with the `forgerender-mcp.exe` bridge and the "AI MCP" switch in the top bar (ON/OFF, with the gear for the AI integration settings). The assistant handles lights (lasers too), materials, camera, environment, render and every effect (haze, smoke, dry ice, dust, fireflies, decals). See the [MCP setup guide](docs/MCP.en.md) for installation, examples, available tools and safety.
 - **Welcome screen** at start-up with an image (`assets/splash.png`), version and commit; it
   closes with "Close" and reopens from File.
 - **Path tracing** on the CPU (all cores) and on the GPU (wgpu compute shaders, Vulkan/DX12)

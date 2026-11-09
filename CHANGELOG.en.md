@@ -10,6 +10,12 @@ The workspace version is defined once, in `version` under `[workspace.package]` 
 - **0.X.Y** (patch): bug fixes only, with no new features.
 - Each release adds a dated section here. The version is set in `Cargo.toml` and, as a fallback, in `packaging/windows/forgerender.iss`.
 
+## 0.52.0 — 9 Nov 2026
+
+- **The AI can manage the effects:** four new MCP tools. `list_effects` returns every effect in the scene with all its values (the field names saved in the project) and what can be added; `add_effect` adds ambient haze (5 types), volumetric smoke (9 presets), dry-ice fog (5 presets), floating dust, fireflies, or a decal from an image on the chosen parts, exactly like the buttons of the Effects tab; `edit_effect` changes only the given values (unknown fields and wrong types are refused, out-of-range values are clamped as in the panel), switches the effect on or off or renames it; `remove_effect` deletes it. `scene_info` now lists the effects too.
+- **Lasers from the AI:** `add_light` and `edit_light` handle the laser (red, green, blue, violet or white, diameter, partial reflections, visible beam).
+- **Guide and manual:** the MCP guide (tools and examples) and the AI control page describe the effects, in English and Italian.
+
 ## 0.51.0 — 9 Nov 2026
 
 - **Viewport background you can choose:** the viewport now starts on **Anthracite** (RGB 40, 44, 52, #282C34), a slightly cool dark grey that keeps black or very dark objects readable. **Settings → Viewport** offers Anthracite (default), Blender-like grey (#30343B), Technical dark (#222831), Light grey (#353A42) and **Custom** with the program's own colour picker (RGB, HEX, CMYK, palettes). The colour changes the viewport and the STEP preview immediately, is saved with the settings and comes back after a restart; the final render does not change.

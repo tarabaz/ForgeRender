@@ -13,6 +13,12 @@ Tutti i componenti la ereditano; il titolo della finestra mostra `ForgeRender v<
 - Ogni incremento aggiunge qui una sezione con data e commit. Il numero cambia nel `Cargo.toml`
   (e nell'installer `packaging/windows/forgerender.iss`, solo come valore di riserva).
 
+## 0.52.0 — 9 nov 2026
+
+- **L'IA gestisce gli effetti:** quattro comandi MCP nuovi. `list_effects` restituisce ogni effetto della scena con tutti i suoi valori (i nomi dei campi salvati nel progetto) e cosa si può aggiungere; `add_effect` aggiunge foschia d'ambiente (5 tipi), fumo volumetrico (9 preset), ghiaccio secco (5 preset), polvere in sospensione, lucciole, oppure un adesivo da un'immagine sui pezzi scelti, esattamente come i pulsanti della scheda Effetti; `edit_effect` cambia solo i valori indicati (campi sconosciuti e tipi sbagliati si rifiutano, i valori fuori intervallo si riportano nei limiti come nel pannello), accende, spegne o rinomina l'effetto; `remove_effect` lo elimina. Anche `scene_info` elenca gli effetti.
+- **Laser dall'IA:** `add_light` e `edit_light` gestiscono il laser (rosso, verde, blu, viola o bianco, diametro, riflessi parziali, fascio visibile).
+- **Guida e manuale:** la guida MCP (comandi ed esempi) e la pagina del controllo con l'IA descrivono gli effetti, in inglese e in italiano.
+
 ## 0.51.0 — 9 nov 2026
 
 - **Sfondo della viewport a scelta:** la viewport parte ora su **Antracite** (RGB 40, 44, 52, #282C34), un grigio scuro leggermente freddo che lascia ben leggibili anche gli oggetti neri o molto scuri. **Impostazioni → Viewport** propone Antracite (predefinito), Grigio Blender-like (#30343B), Scuro tecnico (#222831), Grigio chiaro (#353A42) e **Personalizzato** con il selettore colore del programma (RGB, HEX, CMYK, palette). Il colore cambia subito la viewport e l'anteprima STEP, si salva con le impostazioni e resta dopo il riavvio; il render finale non cambia.

@@ -179,6 +179,11 @@ Esempi di richieste:
 - «Fammi un render di prova veloce e dimmi cosa miglioreresti.»
 - «La luce a destra è troppo forte: dimezzala e rifai il render a 512 campioni.»
 - «Salva il progetto e il render finale nella cartella che ti indico.»
+- «Metti una nebbia bassa e uno spot da dietro, così la luce disegna i raggi nell'aria.»
+- «Metti il fumo d'incenso sul prodotto e fallo più denso e più alto.»
+- «Aggiungi il ghiaccio secco che trabocca dal bicchiere, poi la polvere nei fasci di luce.»
+- «Metti il logo che ti indico sul davanti della scatola.»
+- «Aggiungi un laser verde puntato sul prisma.»
 
 Claude guarda l'anteprima di ogni render e può correggere da solo. Puoi intervenire a mano in
 qualsiasi momento: lui rilegge la scena con `scene_info` prima di modificare.
@@ -194,7 +199,7 @@ all'inquadratura del render.
 
 | Strumento | Cosa fa |
 |---|---|
-| `scene_info` | Stato della scena: prodotto (centro e misure), componenti con materiale, luci, camera, ambiente, impostazioni e stato del render |
+| `scene_info` | Stato della scena: prodotto (centro e misure), componenti con materiale, luci, effetti, camera, ambiente, impostazioni e stato del render |
 | `inspect_components` | Immagini veloci dei pezzi (dalla viewport, in una frazione di secondo): per ogni pezzo diverso un riquadro numerato con il pezzo da solo e l'assieme con il pezzo in arancione, più nome, id, copie, misure, materiali e colori. Serve a Claude per capire che cosa sono i pezzi (forma e funzione) prima di scegliere i materiali. Non modifica la scena |
 | `new_scene` | Scena nuova: studio dimostrativo o vuota |
 | `open_project` / `save_project` | Apre o salva un `.frproject` |
@@ -205,9 +210,12 @@ all'inquadratura del render.
 | `add_object` | Pavimento, fondale, fondale fotografico, parete, cubo, sfera, cilindro, tazza |
 | `transform_objects` | Sposta, ruota, scala, appoggia a terra (annullabile con Ctrl+Z) |
 | `set_visibility` | Mostra o nasconde componenti |
-| `add_light` | Luce area (softbox), punto, spot, direzionale; per lato (destra, sinistra, alto, davanti, dietro, controluce…), colore in Kelvin, intensità relativa, raggio d'azione |
+| `add_light` | Luce area (softbox), punto, spot, direzionale o laser (rosso, verde, blu, viola o bianco, diametro, riflessi parziali, fascio visibile); per lato (destra, sinistra, alto, davanti, dietro, controluce…), colore in Kelvin, intensità relativa, raggio d'azione |
 | `edit_light` / `remove_light` | Modifica o elimina una luce (per numero o nome) |
 | `set_all_lights_color` | Temperatura colore di tutte le luci |
+| `list_effects` | Gli effetti della scena con tutti i loro valori (nomi dei campi come nel progetto) e cosa si può aggiungere: tipi di foschia, preset del fumo e del ghiaccio secco |
+| `add_effect` | Aggiunge foschia d'ambiente (nebbia bassa, nuvole di gas, fumo tossico a terra, strati, riccioli di vapore), fumo volumetrico (9 preset, come incenso, vapore da tazza, pennacchio), ghiaccio secco (5 preset), polvere in sospensione, lucciole, oppure un adesivo da un'immagine sui pezzi scelti; fumo e ghiaccio secco nascono sopra la selezione o nel punto indicato |
+| `edit_effect` / `remove_effect` | Cambia solo i valori indicati di un effetto (per id, tipo o nome; i valori fuori intervallo si riportano nei limiti), lo accende o lo spegne, oppure lo elimina |
 | `list_materials` | Cerca tra i ~120 materiali pronti e la libreria scaricata |
 | `apply_material` | Applica un materiale esistente a componenti o a tutto il prodotto |
 | `create_material` | Crea un materiale da parametri (colore, metallic, roughness, vetro, emissione) e lo applica |

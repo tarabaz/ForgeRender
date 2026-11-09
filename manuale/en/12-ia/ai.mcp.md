@@ -41,8 +41,9 @@ first.
 
 ## What the assistant can do
 
-Read the scene, import models, prepare the studio, add and edit lights, create and apply
-materials, set the environment and the camera, change the render settings, render, look at the
+Read the scene, import models, prepare the studio, add and edit lights (lasers too), create and
+apply materials, add, edit and remove the effects (haze, smoke, dry ice, floating dust, fireflies,
+decals), set the environment and the camera, change the render settings, render, look at the
 result and save image and project. It does not overwrite existing files unless you ask it to.
 
 The full guide, with examples and the list of tools, is in `docs/MCP.en.md` in the program

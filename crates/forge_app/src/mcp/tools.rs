@@ -99,6 +99,10 @@ fn dispatch(app: &mut ForgeApp, name: &str, v: &Value) -> R {
             app.shading_changed();
             done(json!({"luci": app.scene.lights.len(), "kelvin": k}))
         }
+        "list_effects" => done(super::effects::list(app)?),
+        "add_effect" => done(super::effects::add(app, &a)?),
+        "edit_effect" => done(super::effects::edit(app, &a)?),
+        "remove_effect" => done(super::effects::remove(app, &a)?),
         "list_materials" => list_materials(app, &a),
         "apply_material" => apply_material(app, &a),
         "create_material" => create_material(app, &a),
@@ -211,6 +215,7 @@ fn scene_info(app: &mut ForgeApp, a: &Args) -> R {
     let p = app.session.progress();
     v["progetto"] = json!(app.meta.path.as_ref().map(|p| p.display().to_string()));
     v["modifiche_non_salvate"] = json!(app.unsaved);
+    v["effetti"] = super::effects::summary(&app.scene);
     v["selezione"] = json!(app.selection.iter().map(|&i| app.scene.nodes[i].name.clone()).collect::<Vec<_>>());
     v["aspetto"] = json!(presets::matching_look(&app.scene, &app.settings)
         .map(|l| l.label())
@@ -466,6 +471,20 @@ fn product_anchor(app: &ForgeApp) -> (Vec3, f32) {
     }
 }
 
+/// Colore del laser: rosso 650 nm, verde 532, blu 450, viola 405, bianco da laboratorio.
+fn laser_source(a: &Args) -> Result<Option<forge_scene::LaserSource>, String> {
+    use forge_scene::LaserSource as L;
+    let Some(s) = a.str("laser_color")? else { return Ok(None) };
+    Ok(Some(match s.trim().to_lowercase().as_str() {
+        "rosso" | "red" => L::Red,
+        "verde" | "green" => L::Green,
+        "blu" | "blue" => L::Blue,
+        "viola" | "violet" | "uv" => L::Violet,
+        "bianco" | "white" => L::White,
+        other => return Err(format!("colore del laser \"{other}\": rosso, verde, blu, viola o bianco")),
+    }))
+}
+
 fn light_color(a: &Args) -> Result<Option<[f32; 3]>, String> {
     if let Some(c) = a.color("color")? {
         return Ok(Some(c));
@@ -507,7 +526,18 @@ fn add_light(app: &mut ForgeApp, a: &Args) -> R {
             target,
             ..Light::point(&name, pos, 3.0 * strength)
         },
-        _ => return Err(format!("tipo di luce \"{kind}\": area, punto, spot o direzionale")),
+        // Come Aggiungi → Laser: puntato sul prodotto, fascio visibile leggero.
+        "laser" => Light {
+            kind: LightKind::Laser {
+                diameter_mm: a.f32("diameter_mm")?.unwrap_or(2.0).clamp(0.1, 100.0),
+                source: laser_source(a)?.unwrap_or(forge_scene::LaserSource::Red),
+                split: a.bool("split")?.unwrap_or(false),
+            },
+            target,
+            beam_density: a.f32("beam_density")?.unwrap_or(0.05).clamp(0.0, 20.0),
+            ..Light::point(&name, pos, 0.5 * strength)
+        },
+        _ => return Err(format!("tipo di luce \"{kind}\": area, punto, spot, direzionale o laser")),
     };
     if let Some(i) = a.f32("intensity")? {
         l.intensity = i.max(0.0);
@@ -603,7 +633,24 @@ fn edit_light(app: &mut ForgeApp, a: &Args) -> R {
         }
         *inner_angle_deg = *outer_angle_deg * (1.0 - soft);
     }
-    if matches!(l.kind, LightKind::Spot { .. }) {
+    let new_source = laser_source(a)?;
+    if let LightKind::Laser {
+        diameter_mm,
+        source,
+        split,
+    } = &mut l.kind
+    {
+        if let Some(d) = a.f32("diameter_mm")? {
+            *diameter_mm = d.clamp(0.1, 100.0);
+        }
+        if let Some(s) = new_source {
+            *source = s;
+        }
+        if let Some(s) = a.bool("split")? {
+            *split = s;
+        }
+    }
+    if matches!(l.kind, LightKind::Spot { .. } | LightKind::Laser { .. }) {
         if let Some(d) = a.f32("beam_density")? {
             l.beam_density = d.clamp(0.0, 20.0);
         }

@@ -40,8 +40,9 @@ programma scrive solo la sua voce nella configurazione dell'assistente e prima n
 
 ## Cosa può fare l'assistente
 
-Leggere la scena, importare modelli, preparare lo studio, aggiungere e modificare luci, creare e
-applicare materiali, impostare ambiente e camera, cambiare le impostazioni di render, fare il
+Leggere la scena, importare modelli, preparare lo studio, aggiungere e modificare luci (anche i
+laser), creare e applicare materiali, aggiungere, modificare ed eliminare gli effetti (foschia,
+fumo, ghiaccio secco, polvere in sospensione, lucciole, adesivi), impostare ambiente e camera, cambiare le impostazioni di render, fare il
 render, guardare il risultato e salvare immagine e progetto. Non sovrascrive file esistenti se non
 glielo chiedi.
 

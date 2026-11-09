@@ -329,6 +329,24 @@ pub fn light_json(i: usize, l: &Light) -> Value {
                 v["fascio_lunghezza_m"] = json!(beam_len(l));
             }
         }
+        LightKind::Laser {
+            diameter_mm,
+            source,
+            split,
+        } => {
+            v["diametro_mm"] = json!(diameter_mm);
+            v["colore_laser"] = json!(match source {
+                forge_scene::LaserSource::Red => "rosso",
+                forge_scene::LaserSource::Green => "verde",
+                forge_scene::LaserSource::Blue => "blu",
+                forge_scene::LaserSource::Violet => "viola",
+                forge_scene::LaserSource::White => "bianco",
+            });
+            v["riflessi_parziali"] = json!(split);
+            if l.beam_density > 0.0 {
+                v["fascio_densita"] = json!(l.beam_density);
+            }
+        }
         _ => {}
     }
     if l.has_range() && l.range > 0.0 {

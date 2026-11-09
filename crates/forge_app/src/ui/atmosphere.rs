@@ -113,18 +113,28 @@ fn view_ray(app: &ForgeApp, among: &[NodeIndex]) -> Option<(forge_math::Vec3, fo
 
 fn add_decal(app: &mut ForgeApp) {
     let among: Vec<NodeIndex> = app.selection.iter().copied().collect();
-    let Some((o, d, size)) = view_ray(app, &among) else {
+    if view_ray(app, &among).is_none() {
         app.toast(tr("Seleziona prima l'oggetto su cui applicare l'adesivo"));
         return;
-    };
+    }
     let Some(image) = pick_image() else { return };
+    if let Err(e) = add_decal_on(app, &among, image) {
+        app.toast(e);
+    }
+}
+
+/// Adesivo con l'immagine `image` sui componenti `among`, nel punto che guarda la vista (lo usano
+/// il pulsante e il controllo con l'IA). Errore se i componenti non si vedono dalla vista.
+pub(crate) fn add_decal_on(app: &mut ForgeApp, among: &[NodeIndex], image: std::path::PathBuf) -> Result<usize, &'static str> {
+    let Some((o, d, size)) = view_ray(app, among) else {
+        return Err(tr("Seleziona prima l'oggetto su cui applicare l'adesivo"));
+    };
     let up = app.scene.camera.up;
     let width = (size * 0.3).clamp(0.005, 2.0);
-    let Some(mut decal) = app.scene.new_decal(&among, o, d, up, width, aspect_of(&image)) else {
-        app.toast(tr(
+    let Some(mut decal) = app.scene.new_decal(among, o, d, up, width, aspect_of(&image)) else {
+        return Err(tr(
             "L'oggetto selezionato non si vede dalla vista: giralo verso la camera e riprova",
         ));
-        return;
     };
     decal.name = image
         .file_stem()
@@ -135,6 +145,7 @@ fn add_decal(app: &mut ForgeApp) {
     app.scene.sync_effects();
     app.geometry_changed();
     app.appearance_changed();
+    Ok(app.scene.decals.len() - 1)
 }
 
 /// Nebbia bassa, polvere e adesivi della scena (quelli presenti).

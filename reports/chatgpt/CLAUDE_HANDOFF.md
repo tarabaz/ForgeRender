@@ -3028,3 +3028,11 @@ Due righe in alto (modalità e Impostazioni a destra, comandi del render a destr
 **Provato:** fmt, clippy e test del workspace (412 passati, 0 falliti), con test nuovi per preferenze, scheda Render e luci d'ambiente (anche salvataggio e riapertura).
 
 **Non verificato:** l'aspetto nel programma aperto (contrasto con i quattro sfondi, sezione Viewport, cambio di scheda, "[ENV]").
+
+## Effetti comandabili dall'IA — 09/11/2026 (Claude, 0.52.0)
+
+**Fatto:** quattro strumenti MCP nuovi (`list_effects`, `add_effect`, `edit_effect`, `remove_effect`) per foschia, fumo, ghiaccio secco, polvere, lucciole e adesivi, con gli stessi preset e aggiornamenti dei pulsanti; laser in `add_light`/`edit_light`; effetti in `scene_info`. I valori si leggono e si scrivono con i nomi dei campi del progetto (fusione controllata). Codice in `crates/forge_app/src/mcp/effects.rs`.
+
+**Provato:** fmt, clippy e test del workspace (416 passati, 0 falliti), con test per ricerca degli effetti, fusione dei valori e preset nella descrizione.
+
+**Non verificato:** l'uso dal vivo con un assistente collegato alla finestra.

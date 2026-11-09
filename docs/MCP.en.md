@@ -172,6 +172,11 @@ Example requests:
 - "Make a quick test render and tell me what you would improve."
 - "The right light is too strong: halve it and render again at 512 samples."
 - "Save the project and the final render in the folder I give you."
+- "Add a low fog and a spot from behind, so the light draws rays in the air."
+- "Put incense smoke on the product and make it denser and taller."
+- "Add dry-ice fog overflowing from the glass, then floating dust in the light beams."
+- "Put the logo I give you on the front of the box."
+- "Add a green laser aimed at the prism."
 
 Claude looks at every render preview and can correct things itself. You can edit by hand at any
 time: it reads the scene again with `scene_info` before changing it.
@@ -186,7 +191,7 @@ Measurements in **metres**, y up. "Right", "left", "front" are relative to the r
 
 | Tool | What it does |
 |---|---|
-| `scene_info` | Scene state: product (centre and size), components with material, lights, camera, environment, settings and render state |
+| `scene_info` | Scene state: product (centre and size), components with material, lights, effects, camera, environment, settings and render state |
 | `inspect_components` | Quick images of the parts (from the viewport, in a fraction of a second): for each distinct part a numbered tile with the part alone and the assembly with the part in orange, plus name, id, copies, size, materials and colours. Lets Claude understand what the parts are (shape and purpose) before choosing materials. Does not change the scene |
 | `new_scene` | New scene: studio demo or empty |
 | `open_project` / `save_project` | Open or save a `.frproject` |
@@ -197,9 +202,12 @@ Measurements in **metres**, y up. "Right", "left", "front" are relative to the r
 | `add_object` | Floor, backdrop, photo backdrop, wall, cube, sphere, cylinder, cup |
 | `transform_objects` | Move, rotate, scale, drop to the floor (undo with Ctrl+Z) |
 | `set_visibility` | Show or hide components |
-| `add_light` | Area (softbox), point, spot, directional light; by side (right, left, top, front, back, rim…), Kelvin colour, relative strength, range |
+| `add_light` | Area (softbox), point, spot, directional or laser light (red, green, blue, violet or white, diameter, partial reflections, visible beam); by side (right, left, top, front, back, rim…), Kelvin colour, relative strength, range |
 | `edit_light` / `remove_light` | Edit or delete a light (by index or name) |
 | `set_all_lights_color` | Colour temperature of all lights |
+| `list_effects` | The scene effects with all their values (field names as saved in the project) and what can be added: haze types, smoke and dry-ice presets |
+| `add_effect` | Add ambient haze (low fog, gas clouds, toxic floor smoke, layers, vapour curls), volumetric smoke (9 presets, such as incense, steam from a cup, plume), dry-ice fog (5 presets), floating dust, fireflies, or a decal from an image on the chosen parts; smoke and dry ice start above the selection or at a given position |
+| `edit_effect` / `remove_effect` | Change only the given values of an effect (by id, type or name; out-of-range values are clamped), switch it on or off, or delete it |
 | `list_materials` | Search the ~120 ready-made materials and the downloaded library |
 | `apply_material` | Apply an existing material to components or to the whole product |
 | `create_material` | Create a material from parameters (colour, metallic, roughness, glass, emission) and apply it |

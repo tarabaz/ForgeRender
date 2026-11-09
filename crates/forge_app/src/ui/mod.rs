@@ -10,7 +10,7 @@ pub(crate) mod blend_import;
 pub mod central;
 pub(crate) mod color_picker;
 mod demo_info;
-mod fireflies;
+pub(crate) mod fireflies;
 pub mod gizmo;
 pub mod icons;
 pub(crate) mod inspector;

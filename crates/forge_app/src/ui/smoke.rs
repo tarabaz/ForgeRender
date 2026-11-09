@@ -29,7 +29,7 @@ fn shape_hint(s: SmokeShape) -> &'static str {
 
 /// Punto di partenza per un nuovo fumo: sopra i componenti selezionati, altrimenti al centro
 /// della scena appoggiato in basso. Restituisce il centro del fondo del riquadro.
-fn base_point(app: &ForgeApp) -> Vec3 {
+pub(crate) fn base_point(app: &ForgeApp) -> Vec3 {
     let mut b = forge_math::Aabb::EMPTY;
     for &i in &app.selection {
         b.grow(&app.scene.bounds_of(i));

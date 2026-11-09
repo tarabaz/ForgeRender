@@ -18,6 +18,11 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 
 [Consulta tutte le release e le versioni precedenti](https://github.com/tarabaz/ForgeRender/releases).
 
+### Novità della versione 0.52.0
+
+- **L'IA comanda anche gli effetti:** tramite MCP, Claude o Codex possono aggiungere, regolare ed eliminare foschia, fumo volumetrico, ghiaccio secco, polvere in sospensione, lucciole e adesivi, con gli stessi preset della scheda Effetti.
+- **Laser a parole:** l'assistente aggiunge e modifica i laser (colore, diametro, riflessi parziali, fascio visibile).
+
 ### Novità della versione 0.51.0
 
 - **Sfondo della viewport a scelta:** la viewport parte su un grigio Antracite leggermente freddo (#282C34) che lascia leggibili gli oggetti scuri; Impostazioni → Viewport propone quattro colori pronti o uno personalizzato, e il render finale non cambia.
@@ -166,7 +171,7 @@ Per ottenere una dispersione visibile serve un materiale trasparente con un nume
 
 ![Controllo della scena ForgeRender tramite IA e MCP con un comando in linguaggio naturale](docs/img/features/ai-scene-control.jpg)
 
-Collega Claude Desktop, Claude Code o Codex tramite il bridge MCP di ForgeRender e controlla in linguaggio naturale le operazioni supportate sulla scena. Puoi chiedere all'assistente di modificare l'illuminazione, assegnare materiali, configurare la camera o preparare un render: ForgeRender applica le operazioni supportate direttamente alla scena aperta. Il controllo IA è esplicito e può essere disattivato dall'interfaccia.
+Collega Claude Desktop, Claude Code o Codex tramite il bridge MCP di ForgeRender e controlla in linguaggio naturale le operazioni supportate sulla scena. Puoi chiedere all'assistente di modificare l'illuminazione, assegnare materiali, aggiungere e regolare gli effetti (foschia, fumo, ghiaccio secco, polvere in sospensione, lucciole, adesivi, laser), configurare la camera o preparare un render: ForgeRender applica le operazioni supportate direttamente alla scena aperta. Il controllo IA è esplicito e può essere disattivato dall'interfaccia.
 
 [Guida alla configurazione MCP](docs/MCP.md).
 
@@ -403,7 +408,7 @@ La finestra è disposta in modo che si sappia sempre dove guardare e cosa fare d
 - **Lingue**: italiano e inglese, cambio immediato di tutta l'interfaccia (in
   Impostazioni → Lingua, l'ingranaggio in alto a destra). Le traduzioni sono file separati `lang/Lan_*.json`: se ne aggiungono
   altri copiando `Lan_eng.json`.
-- **Controllo IA (MCP)**: comanda ForgeRender in linguaggio naturale tramite Claude Code o Claude Desktop, con il ponte `forgerender-mcp.exe` e l'interruttore "AI MCP" nella barra (ON/OFF, con l'ingranaggio per le impostazioni dell'integrazione AI). Consulta la [guida di configurazione MCP](docs/MCP.md) per installazione, esempi, strumenti disponibili e sicurezza.
+- **Controllo IA (MCP)**: comanda ForgeRender in linguaggio naturale tramite Claude Code o Claude Desktop, con il ponte `forgerender-mcp.exe` e l'interruttore "AI MCP" nella barra (ON/OFF, con l'ingranaggio per le impostazioni dell'integrazione AI). L'assistente gestisce luci (anche i laser), materiali, camera, ambiente, render e tutti gli effetti (foschia, fumo, ghiaccio secco, polvere, lucciole, adesivi). Consulta la [guida di configurazione MCP](docs/MCP.md) per installazione, esempi, strumenti disponibili e sicurezza.
 - **Schermata di benvenuto** all'avvio con immagine (`assets/splash.png`), versione e commit;
   si chiude con "Chiudi" e si riapre da File.
 - **Path tracing** su CPU (tutti i core) e su GPU (compute shader wgpu, Vulkan/DX12) con accumulo

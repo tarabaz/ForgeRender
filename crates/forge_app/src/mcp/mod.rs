@@ -9,6 +9,7 @@
 //! niente accessi concorrenti alla scena. Import, apertura dei progetti e render finiscono nei
 //! fotogrammi successivi.
 
+pub mod effects;
 pub mod inspect;
 pub mod ops;
 pub mod setup;
