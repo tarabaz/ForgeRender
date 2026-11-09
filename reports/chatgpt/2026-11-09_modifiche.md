@@ -280,3 +280,29 @@ Sezione Impostazioni → Viewport, accanto alle preferenze dello sfondo:
 - Provare celle piccole e grandi (ad esempio 1 mm, 10 mm, 10 cm, 1 m) e controllare leggibilità e adattamento delle linee.
 
 Prima di implementare, ispezionare il sistema coordinate/unità e il disegno della griglia già esistente. Riutilizzare o estendere quello attuale se possibile; evitare di sovrapporre due griglie. Nel riscontro indicare file/funzioni interessati, scelte tecniche, test effettivamente eseguiti e commit. Lavorare sul branch sviluppo.
+
+
+## Estendere sfondo e griglia anche alla finestra di importazione STEP — 09/11/2026
+
+### Richiesta aggiuntiva di Valerio
+
+La griglia metrica configurabile richiesta per la viewport deve essere visualizzata anche nella finestra di importazione/anteprima dei file STEP. Anche lo sfondo della finestra di anteprima STEP deve essere **identico** a quello scelto per la viewport.
+
+### Comportamento richiesto
+
+- Usare nella preview STEP lo stesso colore di sfondo effettivo della viewport, letto dalla medesima preferenza/sorgente di verità. Non introdurre un colore STEP separato, un valore hardcoded o una variante approssimativa.
+- Mostrare nella preview STEP la stessa griglia metrica della viewport: stessa visibilità, unità, dimensione reale delle celle, intervallo delle linee principali, colori/contrasto e impostazioni di intensità.
+- Le impostazioni devono essere condivise: modificando sfondo o griglia in Impostazioni → Viewport, sia la viewport principale sia la preview STEP devono aggiornarsi coerentemente, senza riavvio.
+- La griglia nella preview STEP deve essere riferita alle coordinate e al piano di riferimento della preview, con scala reale coerente con quella della viewport; non deve essere un'immagine sovrapposta o una griglia fissa rispetto alla finestra.
+- Mantenere la griglia dietro al modello STEP e non interferire con rotazione, zoom, selezione o controlli della preview.
+- Sfondo e griglia restano esclusivamente elementi di visualizzazione: non devono essere importati nel modello STEP né comparire nel rendering finale.
+
+### Verifiche richieste
+
+1. Confrontare viewport e preview STEP usando ciascun preset di sfondo: il colore delle aree libere deve corrispondere.
+2. Confrontare griglia attiva/disattiva, dimensione cella e linee principali: impostazioni e scala devono coincidere.
+3. Cambiare impostazioni mentre la finestra STEP è aperta e verificare l'aggiornamento immediato, se la finestra è progettata per restare aperta.
+4. Verificare che la griglia resti ancorata al mondo durante zoom e rotazione del modello STEP.
+5. Verificare che né griglia né sfondo entrino nel render finale o nei dati importati.
+
+Prima di implementare, controllare il renderer dedicato alla preview STEP (già descritto nell'handoff come basato su ViewportRenderer con texture propria) e riutilizzare lo stesso percorso/configurazione di sfondo e griglia della viewport, evitando due implementazioni divergenti. Questa richiesta si aggiunge alla correzione già annotata per il disallineamento tra colore selezionato e colore realmente disegnato: prima risolvere la causa di quel disallineamento, poi assicurarsi che viewport e preview STEP condividano lo stesso risultato. Riportare file/funzioni modificati e test effettivi. Lavorare su sviluppo.
