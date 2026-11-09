@@ -161,3 +161,30 @@ Integrare nel repository l'icona ufficiale fornita da Valerio e includerla nel p
 - Non cambiare il logo né ridisegnarlo. Non dichiarare verificata la resa visiva senza averla controllata nel programma e in Windows Explorer.
 
 **Nota tecnica per Claude:** quando `assets/forgerender.ico` sarà presente nel branch, controlla che sia un ICO valido e che contenga davvero le risoluzioni multi-size attese; quindi integra l'icona nel prossimo build. Non creare un'icona sostitutiva né usare un file incompleto.
+
+## Bug: colore sfondo viewport diverso dal colore selezionato — 09/11/2026
+
+### Riscontro di Valerio (screenshot 09/11/2026, ForgeRender 0.51.0 portable)
+
+In Impostazioni → Viewport è selezionato **Grigio chiaro**, RGB 53, 58, 66, HEX `#353A42`. La viewport reale resta invece quasi nera. Campionando lo screenshot nelle zone libere della viewport si misurano circa RGB (9, 11, 14), non RGB (53, 58, 66). La discrepanza è netta e visibile.
+
+Il percorso impostazioni indica `E:\\ForgeRender-0.51.0-portable-x64\\impostazioni.json`.
+
+### Verifiche iniziali
+
+- Il commit 0.51.0 dichiara che il colore scelto viene applicato subito alla viewport e all'anteprima STEP.
+- Nel codice attuale `ForgeApp::viewport_background()` converte `prefs.viewport_background` da sRGB a lineare e `viewport_texture()` passa il valore a `ViewportRenderer::render(..., bg, ...)`.
+- Non è ancora stata individuata la causa. Non assumere che sia un semplice problema di conversione gamma: il valore atteso e quello visualizzato sono molto distanti.
+- Il fatto che il file sia nella cartella portable 0.51.0 va tenuto presente: verificare che la build effettivamente in esecuzione contenga il commit 0.51.0 e che non ci siano percorsi di rendering/texture alternativi che ignorano il parametro.
+
+### Richiesta a Claude Code
+
+Riprodurre e correggere il bug, non limitarsi a cambiare i valori dei preset o il testo dell'interfaccia.
+
+1. Tracciare il valore dalla selezione del preset in `ui/settings.rs`, al salvataggio/applicazione delle preferenze, fino al clear effettivo della texture GPU della viewport.
+2. Verificare se `ViewportRenderer::render` usa davvero `bg` per il colore di clear e se il clear avviene su una texture sRGB con la corretta conversione. Controllare anche alpha/blending, eventuali passaggi successivi che sovrascrivono il fondo e il percorso della viewport mostrata a schermo (non solo STEP preview/capture).
+3. Aggiungere un test che controlli il colore passato/usato dal renderer e, se possibile, un test di rendering/readback per i quattro preset e un colore personalizzato.
+4. Verificare visivamente in esecuzione almeno `#282C34` e `#353A42`: lo sfondo libero della viewport deve risultare coerente con il campione/valore RGB/HEX, senza essere quasi nero. Verificare anche che il render finale non cambi.
+5. Aggiornare manuale/riscontro solo dopo la verifica reale. Riportare causa precisa, file modificati, test eseguiti e commit.
+
+**Non considerare risolto** con i soli test di persistenza delle preferenze: il bug segnalato riguarda la resa GPU reale.
