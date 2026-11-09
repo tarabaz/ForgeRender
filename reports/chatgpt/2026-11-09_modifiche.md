@@ -234,3 +234,49 @@ Aggiungere test automatici per la propagazione del valore dalla preferenza alla 
 ### Riscontro richiesto a Claude
 
 Prima descrivere la causa individuata indicando **file, funzioni e passaggio preciso** in cui il colore viene perso/sovrascritto o non applicato. Poi descrivere la correzione, i file modificati e i test effettivamente eseguiti. Non dichiarare risolto il problema senza aver verificato il colore effettivamente disegnato.
+
+
+## Griglia metrica configurabile della viewport — 09/11/2026
+
+### Richiesta di Valerio
+
+Aggiungere alla viewport una griglia metrica 3D ispirata a Blender, con quadrati in scala reale e impostazioni configurabili dall'utente. La griglia deve aiutare a valutare dimensioni, distanze e proporzioni degli oggetti.
+
+### Funzioni richieste
+
+- Visibilità attivabile/disattivabile dalle impostazioni.
+- Selezione dell'unità di misura: millimetri (mm), centimetri (cm), metri (m), coerente con il sistema di unità della scena se già presente.
+- Selezione della dimensione reale della cella: preset utili (ad esempio 1, 5, 10, 20, 50, 100 mm; equivalenti in cm/m) e valore personalizzato.
+- Selezione dell'intervallo delle linee principali (ad esempio ogni 5, 10 o 20 celle).
+- Distinzione visiva tra linee secondarie e principali, con assi e origine riconoscibili.
+- Eventuale regolazione dell'intensità/contrasto, mantenendo la griglia discreta rispetto agli oggetti.
+- Preferenze persistenti e aggiornamento immediato della viewport.
+
+### Comportamento grafico e tecnico
+
+1. La griglia deve essere ancorata alle coordinate del mondo 3D e al piano di riferimento/ground plane già usato dalla viewport, non alla telecamera.
+2. La spaziatura rappresenta distanze reali della scena: zoom e movimento camera non devono modificarne la dimensione nel mondo.
+3. Adeguare la leggibilità allo zoom: quando le celle diventano troppo fitte o troppo piccole sullo schermo, attenuare/nascondere le suddivisioni minori e mantenere leggibili le linee principali, senza cambiare la scala reale impostata.
+4. Gestire correttamente la prospettiva e le viste ortografiche, se supportate.
+5. La griglia deve restare dietro agli oggetti e non interferire con selezione, gizmo, assi, manipolazione o picking.
+6. La griglia è un ausilio della viewport: non deve comparire nel rendering finale, né alterare illuminazione, materiali o calcoli del render.
+7. Usare il sistema di unità e il piano di riferimento esistenti, evitando di introdurre una seconda convenzione incoerente. Se ForgeRender non ha una scala fisica della scena definita, chiarire nelle impostazioni che le unità sono unità di scena e non millimetri assoluti garantiti.
+
+### Impostazioni suggerite
+
+Sezione Impostazioni → Viewport, accanto alle preferenze dello sfondo:
+- Mostra griglia (toggle)
+- Unità (mm/cm/m o unità scena)
+- Dimensione cella (preset + personalizzata)
+- Linea principale ogni N celle
+- Intensità/contrasto (facoltativo)
+
+### Verifiche richieste
+
+- Controllare che la distanza tra linee corrisponda alla scala impostata in coordinate mondo.
+- Verificare zoom avanti/indietro, rotazione camera, prospettiva e ortografica.
+- Verificare griglia attiva/disattiva e persistenza delle preferenze.
+- Verificare che la griglia non compaia nel render finale e non interferisca con picking, selezione e gizmo.
+- Provare celle piccole e grandi (ad esempio 1 mm, 10 mm, 10 cm, 1 m) e controllare leggibilità e adattamento delle linee.
+
+Prima di implementare, ispezionare il sistema coordinate/unità e il disegno della griglia già esistente. Riutilizzare o estendere quello attuale se possibile; evitare di sovrapporre due griglie. Nel riscontro indicare file/funzioni interessati, scelte tecniche, test effettivamente eseguiti e commit. Lavorare sul branch sviluppo.
