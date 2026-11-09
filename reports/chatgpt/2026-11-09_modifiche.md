@@ -355,3 +355,31 @@ Verificare come vengono generate le anteprime dei materiali (material preview): 
 - Se le preview applicano già un denoiser, non aggiungerne un secondo: descrivere quale viene usato, dove e con quali impostazioni, e verificare che sia effettivamente attivo.
 
 Prima di implementare, Claude deve riferire il comportamento attuale trovato nel codice. Lavorare sul branch sviluppo e indicare file modificati, test effettivi e commit.
+
+
+## Rotazione casuale delle scaglie nella polvere in sospensione — 09/11/2026
+
+### Problema osservato da Valerio
+
+Quando si usa l'effetto **Polvere in sospensione** impostando il tipo di particella su **Scaglie**, le particelle vengono trasportate correttamente dalle correnti d'aria, ma mantengono sostanzialmente tutte la stessa orientazione. Con una camera fissa questo rende il riflesso delle scaglie statico: una scaglia orientata in modo da riflettere la luce verso la camera continua a brillare, mentre una orientata diversamente può non rifletterla mai.
+
+### Comportamento richiesto
+
+- Le scaglie devono avere una **rotazione propria**, indipendente dal movimento di trasporto causato dall'aria.
+- Assegnare a ogni scaglia un orientamento iniziale casuale e una piccola rotazione variabile nel tempo, preferibilmente su più assi, con velocità e fase differenti da particella a particella.
+- La rotazione deve essere **contenuta e naturale**: non devono sembrare coriandoli che compiono capriole continue. È sufficiente una variazione angolare lenta e limitata, ma visibile nel tempo.
+- Il moto deve essere continuo e deterministico per particella (seed stabile): niente scatti, salti casuali a ogni frame o flickering dovuto a casualità rigenerata durante il rendering.
+- Conservare integralmente il movimento delle scaglie già esistente, compreso il trasporto tramite le correnti d'aria. La rotazione va aggiunta come componente indipendente, senza sostituire o alterare la traiettoria.
+- L'obiettivo visivo è che, anche con **camera e luci fisse**, l'inclinazione vari leggermente e produca un luccichio credibile: il riflesso speculare deve comparire e scomparire in funzione dell'orientamento istantaneo della scaglia rispetto alla luce e alla camera, non essere permanentemente acceso o spento per via di una normale fissa.
+- Applicare il comportamento alle scaglie; non introdurre rotazioni non richieste per gli altri tipi di particella.
+
+### Verifiche richieste
+
+1. Individuare il percorso effettivo con cui vengono generate e orientate le particelle di tipo Scaglie, sia in anteprima sia nel render finale, e verificare che entrambe usino lo stesso orientamento animato.
+2. Con camera e luce ferme, osservare nel tempo un gruppo di scaglie: le normali devono cambiare gradualmente e in modo indipendente, con variazioni visibili dei riflessi.
+3. Verificare che le traiettorie dovute all'aria non cambino rispetto al comportamento precedente.
+4. Verificare continuità temporale e determinismo: stesso seed e stesso istante devono produrre lo stesso orientamento; nessun tremolio casuale tra aggiornamenti della viewport.
+5. Controllare che la rotazione non sia eccessiva e non faccia sembrare le scaglie particelle rigide che ruotano senza controllo.
+6. Aggiungere test automatici per orientamento iniziale/variazione temporale/determinismo, se il percorso lo consente. Separare i risultati dei test automatici dalla verifica visiva effettiva.
+
+Prima di modificare, ispezionare il codice della polvere e il modo in cui il renderer calcola la normale/tangente delle scaglie. Riutilizzare la stessa funzione temporale per anteprima e render, se possibile. Lavorare sul branch `sviluppo`; nel riscontro indicare file e funzioni coinvolti, soluzione adottata, test realmente eseguiti e commit.
