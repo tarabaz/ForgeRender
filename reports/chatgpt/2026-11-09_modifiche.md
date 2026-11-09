@@ -520,3 +520,13 @@ Percorso unico per anteprima e render: `forge_scene::effects::Dust::build_at` (c
 **Da sapere sui test.** Un primo giro completo si è bloccato nei test di forge_app mentre la mia copia del programma usava la GPU per le prove a schermo; non si è ripetuto in sette giri successivi. In un giro il dispositivo GPU delle anteprime è ripiegato su DirectX 12 e lo shader del path tracer ha mandato in panic naga (`back/hlsl/conv.rs:117`): succede anche da solo con `FORGE_GPU_BACKEND=dx12`, quindi è un limite che c'era già (il path tracer su DirectX 12), non della griglia (i test della viewport passano anche su DX12). Ho fatto passare uno alla volta i test di forge_app che usano la GPU (`viewport::gpu_test_guard`): cinque giri di forge_app di fila verdi.
 
 **Commit:** su `sviluppo`, messaggio che inizia con «0.53.0».
+
+### Icona di Windows — riscontro di Claude (09/11/2026, 0.53.0)
+
+Valerio ha passato il file (`app.icon.ico`): copiato **identico** (stessi byte) in `assets/forgerender.ico`, unica sorgente. Controllato prima: ICO valido, 7 immagini a 32 bit (256 PNG; 128, 64, 48, 32, 24, 16 bitmap), tutte dentro il file. Logo non toccato.
+
+- **Eseguibile:** `crates/forge_app/build.rs` (`icon_res`) scrive in compilazione un `.res` con ogni immagine come RT_ICON e il gruppo RT_GROUP_ICON 1, e lo passa al linker MSVC (`cargo:rustc-link-arg-bin=forgerender=…`): niente `rc.exe` né dipendenze nuove. Su altri sistemi o toolchain non fa niente.
+- **Finestra e barra delle applicazioni:** la risorsa dell'eseguibile non basta a winit, quindi `main.rs` (`window_icon`, `ico_largest_rgba`) prende dal `.ico` incluso l'immagine da 256 px e la dà a `ViewportBuilder::with_icon`.
+- **Installer:** `SetupIconFile=..\..\assets\forgerender.ico`; collegamenti, disinstallazione e associazione dei progetti usano già `forgerender.exe,0`.
+
+**Verifiche fatte:** dal `forgerender.exe` compilato, con le funzioni di Windows che usa Explorer: un gruppo di icone, estratta a 256 e a 32 px, uguale al logo. Sulla finestra della mia copia (per PID, `WM_GETICON`): icona grande 32 px e piccola 16 px, il logo. Test `icon_tests::program_icon_is_complete`. **Non verificati:** la vista di Explorer e della barra delle applicazioni guardate a schermo (ho letto le icone con le funzioni di sistema, non con una cattura dello schermo), e l'installer non l'ho compilato.

@@ -138,6 +138,49 @@ fn parse_args() -> StartupOptions {
     o
 }
 
+/// Icona del programma (`assets/forgerender.ico`, la stessa delle risorse dell'eseguibile).
+const ICON_ICO: &[u8] = include_bytes!("../../../assets/forgerender.ico");
+
+/// L'immagine più grande del .ico (PNG o bitmap a 32 bit), come RGBA.
+fn ico_largest_rgba(ico: &[u8]) -> Option<(Vec<u8>, u32, u32)> {
+    let u16_at = |o: usize| Some(u16::from_le_bytes(ico.get(o..o + 2)?.try_into().ok()?));
+    let u32_at = |o: usize| Some(u32::from_le_bytes(ico.get(o..o + 4)?.try_into().ok()?));
+    let count = u16_at(4)? as usize;
+    let side = |e: usize| ico.get(e).map(|&b| if b == 0 { 256 } else { b as u32 });
+    let e = (0..count).map(|i| 6 + 16 * i).max_by_key(|&e| side(e).unwrap_or(0))?;
+    let (size, offset) = (u32_at(e + 8)? as usize, u32_at(e + 12)? as usize);
+    let data = ico.get(offset..offset + size)?;
+    if data.starts_with(b"\x89PNG") {
+        let img = image::load_from_memory_with_format(data, image::ImageFormat::Png).ok()?.to_rgba8();
+        let (w, h) = img.dimensions();
+        return Some((img.into_raw(), w, h));
+    }
+    // Bitmap a 32 bit (BGRA, dal basso in alto, altezza doppia per la maschera).
+    let w = u32::from_le_bytes(data.get(4..8)?.try_into().ok()?) as usize;
+    let h = (u32::from_le_bytes(data.get(8..12)?.try_into().ok()?) / 2) as usize;
+    let header = u32::from_le_bytes(data.get(0..4)?.try_into().ok()?) as usize;
+    if u16::from_le_bytes(data.get(14..16)?.try_into().ok()?) != 32 {
+        return None;
+    }
+    let px = data.get(header..header + w * h * 4)?;
+    let mut rgba = Vec::with_capacity(w * h * 4);
+    for y in (0..h).rev() {
+        for p in px[y * w * 4..(y + 1) * w * 4].chunks(4) {
+            rgba.extend([p[2], p[1], p[0], p[3]]);
+        }
+    }
+    Some((rgba, w as u32, h as u32))
+}
+
+/// Icona della finestra e della barra delle applicazioni: va data a parte, la risorsa
+/// dell'eseguibile da sola non basta a winit.
+fn window_icon() -> egui::IconData {
+    match ico_largest_rgba(ICON_ICO) {
+        Some((rgba, width, height)) => egui::IconData { rgba, width, height },
+        None => egui::IconData::default(),
+    }
+}
+
 fn main() -> std::process::ExitCode {
     let log_dir = forge_telemetry::default_log_dir();
     let logs = forge_telemetry::init_logging_to(log_dir.as_deref());
@@ -156,7 +199,8 @@ fn main() -> std::process::ExitCode {
             .with_app_id("ForgeRender")
             .with_inner_size([1600.0, 960.0])
             .with_min_inner_size([960.0, 600.0])
-            .with_drag_and_drop(true),
+            .with_drag_and_drop(true)
+            .with_icon(window_icon()),
         renderer: if startup.safe_mode {
             eframe::Renderer::Glow
         } else {
@@ -192,5 +236,31 @@ fn main() -> std::process::ExitCode {
             tracing::error!("avvio fallito anche in modalità sicura: {e}");
             std::process::ExitCode::FAILURE
         }
+    }
+}
+
+#[cfg(test)]
+mod icon_tests {
+    use super::*;
+
+    /// L'icona del repository è un .ico valido con tutte le misure di Windows, e la finestra ne
+    /// prende la più grande (256 px) con la trasparenza degli angoli.
+    #[test]
+    fn program_icon_is_complete() {
+        let n = u16::from_le_bytes([ICON_ICO[4], ICON_ICO[5]]) as usize;
+        let sides: Vec<u32> = (0..n)
+            .map(|i| match ICON_ICO[6 + 16 * i] {
+                0 => 256,
+                b => b as u32,
+            })
+            .collect();
+        for side in [16, 24, 32, 48, 256] {
+            assert!(sides.contains(&side), "manca la misura {side}: {sides:?}");
+        }
+        let (rgba, w, h) = ico_largest_rgba(ICON_ICO).expect("immagine dell'icona");
+        assert_eq!((w, h), (256, 256));
+        assert_eq!(rgba.len(), 256 * 256 * 4);
+        assert!(rgba[3] < 255, "angolo trasparente");
+        assert!(rgba.chunks(4).any(|p| p[3] == 255), "logo opaco");
     }
 }

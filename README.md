@@ -24,6 +24,7 @@ No installation is required when using the portable ZIP: extract it and run `for
 - **The viewport background is the colour you chose:** the viewport (and the STEP preview) drew the background much darker than the selected colour; now the screen shows exactly the chosen RGB values. **Custom** is selected with a single click and keeps its colour.
 - **Cleaner material previews:** the denoiser of the final render now cleans the material previews too, for the same samples (it can be switched off in Settings).
 - **Glittering flakes:** floating dust flakes tilt slowly on their own, so their glints come and go even with the camera and lights still.
+- **ForgeRender has its icon:** the FR logo on the program in Explorer and on shortcuts, on the window and the taskbar, and on the installer.
 - **Volumetric effects wait for you:** after a change, smoke, dry ice and haze are computed 2.5 seconds after the last edit, never while you drag, and the program no longer jumps to the Render tab by itself; a cancelled computation stays cancelled.
 
 ### What's new in 0.52.0

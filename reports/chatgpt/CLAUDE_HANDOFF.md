@@ -3044,3 +3044,5 @@ Due righe in alto (modalità e Impostazioni a destra, comandi del render a destr
 **Provato:** fmt, clippy, test del workspace (425 passati, 0 falliti); test GPU della viewport; nel programma (copia mia): byte dello sfondo per ogni preset, Semplice e STEP, sequenza di Personalizzato, prova del precalcolo con il fumo.
 
 **Non verificato:** luccichio delle scaglie in animazione; alcune misure della griglia e la vista ortografica nel programma; icona (file assente).
+
+**Icona (0.53.0):** `assets/forgerender.ico` nelle risorse di `forgerender.exe` (`build.rs`), sulla finestra (`main.rs`) e nell'installer (`SetupIconFile`). Verificata dall'eseguibile e dalla finestra; installer non compilato.

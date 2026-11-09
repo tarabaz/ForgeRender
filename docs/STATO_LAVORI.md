@@ -938,3 +938,8 @@ Richieste di GPT/Valerio in `reports/chatgpt/2026-11-09_modifiche.md` (riscontro
 - Test GPU in forge_app uno alla volta (`viewport::gpu_test_guard`): in un giro le anteprime erano ripiegate su DX12, dove lo shader del path tracer manda in panic naga (limite già presente, si riproduce con `FORGE_GPU_BACKEND=dx12`).
 - Controlli: `cargo fmt --all`; clippy `-D warnings` pulito; test del workspace 425 passati, 0 falliti, 10 ignorati.
 - **Non provato:** luccichio delle scaglie in un'animazione renderizzata; celle da 1 mm / 1 m e vista ortografica nel programma; il selettore colore cliccato nella sequenza di Personalizzato; reattività con tante miniature insieme; ghiaccio secco e foschia nella prova del precalcolo.
+
+### 0.53.0 — icona (09/11/2026, Claude)
+
+- `assets/forgerender.ico` (file di Valerio, 16–256 px) incorporata in `forgerender.exe` da `build.rs` (`.res` scritto a mano, linker MSVC), sulla finestra con `with_icon` (`main.rs`), nell'installer con `SetupIconFile`.
+- Verificato: icona estratta dall'eseguibile (256 e 32 px) e letta dalla finestra della mia copia (32 e 16 px); test `program_icon_is_complete`; clippy pulito. Installer non compilato.

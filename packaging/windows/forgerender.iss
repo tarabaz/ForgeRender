@@ -28,6 +28,8 @@ WizardStyle=modern
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 ChangesAssociations=yes
+; Icona dell'installer: la stessa incorporata in forgerender.exe (assets/forgerender.ico).
+SetupIconFile=..\..\assets\forgerender.ico
 UninstallDisplayIcon={app}\forgerender.exe
 
 [Languages]

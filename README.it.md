@@ -24,6 +24,7 @@ Con il pacchetto ZIP portable non serve installazione: estrailo e avvia `forgere
 - **Lo sfondo della viewport è il colore scelto:** la viewport (e l'anteprima STEP) disegnava lo sfondo molto più scuro del colore selezionato; ora sullo schermo ci sono esattamente i valori RGB scelti. **Personalizzato** si sceglie con un clic e conserva il suo colore.
 - **Anteprime dei materiali più pulite:** il denoiser del render finale ora ripulisce anche le anteprime dei materiali, a parità di campioni (si spegne nelle Impostazioni).
 - **Scaglie che luccicano:** le scaglie della polvere in sospensione si inclinano piano per conto loro, così i riflessi si accendono e si spengono anche con camera e luci ferme.
+- **ForgeRender ha la sua icona:** il logo FR sul programma in Explorer e sui collegamenti, sulla finestra e sulla barra delle applicazioni, e sull'installer.
 - **Gli effetti volumetrici ti aspettano:** dopo una modifica fumo, ghiaccio secco e foschia si calcolano 2,5 secondi dopo l'ultima modifica, mai mentre trascini, e il programma non salta più da solo alla scheda Render; un calcolo annullato resta annullato.
 
 ### Novità della versione 0.52.0
