@@ -145,3 +145,19 @@ La funzione Environment carica una scenografia composta da fondale e luci. Le lu
 
 Lavorare sul branch `sviluppo`. Prima di implementare, controllare come il modello scena gestisce identificatori, eliminazione delle luci, persistenza e nomi nell'albero. Nel riscontro finale indicare file modificati, strategia di identificazione, test realmente eseguiti e commit. Non dichiarare come verificato ciò che non è stato provato.
 
+
+## Icona Windows ForgeRender — 09/11/2026
+
+### Richiesta di Valerio
+
+Integrare nel repository l'icona ufficiale fornita da Valerio e includerla nel prossimo build di ForgeRender.
+
+- File previsto: `assets/forgerender.ico`
+- Uso: icona dell'eseguibile Windows e, dove applicabile, icona della finestra/taskbar.
+- Il file ICO è stato caricato sul branch `sviluppo` con il commit dedicato; verificare il contenuto binario e tutte le dimensioni incorporate prima di usarlo nel pacchetto finale.
+- Nel prossimo build, integrare l'icona nelle risorse Windows dell'eseguibile (non limitarsi a copiarla accanto all'EXE).
+- Verificare separatamente l'icona mostrata da Explorer, collegamento/installer e finestra/taskbar: per quest'ultima controllare l'integrazione eframe/winit/Windows, perché la risorsa dell'EXE da sola potrebbe non impostare l'icona della finestra.
+- Aggiornare gli script di build/package e l'installer se necessario, mantenendo un'unica sorgente dell'icona.
+- Non cambiare il logo né ridisegnarlo. Non dichiarare verificata la resa visiva senza averla controllata nel programma e in Windows Explorer.
+
+**Nota tecnica per Claude:** il file è in `assets/forgerender.ico`. Prima di modificare il packaging, controlla che sia un ICO valido e che contenga davvero le risoluzioni multi-size attese; se il contenuto risulta incompleto o corrotto, segnalarlo prima di integrare e chiedere un nuovo upload, senza creare un'icona sostitutiva.
