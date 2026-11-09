@@ -104,3 +104,38 @@ Preparare test che coprano almeno:
 6. Ricaricare lo stesso Environment non crea duplicati.
 
 Lavorare sul branch di sviluppo. Nel riscontro finale indicare file modificati, strategia usata per identificare le luci Environment, test realmente eseguiti e commit. Non dichiarare come verificato ciò che non è stato provato.
+
+## Chiarimento e revisione della strategia luci Environment — 09/11/2026
+
+### Decisione preferita da Valerio e raccomandazione di ChatGPT
+
+Valutata l'alternativa, si preferisce gestire le luci della scenografia come elementi di proprietà dell'Environment, con un ciclo di vita legato alla scenografia attualmente caricata. Questa strategia **sostituisce, per i cambi di Environment, la precedente indicazione di riutilizzare le luci e disattivare quelle in eccesso**.
+
+Comportamento aggiornato:
+
+1. Al primo caricamento di un Environment, disattivare le luci già presenti nella scena, senza eliminarle né modificarne i parametri: sono luci originali dell'utente.
+2. Creare le luci appartenenti al nuovo Environment e attivarle.
+3. Nell'albero della scena mostrare un suffisso chiaro, ad esempio `[ENV]`, accanto al nome di ogni luce gestita dalla scenografia, così che l'utente possa riconoscerle immediatamente.
+4. Quando si cambia Environment, eliminare **soltanto** le luci appartenenti all'Environment precedente e creare quelle della nuova scenografia con tutti i parametri previsti (tipo, posizione, orientamento, colore, potenza, dimensioni e ogni altra proprietà supportata).
+5. Le luci originali dell'utente, prive del contrassegno Environment, non devono essere eliminate o modificate nei cambi successivi.
+6. Se il nuovo Environment contiene più o meno luci, il numero di luci Environment presenti dopo il caricamento deve corrispondere esattamente a quello previsto dalla nuova scenografia: nessun residuo e nessun duplicato.
+7. Ricaricare lo stesso Environment deve produrre lo stesso risultato, senza accumulare luci.
+
+### Identificazione e sicurezza
+
+Il suffisso `[ENV]` nell'albero è un'indicazione visiva per l'utente, **non deve essere l'unico criterio tecnico per decidere quali luci eliminare**. Usare un metadato/ruolo interno dedicato e persistente per identificare in modo affidabile le luci create dal caricamento Environment. Il nome visualizzato può includere il suffisso, ma non deve essere la fonte di verità.
+
+Verificare anche salvataggio e riapertura del progetto: l'appartenenza delle luci all'Environment deve restare riconoscibile. Se il formato/progetto non conserva un metadato adatto, individuare una soluzione compatibile prima di implementare la cancellazione.
+
+### Test aggiornati
+
+- Primo caricamento: luci preesistenti disattivate e conservate; luci Environment create, identificate e attive.
+- Cambio Environment: vengono eliminate solo le vecchie luci Environment e create quelle nuove.
+- La scena utente non perde né modifica le proprie luci durante i cambi.
+- Cambio da Environment con molte luci a uno con poche e viceversa: nessun residuo.
+- Tutti i parametri delle nuove luci corrispondono alla nuova scenografia, inclusi posizione e orientamento.
+- Suffisso `[ENV]` visibile nell'albero e metadato interno coerente.
+- Salvataggio e riapertura del progetto preservano l'identificazione.
+- Ricaricamento dello stesso Environment senza duplicati.
+
+**Nota per Claude:** questa è la strategia preferita e aggiorna le indicazioni precedenti sul cambio di scenografia. Prima di implementare, controlla come il modello scena gestisce identificatori, eliminazione delle luci, persistenza e nomi nell'albero; poi scegli la soluzione più sicura senza affidarti al solo suffisso.
