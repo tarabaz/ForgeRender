@@ -3063,3 +3063,28 @@ Valerio ha richiesto lo studio e l'implementazione completa in ForgeRender di ci
 **Mandato:** implementare tutte e cinque le funzionalità in milestone separate, senza una riscrittura monolitica. La prima azione è verificare HEAD e fare audit del codice reale ForgeRender, fissare benchmark baseline e iniziare Light Tree. Procedere poi con le milestone successive senza attendere un'altra approvazione. Lavorare su `sviluppo` o branch dedicato, mai direttamente su `main`.
 
 **Stato al momento della richiesta:** documento di specifica committato su `sviluppo`; nessuna delle cinque funzionalità è stata implementata da questa richiesta e nessun nuovo benchmark/test del motore è stato eseguito. Claude deve registrare ogni implementazione, test, misura e limite in report separati, senza presentare le proposte come risultati verificati.
+
+
+## Estensione richiesta da Valerio — roadmap completa Cycles (10/11/2026)
+
+Valerio ha esteso la richiesta: oltre alle cinque tecniche iniziali, vuole studiare e implementare tutte le aree della tabella comparativa Cycles, per un totale di undici aree:
+
+1. Light Tree
+2. Path Guiding
+3. Null Scattering per i volumi
+4. Wavefront Path Tracing GPU
+5. Adaptive Subdivision + displacement geometrico reale
+6. PMJ Sampling
+7. Revisione/potenziamento dell'Adaptive Sampling già presente
+8. Import OpenVDB/NanoVDB
+9. Motion Blur fisicamente corretto
+10. Shadow Catcher + Render Passes/AOV
+11. Texture Cache, mipmapping e tile streaming
+
+**Specifiche dettagliate:** `reports/chatgpt/2026-11-10_cycles_features_plan.md`, sezione "Estensione della roadmap". Il documento spiega ogni feature, vantaggi, materiali Cycles da studiare, implementazione richiesta, test e criteri di accettazione.
+
+**Nota importante sullo stato:** Adaptive Sampling esiste già in ForgeRender ma ha avuto risultati negativi su alcune scene ed è disattivato di default secondo i report precedenti. Non riscriverlo senza audit. Anche per le altre aree verificare il codice e classificare lo stato come presente, parziale, assente o non verificato. Non duplicare funzionalità esistenti.
+
+**Mandato aggiornato:** tutte le undici aree fanno parte del target richiesto. Implementarle per milestone separate, con benchmark baseline, test e fallback. Misurare separatamente velocità, qualità e memoria: non presentare ogni feature come accelerazione universale. La prima fase resta audit completo e benchmark; poi implementare senza attendere un'ulteriore approvazione. Aggiornare questo handoff con una tabella di stato per tutte le aree.
+
+**Commit dell'estensione del piano:** `1520eee1b4c7e3ac513fc7ec14ce4ea7721c3862` sul branch `sviluppo`. Nessuna di queste nuove aree è stata implementata da questa modifica documentale.
