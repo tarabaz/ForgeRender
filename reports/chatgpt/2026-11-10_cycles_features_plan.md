@@ -705,3 +705,108 @@ Le priorità non sono un permesso per saltare le altre: tutte le aree sono richi
 7. Aggiornare la risposta di Claude nel handoff con una tabella di stato che distingua completato, parziale, in corso e non iniziato.
 
 **Chiarimento:** questa estensione è una richiesta esplicita di Valerio. Le undici aree sono il target della roadmap; non significa che tutte siano mancanti o che siano già state implementate. Lo stato effettivo va stabilito leggendo il codice e i test correnti.
+
+
+---
+
+# Inventario completo delle feature dichiarate da Blender Cycles — audit e roadmap estesa (10/11/2026)
+
+Valerio ha fornito l'elenco ufficiale delle funzionalità dichiarate da Cycles sul sito Blender. Questo inventario estende la richiesta: non limitarsi alle undici aree già descritte sopra, ma verificare e portare ForgeRender verso una copertura completa delle seguenti capacità. Le undici aree algoritmiche già specificate restano nel mandato; le voci sovrapposte vanno consolidate, non implementate due volte.
+
+## Regola di audit
+
+Per ogni voce classificare lo stato come **presente e verificata**, **presente ma parziale**, **assente** o **non verificata**. Citare file/moduli reali e test che dimostrano lo stato. Una voce UI, un tipo serializzato o uno stub non dimostrano che una feature sia funzionante nel renderer. Non duplicare sistemi esistenti: completare ciò che è parziale. Per ogni differenza indicare beneficio, complessità, dipendenze, test e benchmark.
+
+## A. Core e architettura
+
+1. **Unidirectional Path Tracing + MIS:** audit completo di NEE, PDF e Multiple Importance Sampling per luci, BSDF, environment e volumi. Verificare delta BSDF, emissione diretta e interazione con Light Tree, Path Guiding, PMJ e Null Scattering. Ogni tecnica deve usare PDF coerenti e pesi corretti.
+2. **Kernel CPU/GPU unificato:** non significa obbligare CPU e GPU a usare lo stesso scheduling. Significa condividere modelli dati, semantica fisica, definizioni materiali, PDF, RNG e contratti del PathState dove possibile, evitando che CPU e WGSL divergano. Il Wavefront può rimanere uno scheduling specifico GPU.
+3. **Licenza Apache 2.0:** verificare la licenza effettiva di ForgeRender e delle dipendenze. Non cambiare la licenza automaticamente e non copiare codice Cycles senza verifica puntuale di copyright, licenza e obblighi di attribuzione. Cycles è un riferimento algoritmico, non autorizzazione generica al copia/incolla.
+
+## B. Interattività
+
+4. **Aggiornamenti interattivi di oggetti, shader e luci:** progettare dependency graph/dirty flags e invalidazione selettiva. Cambiare intensità luce non deve ricostruire il BVH; cambiare topologia deve ricostruire le strutture necessarie. Invalidare correttamente Light Tree, guiding, texture cache e accumulatori, senza lasciare dati obsoleti.
+5. **Tiled e Progressive Rendering:** verificare scheduling tile, feedback progressivo, bilanciamento carico, priorità per viewport/ROI, seed e sample count coerenti, integrazione con adaptive sampling e wavefront. Distinguere il progressive rendering dal denoising.
+
+## C. Layers, Passes e compositing
+
+6. **Render Layers:** gruppi di oggetti renderizzabili separatamente, con comportamento esplicito di oggetti esclusi per camera rays, shadow rays, riflessi e GI. Non implementare un layer come semplice hide globale se deve conservare interazioni.
+7. **Holdout Mattes:** oggetti che creano occlusione/matte senza apparire come superfici normali nel Combined; definire alpha, ombre, riflessi e trasparenza.
+8. **Cryptomatte interoperabile:** ID stabili per oggetto/materiale/asset, più contributi per pixel antialias con coverage corretta, canali EXR e metadata compatibili. Una semplice Object ID map non è Cryptomatte.
+9. **Denoising:** OIDN è già presente secondo l'handoff 0.53.0; verificare integrazione completa, guide albedo/normal, viewport/finale, volumi, trasparenze, fireflies, pass e animazioni. Non denoisare indiscriminatamente depth/ID o dati numerici. Valutare denoising temporale soltanto con test anti-flicker/ghosting.
+
+## D. Geometria e accelerazione
+
+10. **Mesh:** audit import, triangolazione, normali, tangenti, UV, attributi, deformazioni e geometrie grandi.
+11. **Curves:** primitive curve renderizzabili (Bezier/NURBS o sottoinsieme documentato), radius lungo curva, shading/UV, intersection efficiente, motion blur. Casi d'uso: capelli, fili, cavi, tubi e fibre.
+12. **Points/point clouds:** milioni di punti con posizione, raggio, orientamento e attributi; rendering come primitive implicite/splat/sfere secondo implementazione. Non espandere obbligatoriamente tutto in mesh.
+13. **Instancing:** mesh/curve/points condivisi con trasformazioni per istanza, ID stabili, bounds e accelerazione gerarchica; interazione con displacement, motion blur, Cryptomatte e render layers.
+14. **Multi-core BVH Build:** costruzione parallela CPU e misurazione del tempo su mesh grandi e scene con molte mesh.
+15. **Fast BVH Refit:** aggiornamento rapido dei bounds per trasformazioni senza rebuild completo; rebuild quando cambia la topologia o il refit degrada troppo il BVH. Misurare build, refit, traversal, memoria e render time.
+
+## E. Subdivision e displacement
+
+16. **Catmull–Clark e Linear subdivision:** supportare Catmull–Clark per superfici quad e linear per i casi compatibili. Non dichiarare Catmull–Clark se si triangola soltanto la mesh o si divide ogni triangolo in quattro.
+17. **Displacement e bump mapping:** mantenere distinta la modifica geometrica reale dal bump apparente. Gestire scale/midlevel, UV seam, bordi crack-free, precisione mappe, normali/tangenti, BVH e istanze. Questa voce si consolida con Adaptive Subdivision già descritta.
+
+## F. Camera
+
+18. **Perspective e Orthographic:** audit e test geometrici.
+19. **Panoramic e Fisheye:** implementare le proiezioni una per una, con mapping e parametri documentati, seam corretti e sampling adeguato.
+20. **Stereoscopic rendering:** due viste coerenti con separazione/convergenza e metadata.
+21. **Depth of Field:** apertura, focus distance, campionamento lente e bokeh/diaframma se supportati; verificare comportamento con le proiezioni camera.
+
+## G. Shading e materiali
+
+22. **Physically based shading:** verificare che parametri e lobi abbiano significato fisico e siano coerenti CPU/GPU.
+23. **Node-based shaders e lights:** verificare se esiste un vero grafo tipizzato valutato dal renderer o solo parametri PBR in pannelli. Se manca, progettare prima backend di valutazione/compilazione e serializzazione .frproject; poi editor visuale. Nodi GUI senza percorso CPU/GPU funzionante non contano.
+24. **Principled BSDF:** audit e completamento dei lobi realmente supportati: base color, metallic, roughness, IOR/specular, transmission, coat, sheen, subsurface, emission, anisotropy. Non aggiungere slider decorativi.
+25. **Production shading features:** inventario di opacity, thin surface, normal, bump, displacement, emission, texture coordinates, attributi e closure. Consolidare nodi equivalenti.
+26. **Open Shading Language (OSL):** valutare integrazione CPU opzionale, licenza, dipendenze, compilazione/bytecode, accesso controllato a texture/attributi/closure e gestione errori. Non promettere supporto GPU se non esiste davvero.
+
+## H. Volumi e Subsurface Scattering
+
+27. **Absorption, scattering, emission; homogeneous/heterogeneous:** consolidare con Null Scattering e OpenVDB/NanoVDB; definire coefficienti fisici e majorant.
+28. **Principled Volume:** parametri density, color, anisotropy, emission/blackbody/temperature se supportati e mapping delle griglie.
+29. **Subsurface Scattering (SSS):** è distinto dallo scattering di fumo/nebbia. Studiare BSSRDF, diffusion profile o random walk per materiali come pelle, cera, latte e marmo; implementare un modello validato con parametri artistici chiari.
+
+## I. Illuminazione
+
+30. **Point, Sun, Spot, Area, Mesh e Environment Lights:** inventario di ogni tipo e correttezza di sampling, emissione visibile, PDF/MIS e CPU/GPU.
+31. **Sky Model:** cielo procedurale fisicamente motivato con sole/atmosfera e importance sampling coerente; distinguere sky da HDRI di sfondo.
+32. **Light Portals:** guide di campionamento verso l'environment attraverso finestre/aperture. Non devono aggiungere energia; PDF/MIS corretti e test in interni.
+33. **Manifold Next Event Estimation (MNEE):** tecnica avanzata per trovare cammini attraverso superfici speculari/rifrangenti e caustiche difficili. Studiare manifold constraints, solver, Jacobian e PDF. È distinta da Path Guiding; iniziare da prototipo limitato e benchmark, con fallback, senza promettere soluzione generale.
+
+## J. Texture
+
+34. **Image textures:** formati, precisione, color space, EXR/HDR.
+35. **Environment textures:** importance sampling della distribuzione HDRI e PDF coerenti.
+36. **Procedural textures:** noise, voronoi, gradient, checker e altri nodi utili, valutati realmente su CPU e GPU.
+37. **Bump e normal maps:** convenzioni OpenGL/DirectX, spazio colore lineare, tangent space, filtering e integrazione con mipmapping.
+38. **Texture coordinates/mapping:** UV, object, generated, world e ulteriori mapping soltanto se implementati.
+39. Consolidare queste voci con Texture Cache, mipmap e tile streaming già descritti; non creare sistemi separati.
+
+## K. Cross Platform e backend hardware
+
+40. Verificare Windows, Linux e macOS, distinguendo CPU e GPU.
+41. Verificare NVIDIA, AMD, Intel e Apple Silicon dove l'hardware/driver è disponibile.
+42. WGPU non garantisce automaticamente parità di feature o prestazioni: distinguere backend compilabile, backend funzionante, feature parity e prestazioni misurate.
+43. Implementare capability detection e fallback espliciti per feature non supportate. Creare matrice CI/hardware; non dichiarare supporto hardware non provato.
+
+## Inventario Cycles da aggiungere alla tabella di stato
+
+La tabella di audit deve includere tutte le voci sopra, oltre alle undici aree già presenti: Light Tree, Path Guiding, Null Scattering, Wavefront, Adaptive Subdivision, PMJ, Adaptive Sampling, OpenVDB/NanoVDB, Motion Blur, Shadow Catcher/Passes e Texture Cache. Le sovrapposizioni (displacement, volumi, AOV, denoising, texture e instancing) vanno consolidate.
+
+## Deliverable richiesto: Cycles Feature Parity Audit
+
+Claude deve produrre una tabella con una riga per ogni feature dichiarata da Cycles e queste colonne:
+- Feature Cycles.
+- Stato ForgeRender: presente e verificata / parziale / assente / non verificata.
+- File/moduli ForgeRender e test che provano lo stato.
+- Differenza concreta rispetto a Cycles.
+- Beneficio atteso: prestazioni, qualità, produttività o compatibilità.
+- Complessità/rischio e dipendenze.
+- Milestone proposta.
+- Test e benchmark di accettazione.
+
+Dopo l'audit, aggiornare la roadmap e implementare le feature assenti/parziali per milestone senza attendere un'altra approvazione. Non dichiarare feature parity finché ogni voce non è implementata e verificata. Licenza e disponibilità hardware sono proprietà da audit/documentare, non algoritmi da copiare.
