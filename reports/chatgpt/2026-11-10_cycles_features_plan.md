@@ -422,3 +422,286 @@ Non usare il solo tempo per campione come metrica: una tecnica può aumentare il
 6. Procedere poi con le milestone successive, aggiornando handoff e report senza sovrascrivere le note precedenti.
 
 **Importante:** questa specifica è una richiesta di implementazione completa, non una dichiarazione che le funzionalità siano già presenti o che i benchmark siano stati eseguiti. Nessuna delle cinque tecniche viene considerata implementata finché il codice, i test e i risultati non lo dimostrano.
+
+
+---
+
+# Estensione della roadmap — ulteriori tecniche Cycles richieste da Valerio (10/11/2026)
+
+Valerio ha chiesto di ampliare il mandato: non limitarsi alle cinque tecniche della prima richiesta, ma portare in ForgeRender anche le altre evoluzioni emerse dal confronto con Cycles. Questa sezione estende e integra il mandato precedente: **tutte le funzionalità elencate qui sotto devono essere studiate e, dove non già presenti in modo completo, implementate**.
+
+Le nuove aree sono:
+
+6. PMJ Sampling / campionamento a bassa discrepanza.
+7. Revisione e potenziamento dell'Adaptive Sampling già esistente.
+8. Importazione e rendering volumetrico OpenVDB/NanoVDB.
+9. Motion Blur fisicamente corretto.
+10. Shadow Catcher e Render Passes/AOV per compositing.
+11. Texture Cache con mip/tile streaming.
+
+Non considerare automaticamente assente una funzione: prima verificare il codice e i test attuali. Per ogni voce distinguere **già presente e validata**, **presente ma incompleta**, **assente**, **non verificata**. Evitare di duplicare sistemi già esistenti.
+
+## 6. PMJ Sampling e sequenze di campionamento
+
+### Che cos'è e perché conta
+
+PMJ significa Progressive Multi-Jittered. È una famiglia di sequenze di punti a bassa discrepanza progettate per distribuire meglio i campioni rispetto a numeri casuali indipendenti, mantenendo buone proprietà anche quando si osservano prefissi progressivi della sequenza.
+
+Nel path tracing i campioni non sono soltanto coordinate pixel: servono numeri casuali per posizione sul pixel, lente, tempo, scelta della luce, direzione BSDF, distanze volumetriche e altri eventi. Una sequenza di qualità può ridurre strutture di rumore e accelerare la convergenza, soprattutto a bassi e medi spp. Non garantisce un miglioramento in ogni scena e deve essere valutata con test statistici.
+
+Cycles documenta l'uso di Sobol e Progressive Multi-Jittered; l'Adaptive Sampling di Cycles è associato al sampler PMJ e al confronto fra due insiemi di campioni. Studiare la versione attuale del codice prima di decidere la sequenza definitiva.
+
+### Materiale da studiare
+
+- Manuale Cycles sampling: https://docs.blender.org/manual/en/latest/render/cycles/render_settings/sampling.html
+- Documentazione tecnica di Cycles: https://developer.blender.org/docs/features/cycles/optimization/
+- Sorgente Cycles sampler/kernel: https://github.com/blender/blender/tree/main/intern/cycles/kernel
+- Paper/risorse PMJ: *Progressive Multi-Jittered Sample Sequences* e lavori correlati di Christensen, Kensler e altri autori; verificare le pubblicazioni originali e le proprietà matematiche prima di implementare.
+
+### Cosa implementare in ForgeRender
+
+1. Fare audit del generatore RNG attuale CPU e GPU: dimensioni, seed, decorrelazione per pixel, sample index e dimensione del cammino.
+2. Separare in modo esplicito le dimensioni del campionamento: pixel, lens, time, light, BSDF, volume e dimensioni successive del path.
+3. Implementare PMJ progressivo con scrambling/rotazioni per pixel e seed, evitando pattern visibili e correlazioni fra pixel.
+4. Mantenere Sobol e il sampler attuale come alternative di riferimento; non sostituire il generatore prima dei benchmark.
+5. Garantire che l'accesso alle dimensioni sia stabile: l'aggiunta di una nuova dimensione di random non deve cambiare casualmente tutte le dimensioni precedenti.
+6. Progettare un'interfaccia comune CPU/GPU e verificare che WGSL riproduca le stesse proprietà statistiche, anche se non necessariamente gli stessi bit.
+7. Integrare PMJ con Light Tree, Path Guiding, NEE, MIS, volume tracking e motion blur: ogni scelta deve consumare la dimensione corretta e usare la PDF corretta.
+8. Rendere selezionabile il sampler nelle impostazioni avanzate e registrare sampler/seed nel metadata del render.
+
+### Test e accettazione
+
+- Test delle proprietà progressive e della distribuzione 2D; test su prefissi 16, 32, 64, 128, 256, 512, 1024 campioni.
+- Test di correlazione fra pixel vicini, pattern su immagini uniformi e distribuzione delle dimensioni.
+- Confronto RNG attuale, Sobol e PMJ su scene diffuse, glossy, DOF, motion blur e volumi.
+- Misurare MSE/RMSE rispetto a reference ad alto spp a pari spp e a pari tempo.
+- Accettare PMJ come default solo se mostra vantaggi ripetibili senza regressioni gravi. Non affermare che PMJ è sempre più veloce.
+
+## 7. Adaptive Sampling: revisione sostanziale del sistema esistente
+
+### Stato noto da non ignorare
+
+ForgeRender ha già un Adaptive Sampling a tile. Le note del repository riportano risultati molto diversi per scena: miglioramento su una scena con cielo, ma peggioramento su una scena cocktail con sfondo scuro, nebbia rada e scintille; alcuni tile raggiungono il limite di 1024 spp. La funzione è stata disattivata di default. Esiste quindi un sistema da migliorare, non una funzione da riscrivere alla cieca.
+
+### Perché è importante
+
+Il sampling uniforme assegna lo stesso numero di campioni a ogni pixel, anche quando alcune zone sono già pulite e altre sono ancora rumorose. L'Adaptive Sampling dovrebbe fermare o ridurre il lavoro nelle zone convergenti e concentrare i campioni dove servono. Se la stima dell'errore è sbagliata, però, può sprecare tempo o interrompere zone ancora rumorose.
+
+### Cosa studiare e implementare
+
+1. Ricostruire esattamente la stima di errore corrente su CPU e GPU, inclusi accumulatori, tile, vicinato, soglia e criterio di arresto.
+2. Studiare il metodo Cycles PMJ con due insiemi/passate di campioni per stimare il rumore; confrontarlo con stimatori basati su varianza/standard error per pixel.
+3. Separare rumore assoluto e relativo: le zone quasi nere non devono ricevere campioni eccessivi solo perché l'errore relativo è instabile.
+4. Gestire outlier e contributi rari, come scintille, fireflies, riflessi puntuali e caustiche; evitare che un singolo evento raro blocchi un intero tile.
+5. Valutare stima locale robusta, sottoblocchi 4×4, massimi/percentili e soglie combinate, senza introdurre bias.
+6. Usare PMJ come percorso preferenziale solo dopo averlo implementato e misurato.
+7. Verificare il bilanciamento CPU/GPU: le note passate indicano differenze nelle frazioni di campioni fra i due backend e una possibile sottostima dell'errore GPU.
+8. Evitare maschere di arresto troppo grossolane: un tile con una piccola zona difficile non deve costringere tutto il riquadro a campionare indefinitamente, ma nemmeno fermare la zona difficile.
+9. Definire min spp, max spp, noise threshold e limiti temporali con comportamento chiaro; il max spp deve essere una protezione, non un sostituto della convergenza.
+10. Implementare diagnostica opzionale che visualizzi sample count, errore stimato e maschera di arresto per individuare i tile problematici.
+11. Fare benchmark su RTX 5070 e Ryzen 9 9900X, non solo su CPU o GPU software.
+
+### Test e accettazione
+
+Usare almeno le scene benchmark già citate nel report di adaptive sampling, incluse cielo e cocktail con fumo/scintille, più interni, superfici scure e scene con contributi rari. Confrontare adaptive vs uniforme a pari tempo e a pari errore; verificare che l'immagine non abbia bias e che nessuna regione rimanga rumorosa per errore dello stimatore. Riportare il tempo totale, distribuzione spp, tile al max spp e qualità. Il nuovo adaptive diventa default soltanto dopo risultati positivi e ripetibili.
+
+## 8. OpenVDB e NanoVDB: volumi sparsi ad alta risoluzione
+
+### Che cosa sono e perché contano
+
+OpenVDB è un formato e una struttura dati per volumi sparsi: memorizza in modo efficiente regioni dove il campo volumetrico è attivo e non alloca una griglia densa uniforme per tutto lo spazio. È usato in VFX per density, temperature, velocity e altri campi di simulazioni.
+
+NanoVDB è una rappresentazione compatibile con l'uso GPU, progettata per rendere accessibili le strutture sparse con layout adatto a device e kernel. Il percorso tipico consiste nell'importare una griglia OpenVDB e convertirla o renderla disponibile come struttura NanoVDB per il rendering.
+
+Per ForgeRender è particolarmente importante: il sistema attuale ha volumi baked e simulazioni proprietarie. Importare VDB permetterebbe di usare fumo, fuoco, nebbia e simulazioni create in Houdini, Blender o altri software, senza doverle ricostruire nel motore. **Non convertire automaticamente una VDB sparsa in una griglia densa enorme**, perché si perderebbe proprio il vantaggio del formato.
+
+### Materiale da studiare
+
+- OpenVDB: https://www.openvdb.org/documentation/
+- Repository OpenVDB: https://github.com/AcademySoftwareFoundation/openvdb
+- NanoVDB: https://github.com/AcademySoftwareFoundation/openvdb/tree/master/nanovdb
+- Blender volume rendering: https://docs.blender.org/manual/en/latest/modeling/volumes/introduction.html
+- Cycles volume implementation: https://github.com/blender/blender/tree/main/intern/cycles/kernel
+
+### Cosa implementare
+
+1. Import di file .vdb e inventario delle griglie disponibili: density, temperature, flame, velocity e nomi personalizzati.
+2. Leggere metadata, transform, voxel size, bounding box, background value, grid class e tipo numerico.
+3. Supportare griglie float e i principali tipi utili; segnalare esplicitamente tipi non supportati.
+4. Mappare i campi importati su proprietà volumetriche ForgeRender senza distruggere o rinominare i dati originali.
+5. Supportare più griglie nello stesso file e selezione del campo per density/emission/temperature/velocity.
+6. Preservare trasformazione spaziale, unità, orientamento e scala voxel.
+7. Implementare sampling trilineare o il filtro appropriato per il tipo di dato; evitare aliasing e discontinuità.
+8. Integrare accelerazione sparse e skipping delle regioni vuote.
+9. Valutare NanoVDB per il percorso GPU; non obbligare la conversione se il backend CPU può leggere direttamente OpenVDB.
+10. Integrare la VDB con Null Scattering e i majorant: il majorant deve essere valido per ogni blocco sparse.
+11. Cache di conversione e metadata, con invalidazione basata su file, griglia, transform e versione del formato.
+12. Gestire sequenze VDB animate (file per frame o sequenza) e sincronizzazione con la timeline; in una prima fase può bastare l'import statico, ma la struttura dati deve non precludere l'animazione.
+13. Conservare i volumi/simulazioni proprietarie di ForgeRender: VDB è un nuovo formato di input, non una sostituzione del sistema esistente.
+
+### Test e accettazione
+
+- VDB omogenea, plume, smoke, fire, più griglie, griglia con transform non identity e file con ampie regioni vuote.
+- Verificare bounds, voxel size, interpolazione, mapping dei campi e conservazione dei metadata.
+- Test di memoria: confronto fra memoria sparse e conversione densa; evitare allocazioni esplosive.
+- Render CPU e GPU con Null Scattering, confrontando le medie e le transmittance.
+- Test di file mancanti/corrotti, griglie sconosciute e sequenze incomplete.
+- Accettazione: import affidabile e rendering corretto senza densificare inutilmente la griglia; documentare i limiti di griglie e metadata supportati.
+
+## 9. Motion Blur fisicamente corretto
+
+### Che cos'è e perché conta
+
+Il motion blur rappresenta l'integrazione del movimento durante l'intervallo di esposizione dell'otturatore. Non deve essere un semplice effetto di post-processing che sfoca l'immagine: camera e oggetti possono muoversi durante l'esposizione e i raggi devono interrogare la scena al tempo di campionamento.
+
+Un path tracer può campionare un tempo per ogni camera ray e valutare trasformazioni e geometria in quell'istante. Il risultato dipende da shutter open/close, rolling shutter se supportato, interpolazione della trasformazione e deformazione della mesh.
+
+### Materiale da studiare
+
+- Cycles motion blur: https://docs.blender.org/manual/en/latest/render/cycles/render_settings/motion_blur.html
+- Cycles source: https://github.com/blender/blender/tree/main/intern/cycles
+- Blender animation data: https://docs.blender.org/manual/en/latest/animation/index.html
+
+### Cosa implementare
+
+1. Audit della timeline ForgeRender: keyframe di trasformazioni, camera, oggetti, luci, effetti e geometria deformabile.
+2. Definire shutter open/close rispetto al frame corrente e una convenzione temporale documentata.
+3. Campionare il tempo per camera ray secondo la distribuzione dell'otturatore.
+4. Valutare trasformazioni di oggetti e camera al tempo del raggio, non soltanto al frame centrale.
+5. Iniziare con motion blur da trasformazioni rigide; successivamente valutare deformazioni vertex-level e istanze.
+6. Aggiornare intersection e BVH: usare bounds conservativi nel tempo, BVH refit o BVH a più tempi secondo la soluzione più efficiente.
+7. Gestire oggetti animati, camera in movimento, luci mobili e volumi animati.
+8. Garantire che la stessa scena senza movimento o con shutter chiuso produca il risultato precedente.
+9. Integrare motion blur con adaptive sampling, PMJ, wavefront e temporal sampling.
+10. Prevedere impostazioni shutter e campionamento comprensibili, senza confondere il motion blur con il frame rate della timeline.
+
+### Test e accettazione
+
+- Oggetto che trasla, ruota e accelera; camera in movimento; oggetto che attraversa una luce; oggetto fermo.
+- Confronto con integrazione temporale ad alta numerosità.
+- Verificare continuità fra frame animati e corretta esposizione.
+- Misurare costo di valutazione temporale e aggiornamento BVH.
+- Accettazione: blur derivato dal tempo di esposizione, silhouette plausibili e nessuna sfocatura artificiale applicata indiscriminatamente in post.
+
+## 10. Shadow Catcher e Render Passes/AOV
+
+### Che cosa sono e perché contano
+
+Uno Shadow Catcher è una superficie che non deve apparire come un normale oggetto opaco nel risultato finale, ma deve ricevere le ombre e le interazioni luminose degli oggetti sovrapposti. È fondamentale per integrare un oggetto renderizzato in una fotografia reale: si rende il prodotto e si conserva il contributo d'ombra sul piano fotografico.
+
+I Render Passes/AOV separano il risultato in componenti: Combined, diffuse direct/indirect, glossy direct/indirect, transmission, emission, environment, volume, normal, albedo, depth/Z, object/material ID e altri dati utili. Non tutti i pass devono essere implementati subito: progettare un sistema estensibile e documentare esattamente la semantica di ogni pass.
+
+### Materiale da studiare
+
+- Blender render passes: https://docs.blender.org/manual/en/latest/render/layers/passes.html
+- Blender shadow catcher: https://docs.blender.org/manual/en/latest/render/cycles/object_settings/object_data.html
+- Cycles implementation: https://github.com/blender/blender/tree/main/intern/cycles/kernel
+- Blender compositing: https://docs.blender.org/manual/en/latest/compositing/index.html
+
+### Cosa implementare
+
+1. Definire un sistema di output multi-pass/AOV nel renderer, senza duplicare il path tracer per ogni pass.
+2. Identificare e accumulare separatamente contributi direct/indirect, diffuse/glossy/transmission/emission/volume dove l'integrator li distingue realmente.
+3. Aggiungere almeno Combined, Albedo, Normal, Depth/Z, Emission e Object ID come prima tranche.
+4. Aggiungere pass direct/indirect e categorie BSDF quando le informazioni sono disponibili senza ambiguità.
+5. Salvare pass in EXR multichannel o file separati, mantenendo precisione floating point e metadata di camera/color management.
+6. Implementare Shadow Catcher con un modello di compositing fisicamente coerente: alpha, shadow contribution e illuminazione indiretta devono essere definite e testate; non limitarsi a colorare il piano di nero.
+7. Gestire oggetti catcher multipli e materiali trasparenti, se supportati.
+8. Esporre l'opzione per oggetto e un'interfaccia chiara nell'Inspector.
+9. Progettare il sistema affinché plugin/MCP e futuri AOV personalizzati possano aggiungere output senza riscrivere l'integrator.
+10. Integrare con il denoiser: decidere quali pass sono guide, quali vengono denoised e quali devono restare raw; non denoisare indiscriminatamente ID/depth.
+11. Conservare i pass nei render animati e nei video/EXR sequence.
+
+### Test e accettazione
+
+- Oggetto su piano catcher con luce area, environment, luce indiretta e ombre morbide.
+- Compositing su sfondo fotografico e alpha corretto.
+- Verificare che Combined sia coerente con la somma dei pass secondo la semantica dichiarata.
+- Test EXR con precisione, canali, alpha e metadata.
+- Verificare che denoising delle guide non corrompa pass numerici.
+- Accettazione: integrazione convincente in fotografia e pass utilizzabili in un compositor, non semplici immagini diagnostiche.
+
+## 11. Texture Cache, mipmapping e tile streaming
+
+### Che cos'è e perché conta
+
+In scene con molte texture ad alta risoluzione, il costo non è soltanto il calcolo dello shader: sono importanti caricamento, decodifica, memoria RAM/VRAM, trasferimento CPU→GPU e accessi casuali durante il rendering. Una texture cache gestisce dati già decodificati, mipmap e caricamento progressivo dei soli tile/resolution necessari.
+
+Il mipmapping riduce aliasing e può diminuire la quantità di dati letti quando una texture occupa pochi pixel sullo schermo. Il tile streaming evita di tenere in memoria l'intera immagine quando è possibile caricare solo le regioni richieste. La cache deve essere misurata: può ridurre memoria e startup, ma può introdurre overhead, I/O e thrashing se dimensionata male.
+
+### Materiale da studiare
+
+- Cycles texture system: https://github.com/blender/blender/tree/main/intern/cycles/kernel
+- Cycles image/texture management: https://github.com/blender/blender/tree/main/intern/cycles/scene
+- Blender image texture documentation: https://docs.blender.org/manual/en/latest/render/shader_nodes/textures/image.html
+- OpenImageIO (riferimento per tiled images e mipmaps): https://openimageio.readthedocs.io/
+
+### Cosa implementare
+
+1. Audit del loader texture ForgeRender, formati supportati, decoder, cache attuale, gestione EXR/HDR e upload GPU.
+2. Evitare caricamenti e decodifiche ripetute della stessa texture; cache condivisa con chiavi canoniche e metadata completi.
+3. Separare texture color (sRGB) da texture data (linear): roughness, metallic, normal, displacement, masks e volume data non devono essere gamma-corrected come albedo.
+4. Generare o caricare mipmap con filtri appropriati; per normal map usare un filtro che preservi la direzione, non una media RGB ingenua.
+5. Usare mip level in base al footprint del raggio/derivate UV, se disponibili nel renderer, per ridurre aliasing e accessi ad alta risoluzione non necessari.
+6. Valutare tiled texture e caricamento parziale per immagini molto grandi, con cache CPU e GPU.
+7. Implementare budget RAM/VRAM e politiche LRU o equivalenti; monitorare eviction e cache hit/miss.
+8. Evitare che la cache mantenga riferimenti a file sostituiti o materiali cancellati; usare invalidazione robusta.
+9. Condividere texture fra materiali e istanze quando la sorgente e la semantica coincidono.
+10. Supportare EXR/HDR ad alta precisione nei canali dove serve, specialmente displacement e mappe numeriche.
+11. Integrare la cache con la libreria materiali, importer Poly Haven/ambientCG, progetti .frproject e texture esterne.
+12. Esporre statistiche diagnostiche: memoria cache, VRAM stimata, hit rate, miss, upload e tempo decodifica.
+13. Implementare fallback per formati non tiled o texture non caricabili in streaming.
+
+### Test e accettazione
+
+- Scene con poche texture piccole, molte texture 4K/8K, texture ripetute, atlanti e immagini tiled.
+- Misurare tempo di apertura scena, tempo al primo render, RAM, VRAM, upload, hit rate e tempo render.
+- Verificare mipmapping e aliasing su texture ad alta frequenza e normal map.
+- Test di invalidazione dopo modifica file, reload e cambio materiale.
+- Accettazione: minore memoria o startup più rapido su scene texture-heavy senza differenze visive scorrette; nessun thrashing evidente e fallback stabile.
+
+---
+
+# Nuova roadmap complessiva e priorità
+
+La roadmap comprende ora **undici aree**: le cinque iniziali più sei estensioni. Alcune sono algoritmi nuovi, altre revisioni di sistemi esistenti.
+
+| Priorità | Area | Beneficio prevalente | Dipendenze/nota |
+|---|---|---|---|
+| P0 | Audit + benchmark baseline | Misurabilità e prevenzione regressioni | Prima di ogni modifica |
+| P1 | Light Tree | Meno rumore/tempo in scene con molte luci | NEE + MIS |
+| P1 | PMJ Sampling | Convergenza migliore a bassi/medi spp | RNG CPU/GPU |
+| P1 | Adaptive Sampling revisionato | Riduzione campioni sprecati | PMJ e stimatore robusto |
+| P1 | Null Scattering | Correttezza volumetrica e niente bias da step | Majorant e volume system |
+| P1 | Texture Cache/mipmap | Memoria, startup e accessi texture | Texture loader/upload |
+| P2 | Wavefront GPU | Throughput GPU in scene complesse | Queue e PathState |
+| P2 | Path Guiding | Meno rumore nell'illuminazione indiretta | PDF/MIS e training |
+| P2 | OpenVDB/NanoVDB | Nuovi volumi e pipeline VFX | Importer + Null Scattering |
+| P2 | Adaptive Subdivision + displacement | Dettaglio geometrico e silhouette | Tessellazione + BVH |
+| P3 | Motion Blur fisico | Animazioni e riprese realistiche | Timeline + BVH temporale |
+| P3 | Shadow Catcher + Passes/AOV | Compositing professionale | Integrator output + EXR |
+
+Le priorità non sono un permesso per saltare le altre: tutte le aree sono richieste. Possono essere riordinate se l'audit dimostra dipendenze o rischi tecnici, ma la motivazione va registrata.
+
+## Indicazioni di implementazione aggiuntive
+
+- PMJ e Adaptive Sampling devono essere progettati insieme, perché la qualità della stima adattiva dipende anche dalla struttura dei campioni.
+- Light Tree, Path Guiding e PMJ devono condividere un contratto rigoroso per PDF e MIS.
+- Null Scattering e OpenVDB/NanoVDB devono essere integrati come un unico percorso volumetrico coerente, mantenendo i volumi nativi ForgeRender.
+- Wavefront deve supportare progressivamente volumi, shadow rays e guiding; non dichiarare completo il wavefront se gestisce solo il caso diffuse base.
+- Texture Cache è trasversale: va progettata prima di introdurre displacement ad alta risoluzione e grandi scene VDB, ma non deve bloccare le altre milestone.
+- Motion Blur richiede una valutazione del costo BVH temporale e del sistema timeline.
+- Shadow Catcher e AOV vanno progettati insieme all'output EXR e al denoiser, per evitare di dover rifare il formato di output.
+- Adaptive Subdivision deve essere misurata anche in termini di preprocessing: non basta ridurre i triangoli se la tessellazione costa più del rendering risparmiato.
+
+## Nuova istruzione operativa a Claude
+
+1. Aggiornare l'audit: per ciascuna delle undici aree riportare lo stato reale del codice ForgeRender (presente, parziale, assente, non verificato) e link ai file.
+2. Non duplicare PMJ/adaptive sampling, texture cache, motion blur, AOV o funzioni che il codice già implementa parzialmente.
+3. Integrare la roadmap completa nel piano di lavoro e nei report, mantenendo milestone indipendenti.
+4. Registrare benchmark baseline specifici per le aree che promettono accelerazioni: Light Tree, PMJ, Adaptive Sampling, Wavefront e Texture Cache. Per le altre misurare qualità, memoria e costi.
+5. Procedere all'implementazione di tutte le aree, senza attendere un'altra approvazione. Per le aree più ampie consegnare prima una versione minima end-to-end e poi estenderla.
+6. Ogni feature deve avere test di correttezza, test statistici ove applicabili, benchmark e fallback.
+7. Aggiornare la risposta di Claude nel handoff con una tabella di stato che distingua completato, parziale, in corso e non iniziato.
+
+**Chiarimento:** questa estensione è una richiesta esplicita di Valerio. Le undici aree sono il target della roadmap; non significa che tutte siano mancanti o che siano già state implementate. Lo stato effettivo va stabilito leggendo il codice e i test correnti.
