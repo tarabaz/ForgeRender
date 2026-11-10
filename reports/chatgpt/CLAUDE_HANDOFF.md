@@ -3088,3 +3088,30 @@ Valerio ha esteso la richiesta: oltre alle cinque tecniche iniziali, vuole studi
 **Mandato aggiornato:** tutte le undici aree fanno parte del target richiesto. Implementarle per milestone separate, con benchmark baseline, test e fallback. Misurare separatamente velocità, qualità e memoria: non presentare ogni feature come accelerazione universale. La prima fase resta audit completo e benchmark; poi implementare senza attendere un'ulteriore approvazione. Aggiornare questo handoff con una tabella di stato per tutte le aree.
 
 **Commit dell'estensione del piano:** `1520eee1b4c7e3ac513fc7ec14ce4ea7721c3862` sul branch `sviluppo`. Nessuna di queste nuove aree è stata implementata da questa modifica documentale.
+
+
+## Inventario ufficiale delle feature Cycles — estensione parity audit (10/11/2026)
+
+Valerio ha fornito l'elenco completo delle feature dichiarate sul sito Blender Cycles. La specifica `reports/chatgpt/2026-11-10_cycles_features_plan.md` è stata estesa con un audit e una roadmap per tutte le categorie: Core, Interactivity, Layers & Passes, Geometry, Subdivision/Displacement, Camera, Shading, Volumes, Lighting, Textures e Cross Platform.
+
+Oltre alle undici aree già richieste, il nuovo audit comprende esplicitamente:
+- unidirectional path tracing + MIS e coerenza architetturale CPU/GPU;
+- dependency graph/dirty flags e aggiornamenti interattivi incrementali;
+- tiled/progressive rendering;
+- Render Layers, Holdout Mattes, Cryptomatte interoperabile e completamento denoising (OIDN già presente);
+- curve, point clouds, instancing;
+- multi-core BVH build e fast BVH refit;
+- Catmull–Clark e linear subdivision;
+- camere panoramic/fisheye, stereoscopic e depth of field;
+- node-based shaders/lights, Principled BSDF e valutazione OSL CPU;
+- Principled Volume e Subsurface Scattering;
+- Sky Model, Light Portals e Manifold NEE;
+- image/environment/procedural textures, coordinate mapping e normal/bump;
+- matrice cross-platform Windows/Linux/macOS e NVIDIA/AMD/Intel/Apple Silicon;
+- audit licenze e dipendenze.
+
+**Deliverable obbligatorio:** produrre un "Cycles Feature Parity Audit" con una riga per ogni feature, stato ForgeRender (presente verificata/parziale/assente/non verificata), file e test che provano lo stato, gap, beneficio, complessità, dipendenze, milestone e criteri di accettazione. Non dedurre la presenza da UI o README. Non duplicare sistemi già esistenti. La licenza e la disponibilità hardware sono da verificare/documentare, non codice da copiare.
+
+Dopo l'audit procedere all'implementazione delle feature assenti/parziali, senza attendere altra approvazione. Nessuna dichiarazione di feature parity senza test e verifica reali.
+
+**Commit specifica completa:** `208c813d7fe1d3b205dc650ae24cd13a6a16a53d` sul branch `sviluppo`. Solo documentazione aggiornata; nessuna feature del renderer è stata implementata da questo commit.
