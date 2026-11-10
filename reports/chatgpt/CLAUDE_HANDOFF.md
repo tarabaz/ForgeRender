@@ -3046,3 +3046,20 @@ Due righe in alto (modalità e Impostazioni a destra, comandi del render a destr
 **Non verificato:** luccichio delle scaglie in animazione; alcune misure della griglia e la vista ortografica nel programma; icona (file assente).
 
 **Icona (0.53.0):** `assets/forgerender.ico` nelle risorse di `forgerender.exe` (`build.rs`), sulla finestra (`main.rs`) e nell'installer (`SetupIconFile`). Verificata dall'eseguibile e dalla finestra; installer non compilato.
+
+
+## Richiesta di Valerio — 10/11/2026: integrazione delle tecniche avanzate di Cycles
+
+Valerio ha richiesto lo studio e l'implementazione completa in ForgeRender di cinque tecniche ispirate a Blender Cycles:
+
+1. Light Tree
+2. Path Guiding
+3. Null Scattering per i volumi
+4. Wavefront Path Tracing GPU
+5. Adaptive Subdivision e displacement geometrico reale
+
+**Specifiche operative complete:** [`reports/chatgpt/2026-11-10_cycles_features_plan.md`](2026-11-10_cycles_features_plan.md). Il documento contiene i link al repository e alla documentazione/sorgente Cycles, i concetti da studiare, requisiti d'implementazione per ogni tecnica, interazioni fra algoritmi, test, benchmark, ordine delle milestone e deliverable.
+
+**Mandato:** implementare tutte e cinque le funzionalità in milestone separate, senza una riscrittura monolitica. La prima azione è verificare HEAD e fare audit del codice reale ForgeRender, fissare benchmark baseline e iniziare Light Tree. Procedere poi con le milestone successive senza attendere un'altra approvazione. Lavorare su `sviluppo` o branch dedicato, mai direttamente su `main`.
+
+**Stato al momento della richiesta:** documento di specifica committato su `sviluppo`; nessuna delle cinque funzionalità è stata implementata da questa richiesta e nessun nuovo benchmark/test del motore è stato eseguito. Claude deve registrare ogni implementazione, test, misura e limite in report separati, senza presentare le proposte come risultati verificati.
